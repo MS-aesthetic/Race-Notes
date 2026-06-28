@@ -78,9 +78,71 @@ The UI is built with a custom "Motorsport Telemetry" dark-theme design system.
 
 ---
 
-## 7. Future Development Considerations
+## 7. Cloud Sync & Auth (Phase 2)
 
-1. **State Management Scaling**: If the app grows to include more views, migrating from `App.tsx` state passing to React Context or a lightweight store like Zustand might be necessary to avoid prop-drilling.
-2. **Cloud Sync**: Currently, data is limited to device `localStorage`. Implementing Firebase or Supabase to sync data across devices (e.g., driver's phone and crew chief's iPad) would be a highly valuable feature.
-3. **Data Export**: Ensure `ExportView` can generate standardized PDFs or CSVs for offline archiving.
-4. **Routing**: As the application grows, introducing `react-router` could allow users to bookmark specific setups or sessions. Ensure `netlify.toml` redirection remains intact if client-side routing is added.
+The application integrates **Supabase** for cloud persistence and user authentication, enabling multi-device sync and team-based collaboration while maintaining a **local-first offline architecture**.
+
+### Authentication (`src/lib/supabase.ts`)
+- **Client Setup**: Supabase client initialized with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from environment variables.
+- **Auth Helpers**:
+  - `signUp(email, password, displayName)`: Register new users and auto-create a profile row.
+  - `signIn(email, password)`: Session-based authentication with auto-refresh tokens.
+  - `signOut()`: Revoke session.
+  - `onAuthChange(callback)`: Real-time auth state listener for login/logout events.
+  - `fetchProfile(userId)`, `searchProfiles(query)`: Fetch user metadata for sharing workflows.
+
+### Local-First Sync Engine (`src/lib/sync.ts`)
+The sync strategy prioritizes offline-first resilience:
+1. **Always write to `localStorage`** first (works offline).
+2. **Debounce push to Supabase** (500ms debounce) when authenticated and online.
+3. **Pull on login**: Merge cloud data with localStorage using `updated_at` timestamps (newer wins).
+
+**Push Functions**:
+- `pushSetups(setups, userId)`: Sync `Setup` configurations.
+- `pushWeekends(weekends, userId)`: Sync `RaceWeekend` race logs.
+- `pushActiveSession(session, userId)`: Persist live session state.
+- `pushTodos(todos, userId)`: Persist To-Do checklists state.
+
+**Pull Functions**:
+- `pullAllData(userId)`: Fetch all cloud data and merge conflict resolution via timestamps. (Due to team RLS, omitting explicit `user_id` query filters allows downloading team data).
+- `pullTodos()`: Fetch To-Do checklists state.
+
+### Database Schema (`supabase/migrations/`)
+
+**1. Profiles** (`profiles` table)
+- Stores public user metadata: `display_name`, `avatar_url`, email.
+- Auto-created on signup via `handle_new_user()` trigger.
+
+**2. Setups** (`setups` table)
+- Persists `Setup` objects: `chassis`, `track`, `date` with `lf`/`rf`/`lr`/`rr` JSONB configurations.
+
+**3. Race Weekends** (`race_weekends` table)
+- Stores grouped race sessions: `name`, `track`, `date`, `sessions` (JSONB array of `SessionRecord`s).
+
+**4. Active Sessions** (`active_sessions` table)
+- One row per user (`id = "active-${userId}"`) storing the current live session state for crew coordination.
+
+**5. Todos** (`todos` table)
+- To-Do lists checklists state (`items` stored as JSONB).
+
+---
+
+## 8. Teams & To-Do Lists (Phase 3)
+
+The application supports **team-based workflows** where multiple crew members collaborate on vehicle setup and strategy seamlessly via Row Level Security (RLS) conditions in the cloud.
+
+### Team Architecture
+**Team-Based Access Model**:
+- **`teams` table**: Stores team metadata (`name`, `created_at`).
+- **`team_members` table**: Maps users to teams with roles (`owner`, `member`).
+- **RLS Function `in_same_team(user_a, user_b)`**: Returns true if both users belong to any common team; used in policies to enable cross-user data visibility within a team.
+
+### Team Permissions via RLS
+- **Setups/Weekends/Sessions/Todos**: Any member in the same team as the owner (`user_id`) can `SELECT` and `UPDATE` records automatically. 
+- Because all users operating in the same team fetch each other's data (the `sync.ts` pull commands are simply `.select('*')` reliant on RLS masking), the application inherently shares and modifies everything mutually without special buttons tracking individual entity "shares". 
+
+### Manage Team UI
+- Replaces individual "Share Setup/Session" buttons with an overall `TeamView` nested inside `Account` (`AuthView.tsx`). 
+- Creates a Team automatically with you as the owner.
+- Sends instant email requests to invite other members to the Team.
+- Automatically syncs the app to anyone mapped natively via Supabase Postgres policies.

@@ -1,14 +1,33 @@
-import { useState } from 'react';
-import { Setup, ActiveSession } from '../types';
+import { useState, useEffect } from 'react';
+import { Setup, ActiveSession, RaceWeekend } from '../types';
+import { User } from '@supabase/supabase-js';
+import { pullSharedData } from '../lib/sync';
 
 interface ExportViewProps {
+  user?: User | null;
   setup: Setup;
   activeSession: ActiveSession;
+  onImportSetup?: (setup: Setup) => void;
+  onImportWeekend?: (weekend: RaceWeekend) => void;
 }
 
-export default function ExportView({ setup, activeSession }: ExportViewProps) {
+export default function ExportView({ user = null, setup, activeSession, onImportSetup, onImportWeekend }: ExportViewProps) {
   const [cloudSync, setCloudSync] = useState(true);
-  
+  const [sharedSetups, setSharedSetups] = useState<Setup[]>([]);
+  const [sharedWeekends, setSharedWeekends] = useState<RaceWeekend[]>([]);
+  const [loadingShared, setLoadingShared] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setLoadingShared(true);
+      pullSharedData(user.id).then((res) => {
+        setSharedSetups(res.sharedSetups);
+        setSharedWeekends(res.sharedWeekends);
+        setLoadingShared(false);
+      });
+    }
+  }, [user]);
+
   // Selection checklist state
   const [items, setItems] = useState([
     { id: '1', title: activeSession.name ? `Active Session (${activeSession.name})` : 'Active Session', subtitle: `${activeSession.name || 'Not Named'} - ${setup.carType || 'No Class Specified'}`, checked: true, icon: 'timer' },
@@ -66,7 +85,7 @@ export default function ExportView({ setup, activeSession }: ExportViewProps) {
             <div class="meta">
               <div>Export date: ${new Date().toLocaleDateString()}</div>
               <div>Vehicle type: ${setup.carType}</div>
-              <div>Team Drive: connected [Team_Drive_01]</div>
+              <div>Cloud Sync: Race Notes</div>
             </div>
           </div>
 
@@ -98,31 +117,23 @@ export default function ExportView({ setup, activeSession }: ExportViewProps) {
                     <th style="padding:4px; font-size:11px;">Tire ID</th>
                     <th style="padding:4px; font-size:11px;">Compound</th>
                     <th style="padding:4px; font-size:11px;">Size</th>
-                    <th style="padding:4px; font-size:11px;">Durom.</th>
                     <th style="padding:4px; font-size:11px;">Air Press.</th>
-                    <th style="padding:4px; font-size:11px;">Back Sp.</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${(['lf', 'rf', 'lr', 'rr'] as const).map(k => {
                     const t = (activeSession.tires?.[k]) || {
-                      tireId: '-',
                       compound: '-',
                       size: '-',
-                      durometer: '-',
                       airPressure: activeSession.pressures?.[k] || '-',
-                      backSpacing: '-',
                     };
                     const label = k === 'lf' ? 'Left Front' : k === 'rf' ? 'Right Front' : k === 'lr' ? 'Left Rear' : 'Right Rear';
                     return `
                       <tr style="border-bottom: 1px solid #eee;">
                         <td style="padding:4px; font-weight:bold;">${label} (${k.toUpperCase()})</td>
-                        <td style="padding:4px;">${t.tireId || '-'}</td>
                         <td style="padding:4px;">${t.compound || '-'}</td>
                         <td style="padding:4px;">${t.size || '-'}</td>
-                        <td style="padding:4px;">${t.durometer || '-'}</td>
                         <td style="padding:4px; font-weight:bold; color:#ba1a20;">${t.airPressure || '-'}</td>
-                        <td style="padding:4px;">${t.backSpacing || '-'}</td>
                       </tr>
                     `;
                   }).join('')}
@@ -215,7 +226,7 @@ export default function ExportView({ setup, activeSession }: ExportViewProps) {
               <div className="flex items-center gap-2 bg-surface-container p-3 border border-outline-variant animate-fade-in">
                 <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse status-glow-green"></span>
                 <span className="font-label-sm text-xs uppercase text-on-surface-variant font-mono tracking-wider">
-                  Connected: Team_Drive_01
+                  Cloud Sync Active
                 </span>
               </div>
             ) : (
@@ -332,6 +343,80 @@ export default function ExportView({ setup, activeSession }: ExportViewProps) {
             Export to PDF Report
           </button>
         </div>
+      </div>
+
+      {/* Shared With Me Section */}
+      <div className="mt-8 pt-8 border-t border-outline-variant">
+        <h2 className="font-display text-xl uppercase font-bold text-on-surface mb-4">
+          Shared With Me
+        </h2>
+        {loadingShared ? (
+          <p className="text-on-surface-variant font-mono text-sm">Loading shared items...</p>
+        ) : (!user ? (
+          <p className="text-on-surface-variant font-mono text-sm">Log in to see items shared with you.</p>
+        ) : (sharedSetups.length === 0 && sharedWeekends.length === 0) ? (
+          <p className="text-on-surface-variant font-mono text-sm">No shared items found.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* Shared Setups */}
+            <div className="flex flex-col gap-3">
+              <h3 className="font-label-md text-sm font-bold uppercase tracking-wider text-on-surface flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-base">settings_input_component</span>
+                Setups
+              </h3>
+              {sharedSetups.length === 0 && (
+                <div className="p-4 border border-outline-variant/30 rounded bg-surface-container/20 text-xs text-on-surface-variant italic">
+                  No setups shared with you yet.
+                </div>
+              )}
+              {sharedSetups.map(s => (
+                <div key={s.id} className="p-4 border border-outline-variant bg-surface-container rounded flex justify-between items-center">
+                  <div>
+                    <p className="font-bold text-sm text-on-surface uppercase">{s.chassis}</p>
+                    <p className="font-mono text-[10px] text-on-surface-variant mt-0.5">{s.carType} • {s.track}</p>
+                  </div>
+                  <button
+                    onClick={() => onImportSetup?.(s)}
+                    className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded font-mono text-[10px] font-bold uppercase transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">download</span>
+                    Import
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Shared Weekends */}
+            <div className="flex flex-col gap-3">
+              <h3 className="font-label-md text-sm font-bold uppercase tracking-wider text-on-surface flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-base">calendar_today</span>
+                Race Weekends
+              </h3>
+              {sharedWeekends.length === 0 && (
+                <div className="p-4 border border-outline-variant/30 rounded bg-surface-container/20 text-xs text-on-surface-variant italic">
+                  No race weekends shared with you yet.
+                </div>
+              )}
+              {sharedWeekends.map(w => (
+                <div key={w.id} className="p-4 border border-outline-variant bg-surface-container rounded flex justify-between items-center">
+                  <div>
+                    <p className="font-bold text-sm text-on-surface uppercase">{w.name}</p>
+                    <p className="font-mono text-[10px] text-on-surface-variant mt-0.5">{w.track} • {w.sessions?.length || 0} Sessions</p>
+                  </div>
+                  <button
+                    onClick={() => onImportWeekend?.(w)}
+                    className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded font-mono text-[10px] font-bold uppercase transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">download</span>
+                    Import
+                  </button>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        ))}
       </div>
     </div>
   );

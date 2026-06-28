@@ -54,12 +54,10 @@ export const INITIAL_SETUP: Setup = {
     botBarHBird: '',
     bottomBarAngle: '',
     droop: '',
+    preload: '',
     tireComp: '',
     tireSize: '',
     stagger: '',
-    rearGear: '',
-    pullBarHole: '',
-    pullBarAngle: '',
     tirePress: '',
   },
   rr: {
@@ -75,13 +73,10 @@ export const INITIAL_SETUP: Setup = {
     botBarHFrame: '',
     botBarHBird: '',
     bottomBarAngle: '',
-    droop: '',
+    preload: '',
     tireComp: '',
     tireSize: '',
     stagger: '',
-    rearGear: '',
-    pullBarHole: '',
-    pullBarAngle: '',
     tirePress: '',
   }
 };
@@ -116,10 +111,10 @@ export const INITIAL_ACTIVE_SESSION: ActiveSession = {
   },
   adjustments: [],
   tires: {
-    lf: { tireId: '', compound: '', size: '', durometer: '', airPressure: '', backSpacing: '' },
-    rf: { tireId: '', compound: '', size: '', durometer: '', airPressure: '', backSpacing: '' },
-    lr: { tireId: '', compound: '', size: '', durometer: '', airPressure: '', backSpacing: '' },
-    rr: { tireId: '', compound: '', size: '', durometer: '', airPressure: '', backSpacing: '' }
+    lf: { compound: '', size: '', airPressure: '' },
+    rf: { compound: '', size: '', airPressure: '' },
+    lr: { compound: '', size: '', airPressure: '' },
+    rr: { compound: '', size: '', airPressure: '' }
   },
   pressures: {
     lf: '',
@@ -128,5 +123,18 @@ export const INITIAL_ACTIVE_SESSION: ActiveSession = {
     rr: '',
   },
   competitionNotes: '',
+};
+
+export const INITIAL_TODOS: import('./types').Todo[] = [];
+
+export const INITIAL_TEAMS: import('./types').Team[] = [];
+
+export const INITIAL_TEAM_MEMBERS: import('./types').TeamMember[] = [];
+
+export const INITIAL_TODO_ITEM: import('./types').TodoItem = {
+  id: '',
+  text: '',
+  desc: '',
+  done: false,
 };
 

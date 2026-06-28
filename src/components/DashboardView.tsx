@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
-import { Setup, SessionRecord, RaceWeekend } from '../types';
+import { Setup, SessionRecord, RaceWeekend, Team } from '../types';
 
 interface DashboardViewProps {
   setup: Setup;
   weekends: RaceWeekend[];
+  team: Team | null;
   onStartNewWeekend: () => void;
   onStartNewSession: () => void;
-  onEditSetup: () => void;
   onSelectSession: (session: SessionRecord) => void;
+  onEditSetup?: () => void;
 }
 
 export default function DashboardView({
   setup,
   weekends,
+  team,
   onStartNewWeekend,
   onStartNewSession,
-  onEditSetup,
   onSelectSession,
 }: DashboardViewProps) {
   // Use mockup tire readings or the custom modified values
@@ -32,11 +33,39 @@ export default function DashboardView({
 
   return (
     <div className="space-y-6" id="dashboard-view-root">
-      
+      {/* TEAM BANNER */}
+      {team && (
+        <section id="section-team-banner">
+          <div className="bg-surface-container-high border border-outline-variant rounded-lg p-6 relative overflow-hidden">
+            <div className="absolute right-0 top-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-16 -mt-16 pointer-events-none"></div>
+            
+            {team.banner_url && (
+              <img
+                src={team.banner_url}
+                alt={team.name}
+                className="absolute inset-0 w-full h-full object-cover opacity-10 pointer-events-none"
+              />
+            )}
+            
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></span>
+                <span className="font-label-sm text-label-sm text-primary uppercase tracking-wider">
+                  Team
+                </span>
+              </div>
+              <h2 className="font-display-lg text-2xl sm:text-3xl text-on-surface font-bold tracking-tight uppercase">
+                {team.name}
+              </h2>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* RACEDAY WEEKENDS & SESSIONS ACCORDION LOG */}
       <section id="section-recent-sessions">
         <h2 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-2">
-          Race Weekends & sessions Log
+          Race Weekends & Sessions Log
         </h2>
 
         {weekends.length === 0 ? (
@@ -92,7 +121,7 @@ export default function DashboardView({
                           No sessions logged for this weekend yet.
                         </div>
                       ) : (
-                        weekend.sessions.map((s, idx) => (
+                        weekend.sessions.map((s) => (
                           <div
                             key={s.id}
                             onClick={() => onSelectSession(s)}

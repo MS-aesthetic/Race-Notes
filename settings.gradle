@@ -1,0 +1,22 @@
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+rootProject.name = 'Race-Notes'
+
+include ':app'
+project(':app').projectDir = file('android/app')
+
+include ':capacitor-android'
+project(':capacitor-android').projectDir = file('node_modules/@capacitor/android/capacitor')
+
+include ':capacitor-cordova-android-plugins'
+project(':capacitor-cordova-android-plugins').projectDir = file('android/capacitor-cordova-android-plugins')
+
+include ':capacitor-filesystem'
+project(':capacitor-filesystem').projectDir = file('node_modules/@capacitor/filesystem/android')
+
+include ':capacitor-share'
+project(':capacitor-share').projectDir = file('node_modules/@capacitor/share/android')
+
+include ':capacitor-splash-screen'
+project(':capacitor-splash-screen').projectDir = file('node_modules/@capacitor/splash-screen/android')

@@ -36,10 +36,9 @@ export interface CornerSetup {
   bottomBarAngleUnit?: string;
   droop?: string;
   droopUnit?: string;
-  rearGear?: string;
-  pullBarHole?: string;
-  pullBarAngle?: string;
-  pullBarAngleUnit?: string;
+  preload?: string;
+  preloadUnit?: string;
+  boundGraphId?: string;
 }
 
 export interface Setup {
@@ -61,12 +60,9 @@ export interface Setup {
 }
 
 export interface TireDetails {
-  tireId: string;
   compound: string;
   size: string;
-  durometer: string;
   airPressure: string;
-  backSpacing: string;
 }
 
 export interface SessionRecord {
@@ -164,3 +160,33 @@ export interface ActiveSession {
   competitionNotes: string;
   screenshots?: string[];
 }
+
+export interface TodoItem {
+  id: string;
+  text: string;
+  desc?: string;
+  done: boolean;
+}
+
+export interface Todo {
+  id: string;
+  user_id: string;
+  title: string;
+  items: TodoItem[];
+  is_template?: boolean;
+  updated_at: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  banner_url?: string;
+  created_at: string;
+}
+
+export interface TeamMember {
+  team_id: string;
+  user_id: string;
+  role: 'owner' | 'member';
+}
+

@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Setup, CornerSetup } from '../types';
+import { INITIAL_SETUP } from '../data';
+
+import { User } from '@supabase/supabase-js';
 
 interface SetupViewProps {
   savedSetups: Setup[];
@@ -62,8 +65,8 @@ export default function SetupView({
   const handleAddNewSetup = (e: React.FormEvent) => {
     e.preventDefault();
     const name = newSetupName.trim() || `Setup #${setups.length + 1}`;
-    // Find active setup to clone from, or fallback to first
-    const activeSetup = setups.find((s) => s.id === activeId) || setups[0];
+    // Find active setup to clone from, fallback to first, then blank template
+    const activeSetup = setups.find((s) => s.id === activeId) || setups[0] || INITIAL_SETUP;
     
     const newSetup: Setup = {
       ...JSON.parse(JSON.stringify(activeSetup)),
@@ -75,7 +78,9 @@ export default function SetupView({
     const updated = [newSetup, ...setups]; // Prepend at the TOP!
     setExpandedId(newSetup.id);
     setNewSetupName('');
-    updateAndSaveSetups(updated, activeId);
+    // Use the new setup's ID as active when creating the very first setup
+    const nextActiveId = setups.length === 0 ? newSetup.id : activeId;
+    updateAndSaveSetups(updated, nextActiveId);
   };
 
   const handleDeleteSetup = (setupId: string) => {
@@ -114,6 +119,10 @@ export default function SetupView({
     const updated = [cloned, ...setups]; // Prepend at the TOP!
     setExpandedId(cloned.id);
     updateAndSaveSetups(updated, activeId);
+  };
+
+  const handleShareSetup = async (setupId: string) => {
+    alert("Data is instantly shared and synced with your Team. Manage your team in the Settings tab.");
   };
 
   return (
@@ -222,40 +231,49 @@ export default function SetupView({
                   <div className="flex items-center gap-1 border-l border-outline-variant/60 pl-2">
                     <button
                       type="button"
-                      title="Clone this configuration"
+                      title="Share with Team"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShareSetup(setupItem.id);
+                      }}
+                      className="p-1.5 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center rounded"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">group</span>
+                    </button>
+                    <button
+                      type="button"
+                      title="Clone setup"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleCloneSetup(setupItem.id);
                       }}
-                      className="p-1 hover:text-primary text-on-surface-variant/70 transition-colors"
+                      className="p-1.5 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center rounded"
                     >
                       <span className="material-symbols-outlined text-[18px]">content_copy</span>
                     </button>
                     <button
                       type="button"
-                      title="Delete configuration"
+                      title="Delete setup permanently"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteSetup(setupItem.id);
                       }}
-                      className="p-1 hover:text-error text-on-surface-variant/70 transition-colors"
+                      className="p-1.5 text-on-surface-variant hover:text-red-400 transition-colors flex items-center justify-center rounded"
                     >
                       <span className="material-symbols-outlined text-[18px]">delete</span>
                     </button>
-                    <span className="material-symbols-outlined text-on-surface-variant/70 text-[20px] transition-transform duration-200 ml-1" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>
-                      expand_more
-                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Expansible Configuration View & Detailed Forms */}
+              {/* Collapsible Content */}
               {isExpanded && (
-                <div className="p-4 border-t border-outline-variant/50 bg-background/40 space-y-6 animate-fade-in">
-                                   {/* SETUP METADATA ROW */}
-                  <div className="flex flex-col gap-4 bg-surface-container/30 p-4 rounded border border-outline-variant/30">
+                <div className="p-4 border-t border-outline-variant/50 bg-[#0a0a0a] space-y-6">
+                  
+                  {/* EDIT METADATA ROW */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Rename Setup Name</label>
+                      <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Chassis Spec Name</label>
                       <input
                         type="text"
                         value={setupItem.chassis}
@@ -264,19 +282,30 @@ export default function SetupView({
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Track</label>
+                      <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Track Profile</label>
                       <input
                         type="text"
-                        value={setupItem.track || ''}
+                        placeholder="e.g. Eldora Speedway"
+                        value={setupItem.track}
                         onChange={(e) => handleMetadataChange(setupItem.id, 'track', e.target.value)}
                         className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Car Class</label>
+                      <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Last Updated</label>
                       <input
                         type="text"
-                        value={setupItem.carType || ''}
+                        value={setupItem.date}
+                        onChange={(e) => handleMetadataChange(setupItem.id, 'date', e.target.value)}
+                        className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Car Class / Series</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. USMTS Late Model"
+                        value={setupItem.carType}
                         onChange={(e) => handleMetadataChange(setupItem.id, 'carType', e.target.value)}
                         className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded"
                       />
@@ -342,16 +371,6 @@ export default function SetupView({
                           className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded"
                         />
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Pull Bar Angle</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 12.5°"
-                          value={setupItem.pullBarAngle || ''}
-                          onChange={(e) => handleMetadataChange(setupItem.id, 'pullBarAngle', e.target.value)}
-                          className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded"
-                        />
-                      </div>
                     </div>
                   </div>
 
@@ -366,7 +385,17 @@ export default function SetupView({
                           Left Front Corner
                         </h4>
                       </div>
-                      <div className="p-4 flex flex-col gap-4">
+                      <div className="p-4 grid grid-cols-2 gap-4">
+                        <div className="col-span-2 bg-[#111] p-2 rounded border border-outline-variant/30 flex items-center justify-between">
+                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant">Bound Smasher Graph</label>
+                          <select 
+                            value={setupItem.lf.boundGraphId || ''}
+                            onChange={(e) => handleCornerChange(setupItem.id, 'lf', 'boundGraphId', e.target.value)}
+                            className="bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded min-w-[120px]">
+                            <option value="">-- None --</option>
+                            <option value="graph-demo">Sample Dyno Run</option>
+                          </select>
+                        </div>
                         <div>
                           <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Spring</label>
                           <input
@@ -459,7 +488,17 @@ export default function SetupView({
                           Right Front Corner
                         </h4>
                       </div>
-                      <div className="p-4 flex flex-col gap-4">
+                      <div className="p-4 grid grid-cols-2 gap-4">
+                        <div className="col-span-2 bg-[#111] p-2 rounded border border-outline-variant/30 flex items-center justify-between">
+                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant">Bound Smasher Graph</label>
+                          <select 
+                            value={setupItem.rf.boundGraphId || ''}
+                            onChange={(e) => handleCornerChange(setupItem.id, 'rf', 'boundGraphId', e.target.value)}
+                            className="bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded min-w-[120px]">
+                            <option value="">-- None --</option>
+                            <option value="graph-demo">Sample Dyno Run</option>
+                          </select>
+                        </div>
                         <div>
                           <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Spring</label>
                           <input
@@ -552,7 +591,17 @@ export default function SetupView({
                           Left Rear Corner
                         </h4>
                       </div>
-                      <div className="p-4 flex flex-col gap-4">
+                      <div className="p-4 grid grid-cols-2 gap-4">
+                        <div className="col-span-2 bg-[#111] p-2 rounded border border-outline-variant/30 flex items-center justify-between">
+                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant">Bound Smasher Graph</label>
+                          <select 
+                            value={setupItem.lr.boundGraphId || ''}
+                            onChange={(e) => handleCornerChange(setupItem.id, 'lr', 'boundGraphId', e.target.value)}
+                            className="bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded min-w-[120px]">
+                            <option value="">-- None --</option>
+                            <option value="graph-demo">Sample Dyno Run</option>
+                          </select>
+                        </div>
                         <div>
                           <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Spring</label>
                           <input
@@ -643,31 +692,12 @@ export default function SetupView({
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Rear Gear Ratio</label>
+                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Preload (in)</label>
                           <input
                             type="text"
-                            value={setupItem.lr.rearGear || ''}
-                            onChange={(e) => handleCornerChange(setupItem.id, 'lr', 'rearGear', e.target.value)}
-                            className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-1.5 outline-none rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Rear Pullbar Hole</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Hole"
-                            value={setupItem.lr.pullBarHole || ''}
-                            onChange={(e) => handleCornerChange(setupItem.id, 'lr', 'pullBarHole', e.target.value)}
-                            className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-1.5 outline-none rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Rear Pullbar Angle</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Angle"
-                            value={setupItem.lr.pullBarAngle || ''}
-                            onChange={(e) => handleCornerChange(setupItem.id, 'lr', 'pullBarAngle', e.target.value)}
+                            placeholder="e.g. 0.50"
+                            value={setupItem.lr.preload || ''}
+                            onChange={(e) => handleCornerChange(setupItem.id, 'lr', 'preload', e.target.value)}
                             className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-1.5 outline-none rounded"
                           />
                         </div>
@@ -702,7 +732,17 @@ export default function SetupView({
                           Right Rear Corner
                         </h4>
                       </div>
-                      <div className="p-4 flex flex-col gap-4">
+                      <div className="p-4 grid grid-cols-2 gap-4">
+                        <div className="col-span-2 bg-[#111] p-2 rounded border border-outline-variant/30 flex items-center justify-between">
+                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant">Bound Smasher Graph</label>
+                          <select 
+                            value={setupItem.rr.boundGraphId || ''}
+                            onChange={(e) => handleCornerChange(setupItem.id, 'rr', 'boundGraphId', e.target.value)}
+                            className="bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded min-w-[120px]">
+                            <option value="">-- None --</option>
+                            <option value="graph-demo">Sample Dyno Run</option>
+                          </select>
+                        </div>
                         <div>
                           <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Spring</label>
                           <input
@@ -783,41 +823,12 @@ export default function SetupView({
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Droop</label>
+                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Preload (in)</label>
                           <input
                             type="text"
-                            placeholder="e.g. Droop"
-                            value={setupItem.rr.droop || ''}
-                            onChange={(e) => handleCornerChange(setupItem.id, 'rr', 'droop', e.target.value)}
-                            className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-1.5 outline-none rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Rear Gear Ratio</label>
-                          <input
-                            type="text"
-                            value={setupItem.rr.rearGear || ''}
-                            onChange={(e) => handleCornerChange(setupItem.id, 'rr', 'rearGear', e.target.value)}
-                            className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-1.5 outline-none rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Rear Pullbar Hole</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Hole"
-                            value={setupItem.rr.pullBarHole || ''}
-                            onChange={(e) => handleCornerChange(setupItem.id, 'rr', 'pullBarHole', e.target.value)}
-                            className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-1.5 outline-none rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1">Rear Pullbar Angle</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Angle"
-                            value={setupItem.rr.pullBarAngle || ''}
-                            onChange={(e) => handleCornerChange(setupItem.id, 'rr', 'pullBarAngle', e.target.value)}
+                            placeholder="e.g. 0.50"
+                            value={setupItem.rr.preload || ''}
+                            onChange={(e) => handleCornerChange(setupItem.id, 'rr', 'preload', e.target.value)}
                             className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-1.5 outline-none rounded"
                           />
                         </div>
@@ -843,9 +854,7 @@ export default function SetupView({
                         </div>
                       </div>
                     </div>
-
                   </div>
-
                 </div>
               )}
             </div>

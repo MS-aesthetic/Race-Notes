@@ -7,5 +7,25 @@ coverage/
 .env*
 !.env.example
 
+# Android / Capacitor
+android/local.properties
+android/app/build/
+android/build/
+android/.gradle/
+android/captures/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Android Studio / IntelliJ
+.idea/
+.gradle/
+*.iml
+local.properties
+build.gradle
+gradle.properties
+settings.gradle
+
 .vscode/
 .antigravity/

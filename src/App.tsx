@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { User } from '@supabase/supabase-js';
 import { Setup, SessionRecord, ActiveSession, RaceWeekend } from './types';
 import {
   INITIAL_SETUP,
@@ -8,18 +9,35 @@ import {
   INITIAL_ACTIVE_SESSION,
 } from './data';
 
+import { supabase, onAuthChange, fetchProfile, getUserTeam, AppUser } from './lib/supabase';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos } from './lib/sync';
+
 import DashboardView from './components/DashboardView';
 import SetupView from './components/SetupView';
-import SessionsView from './components/SessionsView';
-import ExportView from './components/ExportView';
+import RaceWeekendView from './components/RaceWeekendView';
+import SettingsView from './components/SettingsView';
 import QuickReferenceView from './components/QuickReferenceView';
+import SmasherLoadsView from './components/SmasherLoadsView';
+import ToDoView from './components/ToDoView';
+import { Todo } from './types';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'setups' | 'sessions' | 'quickref' | 'export'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'smasherloads' | 'todos'>('dashboard');
   const [setup, setSetup] = useState<Setup>(INITIAL_SETUP);
   const [savedSetups, setSavedSetups] = useState<Setup[]>(INITIAL_SETUPS);
   const [weekends, setWeekends] = useState<RaceWeekend[]>(INITIAL_WEEKENDS);
   const [activeSession, setActiveSession] = useState<ActiveSession>(INITIAL_ACTIVE_SESSION);
+  const [todos, setTodos] = useState<Todo[]>(() => {
+    const saved = localStorage.getItem('race_notes_todos');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // ---- Auth & Cloud Sync State ----
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<AppUser | null>(null);
+  const [team, setTeam] = useState<import('./types').Team | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('');
   // Modal / forms tracking state
   const [showNewWeekendForm, setShowNewWeekendForm] = useState(false);
   const [newWeekendName, setNewWeekendName] = useState('');
@@ -77,9 +95,104 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // ---- Auth: restore session + subscribe to changes ----
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const currentUser = data.session?.user ?? null;
+        setUser(currentUser);
+        if (currentUser) {
+          const p = await fetchProfile(currentUser.id);
+          setProfile(p);
+          const t = await getUserTeam(currentUser.id);
+          setTeam(t);
+        }
+      } catch {
+        // Supabase not configured yet – continue in offline mode
+      }
+      setAuthReady(true);
+    };
+    initAuth();
+
+    const unsub = onAuthChange(async (newUser) => {
+      setUser(newUser);
+      if (newUser) {
+        const p = await fetchProfile(newUser.id);
+        setProfile(p);
+        const t = await getUserTeam(newUser.id);
+        setTeam(t);
+      } else {
+        setProfile(null);
+        setTeam(null);
+      }
+    });
+    return () => { unsub?.data?.subscription?.unsubscribe?.(); };
+  }, []);
+
+  // ---- Cloud sync: pull on login, push on data changes ----
+  useEffect(() => {
+    if (!user) return;
+
+    // Pull cloud data and merge into localStorage
+    const doPull = async () => {
+      setSyncStatus('Syncing...');
+      const data = await pullAllData(user.id, setSyncStatus);
+
+      if (data.setups.length > 0) {
+        mergeIntoLocalStorage('setups', data.setups, 'race_notes_saved_setups');
+        setSavedSetups(prev => {
+          const merged = [...prev];
+          for (const cloud of data.setups) {
+            const idx = merged.findIndex(s => s.id === cloud.id);
+            if (idx >= 0) merged[idx] = cloud;
+            else merged.push(cloud);
+          }
+          return merged;
+        });
+      }
+
+      if (data.weekends.length > 0) {
+        mergeIntoLocalStorage('weekends', data.weekends, 'race_notes_weekends');
+        setWeekends(prev => {
+          const merged = [...prev];
+          for (const cloud of data.weekends) {
+            const idx = merged.findIndex(w => w.id === cloud.id);
+            if (idx >= 0) merged[idx] = cloud;
+            else merged.push(cloud);
+          }
+          return merged;
+        });
+      }
+
+      if (data.activeSession) {
+        mergeIntoLocalStorage('activeSession', data.activeSession, 'race_notes_active_session');
+        setActiveSession(data.activeSession);
+      }
+
+      const cloudTodos = await pullTodos(setSyncStatus);
+      if (cloudTodos.length > 0) {
+        setTodos(cloudTodos);
+        localStorage.setItem('race_notes_todos', JSON.stringify(cloudTodos));
+      }
+
+      setSyncStatus('Synced');
+      setTimeout(() => setSyncStatus(''), 3000);
+    };
+
+    doPull();
+  }, [user]);
+
   const saveSetup = (updatedSetup: Setup) => {
     setSetup(updatedSetup);
     localStorage.setItem('race_notes_setup', JSON.stringify(updatedSetup));
+
+    // Cloud sync
+    if (user) {
+      const merged = savedSetups.map(s => s.id === updatedSetup.id ? updatedSetup : s);
+      if (!merged.find(s => s.id === updatedSetup.id)) merged.push(updatedSetup);
+      pushSetups(merged, user.id, setSyncStatus);
+    }
     
     // Auto sync setup baseline tire pressures to the active logging view for engineering consistency
     setActiveSession((prev) => {
@@ -91,36 +204,24 @@ export default function App() {
       };
       const liveTires = {
         lf: {
-          tireId: prev.tires?.lf.tireId || '',
           compound: updatedSetup.lf.tireComp || prev.tires?.lf.compound || '',
           size: updatedSetup.lf.tireSize || prev.tires?.lf.size || '',
-          durometer: prev.tires?.lf.durometer || '',
           airPressure: `${updatedSetup.lf.tirePress} psi`,
-          backSpacing: prev.tires?.lf.backSpacing || '',
         },
         rf: {
-          tireId: prev.tires?.rf.tireId || '',
           compound: updatedSetup.rf.tireComp || prev.tires?.rf.compound || '',
           size: updatedSetup.rf.tireSize || prev.tires?.rf.size || '',
-          durometer: prev.tires?.rf.durometer || '',
           airPressure: `${updatedSetup.rf.tirePress} psi`,
-          backSpacing: prev.tires?.rf.backSpacing || '',
         },
         lr: {
-          tireId: prev.tires?.lr.tireId || '',
           compound: updatedSetup.lr.tireComp || prev.tires?.lr.compound || '',
           size: updatedSetup.lr.tireSize || prev.tires?.lr.size || '',
-          durometer: prev.tires?.lr.durometer || '',
           airPressure: `${updatedSetup.lr.tirePress} psi`,
-          backSpacing: prev.tires?.lr.backSpacing || '',
         },
         rr: {
-          tireId: prev.tires?.rr.tireId || '',
           compound: updatedSetup.rr.tireComp || prev.tires?.rr.compound || '',
           size: updatedSetup.rr.tireSize || prev.tires?.rr.size || '',
-          durometer: prev.tires?.rr.durometer || '',
           airPressure: `${updatedSetup.rr.tirePress} psi`,
-          backSpacing: prev.tires?.rr.backSpacing || '',
         },
       };
       const updated = {
@@ -138,6 +239,11 @@ export default function App() {
   const handleUpdateSession = (updatedSession: ActiveSession) => {
     setActiveSession(updatedSession);
     localStorage.setItem('race_notes_active_session', JSON.stringify(updatedSession));
+
+    // Cloud sync
+    if (user) {
+      pushActiveSession(updatedSession, user.id);
+    }
 
     // Also update this session's entry structure inside weekends state log to sync them!
     setWeekends((prev) => {
@@ -174,6 +280,7 @@ export default function App() {
       });
 
       localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
+      if (user) pushWeekends(updated, user.id);
       return updated;
     });
   };
@@ -193,6 +300,7 @@ export default function App() {
     setWeekends((prev) => {
       const updated = [newWknd, ...prev];
       localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
+      if (user) pushWeekends(updated, user.id);
       return updated;
     });
 
@@ -220,36 +328,24 @@ export default function App() {
 
     const defaultTires = {
       lf: {
-        tireId: '',
         compound: setup.lf.tireComp || 'D20',
         size: setup.lf.tireSize || '82.0"',
-        durometer: '54',
         airPressure: `${setup.lf.tirePress} psi`,
-        backSpacing: '3.0"',
       },
       rf: {
-        tireId: '',
         compound: setup.rf.tireComp || 'D20',
         size: setup.rf.tireSize || '84.0"',
-        durometer: '55',
         airPressure: `${setup.rf.tirePress} psi`,
-        backSpacing: '3.0"',
       },
       lr: {
-        tireId: '',
         compound: setup.lr.tireComp || 'D60',
         size: setup.lr.tireSize || '86.0"',
-        durometer: '58',
         airPressure: `${setup.lr.tirePress} psi`,
-        backSpacing: '4.0"',
       },
       rr: {
-        tireId: '',
         compound: setup.rr.tireComp || 'D60',
         size: setup.rr.tireSize || '88.0"',
-        durometer: '62',
         airPressure: `${setup.rr.tirePress} psi`,
-        backSpacing: '4.0"',
       },
     };
 
@@ -319,6 +415,7 @@ export default function App() {
         sessions: [newRecord, ...w.sessions]
       } : w);
       localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
+      if (user) pushWeekends(updated, user.id);
       return updated;
     });
 
@@ -330,8 +427,8 @@ export default function App() {
     setNewSessionType('');
     setNewSessionCond('');
     setNewSessionWeather('');
-    setActiveTab('sessions');
-  };;
+    setActiveTab('raceweekend');
+  };
 
   const handleSelectRecentSession = (rec: SessionRecord) => {
     // Dynamically spawn details in modal or swap session
@@ -359,10 +456,10 @@ export default function App() {
       },
       adjustments: rec.adjustments || [],
       tires: rec.tires || {
-        lf: { tireId: '', compound: setup.lf.tireComp || '', size: setup.lf.tireSize || '', durometer: '', airPressure: rec.pressures?.lf || '10.0 psi', backSpacing: '' },
-        rf: { tireId: '', compound: setup.rf.tireComp || '', size: setup.rf.tireSize || '', durometer: '', airPressure: rec.pressures?.rf || '11.0 psi', backSpacing: '' },
-        lr: { tireId: '', compound: setup.lr.tireComp || '', size: setup.lr.tireSize || '', durometer: '', airPressure: rec.pressures?.lr || '8.00 psi', backSpacing: '' },
-        rr: { tireId: '', compound: setup.rr.tireComp || '', size: setup.rr.tireSize || '', durometer: '', airPressure: rec.pressures?.rr || '8.00 psi', backSpacing: '' },
+        lf: { compound: setup.lf.tireComp || '', size: setup.lf.tireSize || '', airPressure: rec.pressures?.lf || '10.0 psi' },
+        rf: { compound: setup.rf.tireComp || '', size: setup.rf.tireSize || '', airPressure: rec.pressures?.rf || '11.0 psi' },
+        lr: { compound: setup.lr.tireComp || '', size: setup.lr.tireSize || '', airPressure: rec.pressures?.lr || '8.00 psi' },
+        rr: { compound: setup.rr.tireComp || '', size: setup.rr.tireSize || '', airPressure: rec.pressures?.rr || '8.00 psi' },
       },
       pressures: rec.pressures || {
         lf: '12.5 psi',
@@ -373,7 +470,7 @@ export default function App() {
       competitionNotes: rec.competitionNotes || 'Enter comments here...',
     };
     setActiveSession(restoredSession);
-    setActiveTab('sessions');
+    setActiveTab('raceweekend');
   };
 
   return (
@@ -395,6 +492,14 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-2">
+              {/* Sync status indicator */}
+              {syncStatus && (
+                <span className={`font-mono text-[9px] uppercase tracking-wider ${
+                  syncStatus === 'Synced' ? 'text-green-400' : 'text-on-surface-variant/60'
+                }`}>
+                  {syncStatus}
+                </span>
+              )}
               <button
                 onClick={() => {
                   setNewWeekendName('');
@@ -442,6 +547,7 @@ export default function App() {
                 <DashboardView
                   setup={setup}
                   weekends={weekends}
+                  team={team}
                   onStartNewWeekend={() => {
                     setNewWeekendName('');
                     setNewWeekendTrack('');
@@ -459,7 +565,10 @@ export default function App() {
                     setShowNewSessionForm(true);
                   }}
                   onEditSetup={() => setActiveTab('setups')}
-                  onSelectSession={handleSelectRecentSession}
+                  onSelectSession={(rec) => {
+                    handleSelectRecentSession(rec);
+                    setActiveTab('raceweekend');
+                  }}
                 />
               )}
 
@@ -470,6 +579,7 @@ export default function App() {
                   onSaveSetups={(updatedSetups, activeId) => {
                     setSavedSetups(updatedSetups);
                     localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
+                    if (user) pushSetups(updatedSetups, user.id, setSyncStatus);
                     
                     if (activeId) {
                       const active = updatedSetups.find(s => s.id === activeId);
@@ -534,15 +644,20 @@ export default function App() {
                 />
               )}
 
-              {activeTab === 'sessions' && (
-                <SessionsView
+              {activeTab === 'raceweekend' && (
+                <RaceWeekendView
+                  user={user}
                   session={activeSession}
+                  weekends={weekends}
                   onUpdateSession={handleUpdateSession}
                 />
               )}
 
-              {activeTab === 'export' && (
-                <ExportView
+              {activeTab === 'settings' && (
+                <SettingsView
+                  user={user}
+                  profile={profile}
+                  onAuthChange={(u) => setUser(u)}
                   setup={setup}
                   activeSession={activeSession}
                 />
@@ -550,6 +665,21 @@ export default function App() {
 
               {activeTab === 'quickref' && (
                 <QuickReferenceView />
+              )}
+
+              {activeTab === 'smasherloads' && (
+                <SmasherLoadsView />
+              )}
+
+              {activeTab === 'todos' && (
+                <ToDoView 
+                  todos={todos} 
+                  onSaveTodos={(updated) => {
+                    setTodos(updated);
+                    localStorage.setItem('race_notes_todos', JSON.stringify(updated));
+                    if (user) pushTodos(updated, user.id, setSyncStatus);
+                  }} 
+                />
               )}
             </motion.div>
           </AnimatePresence>
@@ -564,7 +694,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('dashboard')}
             id="tab-btn-dashboard"
-            className={`flex flex-col items-center justify-center w-20 h-full transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
               activeTab === 'dashboard' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
@@ -583,7 +713,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('setups')}
             id="tab-btn-setups"
-            className={`flex flex-col items-center justify-center w-20 h-full transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
               activeTab === 'setups' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
@@ -598,22 +728,22 @@ export default function App() {
             </span>
           </button>
 
-          {/* Sessions Button */}
+          {/* Race Weekend Button */}
           <button
-            onClick={() => setActiveTab('sessions')}
-            id="tab-btn-sessions"
-            className={`flex flex-col items-center justify-center w-20 h-full transition-all cursor-pointer ${
-              activeTab === 'sessions' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+            onClick={() => setActiveTab('raceweekend')}
+            id="tab-btn-raceweekend"
+            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
+              activeTab === 'raceweekend' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
             <span
               className="material-symbols-outlined text-[20px]"
-              style={{ fontVariationSettings: activeTab === 'sessions' ? "'FILL' 1" : "'FILL' 0" }}
+              style={{ fontVariationSettings: activeTab === 'raceweekend' ? "'FILL' 1" : "'FILL' 0" }}
             >
               timer
             </span>
             <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
-              Sessions
+              Weekend
             </span>
           </button>
 
@@ -621,7 +751,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('quickref')}
             id="tab-btn-quickref"
-            className={`flex flex-col items-center justify-center w-20 h-full transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
               activeTab === 'quickref' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
@@ -636,22 +766,56 @@ export default function App() {
             </span>
           </button>
 
-          {/* Export Button */}
+          {/* Smasher Loads Button */}
           <button
-            onClick={() => setActiveTab('export')}
-            id="tab-btn-export"
-            className={`flex flex-col items-center justify-center w-20 h-full transition-all cursor-pointer ${
-              activeTab === 'export' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+            onClick={() => setActiveTab('smasherloads')}
+            id="tab-btn-smasherloads"
+            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
+              activeTab === 'smasherloads' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
             <span
               className="material-symbols-outlined text-[20px]"
-              style={{ fontVariationSettings: activeTab === 'export' ? "'FILL' 1" : "'FILL' 0" }}
+              style={{ fontVariationSettings: activeTab === 'smasherloads' ? "'FILL' 1" : "'FILL' 0" }}
             >
-              ios_share
+              show_chart
+            </span>
+            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider text-center leading-[10px]">
+              Smasher<br/>Loads
+            </span>
+          </button>
+
+          {/* To Do List Button */}
+          <button onClick={() => setActiveTab('todos')}
+            id="tab-btn-todos"
+            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
+              activeTab === 'todos' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+            }`}>
+            <span className="material-symbols-outlined text-[20px]" 
+                  style={{ fontVariationSettings: activeTab === 'todos' ? "'FILL' 1" : "'FILL' 0" }}>
+              checklist
             </span>
             <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
-              Export
+              To Do
+            </span>
+          </button>
+
+          {/* Settings Button */}
+          <button
+            onClick={() => setActiveTab('settings')}
+            id="tab-btn-settings"
+            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
+              activeTab === 'settings' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+            }`}
+          >
+            <span
+              className="material-symbols-outlined text-[20px]"
+              style={{ fontVariationSettings: activeTab === 'settings' ? "'FILL' 1" : "'FILL' 0" }}
+            >
+              settings
+            </span>
+            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
+              Settings
             </span>
           </button>
         </nav>
