@@ -7,9 +7,10 @@ interface RaceWeekendViewProps {
   session: ActiveSession;
   weekends: RaceWeekend[];
   onUpdateSession: (updatedSession: ActiveSession) => void;
+  onSelectSession: (session: SessionRecord, weekendId?: string) => void;
 }
 
-export default function RaceWeekendView({ session, weekends, onUpdateSession }: RaceWeekendViewProps) {
+export default function RaceWeekendView({ session, weekends, onUpdateSession, onSelectSession }: RaceWeekendViewProps) {
   const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
 
@@ -145,8 +146,16 @@ export default function RaceWeekendView({ session, weekends, onUpdateSession }: 
             <input type="text" className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono" value={session.bestLap} onChange={e => onUpdateSession({ ...session, bestLap: e.target.value })} />
           </label>
           <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase font-mono text-on-surface-variant">Quick Time</span>
+            <input type="text" className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono" value={session.leaderLap || ''} onChange={e => onUpdateSession({ ...session, leaderLap: e.target.value })} />
+          </label>
+          <label className="flex flex-col gap-1">
             <span className="text-[10px] uppercase font-mono text-on-surface-variant">Finish Pos</span>
             <input type="text" className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono" value={session.finishPos} onChange={e => onUpdateSession({ ...session, finishPos: e.target.value })} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase font-mono text-on-surface-variant">Max RPM</span>
+            <input type="text" className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono" value={session.maxRpm || ''} onChange={e => onUpdateSession({ ...session, maxRpm: e.target.value })} />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[10px] uppercase font-mono text-on-surface-variant">Condition</span>
@@ -304,6 +313,19 @@ export default function RaceWeekendView({ session, weekends, onUpdateSession }: 
             </button>
             {expandedSessionId === sx.id && (
               <div className="p-3 bg-[#0e0e0e] border-t border-outline-variant/30 text-xs font-mono text-on-surface-variant space-y-2">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Session Details</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectSession(sx, currentWeekend?.id);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1 bg-surface-bright hover:bg-surface-container-high border border-outline-variant rounded transition-colors text-[10px] font-bold uppercase font-mono text-on-surface cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px] text-primary">edit</span>
+                    Load to Editor
+                  </button>
+                </div>
                 <p><strong>Config Used:</strong> {sx.setupUsed}</p>
                 <p><strong>Conditions:</strong> {sx.condition}</p>
                 <p><strong>Notes:</strong> {sx.competitionNotes || 'None'}</p>

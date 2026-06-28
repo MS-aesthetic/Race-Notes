@@ -57,6 +57,7 @@ export interface Setup {
   pullBarFrameHole?: string;
   pullBarRearHole?: string;
   pullBarAngle?: string;
+  notes?: string;
 }
 
 export interface TireDetails {
@@ -123,6 +124,8 @@ export interface SetupAdjustment {
 }
 
 export interface ActiveSession {
+  id?: string;
+  weekendId?: string;
   name: string;
   track: string;
   setupUsed: string;

@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.racenotes.app',
-  appName: 'Race Notes',
+  appName: 'Crew Chief',
   webDir: 'dist',
 
   // Android-specific configuration

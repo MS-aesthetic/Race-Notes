@@ -64,6 +64,26 @@ body {
   overflow-x: hidden;
 }
 
+/* ─── Safe Area Insets (Android status bar + navigation bar) ─── */
+html, body, #root {
+  height: 100dvh;
+  width: 100vw;
+  overflow: hidden;
+  margin: 0;
+  padding: 0 !important;
+}
+
+/* Sticky header needs extra top padding to clear the status bar */
+#global-bottom-nav-bar {
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  height: calc(4rem + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Header needs to be positioned below the status bar */
+header.bg-surface {
+  padding-top: env(safe-area-inset-top, 0px) !important;
+}
+
 /* Custom scrollbars representing clean sheet metal mechanics */
 ::-webkit-scrollbar {
   width: 8px;

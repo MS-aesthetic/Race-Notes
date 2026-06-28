@@ -248,12 +248,11 @@ export default function App() {
     // Also update this session's entry structure inside weekends state log to sync them!
     setWeekends((prev) => {
       const updated = prev.map((wknd) => {
-        // Track match or search inside sessions
-        const containsSession = wknd.sessions.some(s => s.name.toUpperCase() === updatedSession.name.toUpperCase() && s.track.toLowerCase() === updatedSession.track.toLowerCase());
-        if (!containsSession) return wknd;
+        // If we know the weekend ID, match tightly
+        if (updatedSession.weekendId && wknd.id !== updatedSession.weekendId) return wknd;
 
         const updatedSessions = wknd.sessions.map((s) => {
-          if (s.name.toUpperCase() === updatedSession.name.toUpperCase() && s.track.toLowerCase() === updatedSession.track.toLowerCase()) {
+          if ((updatedSession.id && s.id === updatedSession.id) || (!updatedSession.id && s.name.toUpperCase() === updatedSession.name.toUpperCase() && s.track.toLowerCase() === updatedSession.track.toLowerCase())) {
             return {
               ...s,
               bestLap: `${updatedSession.bestLap}s`,
@@ -409,6 +408,9 @@ export default function App() {
       screenshots: []
     };
 
+    nextSession.id = newRecord.id;
+    nextSession.weekendId = newSessionWeekendId;
+
     setWeekends((prev) => {
       const updated = prev.map(w => w.id === targetWeekend.id ? {
         ...w,
@@ -430,9 +432,11 @@ export default function App() {
     setActiveTab('raceweekend');
   };
 
-  const handleSelectRecentSession = (rec: SessionRecord) => {
+  const handleSelectRecentSession = (rec: SessionRecord, weekendId: string) => {
     // Dynamically spawn details in modal or swap session
     const restoredSession: ActiveSession = {
+      id: rec.id,
+      weekendId: weekendId,
       name: rec.name.toUpperCase(),
       track: rec.track,
       setupUsed: rec.setupUsed || setup.chassis.toUpperCase(),
@@ -470,24 +474,23 @@ export default function App() {
       competitionNotes: rec.competitionNotes || 'Enter comments here...',
     };
     setActiveSession(restoredSession);
-    setActiveTab('raceweekend');
   };
 
   return (
-    <div className="min-h-screen bg-[#0e0e0e] text-on-surface font-sans flex flex-col items-center justify-start p-0" id="applet-main-body">
+    <div className="h-full w-full bg-[#0e0e0e] text-on-surface font-sans flex flex-col items-center justify-start p-0" id="applet-main-body">
 
       {/* Main Core Layout Viewport Container suitable for PWA deployment */}
       <div
         id="viewport-chassis"
-        className="w-full max-w-2xl mx-auto bg-background min-h-screen flex flex-col shadow-none md:shadow-2xl md:border-x border-outline-variant/20"
+        className="w-full max-w-2xl mx-auto bg-background h-full flex flex-col shadow-none md:shadow-2xl md:border-x border-outline-variant/20"
       >
         {/* TopAppBar component with logo title & dual NEW entries triggers */}
         <header className="bg-surface w-full top-0 sticky border-b border-outline-variant z-40">
           <div className="flex justify-between items-center px-4 py-3 w-full">
             <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-primary text-xl">precision_manufacturing</span>
+              <span className="material-symbols-outlined text-primary text-xl">headset_mic</span>
               <h1 className="font-display font-bold tracking-tight text-base text-primary uppercase">
-                RACE NOTES
+                CREW CHIEF
               </h1>
             </div>
             
@@ -565,8 +568,8 @@ export default function App() {
                     setShowNewSessionForm(true);
                   }}
                   onEditSetup={() => setActiveTab('setups')}
-                  onSelectSession={(rec) => {
-                    handleSelectRecentSession(rec);
+                  onSelectSession={(rec, weekendId) => {
+                    handleSelectRecentSession(rec, weekendId || '');
                     setActiveTab('raceweekend');
                   }}
                 />
@@ -650,6 +653,7 @@ export default function App() {
                   session={activeSession}
                   weekends={weekends}
                   onUpdateSession={handleUpdateSession}
+                  onSelectSession={(rec, weekendId) => handleSelectRecentSession(rec, weekendId)}
                 />
               )}
 

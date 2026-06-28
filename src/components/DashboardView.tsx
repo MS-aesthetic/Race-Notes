@@ -7,7 +7,7 @@ interface DashboardViewProps {
   team: Team | null;
   onStartNewWeekend: () => void;
   onStartNewSession: () => void;
-  onSelectSession: (session: SessionRecord) => void;
+  onSelectSession: (session: SessionRecord, weekendId?: string) => void;
   onEditSetup?: () => void;
 }
 
@@ -18,6 +18,7 @@ export default function DashboardView({
   onStartNewWeekend,
   onStartNewSession,
   onSelectSession,
+  onEditSetup,
 }: DashboardViewProps) {
   // Use mockup tire readings or the custom modified values
   const lfPress = setup.lf.tirePress !== '10.0' ? setup.lf.tirePress : '12.5';
@@ -36,27 +37,33 @@ export default function DashboardView({
       {/* TEAM BANNER */}
       {team && (
         <section id="section-team-banner">
-          <div className="bg-surface-container-high border border-outline-variant rounded-lg p-6 relative overflow-hidden">
-            <div className="absolute right-0 top-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-16 -mt-16 pointer-events-none"></div>
-            
-            {team.banner_url && (
-              <img
-                src={team.banner_url}
-                alt={team.name}
-                className="absolute inset-0 w-full h-full object-cover opacity-10 pointer-events-none"
-              />
-            )}
-            
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></span>
-                <span className="font-label-sm text-label-sm text-primary uppercase tracking-wider">
-                  Team
-                </span>
+          <div className="w-full bg-surface-container rounded-lg border border-outline-variant overflow-hidden relative shadow">
+            {team.banner_url ? (
+              <div className="h-32 md:h-40 w-full relative">
+                <img src={team.banner_url} alt="Team Banner" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-[#131313]/60 to-transparent"></div>
               </div>
-              <h2 className="font-display-lg text-2xl sm:text-3xl text-on-surface font-bold tracking-tight uppercase">
-                {team.name}
-              </h2>
+            ) : (
+              <div className="h-24 w-full bg-surface-container-high relative overflow-hidden">
+                <div className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#5b403d_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent"></div>
+              </div>
+            )}
+            <div className={`px-5 pb-4 ${team.banner_url ? 'pt-0 -mt-10 relative z-10' : 'pt-4'}`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded bg-primary text-on-primary flex items-center justify-center font-display font-bold text-xl shadow-lg border border-outline-variant/30 shrink-0">
+                  {team.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h2 className="font-display text-xl font-bold uppercase tracking-tight text-on-surface">
+                    {team.name}
+                  </h2>
+                  <p className="font-mono text-[10px] text-primary uppercase tracking-widest font-semibold flex items-center gap-1.5 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                    Active Team Roster
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -124,7 +131,7 @@ export default function DashboardView({
                         weekend.sessions.map((s) => (
                           <div
                             key={s.id}
-                            onClick={() => onSelectSession(s)}
+                            onClick={() => onSelectSession(s, wknd.id)}
                             id={`session-item-${s.id}`}
                             className="p-3.5 pl-6 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-surface-container-high/40 transition-all cursor-pointer group"
                           >

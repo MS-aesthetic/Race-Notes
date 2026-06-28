@@ -311,6 +311,15 @@ export default function SetupView({
                       />
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Additional Notes</label>
+                    <textarea
+                      placeholder="Enter setup notes..."
+                      value={setupItem.notes || ''}
+                      onChange={(e) => handleMetadataChange(setupItem.id, 'notes', e.target.value)}
+                      className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded min-h-[60px] resize-y"
+                    />
+                  </div>
 
                   {/* CAR SETUP baseline INFO */}
                   <div className="bg-surface-container/50 border border-outline-variant/60 rounded-lg p-4 space-y-3.5" id={`car-setup-baseline-${setupItem.id}`}>

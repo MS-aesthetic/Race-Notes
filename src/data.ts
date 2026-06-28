@@ -6,6 +6,7 @@ export const INITIAL_SETUP: Setup = {
   track: '',
   date: '',
   carType: '',
+  notes: '',
   gear: '',
   frontStagger: '',
   rearStagger: '',
@@ -88,6 +89,8 @@ export const INITIAL_WEEKENDS: RaceWeekend[] = [];
 export const INITIAL_RECENT_SESSIONS: SessionRecord[] = [];
 
 export const INITIAL_ACTIVE_SESSION: ActiveSession = {
+  id: '',
+  weekendId: '',
   name: '',
   track: '',
   setupUsed: '',
