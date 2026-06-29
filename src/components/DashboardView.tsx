@@ -307,9 +307,11 @@ export default function DashboardView({
               <div className="p-4 text-center text-xs font-mono text-on-surface-variant/50">No tires in inventory — add tires under Setups.</div>
             ) : (
               tireInventory.map(t => (
-                <div key={t.id} className="px-4 py-2.5 bg-surface-container">
-                  <span className="font-mono text-xs font-bold text-primary">#{t.tireNumber}</span>
-                  <span className="font-mono text-xs text-on-surface"> &rsaquo;&rsaquo; {t.size} &rsaquo;&rsaquo; {t.compound} &rsaquo;&rsaquo; {t.wheelBackspacing}" BS &rsaquo;&rsaquo; {t.durometer} duro</span>
+                <div key={t.id} className="px-4 py-2.5 bg-surface-container flex items-baseline gap-4">
+                  <span className="font-mono text-xs font-bold text-primary shrink-0">#{t.tireNumber}</span>
+                  <span className="font-mono text-[11px] text-on-surface">
+                    {t.size}{t.size && !t.size.includes('"') ? '"' : ''} <span className="text-outline-variant mx-1">|</span> BS {t.wheelBackspacing}" <span className="text-outline-variant mx-1">|</span> {t.compound} <span className="text-outline-variant mx-1">|</span> Duro {t.durometer || '—'}
+                  </span>
                 </div>
               ))
             )}

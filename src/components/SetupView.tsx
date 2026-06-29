@@ -493,7 +493,7 @@ export default function SetupView({
                               className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">JBAR</label>
+                            <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">JBar Length</label>
                             <input type="text" placeholder="e.g. #3" value={setupItem.jbar || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'jbar', e.target.value)}
                               className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
@@ -636,9 +636,11 @@ export default function SetupView({
             <div className="space-y-3">
               {tires.map(tire => (
                 <div key={tire.id} className="bg-surface-container border border-outline-variant rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <span className="font-mono text-xs font-bold text-primary">#{tire.tireNumber}</span>
-                    <span className="font-mono text-xs text-on-surface"> &rsaquo;&rsaquo; {tire.size} &rsaquo;&rsaquo; {tire.compound} &rsaquo;&rsaquo; {tire.wheelBackspacing}" BS &rsaquo;&rsaquo; {tire.durometer || '—'} duro</span>
+                  <div className="min-w-0 flex-1 flex items-baseline gap-4">
+                    <span className="font-mono text-xs font-bold text-primary shrink-0">#{tire.tireNumber}</span>
+                    <span className="font-mono text-[11px] text-on-surface">
+                      {tire.size}{tire.size && !tire.size.includes('"') ? '"' : ''} <span className="text-outline-variant mx-1">|</span> BS {tire.wheelBackspacing}" <span className="text-outline-variant mx-1">|</span> {tire.compound} <span className="text-outline-variant mx-1">|</span> Duro {tire.durometer || '—'}
+                    </span>
                   </div>
                   <button onClick={() => handleDeleteTire(tire.id)} className="p-1.5 text-on-surface-variant/50 hover:text-error transition-colors flex-shrink-0" title="Delete tire">
                     <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -671,6 +673,10 @@ export default function SetupView({
                       <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Size</label>
                       <input type="text" placeholder='e.g. 84.0"' required value={newTire.size || ''}
                         onChange={e => setNewTire(p => ({ ...p, size: e.target.value }))}
+                        onBlur={e => {
+                          const v = e.target.value.trim();
+                          if (v && !v.endsWith('"')) setNewTire(p => ({ ...p, size: v + '"' }));
+                        }}
                         className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
                     </div>
                   </div>
