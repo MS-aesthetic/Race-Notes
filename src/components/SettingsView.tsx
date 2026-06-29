@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import AuthView from './AuthView';
 import ExportView from './ExportView';
+import GarageView from './GarageView';
 import { User } from '@supabase/supabase-js';
 import { AppUser } from '../lib/supabase';
-import { Setup, ActiveSession, AppTheme, RaceWeekend, AccountingEntry, ShoppingItem, Todo } from '../types';
+import { Setup, ActiveSession, AppTheme, RaceWeekend, AccountingEntry, ShoppingItem, Todo, Car } from '../types';
 
 interface SettingsViewProps {
   user: User | null;
@@ -17,6 +18,16 @@ interface SettingsViewProps {
   todos?: Todo[];
   accounting?: AccountingEntry[];
   shopping?: ShoppingItem[];
+  // Car props
+  cars: Car[];
+  activeCarId: string | null;
+  onSelectCar: (carId: string) => void;
+  onSaveCars: (updated: Car[]) => void;
+  onDeleteCar: (carId: string) => void;
+  setupCount: (carId: string) => number;
+  tireCount: (carId: string) => number;
+  shockCount: (carId: string) => number;
+  initialSubTab?: 'account' | 'appearance' | 'export' | 'garage';
 }
 
 const ACCENT_PRESETS = [
@@ -28,13 +39,19 @@ const ACCENT_PRESETS = [
   { label: 'Cyan',        hex: '#7de8e8' },
 ];
 
-export default function SettingsView({ user, profile, onAuthChange, setup, activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], shopping = [] }: SettingsViewProps) {
-  const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export'>('account');
+export default function SettingsView({ user, profile, onAuthChange, setup, activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], shopping = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab }: SettingsViewProps) {
+  const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export' | 'garage'>(initialSubTab ?? 'account');
 
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Sub-tab bar */}
       <div className="flex bg-surface rounded-lg p-0.5 border border-outline-variant/30 text-xs font-mono uppercase tracking-wider">
+        <button
+          onClick={() => setSubTab('garage')}
+          className={`flex-1 py-2 rounded-md transition-all ${subTab === 'garage' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+        >
+          Garage
+        </button>
         <button
           onClick={() => setSubTab('account')}
           className={`flex-1 py-2 rounded-md transition-all ${subTab === 'account' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
@@ -45,7 +62,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
           onClick={() => setSubTab('appearance')}
           className={`flex-1 py-2 rounded-md transition-all ${subTab === 'appearance' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
         >
-          Appearance
+          Style
         </button>
         <button
           onClick={() => setSubTab('export')}
@@ -56,6 +73,19 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {subTab === 'garage' && (
+          <GarageView
+            cars={cars}
+            activeCarId={activeCarId}
+            onSelectCar={onSelectCar}
+            onSaveCars={onSaveCars}
+            onDeleteCar={onDeleteCar}
+            setupCount={setupCount}
+            tireCount={tireCount}
+            shockCount={shockCount}
+          />
+        )}
+
         {subTab === 'account' && <AuthView user={user} profile={profile} onAuthChange={onAuthChange} />}
 
         {subTab === 'appearance' && (

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Setup, SessionRecord, RaceWeekend, Team, TireInventoryItem, Todo } from '../types';
+import { byActiveCar } from '../lib/scope';
 
 // Maps legacy full session type names to the short codes used in v2
 const SESSION_NAME_MAP: [string, string][] = [
@@ -39,6 +40,7 @@ interface DashboardViewProps {
   onSelectSetup: (setupId: string) => void;
   onGoToTodos: () => void;
   onDeleteWeekend: (weekendId: string) => void;
+  activeCarId?: string | null;
 }
 
 export default function DashboardView({
@@ -54,6 +56,7 @@ export default function DashboardView({
   onSelectSetup,
   onGoToTodos,
   onDeleteWeekend,
+  activeCarId = null,
 }: DashboardViewProps) {
   const [expandedWeekendId, setExpandedWeekendId] = useState<string | null>(
     weekends.length > 0 ? weekends[0].id : null
@@ -62,6 +65,10 @@ export default function DashboardView({
   const [setupsOpen, setSetupsOpen] = useState(false);
   const [tiresOpen, setTiresOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
+
+  // Filter at display time — never mutate the master arrays
+  const displayedSetups = byActiveCar(savedSetups, activeCarId);
+  const displayedTires = byActiveCar(tireInventory, activeCarId);
 
   const uniqueTracks = Array.from(new Set(weekends.map(w => w.track).filter(Boolean))).sort();
   const filteredWeekends = trackFilter ? weekends.filter(w => w.track === trackFilter) : weekends;
@@ -251,7 +258,7 @@ export default function DashboardView({
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[20px]">tune</span>
             <span className="font-mono text-xs font-bold uppercase text-on-surface tracking-wider">
-              Setups ({savedSetups.length})
+              Setups ({displayedSetups.length})
             </span>
           </div>
           <span
@@ -262,10 +269,10 @@ export default function DashboardView({
 
         {setupsOpen && (
           <div className="mt-1 border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
-            {savedSetups.length === 0 ? (
+            {displayedSetups.length === 0 ? (
               <div className="p-4 text-center text-xs font-mono text-on-surface-variant/50">No setups saved yet.</div>
             ) : (
-              savedSetups.map(s => (
+              displayedSetups.map(s => (
                 <button
                   key={s.id}
                   onClick={() => onSelectSetup(s.id)}
@@ -292,7 +299,7 @@ export default function DashboardView({
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[20px]">trip_origin</span>
             <span className="font-mono text-xs font-bold uppercase text-on-surface tracking-wider">
-              Tires ({tireInventory.length})
+              Tires ({displayedTires.length})
             </span>
           </div>
           <span
@@ -303,10 +310,10 @@ export default function DashboardView({
 
         {tiresOpen && (
           <div className="mt-1 border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
-            {tireInventory.length === 0 ? (
+            {displayedTires.length === 0 ? (
               <div className="p-4 text-center text-xs font-mono text-on-surface-variant/50">No tires in inventory — add tires under Setups.</div>
             ) : (
-              tireInventory.map(t => (
+              displayedTires.map(t => (
                 <div key={t.id} className="px-4 py-2.5 bg-surface-container flex items-baseline gap-4">
                   <span className="font-mono text-xs font-bold text-primary shrink-0">#{t.tireNumber}</span>
                   <span className="font-mono text-[11px] text-on-surface">
