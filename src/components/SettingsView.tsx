@@ -135,6 +135,53 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
               </div>
             </div>
 
+            {/* Font Size */}
+            <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+              <div>
+                <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Font Size</label>
+                <p className="text-[10px] font-mono text-on-surface-variant/60 mt-0.5">Scales all text and UI elements throughout the app.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  { value: 'standard', icon: 'format_size', label: 'Standard', desc: '16px base' },
+                  { value: 'large',    icon: 'text_increase', label: 'Large',    desc: '19px base' },
+                ] as const).map(opt => {
+                  const active = (theme.fontSize ?? 'standard') === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => onThemeChange({ ...theme, fontSize: opt.value })}
+                      className={`flex flex-col items-center gap-1.5 p-4 rounded-lg border-2 transition-all ${
+                        active
+                          ? 'border-primary bg-primary/10'
+                          : 'border-outline-variant/50 bg-surface hover:border-outline'
+                      }`}
+                    >
+                      <span
+                        className={`material-symbols-outlined text-2xl ${active ? 'text-primary' : 'text-on-surface-variant'}`}
+                        style={{ fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0" }}
+                      >
+                        {opt.icon}
+                      </span>
+                      <span className={`font-mono text-xs uppercase font-bold ${active ? 'text-primary' : 'text-on-surface-variant'}`}>
+                        {opt.label}
+                      </span>
+                      <span className={`font-mono text-[9px] ${active ? 'text-primary/70' : 'text-on-surface-variant/50'}`}>
+                        {opt.desc}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Live preview */}
+              <div className="border border-outline-variant/40 rounded-lg p-3 space-y-1 bg-surface">
+                <p className="text-[10px] font-mono uppercase text-on-surface-variant font-bold tracking-wider">Preview at current scale</p>
+                <p className="text-xs font-mono text-on-surface">Small label — 0.75rem</p>
+                <p className="text-sm font-mono text-on-surface">Body text — 0.875rem</p>
+                <p className="text-base font-mono text-primary font-bold">Heading — 1rem</p>
+              </div>
+            </div>
+
             {/* Live preview strip */}
             <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-2">
               <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Live Preview</label>
@@ -160,7 +207,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
 
             {/* Reset */}
             <button
-              onClick={() => onThemeChange({ mode: 'dark', accent: '#ffb3ac' })}
+              onClick={() => onThemeChange({ mode: 'dark', accent: '#ffb3ac', fontSize: 'standard' })}
               className="w-full py-2 border border-outline-variant text-on-surface-variant font-mono text-xs uppercase rounded hover:border-outline transition-colors"
             >
               Reset to Defaults

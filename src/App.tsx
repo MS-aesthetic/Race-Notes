@@ -9,7 +9,7 @@ import {
   INITIAL_ACTIVE_SESSION,
 } from './data';
 
-import { supabase, onAuthChange, fetchProfile, getUserTeam, AppUser } from './lib/supabase';
+import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, AppUser } from './lib/supabase';
 import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos } from './lib/sync';
 
 import DashboardView from './components/DashboardView';
@@ -47,7 +47,7 @@ export default function App() {
       const saved = localStorage.getItem('race_notes_theme');
       if (saved) return JSON.parse(saved);
     } catch {}
-    return { mode: 'dark', accent: '#ffb3ac' };
+    return { mode: 'dark', accent: '#ffb3ac', fontSize: 'standard' };
   });
 
   const handleThemeChange = (updated: AppTheme) => {
@@ -69,12 +69,15 @@ export default function App() {
     const b = parseInt(hex.slice(5, 7), 16) || 0;
     const luma = 0.299 * r + 0.587 * g + 0.114 * b;
     root.style.setProperty('--color-on-primary', luma > 160 ? '#1a0003' : '#ffffff');
+    // Font scale
+    root.style.fontSize = theme.fontSize === 'large' ? '19px' : '16px';
   }, [theme]);
 
   // ---- Auth & Cloud Sync State ----
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<AppUser | null>(null);
   const [team, setTeam] = useState<import('./types').Team | null>(null);
+  const [teamMembers, setTeamMembers] = useState<AppUser[]>([]);
   const [authReady, setAuthReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState('');
   // Modal / forms tracking state
@@ -146,6 +149,10 @@ export default function App() {
           setProfile(p);
           const t = await getUserTeam(currentUser.id);
           setTeam(t);
+          if (t) {
+            const members = await getTeamMembers(t.id);
+            setTeamMembers(members);
+          }
         }
       } catch {
         // Supabase not configured yet – continue in offline mode
@@ -161,9 +168,14 @@ export default function App() {
         setProfile(p);
         const t = await getUserTeam(newUser.id);
         setTeam(t);
+        if (t) {
+          const members = await getTeamMembers(t.id);
+          setTeamMembers(members);
+        }
       } else {
         setProfile(null);
         setTeam(null);
+        setTeamMembers([]);
       }
     });
     return () => { unsub?.data?.subscription?.unsubscribe?.(); };
@@ -717,13 +729,15 @@ export default function App() {
 
 
               {activeTab === 'todos' && (
-                <ToDoView 
-                  todos={todos} 
+                <ToDoView
+                  todos={todos}
+                  teamMembers={teamMembers}
+                  currentUserId={user?.id ?? null}
                   onSaveTodos={(updated) => {
                     setTodos(updated);
                     localStorage.setItem('race_notes_todos', JSON.stringify(updated));
                     if (user) pushTodos(updated, user.id, setSyncStatus);
-                  }} 
+                  }}
                 />
               )}
             </motion.div>

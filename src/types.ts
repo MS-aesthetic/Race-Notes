@@ -196,6 +196,10 @@ export interface TodoItem {
   /** ISO timestamp when item was completed */
   completedAt?: string;
   done: boolean;
+  /** user_id of the team member assigned to this task */
+  assignedTo?: string;
+  /** Display name of assigned member (cached for offline display) */
+  assignedToName?: string;
 }
 
 export interface Todo {
@@ -225,4 +229,6 @@ export interface AppTheme {
   mode: 'dark' | 'light';
   /** Hex color string e.g. "#ffb3ac" */
   accent: string;
+  /** UI font scale — 'standard' (16px base) or 'large' (19px base) */
+  fontSize: 'standard' | 'large';
 }

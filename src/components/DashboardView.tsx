@@ -32,6 +32,13 @@ export default function DashboardView({
     weekends.length > 0 ? weekends[0].id : null
   );
 
+  // Track filter
+  const [trackFilter, setTrackFilter] = useState<string>('');
+  const uniqueTracks = Array.from(new Set(weekends.map(w => w.track).filter(Boolean))).sort();
+  const filteredWeekends = trackFilter
+    ? weekends.filter(w => w.track === trackFilter)
+    : weekends;
+
   return (
     <div className="space-y-6" id="dashboard-view-root">
       {/* TEAM BANNER */}
@@ -71,17 +78,47 @@ export default function DashboardView({
 
       {/* RACEDAY WEEKENDS & SESSIONS ACCORDION LOG */}
       <section id="section-recent-sessions">
-        <h2 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-2">
-          Race Weekends & Sessions Log
-        </h2>
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+          <h2 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
+            Race Weekends & Sessions Log
+          </h2>
+          {uniqueTracks.length > 0 && (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="material-symbols-outlined text-on-surface-variant text-[15px]">filter_list</span>
+              <select
+                value={trackFilter}
+                onChange={e => setTrackFilter(e.target.value)}
+                className="bg-surface-container border border-outline-variant focus:border-primary text-on-surface font-mono text-[11px] px-2 py-1 rounded outline-none"
+              >
+                <option value="">All Tracks</option>
+                {uniqueTracks.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+              {trackFilter && (
+                <button
+                  onClick={() => setTrackFilter('')}
+                  className="material-symbols-outlined text-on-surface-variant hover:text-primary text-[15px]"
+                  title="Clear filter"
+                >
+                  close
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         {weekends.length === 0 ? (
           <div className="bg-surface-container border border-outline-variant rounded-lg p-6 text-center text-on-surface-variant/80 font-mono text-xs">
             No Race Weekend logs captured yet. Start a new session above!
           </div>
+        ) : filteredWeekends.length === 0 ? (
+          <div className="bg-surface-container border border-outline-variant rounded-lg p-6 text-center text-on-surface-variant/80 font-mono text-xs">
+            No weekends found for <span className="text-primary font-bold">{trackFilter}</span>.
+          </div>
         ) : (
           <div className="space-y-3.5">
-            {weekends.map((weekend) => {
+            {filteredWeekends.map((weekend) => {
               const isExpanded = expandedWeekendId === weekend.id;
 
               return (
