@@ -45,12 +45,54 @@ export interface CornerSetup {
   boundGraphId?: string;
 }
 
+/** Allowed car types — drives the Garage dropdown. Keep extensible. */
+export const CAR_TYPES = ['Dirt Late Model', 'A Mod', 'B Mod'] as const;
+export type CarType = typeof CAR_TYPES[number] | string; // string fallback for forward-compat
+
+export interface Car {
+  id: string;               // client-generated, e.g. `car-${Date.now()}-${rand}`
+  teamId?: string | null;   // set when user is on a team; else null
+  userId: string;           // creator / owner (always set)
+  carType: CarType;
+  chassis: string;          // free text — chassis name/number
+  division: string;         // free text — division being raced
+  /** Optional friendly label; if empty, UI derives "{chassis} · {carType}" */
+  name?: string;
+  createdAt: string;        // ISO
+  updatedAt: string;        // ISO
+}
+
+// ─── Smasher / Shock-Load Graph ───────────────────────────────────────────────
+
+export type ShockCorner = 'LF' | 'RF' | 'LR' | 'RR';
+
+export interface ShockDataPoint {
+  height: string; // shock height in inches
+  load: string;   // load in lbs
+}
+
+export interface ShockSession {
+  id: string;
+  label: string;
+  corner: ShockCorner;
+  springRate: string;
+  shock: string;
+  date: string;
+  points: ShockDataPoint[];
+  /** Base64 dyno graph photos */
+  photos?: string[];
+  /** Car this session belongs to */
+  carId?: string;
+}
+
 export interface Setup {
   id: string;
   chassis: string;
   track: string;
   date: string;
   carType: string;
+  /** Car profile this setup belongs to */
+  carId?: string;
   lf: CornerSetup;
   rf: CornerSetup;
   lr: CornerSetup;
@@ -79,6 +121,8 @@ export interface TireInventoryItem {
   durometer: string;
   airPressure?: string;
   createdAt?: string;
+  /** Car profile this tire belongs to */
+  carId?: string;
 }
 
 export interface TireDetails {

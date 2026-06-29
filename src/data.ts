@@ -1,4 +1,4 @@
-import { Setup, SessionRecord, ActiveSession, RaceWeekend } from './types';
+import { Setup, SessionRecord, ActiveSession, RaceWeekend, Car, ShockSession } from './types';
 
 export const INITIAL_SETUP: Setup = {
   id: '',
@@ -127,6 +127,10 @@ export const INITIAL_ACTIVE_SESSION: ActiveSession = {
   },
   competitionNotes: '',
 };
+
+export const INITIAL_CARS: Car[] = [];
+
+export const INITIAL_SHOCK_SESSIONS: ShockSession[] = [];
 
 export const INITIAL_TODOS: import('./types').Todo[] = [];
 
