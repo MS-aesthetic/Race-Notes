@@ -237,11 +237,21 @@ export interface Todo {
   updated_at: string;
 }
 
+export interface TeamProfile {
+  racePassUrl?: string;
+  transponderIds?: string;
+  hometown?: string;
+  age?: string;
+  carNumber?: string;
+  division?: string;
+}
+
 export interface Team {
   id: string;
   name: string;
   banner_url?: string;
   created_at: string;
+  profile?: TeamProfile;
 }
 
 export interface TeamMember {

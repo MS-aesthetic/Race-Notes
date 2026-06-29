@@ -430,14 +430,25 @@ export default function App() {
     setShowNewSessionForm(true);
   };
 
+  // ── Session type → short code mapping ────────────────────────────────────────
+
+  const SESSION_CODES: Record<string, string> = {
+    'Test': 'Test',
+    'Hot Laps': 'HL',
+    'Qualifying': 'Qual',
+    'Heat Race': 'Heat',
+    'Feature': 'Feat.',
+  };
+
   // ── Auto-number session name ─────────────────────────────────────────────────
 
   const buildSessionName = (type: string, weekendId: string): string => {
+    const code = SESSION_CODES[type] ?? type;
     const weekend = weekends.find(w => w.id === weekendId);
-    if (!weekend) return type;
-    const existing = weekend.sessions.filter(s => s.name === type || s.name.startsWith(`${type} `));
-    if (existing.length === 0) return type;
-    return `${type} ${existing.length + 1}`;
+    if (!weekend) return code;
+    const existing = weekend.sessions.filter(s => s.name === code || s.name.startsWith(`${code} `));
+    if (existing.length === 0) return code;
+    return `${code} ${existing.length + 1}`;
   };
 
   const handleCreateNewWeekend = (e: React.FormEvent) => {
@@ -547,7 +558,7 @@ export default function App() {
 
     const newRecord: SessionRecord = {
       id: `session-rec-${Date.now()}`,
-      type: newSessionType,
+      type: sessionName,
       name: sessionName,
       track: targetWeekend.track,
       condition: newSessionCond,
@@ -725,8 +736,11 @@ export default function App() {
             >
               {activeTab === 'dashboard' && (
                 <DashboardView
-                  setup={setup}
                   weekends={weekends}
+                  savedSetups={savedSetups}
+                  tireInventory={tireInventory}
+                  todos={todos}
+                  userId={user?.id}
                   team={team}
                   onStartNewWeekend={() => {
                     setNewWeekendName('');
@@ -735,11 +749,16 @@ export default function App() {
                     setShowNewWeekendForm(true);
                   }}
                   onStartNewSession={() => handleOpenNewSessionForm()}
-                  onEditSetup={() => setActiveTab('setups')}
                   onSelectSession={(rec, weekendId) => {
                     handleSelectRecentSession(rec, weekendId || '');
                     setActiveTab('raceweekend');
                   }}
+                  onSelectSetup={(setupId) => {
+                    const found = savedSetups.find(s => s.id === setupId);
+                    if (found) setSetup(found);
+                    setActiveTab('setups');
+                  }}
+                  onGoToTodos={() => setActiveTab('todos')}
                   onDeleteWeekend={handleDeleteWeekend}
                 />
               )}
@@ -825,6 +844,7 @@ export default function App() {
                   session={activeSession}
                   weekends={weekends}
                   tireInventory={tireInventory}
+                  savedSetups={savedSetups}
                   onUpdateSession={handleUpdateSession}
                   onUpdateWeekend={handleUpdateWeekend}
                   onDeleteSession={handleDeleteSession}
@@ -1159,17 +1179,24 @@ export default function App() {
                 <div>
                   <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">Session Type</label>
                   <div className="grid grid-cols-5 gap-1">
-                    {(['Test', 'Hot Laps', 'Qualifying', 'Heat Race', 'Feature'] as const).map(t => (
+                    {([
+                      { key: 'Test', code: 'Test' },
+                      { key: 'Hot Laps', code: 'HL' },
+                      { key: 'Qualifying', code: 'Qual' },
+                      { key: 'Heat Race', code: 'Heat' },
+                      { key: 'Feature', code: 'Feat.' },
+                    ] as const).map(({ key, code }) => (
                       <button
-                        key={t}
+                        key={key}
                         type="button"
-                        onClick={() => setNewSessionType(t)}
-                        className={`py-2 px-1 rounded border font-mono text-[9px] font-bold uppercase transition-all text-center leading-tight ${
-                          newSessionType === t
+                        title={key}
+                        onClick={() => setNewSessionType(key)}
+                        className={`py-2 px-1 rounded border font-mono text-[10px] font-bold uppercase transition-all text-center leading-tight ${
+                          newSessionType === key
                             ? 'bg-primary/20 border-primary text-primary'
                             : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
                         }`}
-                      >{t}</button>
+                      >{code}</button>
                     ))}
                   </div>
                   {newSessionWeekendId && (

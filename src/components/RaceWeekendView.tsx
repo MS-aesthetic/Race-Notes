@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot } from '../types';
+import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup } from '../types';
 import { User } from '@supabase/supabase-js';
 
 interface RaceWeekendViewProps {
@@ -7,6 +7,7 @@ interface RaceWeekendViewProps {
   session: ActiveSession;
   weekends: RaceWeekend[];
   tireInventory?: TireInventoryItem[];
+  savedSetups?: Setup[];
   onUpdateSession: (updatedSession: ActiveSession) => void;
   onUpdateWeekend: (updated: RaceWeekend) => void;
   onDeleteSession: (weekendId: string, sessionId: string) => void;
@@ -56,7 +57,7 @@ function compressImage(file: File, maxPx = 1024, quality = 0.82): Promise<string
 }
 
 export default function RaceWeekendView({
-  session, weekends, tireInventory = [], onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession,
+  session, weekends, tireInventory = [], savedSetups = [], onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession,
 }: RaceWeekendViewProps) {
   const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
@@ -64,6 +65,7 @@ export default function RaceWeekendView({
   const [weatherError, setWeatherError] = useState('');
   const [showZipInput, setShowZipInput] = useState(false);
   const [zipCode, setZipCode] = useState('');
+  const [editorCollapsed, setEditorCollapsed] = useState(false);
 
   // ── Weekend lookup: prefer weekendId, fall back to track match ───────────────
   const currentWeekend =
@@ -137,6 +139,37 @@ export default function RaceWeekendView({
         }
       : { ...currentTires[corner], tireId: '' };
     onUpdateSession({ ...session, tires: { ...currentTires, [corner]: updated } });
+  };
+
+  // ── Import tires from bound setup ───────────────────────────────────────────
+
+  const handleImportTiresFromSetup = () => {
+    if (!currentWeekend?.setupId) return;
+    const boundSetup = savedSetups.find(s => s.id === currentWeekend.setupId);
+    if (!boundSetup) return;
+    const currentTires = session.tires || {
+      lf: { compound: '', size: '', airPressure: '' },
+      rf: { compound: '', size: '', airPressure: '' },
+      lr: { compound: '', size: '', airPressure: '' },
+      rr: { compound: '', size: '', airPressure: '' },
+    };
+    const corners = ['lf', 'rf', 'lr', 'rr'] as const;
+    const updatedTires = { ...currentTires };
+    const updatedPressures = { ...session.pressures };
+    for (const corner of corners) {
+      const c = boundSetup[corner];
+      const matchedTire = c.tireInventoryId ? tireInventory.find(t => t.id === c.tireInventoryId) : null;
+      updatedTires[corner] = {
+        ...currentTires[corner],
+        compound: matchedTire?.compound || c.tireComp || currentTires[corner].compound,
+        size: matchedTire?.size || c.tireSize || currentTires[corner].size,
+        tireId: matchedTire?.id || currentTires[corner].tireId,
+        durometer: matchedTire?.durometer || currentTires[corner].durometer,
+        airPressure: c.tirePress || currentTires[corner].airPressure,
+      };
+      updatedPressures[corner] = c.tirePress || updatedPressures[corner];
+    }
+    onUpdateSession({ ...session, tires: updatedTires, pressures: updatedPressures });
   };
 
   // ── Photo helpers ────────────────────────────────────────────────────────────
@@ -341,8 +374,24 @@ export default function RaceWeekendView({
       )}
 
       {/* ── Active Session Editor ─────────────────────────────────────────── */}
-      <section className="bg-surface-container rounded-lg p-4 border border-outline-variant">
-        <h2 className="text-primary font-display font-bold uppercase mb-4">Active Log: {session.name}</h2>
+      <section className="bg-surface-container rounded-lg border border-outline-variant">
+        {/* Collapsible header */}
+        <button
+          onClick={() => setEditorCollapsed(v => !v)}
+          className="w-full flex items-center justify-between p-4 hover:bg-surface-container-high transition-colors rounded-t-lg"
+        >
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>edit_note</span>
+            <h2 className="text-primary font-display font-bold uppercase text-sm">Active Log: {session.name}</h2>
+          </div>
+          <span
+            className="material-symbols-outlined text-on-surface-variant transition-transform duration-200"
+            style={{ transform: editorCollapsed ? 'rotate(180deg)' : 'none' }}
+          >expand_less</span>
+        </button>
+
+        {editorCollapsed ? null : (
+        <div className="p-4 pt-0">
 
         {/* Core Inputs */}
         <div className="grid grid-cols-2 gap-4 mb-6">
@@ -408,19 +457,27 @@ export default function RaceWeekendView({
 
         {/* Tire Selection */}
         <div className="pt-4 border-t border-outline-variant/60 mb-6">
-          <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-3">Tires Installed</h3>
-          {tireInventory.length === 0 ? (
-            <div className="bg-[#0e0e0e] border border-outline-variant rounded p-3 text-center">
-              <p className="font-mono text-[11px] text-on-surface-variant/50 italic">No tires in inventory — add tires under Setups first.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {(['lf', 'rf', 'lr', 'rr'] as const).map(corner => {
-                const selectedTireId = session.tires?.[corner]?.tireId || '';
-                const airPressure = session.tires?.[corner]?.airPressure || session.pressures[corner] || '';
-                return (
-                  <div key={corner} className="bg-[#0e0e0e] border border-outline-variant rounded p-2 space-y-2">
-                    <span className="text-[10px] font-bold text-primary uppercase block">{corner.toUpperCase()}</span>
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <h3 className="font-mono text-xs uppercase text-on-surface-variant">Tires Installed</h3>
+            {currentWeekend?.setupId && savedSetups.find(s => s.id === currentWeekend.setupId) && (
+              <button
+                type="button"
+                onClick={handleImportTiresFromSetup}
+                className="flex items-center gap-1 text-[10px] font-mono font-bold uppercase px-2 py-1 rounded border border-primary/50 text-primary hover:bg-primary/10 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[13px]">download</span>
+                Import from Setup
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {(['lf', 'rf', 'lr', 'rr'] as const).map(corner => {
+              const selectedTireId = session.tires?.[corner]?.tireId || '';
+              const airPressure = session.tires?.[corner]?.airPressure || session.pressures[corner] || '';
+              return (
+                <div key={corner} className="bg-[#0e0e0e] border border-outline-variant rounded p-2 space-y-2">
+                  <span className="text-[10px] font-bold text-primary uppercase block">{corner.toUpperCase()}</span>
+                  {tireInventory.length > 0 && (
                     <div className="relative">
                       <select
                         value={selectedTireId}
@@ -429,37 +486,33 @@ export default function RaceWeekendView({
                       >
                         <option value="">-- Select Tire --</option>
                         {tireInventory.map(t => (
-                          <option key={t.id} value={t.id}>
-                            #{t.tireNumber} · {t.compound} · {t.size}
-                          </option>
+                          <option key={t.id} value={t.id}>#{t.tireNumber} · {t.compound} · {t.size}</option>
                         ))}
                       </select>
                       <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-[12px] text-on-surface-variant pointer-events-none">expand_more</span>
                     </div>
-                    {selectedTireId && (() => {
-                      const t = tireInventory.find(x => x.id === selectedTireId);
-                      return t ? (
-                        <p className="font-mono text-[9px] text-on-surface-variant/60">
-                          {t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS
-                        </p>
-                      ) : null;
-                    })()}
-                    <div>
-                      <label className="block text-[9px] font-mono uppercase text-on-surface-variant/60 mb-0.5">Air Pressure (psi)</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="e.g. 11.5"
-                        value={airPressure}
-                        onChange={e => handleTireChange(corner, 'airPressure', e.target.value)}
-                        className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 rounded outline-none"
-                      />
-                    </div>
+                  )}
+                  {selectedTireId && (() => {
+                    const t = tireInventory.find(x => x.id === selectedTireId);
+                    return t ? (
+                      <p className="font-mono text-[9px] text-on-surface-variant/60">{t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS</p>
+                    ) : null;
+                  })()}
+                  <div>
+                    <label className="block text-[9px] font-mono uppercase text-on-surface-variant/60 mb-0.5">Air Pressure (psi)</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g. 11.5"
+                      value={airPressure}
+                      onChange={e => handleTireChange(corner, 'airPressure', e.target.value)}
+                      className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 rounded outline-none"
+                    />
                   </div>
-                );
-              })}
-            </div>
-          )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Setup Adjustments */}
@@ -512,6 +565,8 @@ export default function RaceWeekendView({
             </div>
           )}
         </div>
+        </div>
+        )}
       </section>
 
       {/* ── All Sessions in Weekend ───────────────────────────────────────── */}

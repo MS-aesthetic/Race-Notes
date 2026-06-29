@@ -467,14 +467,14 @@ const TRACK_CONDITION_INFO: Record<Exclude<TrackCondition, 'all'>, { label: stri
 };
 
 const CAR_BEHAVIOR_OPTIONS: { value: CarBehavior; label: string; group: string }[] = [
-  { value: 'select', label: '— Select what the car is doing —', group: '' },
-  { value: 'loose-entry', label: 'Loose on Entry (sliding at turn-in)', group: 'TIGHTEN' },
-  { value: 'loose-center', label: 'Loose in Center (sliding at apex)', group: 'TIGHTEN' },
-  { value: 'loose-exit', label: 'Loose on Exit (spinning on throttle)', group: 'TIGHTEN' },
-  { value: 'tight-entry', label: 'Tight on Entry (pushing at turn-in)', group: 'LOOSEN' },
-  { value: 'tight-center', label: 'Tight in Center (pushing through apex)', group: 'LOOSEN' },
-  { value: 'tight-exit', label: 'Tight on Exit (pushing on throttle)', group: 'LOOSEN' },
-  { value: 'need-drive', label: 'Need More Drive / Forward Bite', group: 'ADD TRACTION' },
+  { value: 'select', label: '— Select Symptom —', group: '' },
+  { value: 'loose-entry', label: 'Loose on Entry', group: 'TIGHTEN' },
+  { value: 'loose-center', label: 'Loose in Center', group: 'TIGHTEN' },
+  { value: 'loose-exit', label: 'Loose on Exit', group: 'TIGHTEN' },
+  { value: 'tight-entry', label: 'Tight on Entry', group: 'LOOSEN' },
+  { value: 'tight-center', label: 'Tight in Center', group: 'LOOSEN' },
+  { value: 'tight-exit', label: 'Tight on Exit', group: 'LOOSEN' },
+  { value: 'need-drive', label: 'Need More Drive', group: 'ADD TRACTION' },
 ];
 
 const TRACK_OPTIONS: { value: TrackCondition; label: string }[] = [
@@ -579,7 +579,7 @@ export default function QuickReferenceView() {
         <div className="p-4 space-y-3">
           <div>
             <label className="block text-[10px] font-mono uppercase font-bold text-on-surface-variant mb-1.5 tracking-wider">
-              What is the car doing?
+              Symptom
             </label>
             <select
               value={carBehavior}
