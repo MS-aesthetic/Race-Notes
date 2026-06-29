@@ -635,21 +635,10 @@ export default function SetupView({
           {tires.length > 0 && (
             <div className="space-y-3">
               {tires.map(tire => (
-                <div key={tire.id} className="bg-surface-container border border-outline-variant rounded-lg p-4 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="bg-primary/15 border border-primary/30 rounded px-2 py-1 flex-shrink-0">
-                      <span className="font-mono text-xs font-black text-primary">#{tire.tireNumber}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-sm font-bold text-on-surface">{tire.size}</span>
-                        <span className="bg-surface border border-outline-variant text-[10px] font-mono px-1.5 py-0.5 rounded text-on-surface-variant uppercase">{tire.compound}</span>
-                      </div>
-                      <div className="text-[10px] font-mono text-on-surface-variant mt-0.5 flex gap-x-3 flex-wrap">
-                        <span>Backspacing: <strong>{tire.wheelBackspacing}"</strong></span>
-                        {tire.durometer && <span>Durometer: <strong>{tire.durometer}</strong></span>}
-                      </div>
-                    </div>
+                <div key={tire.id} className="bg-surface-container border border-outline-variant rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <span className="font-mono text-xs font-bold text-primary">#{tire.tireNumber}</span>
+                    <span className="font-mono text-xs text-on-surface"> &rsaquo;&rsaquo; {tire.size} &rsaquo;&rsaquo; {tire.compound} &rsaquo;&rsaquo; {tire.wheelBackspacing}" BS &rsaquo;&rsaquo; {tire.durometer || '—'} duro</span>
                   </div>
                   <button onClick={() => handleDeleteTire(tire.id)} className="p-1.5 text-on-surface-variant/50 hover:text-error transition-colors flex-shrink-0" title="Delete tire">
                     <span className="material-symbols-outlined text-[16px]">delete</span>

@@ -218,11 +218,8 @@ export default function DashboardView({
                             className="p-3.5 pl-6 flex justify-between items-center hover:bg-surface-container-high/40 transition-all cursor-pointer group"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="bg-surface border border-outline-variant/50 w-10 h-10 rounded flex items-center justify-center shrink-0 group-hover:border-primary transition-all">
-                                <span className="text-[10px] text-on-surface font-mono font-bold leading-tight text-center px-0.5">{normalizeSessionName(s.name)}</span>
-                              </div>
                               <div>
-                                <div className="font-semibold text-sm text-on-surface uppercase tracking-wide group-hover:text-primary transition-colors">{normalizeSessionName(s.name)}</div>
+                                <div className="font-semibold text-sm text-on-surface uppercase tracking-wide group-hover:text-primary transition-colors">{s.name}</div>
                                 <div className="text-[11px] text-on-surface-variant/80 font-mono">{s.condition}{s.time ? ` • ${s.time}` : ''}</div>
                               </div>
                             </div>
@@ -310,14 +307,9 @@ export default function DashboardView({
               <div className="p-4 text-center text-xs font-mono text-on-surface-variant/50">No tires in inventory — add tires under Setups.</div>
             ) : (
               tireInventory.map(t => (
-                <div key={t.id} className="px-4 py-3 bg-surface-container flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full border border-outline-variant/60 bg-surface flex items-center justify-center shrink-0">
-                    <span className="font-mono text-[9px] font-bold text-primary">#{t.tireNumber}</span>
-                  </div>
-                  <div>
-                    <div className="font-mono text-xs font-bold text-on-surface">{t.compound} · {t.size}</div>
-                    <div className="font-mono text-[10px] text-on-surface-variant">{t.wheelBackspacing}" BS · {t.durometer} duro</div>
-                  </div>
+                <div key={t.id} className="px-4 py-2.5 bg-surface-container">
+                  <span className="font-mono text-xs font-bold text-primary">#{t.tireNumber}</span>
+                  <span className="font-mono text-xs text-on-surface"> &rsaquo;&rsaquo; {t.size} &rsaquo;&rsaquo; {t.compound} &rsaquo;&rsaquo; {t.wheelBackspacing}" BS &rsaquo;&rsaquo; {t.durometer} duro</span>
                 </div>
               ))
             )}
