@@ -38,6 +38,8 @@ export function pushSetups(setups: Setup[], userId: string, onStatus?: SyncCallb
         pull_bar_frame_hole: s.pullBarFrameHole || '',
         pull_bar_rear_hole: s.pullBarRearHole || '',
         pull_bar_angle: s.pullBarAngle || '',
+        notes: s.notes || '',
+        screenshots: s.screenshots || [],
         lf: s.lf,
         rf: s.rf,
         lr: s.lr,
@@ -128,6 +130,8 @@ export async function pullAllData(
         pullBarFrameHole: (r.pull_bar_frame_hole as string) || '',
         pullBarRearHole: (r.pull_bar_rear_hole as string) || '',
         pullBarAngle: (r.pull_bar_angle as string) || '',
+        notes: (r.notes as string) || '',
+        screenshots: (r.screenshots as string[]) || [],
         lf: (r.lf as Setup['lf']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
         rf: (r.rf as Setup['rf']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
         lr: (r.lr as Setup['lr']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
@@ -208,6 +212,8 @@ export async function pullSharedData(userId: string): Promise<{
           pullBarFrameHole: (r.pull_bar_frame_hole as string) || '',
           pullBarRearHole: (r.pull_bar_rear_hole as string) || '',
           pullBarAngle: (r.pull_bar_angle as string) || '',
+          notes: (r.notes as string) || '',
+          screenshots: (r.screenshots as string[]) || [],
           lf: (r.lf as Setup['lf']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
           rf: (r.rf as Setup['rf']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
           lr: (r.lr as Setup['lr']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
@@ -303,4 +309,51 @@ export async function pullTodos(onStatus?: SyncCallback): Promise<Todo[]> {
   const { data } = await supabase.from('todos').select('*').order('updated_at', { ascending: false });
   if (data) onStatus?.(`Pulled ${data.length} To-Do lists`);
   return (data as any) || [];
+}
+
+// ---------------------------------------------------------------------------
+// Supabase Storage — file upload/delete helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Upload a File to the race-attachments bucket.
+ * Requires the user to be authenticated.
+ * Returns the public URL on success, throws on failure.
+ *
+ * Path: {userId}/{entityType}/{entityId}/{timestamp}_{random}.{ext}
+ */
+export async function uploadAttachment(
+  file: File,
+  userId: string,
+  entityType: 'sessions' | 'setups',
+  entityId: string,
+): Promise<string> {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const safeName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const path = `${userId}/${entityType}/${entityId}/${safeName}`;
+
+  const { error } = await supabase.storage
+    .from('race-attachments')
+    .upload(path, file, { upsert: false, contentType: file.type });
+
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+
+  const { data } = supabase.storage.from('race-attachments').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+/**
+ * Delete a file from the race-attachments bucket given its full public URL.
+ * Silently no-ops if the URL is not a Supabase Storage URL.
+ */
+export async function deleteAttachment(publicUrl: string): Promise<void> {
+  try {
+    const marker = '/object/public/race-attachments/';
+    const idx = publicUrl.indexOf(marker);
+    if (idx === -1) return;
+    const path = decodeURIComponent(publicUrl.slice(idx + marker.length));
+    await supabase.storage.from('race-attachments').remove([path]);
+  } catch (e) {
+    console.warn('deleteAttachment failed', e);
+  }
 }

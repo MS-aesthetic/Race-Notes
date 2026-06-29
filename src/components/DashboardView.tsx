@@ -131,7 +131,7 @@ export default function DashboardView({
                         weekend.sessions.map((s) => (
                           <div
                             key={s.id}
-                            onClick={() => onSelectSession(s, wknd.id)}
+                            onClick={() => onSelectSession(s, weekend.id)}
                             id={`session-item-${s.id}`}
                             className="p-3.5 pl-6 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-surface-container-high/40 transition-all cursor-pointer group"
                           >

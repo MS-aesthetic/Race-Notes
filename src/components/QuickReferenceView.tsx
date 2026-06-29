@@ -118,6 +118,23 @@ export default function QuickReferenceView() {
   const [selectedCondition, setSelectedCondition] = useState<string>('all');
   const [selectedComponent, setSelectedComponent] = useState<string>('all');
 
+  // ── Gear Ratio Calculator state ───────────────────────────────────────
+  const [calcOpen, setCalcOpen]       = useState(true);
+  const [topGear, setTopGear]         = useState('');
+  const [bottomGear, setBottomGear]   = useState('');
+  const [driveRatio, setDriveRatio]   = useState('4.86');
+  const [customDrive, setCustomDrive] = useState('');
+
+  const gearResult = useMemo(() => {
+    const top   = parseFloat(topGear);
+    const bot   = parseFloat(bottomGear);
+    const drive = driveRatio === 'custom' ? parseFloat(customDrive) : parseFloat(driveRatio);
+    if (!isNaN(top) && !isNaN(bot) && bot > 0 && !isNaN(drive) && drive > 0) {
+      return (top / bot) * drive;
+    }
+    return null;
+  }, [topGear, bottomGear, driveRatio, customDrive]);
+
   // Gather unique component names for the filter dropdown
   const uniqueComponents = useMemo(() => {
     const list = new Set<string>();
@@ -178,6 +195,116 @@ export default function QuickReferenceView() {
 
   return (
     <div className="space-y-5 text-on-surface pb-8" id="quick-reference-page">
+
+      {/* ── GEAR RATIO CALCULATOR ──────────────────────────────────────── */}
+      <section className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
+        <button
+          onClick={() => setCalcOpen(v => !v)}
+          className="w-full p-4 flex justify-between items-center hover:bg-surface-container-high transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-xl">calculate</span>
+            <div className="text-left">
+              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">
+                Gear Ratio Calculator
+              </h3>
+              <p className="text-[10px] font-mono text-on-surface-variant">
+                (Top Gear ÷ Bottom Gear) × Drive Ratio
+              </p>
+            </div>
+          </div>
+          <span className="material-symbols-outlined text-on-surface-variant">
+            {calcOpen ? 'expand_less' : 'expand_more'}
+          </span>
+        </button>
+
+        {calcOpen && (
+          <div className="p-4 border-t border-outline-variant/60 bg-[#0a0a0a] space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              {/* Top Gear */}
+              <div>
+                <label className="block text-[9px] font-mono uppercase text-on-surface-variant mb-1 font-bold tracking-wider">
+                  Top Gear
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={topGear}
+                  onChange={e => setTopGear(e.target.value)}
+                  placeholder="e.g. 22"
+                  className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-2 outline-none rounded"
+                />
+              </div>
+              {/* Bottom Gear */}
+              <div>
+                <label className="block text-[9px] font-mono uppercase text-on-surface-variant mb-1 font-bold tracking-wider">
+                  Bottom Gear
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={bottomGear}
+                  onChange={e => setBottomGear(e.target.value)}
+                  placeholder="e.g. 10"
+                  className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-2 outline-none rounded"
+                />
+              </div>
+              {/* Drive Ratio */}
+              <div>
+                <label className="block text-[9px] font-mono uppercase text-on-surface-variant mb-1 font-bold tracking-wider">
+                  Drive Ratio
+                </label>
+                <select
+                  value={driveRatio}
+                  onChange={e => setDriveRatio(e.target.value)}
+                  className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-2 outline-none rounded"
+                >
+                  <option value="4.86">4.86 (Default)</option>
+                  <option value="4.11">4.11</option>
+                  <option value="custom">Custom…</option>
+                </select>
+                {driveRatio === 'custom' && (
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    value={customDrive}
+                    onChange={e => setCustomDrive(e.target.value)}
+                    placeholder="e.g. 5.14"
+                    className="w-full mt-1.5 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-2 outline-none rounded"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Result */}
+            {gearResult !== null ? (
+              <div className="bg-surface-container border border-primary/30 rounded-lg p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-mono uppercase text-on-surface-variant font-bold">
+                    Calculated Gear Ratio
+                  </p>
+                  <p className="text-[11px] font-mono text-on-surface-variant/70 mt-0.5">
+                    ({topGear} ÷ {bottomGear}) × {driveRatio === 'custom' ? (customDrive || '?') : driveRatio}
+                  </p>
+                </div>
+                <span className="font-mono text-4xl font-black text-primary tracking-tight">
+                  {gearResult.toFixed(3)}
+                </span>
+              </div>
+            ) : (
+              <div className="bg-surface-container border border-outline-variant/40 rounded-lg p-4 text-center">
+                <p className="font-mono text-xs text-on-surface-variant/50">
+                  Enter Top Gear and Bottom Gear values to calculate
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
       {/* Header Banner */}
       <header className="relative bg-surface-container border border-outline-variant rounded-lg p-5 overflow-hidden">
         <div className="absolute right-0 top-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 pointer-events-none"></div>
@@ -323,12 +450,6 @@ export default function QuickReferenceView() {
               >
                 {/* Header of the troubleshooting group card */}
                 <div className={`p-4 border-b border-outline-variant/60 relative ${isTighten ? 'bg-[#ba1a20]/10' : 'bg-primary/10'}`}>
-                  <div className="absolute right-4 top-4 flex items-center gap-1">
-                    <span className={`w-2 h-2 rounded-full ${isTighten ? 'bg-[#ff5555]' : 'bg-[#55ff55]'}`}></span>
-                    <span className="font-mono text-[9px] uppercase tracking-wider font-bold">
-                      {group.type} style
-                    </span>
-                  </div>
                   <div>
                     <h3 className="font-display font-extrabold text-sm sm:text-base text-on-surface uppercase tracking-wide">
                       {group.title}

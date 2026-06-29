@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActiveSession, TireDetails, RaceWeekend } from '../types';
+import { ActiveSession, TireDetails, RaceWeekend, SessionRecord } from '../types';
 import { User } from '@supabase/supabase-js';
 
 interface RaceWeekendViewProps {
@@ -277,7 +277,7 @@ export default function RaceWeekendView({ session, weekends, onUpdateSession, on
               <input type="file" multiple accept="image/*" className="hidden" onChange={handleCreateScreenshot} />
             </label>
           </div>
-          
+
           {session.screenshots && session.screenshots.length > 0 && (
             <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar">
               {session.screenshots.map((src, i) => (

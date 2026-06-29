@@ -18,12 +18,16 @@ export interface CornerSetup {
   wheelSpacerUnit?: string; // in
   tirePress: string;
   tirePressUnit?: string; // psi
+  tireInventoryId?: string; // reference to TireInventoryItem.id
+  backspacing?: string; // wheel backspacing in inches
 
   // Rear specific
   springHeight?: string;
   springHeightUnit?: string;
   load?: string;
   loadUnit?: string;
+  topBarLength?: string; // Top bar length
+  bottomBarLength?: string; // Bottom bar length
   topBarHFrame?: string;
   topBarHBird?: string;
   topBarAngRH?: string;
@@ -52,18 +56,36 @@ export interface Setup {
   lr: CornerSetup;
   rr: CornerSetup;
   gear?: string;
+  toe?: string;
+  jbar?: string;
+  jbarFrameHeight?: string;
+  jbarPinionHeight?: string;
   frontStagger?: string;
   rearStagger?: string;
   pullBarFrameHole?: string;
   pullBarRearHole?: string;
   pullBarAngle?: string;
   notes?: string;
+  /** Supabase Storage public URLs for attached photos/files */
+  screenshots?: string[];
+}
+
+export interface TireInventoryItem {
+  id: string;
+  tireNumber: string;
+  size: string;
+  compound: string;
+  wheelBackspacing: '2' | '3' | '4';
+  durometer: string;
 }
 
 export interface TireDetails {
   compound: string;
   size: string;
   airPressure: string;
+  tireId?: string;
+  durometer?: string;
+  backSpacing?: string;
 }
 
 export interface SessionRecord {
@@ -167,7 +189,12 @@ export interface ActiveSession {
 export interface TodoItem {
   id: string;
   text: string;
+  /** Notes/description set when the item is created */
   desc?: string;
+  /** Note recorded when the item is checked off */
+  completionNote?: string;
+  /** ISO timestamp when item was completed */
+  completedAt?: string;
   done: boolean;
 }
 
@@ -193,3 +220,9 @@ export interface TeamMember {
   role: 'owner' | 'member';
 }
 
+/** App-wide visual theme stored in localStorage key: race_notes_theme */
+export interface AppTheme {
+  mode: 'dark' | 'light';
+  /** Hex color string e.g. "#ffb3ac" */
+  accent: string;
+}

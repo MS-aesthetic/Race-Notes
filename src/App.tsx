@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '@supabase/supabase-js';
-import { Setup, SessionRecord, ActiveSession, RaceWeekend } from './types';
+import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem } from './types';
 import {
   INITIAL_SETUP,
   INITIAL_SETUPS,
@@ -17,12 +17,11 @@ import SetupView from './components/SetupView';
 import RaceWeekendView from './components/RaceWeekendView';
 import SettingsView from './components/SettingsView';
 import QuickReferenceView from './components/QuickReferenceView';
-import SmasherLoadsView from './components/SmasherLoadsView';
 import ToDoView from './components/ToDoView';
 import { Todo } from './types';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'smasherloads' | 'todos'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'todos'>('dashboard');
   const [setup, setSetup] = useState<Setup>(INITIAL_SETUP);
   const [savedSetups, setSavedSetups] = useState<Setup[]>(INITIAL_SETUPS);
   const [weekends, setWeekends] = useState<RaceWeekend[]>(INITIAL_WEEKENDS);
@@ -31,6 +30,46 @@ export default function App() {
     const saved = localStorage.getItem('race_notes_todos');
     return saved ? JSON.parse(saved) : [];
   });
+
+  const [tireInventory, setTireInventory] = useState<TireInventoryItem[]>(() => {
+    const saved = localStorage.getItem('race_notes_tires');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const handleSaveTires = (updated: TireInventoryItem[]) => {
+    setTireInventory(updated);
+    localStorage.setItem('race_notes_tires', JSON.stringify(updated));
+  };
+
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  const [theme, setTheme] = useState<AppTheme>(() => {
+    try {
+      const saved = localStorage.getItem('race_notes_theme');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { mode: 'dark', accent: '#ffb3ac' };
+  });
+
+  const handleThemeChange = (updated: AppTheme) => {
+    setTheme(updated);
+    localStorage.setItem('race_notes_theme', JSON.stringify(updated));
+  };
+
+  // Apply theme tokens to document root whenever theme changes
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme.mode);
+    const hex = theme.accent;
+    root.style.setProperty('--color-primary', hex);
+    root.style.setProperty('--color-primary-fixed-dim', hex);
+    root.style.setProperty('--color-surface-tint', hex);
+    // Derive on-primary contrast colour
+    const r = parseInt(hex.slice(1, 3), 16) || 0;
+    const g = parseInt(hex.slice(3, 5), 16) || 0;
+    const b = parseInt(hex.slice(5, 7), 16) || 0;
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    root.style.setProperty('--color-on-primary', luma > 160 ? '#1a0003' : '#ffffff');
+  }, [theme]);
 
   // ---- Auth & Cloud Sync State ----
   const [user, setUser] = useState<User | null>(null);
@@ -579,6 +618,9 @@ export default function App() {
                 <SetupView
                   savedSetups={savedSetups}
                   activeSetupId={setup.id}
+                  user={user}
+                  tireInventory={tireInventory}
+                  onSaveTires={handleSaveTires}
                   onSaveSetups={(updatedSetups, activeId) => {
                     setSavedSetups(updatedSetups);
                     localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
@@ -664,6 +706,8 @@ export default function App() {
                   onAuthChange={(u) => setUser(u)}
                   setup={setup}
                   activeSession={activeSession}
+                  theme={theme}
+                  onThemeChange={handleThemeChange}
                 />
               )}
 
@@ -671,9 +715,6 @@ export default function App() {
                 <QuickReferenceView />
               )}
 
-              {activeTab === 'smasherloads' && (
-                <SmasherLoadsView />
-              )}
 
               {activeTab === 'todos' && (
                 <ToDoView 
@@ -747,7 +788,7 @@ export default function App() {
               timer
             </span>
             <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
-              Weekend
+              Sessions
             </span>
           </button>
 
@@ -767,25 +808,6 @@ export default function App() {
             </span>
             <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
               Reference
-            </span>
-          </button>
-
-          {/* Smasher Loads Button */}
-          <button
-            onClick={() => setActiveTab('smasherloads')}
-            id="tab-btn-smasherloads"
-            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
-              activeTab === 'smasherloads' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
-            }`}
-          >
-            <span
-              className="material-symbols-outlined text-[20px]"
-              style={{ fontVariationSettings: activeTab === 'smasherloads' ? "'FILL' 1" : "'FILL' 0" }}
-            >
-              show_chart
-            </span>
-            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider text-center leading-[10px]">
-              Smasher<br/>Loads
             </span>
           </button>
 
