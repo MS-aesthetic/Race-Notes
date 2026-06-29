@@ -777,8 +777,8 @@ export default function QuickReferenceView() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-xl">schema</span>
             <div className="text-left">
-              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Shock Quick Reference</h3>
-              <p className="text-[10px] font-mono text-on-surface-variant">Shock adjustment matrix + corner-by-corner guide + baseline specs</p>
+              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Shock Adjustment Handling Impacts</h3>
+              <p className="text-[10px] font-mono text-on-surface-variant">How each shock change affects handling — entry · middle · exit</p>
             </div>
           </div>
           <span className="material-symbols-outlined text-on-surface-variant">{shockOpen ? 'expand_less' : 'expand_more'}</span>
@@ -882,6 +882,42 @@ export default function QuickReferenceView() {
                 ))}
               </div>
             </div>
+            {/* Shock → Handling Impact Summary */}
+            <div>
+              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest mb-2">Shock Adjustment → Handling Impact — At a Glance</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[10px] font-mono border-collapse">
+                  <thead>
+                    <tr className="text-on-surface-variant">
+                      <th className="text-left p-1.5 border border-outline-variant/30">Corner</th>
+                      <th className="text-left p-1.5 border border-outline-variant/30">Adj.</th>
+                      <th className="text-left p-1.5 border border-outline-variant/30 text-[#ff5555]">↑ Stiffen →</th>
+                      <th className="text-left p-1.5 border border-outline-variant/30 text-primary">↓ Soften →</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-[#dfdad8]">
+                    {[
+                      ['LF', 'Comp', 'Tighter entry — slows nose dive on turn-in', 'Looser entry — faster nose dive, more rotation'],
+                      ['LF', 'Reb', 'Tighter middle — holds LF corner loaded through apex', 'Looser middle/exit — frees LF, shifts weight rearward on throttle'],
+                      ['RF', 'Comp', 'Tighter entry — resists rapid chassis roll onto RF', 'Looser entry — faster roll onto RF, quicker turn-in response'],
+                      ['RF', 'Reb', 'Tighter middle & exit — holds nose down, prevents early lift', 'Looser middle & exit — nose rises faster, weight transfers rearward quickly'],
+                      ['LR', 'Comp', 'Tighter middle & exit — preserves trailing arm geometry under throttle', 'Looser exit / more drive — smooth progressive squat, more forward bite'],
+                      ['LR', 'Reb', 'Tighter entry — "ties down" LR under braking, rear stays planted', 'Looser entry — LR extends freely, reduces rear snap on turn-in'],
+                      ['RR', 'Comp', 'Tighter middle — controls lateral weight transfer rate to RR', 'Loosens exit snap — absorbs torque hit, RR cushions on throttle'],
+                      ['RR', 'Reb', 'Tighter exit — holds RR side bite, car stays planted in groove', 'Looser exit — releases RR side bite faster, car can rotate off corner'],
+                    ].map(([corner, adj, stiffen, soften]) => (
+                      <tr key={`${corner}-${adj}`} className="border-b border-outline-variant/20">
+                        <td className="p-1.5 border border-outline-variant/30 text-on-surface font-black">{corner}</td>
+                        <td className="p-1.5 border border-outline-variant/30 text-on-surface-variant font-bold">{adj}</td>
+                        <td className="p-1.5 border border-outline-variant/30 text-[#ff8888]">{stiffen}</td>
+                        <td className="p-1.5 border border-outline-variant/30 text-primary">{soften}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             {/* Baseline specs */}
             <div className="space-y-2">
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Baseline Specs — Modified &amp; Late Model (4-Bar)</p>
@@ -937,8 +973,8 @@ export default function QuickReferenceView() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-xl">linear_scale</span>
             <div className="text-left">
-              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">4-Link Position Reference</h3>
-              <p className="text-[10px] font-mono text-on-surface-variant">LR &amp; RR bar angles — what each adjustment does</p>
+              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">4-Link Adjustments</h3>
+              <p className="text-[10px] font-mono text-on-surface-variant">All four bars — entry, center &amp; exit handling impacts</p>
             </div>
           </div>
           <span className="material-symbols-outlined text-on-surface-variant">{fourLinkOpen ? 'expand_less' : 'expand_more'}</span>
@@ -1045,6 +1081,43 @@ export default function QuickReferenceView() {
                     <li>Loosens exit, reduces dead-hook tendency</li>
                   </ul>
                 </div>
+              </div>
+            </div>
+
+            {/* 4-Link Handling Scenario Quick Guide */}
+            <div>
+              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest mb-2">4-Link Handling Scenario Quick Guide</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[10px] font-mono border-collapse">
+                  <thead>
+                    <tr className="text-on-surface-variant">
+                      <th className="text-left p-1.5 border border-outline-variant/30">Car Behavior</th>
+                      <th className="text-left p-1.5 border border-outline-variant/30">Bar</th>
+                      <th className="text-left p-1.5 border border-outline-variant/30">Adjustment</th>
+                      <th className="text-left p-1.5 border border-outline-variant/30">Handling Result</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-[#dfdad8]">
+                    {[
+                      ['Loose Entry', 'RR Lower', 'Flatter — lower on chassis', 'Less roll steer → rear axle tracks squarer, more stable on turn-in'],
+                      ['Tight Entry', 'RR Lower', 'Steeper — raise chassis', 'More roll steer → forces RR wheel forward, promotes rotation at turn-in'],
+                      ['Loose Center', 'LR Lower', 'Flatter — lower on chassis', 'Holds spring load longer → less roll steer, tightens the middle'],
+                      ['Tight Center', 'LR Lower', 'Steeper — raise chassis / lower birdcage', 'More roll steer under throttle → loosens middle, adds rotation through apex'],
+                      ['Tight Center', 'LR Upper', 'Raise on chassis', 'Increases anti-squat angle → assists mid-corner rotation when apex is tight'],
+                      ['Loose Exit', 'LR Upper', 'Steeper — raise chassis / lower birdcage', 'Max anti-squat → LR tire clamped to track = max forward bite, tightens exit'],
+                      ['Tight Exit', 'LR Lower', 'Steeper — raise chassis / lower birdcage', 'Faster hike-up speed → more aggressive rear steer → loosens exit rotation'],
+                      ['Need Drive', 'LR Upper', 'Steepen to maximum safe angle', 'Maximum vertical clamping force on LR footprint under acceleration'],
+                      ['Need Drive', 'LR Lower', 'Flatten — lower on chassis', 'Holds spring load longer during hike-up → sustained forward bite off corner'],
+                    ].map(([behavior, bar, adj, result], i) => (
+                      <tr key={i} className="border-b border-outline-variant/20">
+                        <td className="p-1.5 border border-outline-variant/30 text-on-surface-variant font-bold">{behavior}</td>
+                        <td className="p-1.5 border border-outline-variant/30 text-on-surface font-bold">{bar}</td>
+                        <td className="p-1.5 border border-outline-variant/30">{adj}</td>
+                        <td className="p-1.5 border border-outline-variant/30 text-primary">{result}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
