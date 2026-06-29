@@ -491,6 +491,35 @@ export default function App() {
     setActiveTab('raceweekend');
   };
 
+  const handleDeleteWeekend = (weekendId: string) => {
+    if (!window.confirm('Delete this race weekend and all its sessions? This cannot be undone.')) return;
+    const updated = weekends.filter(w => w.id !== weekendId);
+    setWeekends(updated);
+    localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
+    if (user) pushWeekends(updated, user.id);
+  };
+
+  const handleDeleteSession = (weekendId: string, sessionId: string) => {
+    if (!window.confirm('Delete this session? This cannot be undone.')) return;
+    const updated = weekends.map(w =>
+      w.id === weekendId ? { ...w, sessions: w.sessions.filter(s => s.id !== sessionId) } : w
+    );
+    setWeekends(updated);
+    localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
+    if (user) pushWeekends(updated, user.id);
+    // If we just deleted the active session, clear weekendId so view resets
+    if (activeSession.id === sessionId) {
+      setActiveSession(prev => ({ ...prev, id: undefined, weekendId: undefined }));
+    }
+  };
+
+  const handleUpdateWeekend = (updated: RaceWeekend) => {
+    const updatedList = weekends.map(w => w.id === updated.id ? updated : w);
+    setWeekends(updatedList);
+    localStorage.setItem('race_notes_weekends', JSON.stringify(updatedList));
+    if (user) pushWeekends(updatedList, user.id);
+  };
+
   const handleSelectRecentSession = (rec: SessionRecord, weekendId: string) => {
     // Dynamically spawn details in modal or swap session
     const restoredSession: ActiveSession = {
@@ -531,6 +560,8 @@ export default function App() {
         rr: '13.5 psi',
       },
       competitionNotes: rec.competitionNotes || 'Enter comments here...',
+      screenshots: rec.screenshots || [],
+      dynoPhotos: rec.dynoPhotos || [],
     };
     setActiveSession(restoredSession);
   };
@@ -621,6 +652,7 @@ export default function App() {
                     handleSelectRecentSession(rec, weekendId || '');
                     setActiveTab('raceweekend');
                   }}
+                  onDeleteWeekend={handleDeleteWeekend}
                 />
               )}
 
@@ -705,6 +737,8 @@ export default function App() {
                   session={activeSession}
                   weekends={weekends}
                   onUpdateSession={handleUpdateSession}
+                  onUpdateWeekend={handleUpdateWeekend}
+                  onDeleteSession={handleDeleteSession}
                   onSelectSession={(rec, weekendId) => handleSelectRecentSession(rec, weekendId)}
                 />
               )}
@@ -718,6 +752,10 @@ export default function App() {
                   activeSession={activeSession}
                   theme={theme}
                   onThemeChange={handleThemeChange}
+                  weekends={weekends}
+                  todos={todos}
+                  accounting={accounting}
+                  shopping={shopping}
                 />
               )}
 
@@ -731,6 +769,7 @@ export default function App() {
                   todos={todos}
                   teamMembers={teamMembers}
                   currentUserId={user?.id ?? null}
+                  weekends={weekends}
                   onSaveTodos={(updated) => {
                     setTodos(updated);
                     localStorage.setItem('race_notes_todos', JSON.stringify(updated));
