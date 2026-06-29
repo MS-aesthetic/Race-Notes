@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Setup, ActiveSession, RaceWeekend } from '../types';
+import { Setup, ActiveSession, RaceWeekend, AccountingEntry, ShoppingItem, Todo } from '../types';
 import { User } from '@supabase/supabase-js';
 import { pullSharedData } from '../lib/sync';
 
@@ -9,9 +9,13 @@ interface ExportViewProps {
   activeSession: ActiveSession;
   onImportSetup?: (setup: Setup) => void;
   onImportWeekend?: (weekend: RaceWeekend) => void;
+  weekends?: RaceWeekend[];
+  todos?: Todo[];
+  accounting?: AccountingEntry[];
+  shopping?: ShoppingItem[];
 }
 
-export default function ExportView({ user = null, setup, activeSession, onImportSetup, onImportWeekend }: ExportViewProps) {
+export default function ExportView({ user = null, setup, activeSession, onImportSetup, onImportWeekend, weekends = [], todos = [], accounting = [], shopping = [] }: ExportViewProps) {
   const [cloudSync, setCloudSync] = useState(true);
   const [sharedSetups, setSharedSetups] = useState<Setup[]>([]);
   const [sharedWeekends, setSharedWeekends] = useState<RaceWeekend[]>([]);
@@ -43,6 +47,119 @@ export default function ExportView({ user = null, setup, activeSession, onImport
   };
 
   const selectedCount = items.filter((it) => it.checked).length;
+
+  // Weekend Report state
+  const [selectedWeekendId, setSelectedWeekendId] = useState<string>(weekends[0]?.id || '');
+
+  const handleWeekendReport = () => {
+    const weekend = weekends.find(w => w.id === selectedWeekendId);
+    if (!weekend) { alert('Select a race weekend first.'); return; }
+
+    const linkedTasks = todos.flatMap(t => t.items.filter(i => i.weekendId === weekend.id));
+    const linkedAccounting = accounting.filter(e => e.weekendId === weekend.id);
+    const linkedShopping = shopping.filter(s => s.weekendId === weekend.id);
+
+    const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+    const totalIncome = linkedAccounting.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
+    const totalExpense = linkedAccounting.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
+    const shoppingTotal = linkedShopping.reduce((s, i) => s + (i.cost ?? 0), 0);
+
+    const sessionsHtml = weekend.sessions.map(s => `
+      <div class="session-card">
+        <div class="session-header">
+          <strong>${s.name}</strong>
+          <span>${s.type}</span>
+        </div>
+        <table><tbody>
+          <tr><td>Best Lap</td><td><strong>${s.bestLap || '—'}</strong></td><td>Finish</td><td><strong>${s.finishPos || '—'}</strong></td></tr>
+          <tr><td>Conditions</td><td colspan="3">${s.condition || '—'}</td></tr>
+          <tr><td>Weather</td><td colspan="3">${s.weather || '—'}</td></tr>
+          <tr><td>Setup</td><td colspan="3">${s.setupUsed || '—'}</td></tr>
+          ${s.adjustments?.length ? `<tr><td valign="top">Adjustments</td><td colspan="3">${s.adjustments.map(a => `${a.label} ${a.value}`).join(' · ')}</td></tr>` : ''}
+          ${s.diagnostics ? `<tr><td valign="top">Driver Feedback</td><td colspan="3">Entry: ${s.diagnostics.cornerEntry} · Apex: ${s.diagnostics.centerApex} · Exit: ${s.diagnostics.cornerExit}</td></tr>` : ''}
+          ${s.competitionNotes ? `<tr><td valign="top">Notes</td><td colspan="3">${s.competitionNotes}</td></tr>` : ''}
+        </tbody></table>
+      </div>
+    `).join('');
+
+    const accountingHtml = linkedAccounting.length ? `
+      <table><thead><tr><th>Name</th><th>Type</th><th>Amount</th><th>Payer</th><th>Payee</th></tr></thead><tbody>
+        ${linkedAccounting.map(e => `<tr><td>${e.name}</td><td>${e.type}</td><td>${e.type === 'income' ? '+' : '−'}${fmt(e.amount)}</td><td>${e.payer || '—'}</td><td>${e.payee || '—'}</td></tr>`).join('')}
+        <tr class="total-row"><td colspan="2"><strong>Net</strong></td><td><strong>${fmt(totalIncome - totalExpense)}</strong></td><td colspan="2">Income: ${fmt(totalIncome)} · Expenses: ${fmt(totalExpense)}</td></tr>
+      </tbody></table>` : '<p class="empty">No accounting entries linked to this weekend.</p>';
+
+    const shoppingHtml = linkedShopping.length ? `
+      <table><thead><tr><th>Item</th><th>Cost</th><th>Status</th></tr></thead><tbody>
+        ${linkedShopping.map(i => `<tr><td>${i.name}${i.description ? `<br><small>${i.description}</small>` : ''}</td><td>${i.cost != null ? fmt(i.cost) : '—'}</td><td>${i.purchased ? '✓ Purchased' : 'Needed'}</td></tr>`).join('')}
+        <tr class="total-row"><td colspan="1"><strong>Estimated Total</strong></td><td><strong>${fmt(shoppingTotal)}</strong></td><td></td></tr>
+      </tbody></table>` : '<p class="empty">No shopping items linked to this weekend.</p>';
+
+    const tasksHtml = linkedTasks.length ? `<ul>${linkedTasks.map(t => `<li class="${t.done ? 'done' : ''}">${t.done ? '✓' : '○'} ${t.text}${t.completionNote ? ` — <em>${t.completionNote}</em>` : ''}</li>`).join('')}</ul>` : '<p class="empty">No tasks linked to this weekend.</p>';
+
+    const weatherHtml = weekend.weather ? `
+      <table><tbody>
+        <tr><td>Location</td><td><strong>${weekend.weather.location}</strong></td></tr>
+        <tr><td>Temperature</td><td>${weekend.weather.temp}°F</td></tr>
+        <tr><td>Conditions</td><td>${weekend.weather.condition}</td></tr>
+        <tr><td>Humidity</td><td>${weekend.weather.humidity}%</td></tr>
+        <tr><td>Wind</td><td>${weekend.weather.windSpeed} mph</td></tr>
+        <tr><td>Fetched</td><td>${new Date(weekend.weather.fetchedAt).toLocaleString()}</td></tr>
+      </tbody></table>` : '<p class="empty">No weather data saved for this weekend.</p>';
+
+    const pw = window.open('', '_blank');
+    if (!pw) { alert('Allow popups to export the report.'); return; }
+    pw.document.write(`<!DOCTYPE html><html><head><title>Weekend Report — ${weekend.name}</title><style>
+      body{font-family:sans-serif;color:#111;padding:32px;max-width:900px;margin:0 auto;line-height:1.5}
+      .header{border-bottom:3px solid #ba1a20;padding-bottom:16px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start}
+      .logo{font-size:20px;font-weight:900;color:#ba1a20;text-transform:uppercase;letter-spacing:-1px}
+      h1{color:#ba1a20;text-transform:uppercase;font-size:22px;margin:0 0 4px}
+      h2{text-transform:uppercase;font-size:14px;color:#444;border-bottom:1px solid #ddd;padding-bottom:6px;margin:24px 0 12px}
+      table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px}
+      th{background:#f0f0f0;text-align:left;padding:6px 10px;font-size:12px;text-transform:uppercase}
+      td{padding:5px 10px;border-bottom:1px solid #eee;vertical-align:top}
+      .total-row td{font-weight:bold;background:#fafafa;border-top:2px solid #ddd}
+      .session-card{border:1px solid #ddd;padding:12px 16px;margin-bottom:12px;border-left:4px solid #ba1a20}
+      .session-header{display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;font-weight:bold;text-transform:uppercase}
+      ul{list-style:none;padding:0;margin:0}
+      li{padding:4px 0;border-bottom:1px solid #eee;font-size:13px}
+      li.done{color:#888;text-decoration:line-through}
+      .empty{color:#999;font-size:13px;font-style:italic}
+      small{color:#777}
+      @media print{body{padding:16px}}
+    </style></head><body>
+      <div class="header">
+        <div>
+          <div class="logo">CREW CHIEF — Weekend Report</div>
+          <div style="font-size:12px;color:#555;margin-top:4px">Generated ${new Date().toLocaleString()}</div>
+        </div>
+        <div style="text-align:right;font-size:12px;color:#555">
+          <div>${weekend.sessions.length} Session${weekend.sessions.length !== 1 ? 's' : ''}</div>
+        </div>
+      </div>
+
+      <h1>${weekend.name}</h1>
+      <p style="color:#555;font-size:14px">${weekend.track} · ${weekend.date}</p>
+      ${weekend.notes ? `<div style="background:#f9f9f9;border-left:3px solid #ba1a20;padding:10px 14px;margin:12px 0;font-size:13px">${weekend.notes}</div>` : ''}
+
+      <h2>Weather & Location</h2>
+      ${weatherHtml}
+
+      <h2>Sessions (${weekend.sessions.length})</h2>
+      ${weekend.sessions.length ? sessionsHtml : '<p class="empty">No sessions recorded.</p>'}
+
+      <h2>Tasks Linked to This Weekend</h2>
+      ${tasksHtml}
+
+      <h2>Accounting</h2>
+      ${accountingHtml}
+
+      <h2>Shopping List</h2>
+      ${shoppingHtml}
+
+      <script>window.onload=()=>{window.print()}</script>
+    </body></html>`);
+    pw.document.close();
+  };
 
   const handlePrint = () => {
     // Dynamically trigger print for the report layout
@@ -344,6 +461,64 @@ export default function ExportView({ user = null, setup, activeSession, onImport
           </button>
         </div>
       </div>
+
+      {/* Weekend Report Section */}
+      {weekends.length > 0 && (
+        <div className="pt-6 border-t border-outline-variant space-y-4">
+          <div>
+            <h2 className="font-display text-xl uppercase font-bold text-on-surface">Weekend Report</h2>
+            <p className="text-on-surface-variant font-mono text-xs mt-1">Export a full weekend summary — sessions, weather, notes, tasks, accounting, and shopping all in one PDF.</p>
+          </div>
+
+          <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+            <label className="font-mono text-[10px] uppercase font-bold text-on-surface-variant tracking-wider block">Select Weekend</label>
+            <div className="relative">
+              <select
+                value={selectedWeekendId}
+                onChange={e => setSelectedWeekendId(e.target.value)}
+                className="w-full bg-[#0e0e0e] border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-3 rounded-lg outline-none appearance-none cursor-pointer pr-8"
+              >
+                {weekends.map(w => (
+                  <option key={w.id} value={w.id}>{w.name} — {w.track} ({w.date})</option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
+            </div>
+
+            {selectedWeekendId && (() => {
+              const w = weekends.find(x => x.id === selectedWeekendId);
+              if (!w) return null;
+              const linkedTasks = todos.flatMap(t => t.items.filter(i => i.weekendId === w.id));
+              const linkedAcct = accounting.filter(e => e.weekendId === w.id);
+              const linkedShop = shopping.filter(s => s.weekendId === w.id);
+              return (
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  {[
+                    { label: 'Sessions', value: w.sessions.length, icon: 'timer' },
+                    { label: 'Tasks', value: linkedTasks.length, icon: 'checklist' },
+                    { label: 'Expenses', value: linkedAcct.length, icon: 'account_balance' },
+                    { label: 'Shopping', value: linkedShop.length, icon: 'shopping_cart' },
+                  ].map(({ label, value, icon }) => (
+                    <div key={label} className="bg-surface border border-outline-variant/50 rounded p-2">
+                      <span className="material-symbols-outlined text-primary text-[14px] block">{icon}</span>
+                      <p className="font-mono text-lg font-bold text-on-surface">{value}</p>
+                      <p className="font-mono text-[9px] text-on-surface-variant uppercase">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            <button
+              onClick={handleWeekendReport}
+              className="w-full py-3 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80 flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+              Export Weekend Report
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Shared With Me Section */}
       <div className="mt-8 pt-8 border-t border-outline-variant">

@@ -3,7 +3,7 @@ import AuthView from './AuthView';
 import ExportView from './ExportView';
 import { User } from '@supabase/supabase-js';
 import { AppUser } from '../lib/supabase';
-import { Setup, ActiveSession, AppTheme } from '../types';
+import { Setup, ActiveSession, AppTheme, RaceWeekend, AccountingEntry, ShoppingItem, Todo } from '../types';
 
 interface SettingsViewProps {
   user: User | null;
@@ -13,6 +13,10 @@ interface SettingsViewProps {
   activeSession: ActiveSession;
   theme: AppTheme;
   onThemeChange: (t: AppTheme) => void;
+  weekends?: RaceWeekend[];
+  todos?: Todo[];
+  accounting?: AccountingEntry[];
+  shopping?: ShoppingItem[];
 }
 
 const ACCENT_PRESETS = [
@@ -24,7 +28,7 @@ const ACCENT_PRESETS = [
   { label: 'Cyan',        hex: '#7de8e8' },
 ];
 
-export default function SettingsView({ user, profile, onAuthChange, setup, activeSession, theme, onThemeChange }: SettingsViewProps) {
+export default function SettingsView({ user, profile, onAuthChange, setup, activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], shopping = [] }: SettingsViewProps) {
   const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export'>('account');
 
   return (
@@ -215,7 +219,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
           </div>
         )}
 
-        {subTab === 'export' && <ExportView setup={setup} activeSession={activeSession} />}
+        {subTab === 'export' && <ExportView setup={setup} activeSession={activeSession} weekends={weekends} todos={todos} accounting={accounting} shopping={shopping} />}
       </div>
     </div>
   );

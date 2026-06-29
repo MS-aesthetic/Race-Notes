@@ -128,6 +128,18 @@ export interface SessionRecord {
   time?: string;
   setupUsed?: string;
   screenshots?: string[];
+  /** Shock dyno graph images (base64) */
+  dynoPhotos?: string[];
+}
+
+/** Weather snapshot fetched via GPS or zip code */
+export interface WeatherSnapshot {
+  temp: number;
+  humidity: number;
+  windSpeed: number;
+  condition: string;
+  location: string;
+  fetchedAt: string;
 }
 
 export interface RaceWeekend {
@@ -136,6 +148,12 @@ export interface RaceWeekend {
   track: string;
   date: string;
   sessions: SessionRecord[];
+  /** Free-text notes for the entire weekend */
+  notes?: string;
+  /** Weather fetched from GPS or zip */
+  weather?: WeatherSnapshot;
+  /** Human-readable location string */
+  location?: string;
 }
 
 export interface SetupAdjustment {
@@ -184,6 +202,8 @@ export interface ActiveSession {
   };
   competitionNotes: string;
   screenshots?: string[];
+  /** Shock dyno graph images (base64) */
+  dynoPhotos?: string[];
 }
 
 export interface TodoItem {
@@ -200,6 +220,9 @@ export interface TodoItem {
   assignedTo?: string;
   /** Display name of assigned member (cached for offline display) */
   assignedToName?: string;
+  /** Optional link to a race weekend */
+  weekendId?: string;
+  weekendName?: string;
 }
 
 export interface Todo {
@@ -237,6 +260,11 @@ export interface AccountingEntry {
   /** Who received / where money went */
   payee?: string;
   date: string;
+  /** Optional link to a race weekend */
+  weekendId?: string;
+  weekendName?: string;
+  /** Base64 receipt photo */
+  receiptPhoto?: string;
 }
 
 /** Single item on a shopping list */
@@ -247,6 +275,9 @@ export interface ShoppingItem {
   cost?: number;
   purchased: boolean;
   purchasedAt?: string;
+  /** Optional link to a race weekend */
+  weekendId?: string;
+  weekendName?: string;
 }
 
 /** App-wide visual theme stored in localStorage key: race_notes_theme */

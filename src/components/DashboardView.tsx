@@ -9,6 +9,7 @@ interface DashboardViewProps {
   onStartNewSession: () => void;
   onSelectSession: (session: SessionRecord, weekendId?: string) => void;
   onEditSetup?: () => void;
+  onDeleteWeekend: (weekendId: string) => void;
 }
 
 export default function DashboardView({
@@ -19,6 +20,7 @@ export default function DashboardView({
   onStartNewSession,
   onSelectSession,
   onEditSetup,
+  onDeleteWeekend,
 }: DashboardViewProps) {
   // Use mockup tire readings or the custom modified values
   const lfPress = setup.lf.tirePress !== '10.0' ? setup.lf.tirePress : '12.5';
@@ -151,6 +153,13 @@ export default function DashboardView({
                       <span className="px-2 py-0.5 bg-surface-bright border border-outline-variant text-[10px] uppercase font-bold text-on-surface-variant rounded font-mono">
                         {weekend.sessions.length} {weekend.sessions.length === 1 ? 'Sess.' : 'Sess.'}
                       </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDeleteWeekend(weekend.id); }}
+                        className="material-symbols-outlined text-on-surface-variant/40 hover:text-red-400 text-[18px] transition-colors p-1 rounded"
+                        title="Delete weekend"
+                      >
+                        delete
+                      </button>
                       <span
                         className="material-symbols-outlined text-on-surface-variant transition-transform duration-200"
                         style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}
