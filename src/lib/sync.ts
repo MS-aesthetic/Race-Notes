@@ -293,6 +293,14 @@ export function mergeIntoLocalStorage(
   return false;
 }
 
+/** Hard-delete a single race weekend row from Supabase */
+export async function deleteWeekendFromCloud(weekendId: string): Promise<void> {
+  try {
+    const { error } = await supabase.from('race_weekends').delete().eq('id', weekendId);
+    if (error) console.warn('Sync: deleteWeekendFromCloud error:', error.message);
+  } catch (e) { console.warn('Sync: deleteWeekendFromCloud failed', e); }
+}
+
 export function pushTodos(todos: Todo[], userId: string, onStatus?: SyncCallback) {
   const key = 'todos';
   if (pushDebounceTimers.has(key)) clearTimeout(pushDebounceTimers.get(key)!);

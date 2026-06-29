@@ -10,7 +10,7 @@ import {
 } from './data';
 
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, AppUser } from './lib/supabase';
-import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos } from './lib/sync';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud } from './lib/sync';
 
 import DashboardView from './components/DashboardView';
 import SetupView from './components/SetupView';
@@ -415,6 +415,21 @@ export default function App() {
     } catch { setSessionWeatherError('Could not fetch weather.'); setSessionWeatherLoading(false); }
   };
 
+  // ── Open session creation form ────────────────────────────────────────────────
+
+  const handleOpenNewSessionForm = (preferWeekendId?: string) => {
+    const targetId = preferWeekendId || activeSession.weekendId || (weekends[0]?.id ?? '');
+    if (targetId) setNewSessionWeekendId(targetId);
+    setNewSessionType('Test');
+    setNewSessionCond('');
+    setSessionWeatherStr('');
+    setSessionWeatherError('');
+    setShowSessionZipInput(false);
+    setSessionZipCode('');
+    setNewSessionTimeOfDay('current');
+    setShowNewSessionForm(true);
+  };
+
   // ── Auto-number session name ─────────────────────────────────────────────────
 
   const buildSessionName = (type: string, weekendId: string): string => {
@@ -593,6 +608,8 @@ export default function App() {
     const updated = weekends.filter(w => w.id !== weekendId);
     setWeekends(updated);
     localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
+    // Hard-delete from cloud so it doesn't come back on next sync pull
+    deleteWeekendFromCloud(weekendId);
     if (user) pushWeekends(updated, user.id);
   };
 
@@ -690,24 +707,7 @@ export default function App() {
                   {syncStatus}
                 </span>
               )}
-              {activeTab === 'raceweekend' && (
-                <button
-                  onClick={() => {
-                    if (weekends.length > 0) {
-                      setNewSessionWeekendId(weekends[0].id);
-                    }
-                    setNewSessionName('');
-                    setNewSessionType('');
-                    setNewSessionCond('');
-                    setNewSessionWeather('');
-                    setShowNewSessionForm(true);
-                  }}
-                  id="top-action-new-session"
-                  className="font-mono text-[10px] text-primary hover:text-primary-fixed uppercase hover:bg-surface-container-high transition-colors px-2 py-1 active:opacity-80 border border-outline-variant/60 font-semibold rounded-sm"
-                >
-                  + SESSION
-                </button>
-              )}
+{/* +Session moved into RaceWeekendView as a prominent top-center button */}
             </div>
           </div>
         </header>
@@ -734,16 +734,7 @@ export default function App() {
                     setNewWeekendDate(new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
                     setShowNewWeekendForm(true);
                   }}
-                  onStartNewSession={() => {
-                    if (weekends.length > 0) {
-                      setNewSessionWeekendId(weekends[0].id);
-                    }
-                    setNewSessionName('');
-                    setNewSessionType('');
-                    setNewSessionCond('');
-                    setNewSessionWeather('');
-                    setShowNewSessionForm(true);
-                  }}
+                  onStartNewSession={() => handleOpenNewSessionForm()}
                   onEditSetup={() => setActiveTab('setups')}
                   onSelectSession={(rec, weekendId) => {
                     handleSelectRecentSession(rec, weekendId || '');
@@ -838,6 +829,7 @@ export default function App() {
                   onUpdateWeekend={handleUpdateWeekend}
                   onDeleteSession={handleDeleteSession}
                   onSelectSession={(rec, weekendId) => handleSelectRecentSession(rec, weekendId)}
+                  onNewSession={() => handleOpenNewSessionForm(activeSession.weekendId)}
                 />
               )}
 

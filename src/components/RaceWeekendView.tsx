@@ -11,6 +11,7 @@ interface RaceWeekendViewProps {
   onUpdateWeekend: (updated: RaceWeekend) => void;
   onDeleteSession: (weekendId: string, sessionId: string) => void;
   onSelectSession: (session: SessionRecord, weekendId?: string) => void;
+  onNewSession?: () => void;
 }
 
 // ── Weather condition code → label ────────────────────────────────────────────
@@ -55,7 +56,7 @@ function compressImage(file: File, maxPx = 1024, quality = 0.82): Promise<string
 }
 
 export default function RaceWeekendView({
-  session, weekends, tireInventory = [], onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession,
+  session, weekends, tireInventory = [], onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession,
 }: RaceWeekendViewProps) {
   const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
@@ -516,9 +517,21 @@ export default function RaceWeekendView({
       {/* ── All Sessions in Weekend ───────────────────────────────────────── */}
       {currentWeekend && (
         <section>
-          <h2 className="text-on-surface font-display font-bold uppercase mb-2 text-sm tracking-wide">
+          <h2 className="text-on-surface font-display font-bold uppercase mb-3 text-sm tracking-wide">
             All Sessions — {currentWeekend.name}
           </h2>
+
+          {/* Prominent new session CTA */}
+          {onNewSession && (
+            <button
+              onClick={onNewSession}
+              className="w-full flex items-center justify-center gap-3 py-4 mb-4 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-primary font-display font-bold uppercase tracking-wider text-base"
+            >
+              <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
+              Start New Session
+            </button>
+          )}
+
           <div className="flex flex-col gap-2">
             {displaySessions.length === 0 && (
               <p className="font-mono text-xs text-on-surface-variant/40 text-center py-4">No sessions logged yet for this weekend.</p>
