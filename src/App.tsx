@@ -521,11 +521,11 @@ export default function App() {
       {/* Main Core Layout Viewport Container suitable for PWA deployment */}
       <div
         id="viewport-chassis"
-        className="w-full max-w-2xl mx-auto bg-background h-full flex flex-col shadow-none md:shadow-2xl md:border-x border-outline-variant/20"
+        className="w-full max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl mx-auto bg-background h-full flex flex-col shadow-none md:shadow-2xl md:border-x border-outline-variant/20"
       >
         {/* TopAppBar component with logo title & dual NEW entries triggers */}
         <header className="bg-surface w-full top-0 sticky border-b border-outline-variant z-40">
-          <div className="flex justify-between items-center px-4 py-3 w-full">
+          <div className="flex justify-between items-center px-4 md:px-6 py-3 w-full">
             <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-primary text-xl">headset_mic</span>
               <h1 className="font-display font-bold tracking-tight text-base text-primary uppercase">
@@ -575,7 +575,7 @@ export default function App() {
         </header>
 
         {/* Core Main Active Canvas Area */}
-        <main className="flex-grow p-4 overflow-y-auto pb-6 custom-scrollbar">
+        <main className="flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto pb-6 custom-scrollbar">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -732,7 +732,7 @@ export default function App() {
 
         {/* Global Bottom Tab Navigation bar */}
         <nav
-          className="bg-surface-container border-t border-outline-variant z-40 flex justify-around items-center h-16 px-2 sticky bottom-0 w-full flex-shrink-0"
+          className="bg-surface-container border-t border-outline-variant z-40 flex justify-around items-center h-16 md:h-[72px] px-2 md:px-6 lg:px-12 sticky bottom-0 w-full flex-shrink-0"
           id="global-bottom-nav-bar"
         >
           {/* Dashboard Button */}

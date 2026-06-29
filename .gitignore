@@ -29,3 +29,6 @@ settings.gradle
 
 .vscode/
 .antigravity/
+
+# Local Netlify folder
+.netlify
