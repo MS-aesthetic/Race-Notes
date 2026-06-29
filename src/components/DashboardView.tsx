@@ -78,30 +78,33 @@ export default function DashboardView({
 
       {/* RACEDAY WEEKENDS & SESSIONS ACCORDION LOG */}
       <section id="section-recent-sessions">
-        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+        <div className="flex flex-col gap-2 mb-3">
           <h2 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
             Race Weekends & Sessions Log
           </h2>
           {uniqueTracks.length > 0 && (
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="material-symbols-outlined text-on-surface-variant text-[15px]">filter_list</span>
-              <select
-                value={trackFilter}
-                onChange={e => setTrackFilter(e.target.value)}
-                className="bg-surface-container border border-outline-variant focus:border-primary text-on-surface font-mono text-[11px] px-2 py-1 rounded outline-none"
-              >
-                <option value="">All Tracks</option>
-                {uniqueTracks.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-[18px] shrink-0">filter_list</span>
+              <div className="relative flex-1">
+                <select
+                  value={trackFilter}
+                  onChange={e => setTrackFilter(e.target.value)}
+                  className="w-full bg-surface-container border-2 border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-3 rounded-lg outline-none appearance-none cursor-pointer pr-8"
+                >
+                  <option value="">All Tracks</option>
+                  {uniqueTracks.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
+              </div>
               {trackFilter && (
                 <button
                   onClick={() => setTrackFilter('')}
-                  className="material-symbols-outlined text-on-surface-variant hover:text-primary text-[15px]"
+                  className="flex items-center justify-center w-11 h-11 rounded-lg border-2 border-outline-variant bg-surface-container shrink-0 active:opacity-70"
                   title="Clear filter"
                 >
-                  close
+                  <span className="material-symbols-outlined text-on-surface-variant text-[18px]">close</span>
                 </button>
               )}
             </div>

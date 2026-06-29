@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '@supabase/supabase-js';
-import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem } from './types';
+import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem } from './types';
 import {
   INITIAL_SETUP,
   INITIAL_SETUPS,
@@ -17,11 +17,11 @@ import SetupView from './components/SetupView';
 import RaceWeekendView from './components/RaceWeekendView';
 import SettingsView from './components/SettingsView';
 import QuickReferenceView from './components/QuickReferenceView';
-import ToDoView from './components/ToDoView';
+import TrackersView from './components/TrackersView';
 import { Todo } from './types';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'todos'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'trackers'>('dashboard');
   const [setup, setSetup] = useState<Setup>(INITIAL_SETUP);
   const [savedSetups, setSavedSetups] = useState<Setup[]>(INITIAL_SETUPS);
   const [weekends, setWeekends] = useState<RaceWeekend[]>(INITIAL_WEEKENDS);
@@ -29,6 +29,14 @@ export default function App() {
   const [todos, setTodos] = useState<Todo[]>(() => {
     const saved = localStorage.getItem('race_notes_todos');
     return saved ? JSON.parse(saved) : [];
+  });
+
+  const [accounting, setAccounting] = useState<AccountingEntry[]>(() => {
+    try { const s = localStorage.getItem('race_notes_accounting'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+
+  const [shopping, setShopping] = useState<ShoppingItem[]>(() => {
+    try { const s = localStorage.getItem('race_notes_shopping'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
 
   const [tireInventory, setTireInventory] = useState<TireInventoryItem[]>(() => {
@@ -554,34 +562,24 @@ export default function App() {
                   {syncStatus}
                 </span>
               )}
-              <button
-                onClick={() => {
-                  setNewWeekendName('');
-                  setNewWeekendTrack('');
-                  setNewWeekendDate(new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
-                  setShowNewWeekendForm(true);
-                }}
-                id="top-action-new-weekend"
-                className="font-mono text-[10px] text-on-surface-variant hover:text-on-surface uppercase hover:bg-surface-container-high transition-colors px-2 py-1 active:opacity-80 border border-outline-variant/60 font-semibold rounded-sm"
-              >
-                + WEEKEND
-              </button>
-              <button
-                onClick={() => {
-                  if (weekends.length > 0) {
-                    setNewSessionWeekendId(weekends[0].id);
-                  }
-                  setNewSessionName('');
-                  setNewSessionType('');
-                  setNewSessionCond('');
-                  setNewSessionWeather('');
-                  setShowNewSessionForm(true);
-                }}
-                id="top-action-new-session"
-                className="font-mono text-[10px] text-primary hover:text-primary-fixed uppercase hover:bg-surface-container-high transition-colors px-2 py-1 active:opacity-80 border border-outline-variant/60 font-semibold rounded-sm"
-              >
-                + SESSION
-              </button>
+              {activeTab === 'raceweekend' && (
+                <button
+                  onClick={() => {
+                    if (weekends.length > 0) {
+                      setNewSessionWeekendId(weekends[0].id);
+                    }
+                    setNewSessionName('');
+                    setNewSessionType('');
+                    setNewSessionCond('');
+                    setNewSessionWeather('');
+                    setShowNewSessionForm(true);
+                  }}
+                  id="top-action-new-session"
+                  className="font-mono text-[10px] text-primary hover:text-primary-fixed uppercase hover:bg-surface-container-high transition-colors px-2 py-1 active:opacity-80 border border-outline-variant/60 font-semibold rounded-sm"
+                >
+                  + SESSION
+                </button>
+              )}
             </div>
           </div>
         </header>
@@ -728,8 +726,8 @@ export default function App() {
               )}
 
 
-              {activeTab === 'todos' && (
-                <ToDoView
+              {activeTab === 'trackers' && (
+                <TrackersView
                   todos={todos}
                   teamMembers={teamMembers}
                   currentUserId={user?.id ?? null}
@@ -737,6 +735,16 @@ export default function App() {
                     setTodos(updated);
                     localStorage.setItem('race_notes_todos', JSON.stringify(updated));
                     if (user) pushTodos(updated, user.id, setSyncStatus);
+                  }}
+                  accounting={accounting}
+                  onSaveAccounting={(updated) => {
+                    setAccounting(updated);
+                    localStorage.setItem('race_notes_accounting', JSON.stringify(updated));
+                  }}
+                  shopping={shopping}
+                  onSaveShopping={(updated) => {
+                    setShopping(updated);
+                    localStorage.setItem('race_notes_shopping', JSON.stringify(updated));
                   }}
                 />
               )}
@@ -825,18 +833,18 @@ export default function App() {
             </span>
           </button>
 
-          {/* To Do List Button */}
-          <button onClick={() => setActiveTab('todos')}
-            id="tab-btn-todos"
+          {/* Trackers Button */}
+          <button onClick={() => setActiveTab('trackers')}
+            id="tab-btn-trackers"
             className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
-              activeTab === 'todos' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+              activeTab === 'trackers' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}>
-            <span className="material-symbols-outlined text-[20px]" 
-                  style={{ fontVariationSettings: activeTab === 'todos' ? "'FILL' 1" : "'FILL' 0" }}>
-              checklist
+            <span className="material-symbols-outlined text-[20px]"
+                  style={{ fontVariationSettings: activeTab === 'trackers' ? "'FILL' 1" : "'FILL' 0" }}>
+              monitoring
             </span>
             <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
-              To Do
+              Trackers
             </span>
           </button>
 

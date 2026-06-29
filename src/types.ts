@@ -224,6 +224,31 @@ export interface TeamMember {
   role: 'owner' | 'member';
 }
 
+/** Single line item in the accounting ledger */
+export interface AccountingEntry {
+  id: string;
+  name: string;
+  description?: string;
+  /** Positive value; type field determines income vs expense */
+  amount: number;
+  type: 'income' | 'expense';
+  /** Who paid / where money came from */
+  payer?: string;
+  /** Who received / where money went */
+  payee?: string;
+  date: string;
+}
+
+/** Single item on a shopping list */
+export interface ShoppingItem {
+  id: string;
+  name: string;
+  description?: string;
+  cost?: number;
+  purchased: boolean;
+  purchasedAt?: string;
+}
+
 /** App-wide visual theme stored in localStorage key: race_notes_theme */
 export interface AppTheme {
   mode: 'dark' | 'light';
