@@ -1,7 +1,7 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-06-29 (session 5 changes)
-> Branch at time of writing: `feature/session-v2`  
+> Last updated: 2026-06-29 (session 6 — car profiles)
+> Branch at time of writing: `feature/car-profiles` (cut from `feature/session-v2`)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 
 ---
@@ -63,7 +63,8 @@ Race-Notes/
 │   │   ├── ExportView.tsx         # Weekend report + export (sub-tab of Settings)
 │   │   ├── QuickReferenceView.tsx # Dirt-track tuning reference / adjustment finder
 │   │   ├── RaceWeekendView.tsx    # Active session editor + all-sessions list
-│   │   ├── SettingsView.tsx       # Account / Appearance / Export sub-tabs
+│   │   ├── GarageView.tsx         # Car CRUD + active-car selector (inside Settings)
+│   │   ├── SettingsView.tsx       # Account / Style / Export / Garage sub-tabs
 │   │   ├── SetupView.tsx          # Car setup sheet + tire inventory + smasher
 │   │   ├── SmasherLoadsView.tsx   # Shock load data points + dyno graph photos
 │   │   ├── TeamView.tsx           # Team management (invite, roles)
@@ -71,7 +72,8 @@ Race-Notes/
 │   │   └── TrackersView.tsx       # Accounting + Shopping sub-tabs
 │   └── lib/
 │       ├── supabase.ts            # Supabase client + AppUser type
-│       └── sync.ts                # Push/pull helpers for cloud sync
+│       ├── sync.ts                # Push/pull helpers for cloud sync
+│       └── scope.ts               # byActiveCar filter helper (car-profiles feature)
 ├── capacitor.config.ts
 ├── vite.config.ts
 ├── package.json
@@ -102,6 +104,38 @@ Tab IDs are string literals stored in `activeTab` state in `App.tsx`.
 
 ## 5. TypeScript Interfaces (`src/types.ts`)
 
+### `Car` + `CAR_TYPES` *(feature/car-profiles)*
+```ts
+export const CAR_TYPES = ['Dirt Late Model', 'A Mod', 'B Mod'] as const;
+export type CarType = typeof CAR_TYPES[number] | string; // open-ended for custom values
+
+export interface Car {
+  id: string;          // client-generated UUID
+  teamId?: string | null;
+  userId: string;
+  carType: CarType;
+  chassis: string;
+  division: string;
+  name?: string;
+  createdAt: string;   // ISO
+  updatedAt: string;   // ISO
+}
+```
+**Ownership:** if the user is on a team (`teamId` is set), the car is team-owned and visible to all team members. Otherwise it is user-owned.
+
+### `ShockCorner` / `ShockDataPoint` / `ShockSession` *(feature/car-profiles — promoted from local types)*
+```ts
+export type ShockCorner = 'LF' | 'RF' | 'LR' | 'RR';
+export interface ShockDataPoint { height: string; load: string; }
+export interface ShockSession {
+  id: string; label: string; corner: ShockCorner;
+  springRate: string; shock: string; date: string;
+  points: ShockDataPoint[]; photos?: string[];
+  carId?: string; // car-scoped
+}
+```
+Previously defined as local types inside `SmasherLoadsView.tsx`; now global so `App.tsx` and `sync.ts` can use them.
+
 ### `CornerSetup`
 Per-corner setup data (spring, shock, tire, measurements). All measurement fields are strings for flexibility. Key fields:
 - `spring`, `shock`, `tireComp`, `tireSize`, `tirePress`
@@ -120,6 +154,7 @@ interface Setup {
   pullBarFrameHole?: string; pullBarRearHole?: string; pullBarAngle?: string;
   notes?: string;
   screenshots?: string[]; // Supabase Storage public URLs
+  carId?: string;          // car-scoped (feature/car-profiles)
 }
 ```
 
@@ -128,6 +163,7 @@ interface Setup {
 interface TireInventoryItem {
   id: string; tireNumber: string; size: string; compound: string;
   wheelBackspacing: '2' | '3' | '4'; durometer: string;
+  carId?: string; // car-scoped (feature/car-profiles)
 }
 ```
 
@@ -236,7 +272,9 @@ interface AppTheme {
 | `race_notes_weekends` | `RaceWeekend[]` | All race weekends + their sessions |
 | `race_notes_active_session` | `ActiveSession` | Session being edited right now |
 | `race_notes_tires` | `TireInventoryItem[]` | Tire inventory |
-| `race_notes_shock_graphs` | `ShockSession[]` | Smasher load graph data (local to SmasherLoadsView) |
+| `race_notes_shock_graphs` | `ShockSession[]` | Smasher load graph data — now lifted to App.tsx, synced to cloud |
+| `race_notes_cars` | `Car[]` | All cars (synced to cloud) |
+| `race_notes_active_car` | `string` | Active car ID — **device-local, never synced to Supabase** |
 | `race_notes_todos` | `Todo[]` | To-do lists |
 | `race_notes_accounting` | `AccountingEntry[]` | Accounting ledger entries |
 | `race_notes_shopping` | `ShoppingItem[]` | Shopping list items |
@@ -257,10 +295,15 @@ All push calls are debounced 500ms via a shared `pushDebounceTimers` Map.
 | Function | Supabase table | Behavior |
 |----------|----------------|----------|
 | `pushWeekends(weekends, userId)` | `race_weekends` | upserts all surviving weekends |
-| `pushSetups(setups, userId)` | `setups` | upserts all setups |
+| `pushSetups(setups, userId)` | `setups` | upserts all setups (includes `car_id`) |
 | `pushActiveSession(session, userId)` | `active_sessions` | upserts single row keyed by user_id |
 | `pushTodos(todos, userId)` | `todos` | upserts all todos |
+| `pushTires(tires, userId)` | `tire_inventory` | upserts all tires (includes `car_id`) |
+| `pushCars(cars, userId, teamId)` | `cars` | upserts all cars |
+| `pushShockSessions(sessions, userId)` | `shock_sessions` | upserts all shock sessions |
 | `deleteWeekendFromCloud(weekendId)` | `race_weekends` | **hard-deletes** one row by id (no debounce) |
+| `deleteCarFromCloud(carId)` | `cars` | hard-deletes one car |
+| `deleteShockSessionFromCloud(sessionId)` | `shock_sessions` | hard-deletes one shock session |
 
 ### Pull function
 `pullAllData(userId)` — called once on login. Returns setups, weekends, and active session from cloud. App.tsx merges them via `mergeIntoLocalStorage` + setState merge loops.
@@ -278,12 +321,18 @@ Cloud items always overwrite local items of the same `id`. Local-only items are 
 | Table | Key columns | Notes |
 |-------|-------------|-------|
 | `race_weekends` | `id, user_id, name, track, date, sessions (jsonb), updated_at` | sessions array stored as JSONB blob |
-| `setups` | `id, user_id, chassis, track, date, lf/rf/lr/rr (jsonb), screenshots (text[]), updated_at` | |
+| `setups` | `id, user_id, chassis, track, date, lf/rf/lr/rr (jsonb), screenshots (text[]), car_id (text), updated_at` | `car_id` added in migration 009 |
 | `active_sessions` | `id, user_id, data (jsonb), updated_at` | one row per user |
 | `todos` | `id, user_id, title, items (jsonb), is_template, updated_at` | |
+| `tire_inventory` | `id, user_id, tire_number, size, compound, wheel_backspacing, durometer, car_id (text), created_at, updated_at` | `car_id` added in migration 009 |
+| `cars` | `id (text), user_id, team_id, car_type, chassis, division, name, created_at, updated_at` | migration 009; `id` is text (client-generated UUID) to match local-first pattern |
+| `shock_sessions` | `id (text), user_id, car_id (text), label, corner, spring_rate, shock, date, points (jsonb), photos (text[]), created_at, updated_at` | migration 009; replaces localStorage-only storage |
 | `shared_setups` | `setup_id, shared_with (user_id)` | sharing permissions |
 | `shared_weekends` | `weekend_id, shared_with (user_id)` | sharing permissions |
 | Storage bucket | `race-attachments` | photos/files; path: `{userId}/{entityType}/{entityId}/{timestamp}.{ext}` |
+
+**Migration file:** `supabase/migrations/009_cars.sql`
+**RLS pattern:** all new tables use `in_same_team()` helper — team members can view/update each other's cars, setups, tires, and shock sessions.
 
 ---
 
@@ -303,6 +352,32 @@ tireInventory: TireInventoryItem[]   // all tires
 user: User | null                    // Supabase auth user
 team: Team | null                    // user's team
 theme: AppTheme                      // dark/light, accent color, font size
+
+// Car profiles (feature/car-profiles)
+cars: Car[]                          // all cars (from race_notes_cars)
+activeCarId: string | null           // active car (from race_notes_active_car, device-local)
+shockSessions: ShockSession[]        // all shock sessions (lifted from SmasherLoadsView)
+settingsSubTab: string               // deep-link target for SettingsView
+```
+
+**Derived:**
+```ts
+const activeCar = cars.find(c => c.id === activeCarId) ?? null;
+```
+
+**Car handlers:**
+- `handleSaveCars(updated)` — persists to `race_notes_cars` + pushCars to cloud
+- `handleSelectCar(carId)` — writes to `race_notes_active_car` (localStorage only, never synced)
+- `handleDeleteCar(carId)` — **blocked** if car owns any setup/tire/shock data; alerts the user; otherwise deletes locally + cloud, selects next car
+- `handleSaveShockSessions(updated)` — persists to `race_notes_shock_graphs` + pushShockSessions to cloud
+
+**Auto-select effect:** on mount and whenever `cars` or `activeCarId` changes, if `activeCarId` is missing or dangling (not in `cars`), auto-selects `cars[0].id`.
+
+**One-time backfill effect (useRef guarded):** runs once after post-login pull if `cars.length === 0`. Creates a `defaultCar` from the first setup's chassis/carType, stamps all legacy setups, tires, and shock sessions with `defaultCar.id`, saves the car, and selects it.
+
+**New-weekend setup picker:** filters `savedSetups` to active car's setups (`s.carId === activeCarId`).
+
+**Header:** active car chip (shows `chassis · carType`) appears when a car is selected; taps to `Settings → Garage`. "Add Car" button appears when `cars.length === 0`.
 
 // New session form
 showNewSessionForm: boolean
@@ -369,6 +444,8 @@ Three collapsible sections below the weekend list:
 ### `SetupView.tsx`
 Full car setup form (4 corners, pull bar, stagger, gear, notes, screenshots). Contains tire inventory management (`TireInventoryItem` CRUD). Links to `SmasherLoadsView` for shock dyno data.
 
+**feature/car-profiles changes:** Accepts `activeCarId?`, `activeCar?`, `shockSessions?`, `onSaveShockSessions?`. New setups and tires are stamped with `carId`. `byActiveCar` filter applied at display time (`displayedSetups`, `displayedTires`). CornerForm receives `displayedTires` so inventory picker only shows active car's tires. "New Setup" form and "Add Tire" button show a prompt ("Add a car in Settings → Garage to start.") and are disabled when no car is active.
+
 **Car Setup Info Baseline section** includes:
 - Gear, JBar Length, J-Bar Frame/Pinion Height, Pull Bar holes
 - **Computed stagger** (RF−LF, RR−LR) — auto-calculated from tire sizes
@@ -393,10 +470,12 @@ Symptom picker label: **"Symptom"** (not "What is the car doing?"). Option label
 ---
 
 ### `SmasherLoadsView.tsx`
-Shock load graph data entry. Each `ShockSession` (local interface, not same as `SessionRecord`) has:
+Shock load graph data entry. Each `ShockSession` (now a global type in `types.ts`, not same as `SessionRecord`) has:
 - Corner + shock ID
 - Data points: height/load pairs — **text inputs with `inputMode="decimal"`**, no stepper buttons
 - Dyno graph photos: base64 JPEG (compressed via canvas). Photos live here, NOT in RaceWeekendView.
+
+**feature/car-profiles changes:** State lifted to App.tsx. Props: `activeCarId?`, `sessions?` (full array from App), `onSave?`. When props are provided the component uses them; falls back to localStorage for backward compatibility. New sessions are stamped with `carId`. `byActiveCar` filter applied at display time. "New Session" button disabled with tooltip when no car is active.
 
 ---
 
@@ -406,7 +485,15 @@ Sub-tabs: Accounting | Shopping. Entries can be linked to a race weekend via `we
 ---
 
 ### `SettingsView.tsx`
-Sub-tabs: Account | Appearance | Export. Passes `weekends`, `todos`, `accounting`, `shopping` down to `ExportView`.
+Sub-tabs: **Garage | Account | Style | Export**. "Appearance" was renamed to "Style"; "Garage" is a new first tab (feature/car-profiles). Passes `weekends`, `todos`, `accounting`, `shopping` down to `ExportView`. Accepts `initialSubTab?` prop so App.tsx can deep-link directly to Garage (e.g. from the header car chip).
+
+### `GarageView.tsx` *(feature/car-profiles)*
+Rendered inside SettingsView's Garage tab. Manages the `Car[]` array:
+- Active-car selector — button row, highlighted with `border-primary bg-primary/5`
+- Add car form: `CAR_TYPES` dropdown, chassis, division, name
+- Per-car inline edit form
+- Delete button disabled (with tooltip) when the car owns any setups, tires, or shock sessions (`setupCount + tireCount + shockCount > 0`)
+- Auto-selects the first car when a car is first added
 
 ---
 
@@ -517,7 +604,8 @@ copy android\app\build\outputs\apk\debug\app-debug.apk CrewChief.apk
 | Branch | Status |
 |--------|--------|
 | `master` | Production — deployed to Netlify |
-| `feature/session-v2` | Active development |
+| `feature/session-v2` | Base branch — active development |
+| `feature/car-profiles` | Cut from `feature/session-v2` — **do not merge to master without owner approval** |
 
 Feature branches merged to master (history):
 - `feature/weekend-v2` — weekend report, ExportView, SettingsView weekend props
@@ -526,7 +614,7 @@ Standard commit:
 ```bash
 git add -A
 git commit -m "feat: description"
-git push origin feature/session-v2
+git push origin feature/car-profiles   # or feature/session-v2 as appropriate
 ```
 
 ---
@@ -630,3 +718,60 @@ On login / page refresh (authenticated):
 | Tire list: sort by Newest/Oldest/Size↑/Size↓; filter by Compound | `SetupView.tsx` |
 | Tire list: `airPressure` shown in single-line row if present (both Dashboard and Setups tab) | `SetupView.tsx`, `DashboardView.tsx` |
 | App pulls tires from cloud on login; pushes on every save; deletes from cloud on tire delete | `App.tsx` |
+
+**feature/car-profiles additions:**
+
+| Change | File(s) |
+|--------|---------|
+| `Car`, `CAR_TYPES`, `CarType` types added | `types.ts` |
+| `ShockCorner`, `ShockDataPoint`, `ShockSession` promoted to global types | `types.ts` |
+| `carId?: string` added to `Setup` and `TireInventoryItem` | `types.ts` |
+| `INITIAL_CARS`, `INITIAL_SHOCK_SESSIONS` constants added | `data.ts` |
+| `pushCars`, `pullCars`, `deleteCarFromCloud`, `pushShockSessions`, `pullShockSessions`, `deleteShockSessionFromCloud` | `lib/sync.ts` |
+| `car_id` column mapped in all setup/tire push+pull | `lib/sync.ts` |
+| `byActiveCar` filter helper | `lib/scope.ts` (new) |
+| Supabase migration 009: `cars`, `shock_sessions` tables; `car_id` on `setups` + `tire_inventory` | `supabase/migrations/009_cars.sql` |
+| App: `cars`, `activeCarId`, `shockSessions` state; all car handlers; header chip; backfill effect | `App.tsx` |
+| GarageView component (car CRUD + active-car selector) | `src/components/GarageView.tsx` (new) |
+| SettingsView: Garage tab added (first tab); `initialSubTab?` prop; "Appearance" → "Style" | `SettingsView.tsx` |
+| SetupView: car scoping (`byActiveCar`), `carId` stamping, empty-state guards | `SetupView.tsx` |
+| SmasherLoadsView: state lifted to App; props for sessions + onSave + activeCarId | `SmasherLoadsView.tsx` |
+| DashboardView: `byActiveCar` applied to setups + tires in dashboard panels | `DashboardView.tsx` |
+
+---
+
+## 19. Car Profiles Architecture *(feature/car-profiles)*
+
+### Design: Option A — Relational carId tagging
+One combined dataset. Views filter by active car using `byActiveCar`. The master arrays in App.tsx always hold all items for all cars — filtering happens only at display time, never mutating the source arrays.
+
+### Scoped vs. Global entities
+| Scoped to active car | Global (never car-scoped) |
+|---------------------|--------------------------|
+| `Setup[]` | `RaceWeekend[]` |
+| `TireInventoryItem[]` | `ActiveSession` |
+| `ShockSession[]` | `AccountingEntry[]` |
+| | `ShoppingItem[]` |
+| | `Todo[]` |
+| | `AppTheme` |
+
+### Active car — device-local
+`activeCarId` (from `race_notes_active_car`) is **never synced to Supabase**. Each device/browser independently picks which car is "active." This is intentional — one person might be working on two cars simultaneously on different devices.
+
+### Filter helper (`src/lib/scope.ts`)
+```ts
+export const byActiveCar = <T extends { carId?: string }>(
+  items: T[],
+  carId: string | null,
+): T[] => (carId ? items.filter(i => i.carId === carId) : items);
+```
+When `carId` is `null` (no active car), **all items are returned** — no data is hidden, just unfiltered.
+
+### Deletion policy
+A car **cannot be deleted** if it owns any setup, tire, or shock session data. `handleDeleteCar` in App.tsx checks `carSetupCount + carTireCount + carShockCount > 0` and alerts the user instead of deleting. GarageView's delete button is also disabled with a tooltip showing the counts.
+
+### One-time backfill
+Runs once after the first post-login `doPull` completes, guarded by a `didBackfill` `useRef`. If `cars.length === 0` at that point, it creates a single `defaultCar` from the first setup's chassis/carType and stamps all existing setups, tires, and shock sessions with that car's id. This migrates legacy data seamlessly without user interaction.
+
+### Empty-state guards
+When `activeCarId` is null: "New Setup" form is replaced with a prompt, "Add Tire" and "New Session" buttons are disabled — all say "Add a car in Settings → Garage to start." App.tsx also auto-selects `cars[0]` if `activeCarId` is missing but cars exist.
