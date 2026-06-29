@@ -12,6 +12,7 @@ interface SetupViewProps {
   user?: User | null;
   tireInventory: TireInventoryItem[];
   onSaveTires: (tires: TireInventoryItem[]) => void;
+  onDeleteTireFromCloud?: (tireId: string) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -205,7 +206,7 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = []
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function SetupView({
-  savedSetups, activeSetupId, onSaveSetups, user, tireInventory, onSaveTires,
+  savedSetups, activeSetupId, onSaveSetups, user, tireInventory, onSaveTires, onDeleteTireFromCloud,
 }: SetupViewProps) {
   const [subTab, setSubTab] = useState<'setups' | 'smasherloads' | 'tires'>('setups');
   const [setups, setSetups] = useState<Setup[]>(savedSetups);
@@ -218,6 +219,8 @@ export default function SetupView({
   const [tires, setTires] = useState<TireInventoryItem[]>(tireInventory);
   const [showAddTireForm, setShowAddTireForm] = useState(false);
   const [newTire, setNewTire] = useState<Partial<TireInventoryItem>>({ wheelBackspacing: '2' });
+  const [tireSort, setTireSort] = useState<'newest' | 'oldest' | 'size-asc' | 'size-desc'>('newest');
+  const [tireCompoundFilter, setTireCompoundFilter] = useState<string>('all');
 
   React.useEffect(() => { setSetups(savedSetups); }, [savedSetups]);
   React.useEffect(() => { setTires(tireInventory); }, [tireInventory]);
@@ -324,6 +327,7 @@ export default function SetupView({
 
   const handleAddTire = (e: React.FormEvent) => {
     e.preventDefault();
+    const now = new Date().toISOString();
     const tire: TireInventoryItem = {
       id: `tire-${Date.now()}`,
       tireNumber: newTire.tireNumber || '',
@@ -331,6 +335,8 @@ export default function SetupView({
       compound: newTire.compound || '',
       wheelBackspacing: (newTire.wheelBackspacing as '2' | '3' | '4') || '2',
       durometer: newTire.durometer || '',
+      airPressure: newTire.airPressure || '',
+      createdAt: now,
     };
     saveTires([tire, ...tires]);
     setNewTire({ wheelBackspacing: '2' });
@@ -340,6 +346,7 @@ export default function SetupView({
   const handleDeleteTire = (id: string) => {
     if (!window.confirm('Delete this tire from inventory?')) return;
     saveTires(tires.filter(t => t.id !== id));
+    onDeleteTireFromCloud?.(id);
   };
 
   // ── Sub-tab button helper ─────────────────────────────────────────────────────
@@ -684,23 +691,82 @@ export default function SetupView({
             </div>
           )}
 
-          {tires.length > 0 && (
-            <div className="space-y-3">
-              {tires.map(tire => (
-                <div key={tire.id} className="bg-surface-container border border-outline-variant rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1 flex items-baseline gap-4">
-                    <span className="font-mono text-xs font-bold text-primary shrink-0">#{tire.tireNumber}</span>
-                    <span className="font-mono text-[11px] text-on-surface">
-                      {tire.size}{tire.size && !tire.size.includes('"') ? '"' : ''} <span className="text-outline-variant mx-1">|</span> BS {tire.wheelBackspacing}" <span className="text-outline-variant mx-1">|</span> {tire.compound} <span className="text-outline-variant mx-1">|</span> Duro {tire.durometer || '—'}
-                    </span>
+          {tires.length > 0 && (() => {
+            // Unique compounds for filter
+            const compounds = Array.from(new Set(tires.map(t => t.compound).filter(Boolean))).sort();
+            // Filter
+            const filtered = tireCompoundFilter === 'all'
+              ? tires
+              : tires.filter(t => t.compound === tireCompoundFilter);
+            // Sort
+            const parseSz = (s: string) => parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
+            const sorted = [...filtered].sort((a, b) => {
+              if (tireSort === 'oldest') {
+                return (a.createdAt || a.id).localeCompare(b.createdAt || b.id);
+              }
+              if (tireSort === 'size-asc') return parseSz(a.size) - parseSz(b.size);
+              if (tireSort === 'size-desc') return parseSz(b.size) - parseSz(a.size);
+              // newest (default): most recent first
+              return (b.createdAt || b.id).localeCompare(a.createdAt || a.id);
+            });
+            return (
+              <>
+                {/* Sort + Filter controls */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  <div className="relative flex-1 min-w-[140px]">
+                    <select
+                      value={tireSort}
+                      onChange={e => setTireSort(e.target.value as typeof tireSort)}
+                      className="w-full bg-surface-container border border-outline-variant focus:border-primary text-on-surface font-mono text-[10px] px-2 py-1.5 rounded outline-none appearance-none pr-6"
+                    >
+                      <option value="newest">Sort: Newest</option>
+                      <option value="oldest">Sort: Oldest</option>
+                      <option value="size-asc">Sort: Size ↑</option>
+                      <option value="size-desc">Sort: Size ↓</option>
+                    </select>
+                    <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[12px] text-on-surface-variant pointer-events-none">expand_more</span>
                   </div>
-                  <button onClick={() => handleDeleteTire(tire.id)} className="p-1.5 text-on-surface-variant/50 hover:text-error transition-colors flex-shrink-0" title="Delete tire">
-                    <span className="material-symbols-outlined text-[16px]">delete</span>
-                  </button>
+                  <div className="relative flex-1 min-w-[140px]">
+                    <select
+                      value={tireCompoundFilter}
+                      onChange={e => setTireCompoundFilter(e.target.value)}
+                      className="w-full bg-surface-container border border-outline-variant focus:border-primary text-on-surface font-mono text-[10px] px-2 py-1.5 rounded outline-none appearance-none pr-6"
+                    >
+                      <option value="all">Compound: All</option>
+                      {compounds.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[12px] text-on-surface-variant pointer-events-none">expand_more</span>
+                  </div>
+                  {tireCompoundFilter !== 'all' && (
+                    <button onClick={() => setTireCompoundFilter('all')} className="flex items-center justify-center w-7 h-7 rounded border border-outline-variant bg-surface-container text-on-surface-variant hover:text-on-surface shrink-0">
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
+
+                <div className="space-y-2">
+                  {sorted.length === 0 && (
+                    <p className="text-center text-xs font-mono text-on-surface-variant/40 py-4">No tires match the current filter.</p>
+                  )}
+                  {sorted.map(tire => (
+                    <div key={tire.id} className="bg-surface-container border border-outline-variant rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-3 flex-wrap">
+                          <span className="font-mono text-xs font-bold text-primary shrink-0">#{tire.tireNumber}</span>
+                          <span className="font-mono text-[11px] text-on-surface">
+                            {tire.size}{tire.size && !tire.size.includes('"') ? '"' : ''} <span className="text-outline-variant mx-1">|</span> BS {tire.wheelBackspacing}" <span className="text-outline-variant mx-1">|</span> {tire.compound} <span className="text-outline-variant mx-1">|</span> Duro {tire.durometer || '—'}{tire.airPressure ? <><span className="text-outline-variant mx-1">|</span> {tire.airPressure} psi</> : null}
+                          </span>
+                        </div>
+                      </div>
+                      <button onClick={() => handleDeleteTire(tire.id)} className="p-1.5 text-on-surface-variant/50 hover:text-error transition-colors flex-shrink-0" title="Delete tire">
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
 
           {/* Add Tire Modal */}
           {showAddTireForm && (
@@ -755,6 +821,12 @@ export default function SetupView({
                         onChange={e => setNewTire(p => ({ ...p, durometer: e.target.value }))}
                         className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Air Pressure (psi)</label>
+                    <input type="text" placeholder="e.g. 10" value={newTire.airPressure || ''}
+                      onChange={e => setNewTire(p => ({ ...p, airPressure: e.target.value }))}
+                      className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
                   </div>
                   <div className="flex gap-2 pt-1 justify-end font-mono text-xs">
                     <button type="button" onClick={() => setShowAddTireForm(false)}

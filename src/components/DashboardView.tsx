@@ -310,7 +310,7 @@ export default function DashboardView({
                 <div key={t.id} className="px-4 py-2.5 bg-surface-container flex items-baseline gap-4">
                   <span className="font-mono text-xs font-bold text-primary shrink-0">#{t.tireNumber}</span>
                   <span className="font-mono text-[11px] text-on-surface">
-                    {t.size}{t.size && !t.size.includes('"') ? '"' : ''} <span className="text-outline-variant mx-1">|</span> BS {t.wheelBackspacing}" <span className="text-outline-variant mx-1">|</span> {t.compound} <span className="text-outline-variant mx-1">|</span> Duro {t.durometer || '—'}
+                    {t.size}{t.size && !t.size.includes('"') ? '"' : ''} <span className="text-outline-variant mx-1">|</span> BS {t.wheelBackspacing}" <span className="text-outline-variant mx-1">|</span> {t.compound} <span className="text-outline-variant mx-1">|</span> Duro {t.durometer || '—'}{t.airPressure ? <><span className="text-outline-variant mx-1">|</span> {t.airPressure} psi</> : null}
                   </span>
                 </div>
               ))

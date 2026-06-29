@@ -77,6 +77,8 @@ export interface TireInventoryItem {
   compound: string;
   wheelBackspacing: '2' | '3' | '4';
   durometer: string;
+  airPressure?: string;
+  createdAt?: string;
 }
 
 export interface TireDetails {

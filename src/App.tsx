@@ -10,7 +10,7 @@ import {
 } from './data';
 
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, AppUser } from './lib/supabase';
-import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud } from './lib/sync';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud } from './lib/sync';
 
 import DashboardView from './components/DashboardView';
 import SetupView from './components/SetupView';
@@ -47,6 +47,11 @@ export default function App() {
   const handleSaveTires = (updated: TireInventoryItem[]) => {
     setTireInventory(updated);
     localStorage.setItem('race_notes_tires', JSON.stringify(updated));
+    if (user) pushTires(updated, user.id);
+  };
+
+  const handleDeleteTireFromCloud = async (tireId: string) => {
+    if (user) await deleteTireFromCloud(tireId);
   };
 
   // ── Theme ──────────────────────────────────────────────────────────────────
@@ -241,6 +246,12 @@ export default function App() {
       if (cloudTodos.length > 0) {
         setTodos(cloudTodos);
         localStorage.setItem('race_notes_todos', JSON.stringify(cloudTodos));
+      }
+
+      const cloudTires = await pullTires(user.id, setSyncStatus);
+      if (cloudTires.length > 0) {
+        setTireInventory(cloudTires);
+        localStorage.setItem('race_notes_tires', JSON.stringify(cloudTires));
       }
 
       setSyncStatus('Synced');
@@ -770,6 +781,7 @@ export default function App() {
                   user={user}
                   tireInventory={tireInventory}
                   onSaveTires={handleSaveTires}
+                  onDeleteTireFromCloud={handleDeleteTireFromCloud}
                   onSaveSetups={(updatedSetups, activeId) => {
                     setSavedSetups(updatedSetups);
                     localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));

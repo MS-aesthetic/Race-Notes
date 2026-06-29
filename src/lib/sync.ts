@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Setup, RaceWeekend, ActiveSession, SessionRecord, Todo } from '../types';
+import { Setup, RaceWeekend, ActiveSession, SessionRecord, Todo, TireInventoryItem } from '../types';
 
 // ---------------------------------------------------------------------------
 // Local-First Sync Engine
@@ -299,6 +299,63 @@ export async function deleteWeekendFromCloud(weekendId: string): Promise<void> {
     const { error } = await supabase.from('race_weekends').delete().eq('id', weekendId);
     if (error) console.warn('Sync: deleteWeekendFromCloud error:', error.message);
   } catch (e) { console.warn('Sync: deleteWeekendFromCloud failed', e); }
+}
+
+export function pushTires(tires: TireInventoryItem[], userId: string, onStatus?: SyncCallback) {
+  const key = 'tires';
+  if (pushDebounceTimers.has(key)) clearTimeout(pushDebounceTimers.get(key)!);
+  pushDebounceTimers.set(key, setTimeout(async () => {
+    try {
+      const rows = tires.map(t => ({
+        id: t.id,
+        user_id: userId,
+        tire_number: t.tireNumber,
+        size: t.size,
+        compound: t.compound,
+        wheel_backspacing: t.wheelBackspacing,
+        durometer: t.durometer,
+        air_pressure: t.airPressure || '',
+        created_at: t.createdAt || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+      const { error } = await supabase.from('tire_inventory').upsert(rows, { onConflict: 'id' });
+      if (error) console.warn('Sync: pushTires error:', error.message);
+      else onStatus?.('Tires synced to cloud');
+    } catch (e) { console.warn('Sync: pushTires failed', e); }
+  }, 500));
+}
+
+export async function pullTires(userId: string, onStatus?: SyncCallback): Promise<TireInventoryItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('tire_inventory')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) { console.warn('Sync: pullTires error:', error.message); return []; }
+    if (!data) return [];
+    onStatus?.(`Pulled ${data.length} tires from cloud`);
+    return data.map((r: Record<string, unknown>) => ({
+      id: r.id as string,
+      tireNumber: (r.tire_number as string) || '',
+      size: (r.size as string) || '',
+      compound: (r.compound as string) || '',
+      wheelBackspacing: ((r.wheel_backspacing as string) || '2') as '2' | '3' | '4',
+      durometer: (r.durometer as string) || '',
+      airPressure: (r.air_pressure as string) || undefined,
+      createdAt: (r.created_at as string) || undefined,
+    }));
+  } catch (e) {
+    console.warn('Sync: pullTires failed', e);
+    return [];
+  }
+}
+
+export async function deleteTireFromCloud(tireId: string): Promise<void> {
+  try {
+    const { error } = await supabase.from('tire_inventory').delete().eq('id', tireId);
+    if (error) console.warn('Sync: deleteTireFromCloud error:', error.message);
+  } catch (e) { console.warn('Sync: deleteTireFromCloud failed', e); }
 }
 
 export function pushTodos(todos: Todo[], userId: string, onStatus?: SyncCallback) {

@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-06-29 (session 4 changes)
+> Last updated: 2026-06-29 (session 5 changes)
 > Branch at time of writing: `feature/session-v2`  
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 
@@ -624,3 +624,9 @@ On login / page refresh (authenticated):
 | Supabase: `profile_data jsonb` column added to `teams` table | migration applied |
 | Bottom nav: Trackers now appears before Reference | `App.tsx` |
 | Delete weekend now syncs correctly to cloud | `App.tsx`, `lib/sync.ts` |
+| Tire cloud sync: `tire_inventory` Supabase table + RLS; `pushTires`, `pullTires`, `deleteTireFromCloud` | `lib/sync.ts`, `App.tsx` |
+| `TireInventoryItem`: added `airPressure?: string` and `createdAt?: string` fields | `types.ts` |
+| Tire add form: Air Pressure (psi) field; new tires get `createdAt` ISO timestamp | `SetupView.tsx` |
+| Tire list: sort by Newest/Oldest/Size↑/Size↓; filter by Compound | `SetupView.tsx` |
+| Tire list: `airPressure` shown in single-line row if present (both Dashboard and Setups tab) | `SetupView.tsx`, `DashboardView.tsx` |
+| App pulls tires from cloud on login; pushes on every save; deletes from cloud on tire delete | `App.tsx` |
