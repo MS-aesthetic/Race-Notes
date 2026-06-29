@@ -17,6 +17,33 @@ interface ShockSession {
   shock: string;       // e.g. "Afco 26-1"
   date: string;
   points: DataPoint[];
+  /** Base64 dyno graph photos */
+  photos?: string[];
+}
+
+// ─── Image compression helper ─────────────────────────────────────────────────
+
+function compressImage(file: File, maxPx = 1400, quality = 0.85): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > height) {
+          if (width > maxPx) { height = Math.round(height * maxPx / width); width = maxPx; }
+        } else {
+          if (height > maxPx) { width = Math.round(width * maxPx / height); height = maxPx; }
+        }
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 // ─── Colour palette per corner ───────────────────────────────────────────────
@@ -339,6 +366,27 @@ export default function SmasherLoadsView() {
     persist(next);
   };
 
+  // ── Photo handlers ────────────────────────────────────────────────────────
+  const handleAddPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!activeSession) return;
+    const files = e.target.files;
+    if (!files) return;
+    const compressed = await Promise.all(Array.from(files).map(f => compressImage(f)));
+    const next = sessions.map(s =>
+      s.id === activeSession.id ? { ...s, photos: [...(s.photos || []), ...compressed] } : s
+    );
+    persist(next);
+    e.target.value = '';
+  };
+
+  const handleDeletePhoto = (idx: number) => {
+    if (!activeSession) return;
+    const next = sessions.map(s =>
+      s.id === activeSession.id ? { ...s, photos: (s.photos || []).filter((_, i) => i !== idx) } : s
+    );
+    persist(next);
+  };
+
   const col = activeSession ? CORNER_COLORS[activeSession.corner] : null;
 
   return (
@@ -522,8 +570,8 @@ export default function SmasherLoadsView() {
                 </label>
                 <input
                   id="entry-height"
-                  type="number"
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="e.g. 12.50"
                   value={entryHeight}
                   required
@@ -537,8 +585,8 @@ export default function SmasherLoadsView() {
                 </label>
                 <input
                   id="entry-load"
-                  type="number"
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="e.g. 325"
                   value={entryLoad}
                   required
@@ -604,6 +652,42 @@ export default function SmasherLoadsView() {
               </table>
             </div>
           )}
+
+          {/* ── Dyno Graph Photos ── */}
+          <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-outline-variant/40 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[16px]">photo_library</span>
+                <h4 className="font-mono text-xs uppercase font-bold text-on-surface tracking-wider">Dyno Graph Photos</h4>
+              </div>
+              <label className="flex items-center gap-1.5 cursor-pointer h-8 px-3 border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary font-mono text-[10px] uppercase font-bold rounded transition-colors">
+                <span className="material-symbols-outlined text-[14px]">add_photo_alternate</span>
+                Add Photo
+                <input type="file" multiple accept="image/*" className="hidden" onChange={handleAddPhotos} />
+              </label>
+            </div>
+
+            {(!activeSession.photos || activeSession.photos.length === 0) ? (
+              <p className="text-on-surface-variant/40 font-mono text-[11px] italic text-center py-4">
+                No photos yet — attach dyno graph images or printouts here.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {activeSession.photos.map((photo, idx) => (
+                  <div key={idx} className="relative group rounded overflow-hidden border border-outline-variant/50">
+                    <img src={photo} alt={`Dyno photo ${idx + 1}`} className="w-full h-32 object-cover" />
+                    <button
+                      onClick={() => handleDeletePhoto(idx)}
+                      className="absolute top-1 right-1 bg-black/70 hover:bg-error text-white rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 

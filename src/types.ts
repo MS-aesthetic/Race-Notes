@@ -154,6 +154,9 @@ export interface RaceWeekend {
   weather?: WeatherSnapshot;
   /** Human-readable location string */
   location?: string;
+  /** Setup bound to this weekend */
+  setupId?: string;
+  setupName?: string;
 }
 
 export interface SetupAdjustment {
