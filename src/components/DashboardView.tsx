@@ -1,6 +1,31 @@
 import React, { useState } from 'react';
 import { Setup, SessionRecord, RaceWeekend, Team, TireInventoryItem, Todo } from '../types';
 
+// Maps legacy full session type names to the short codes used in v2
+const SESSION_NAME_MAP: [string, string][] = [
+  ['HOT LAPS', 'HL'],
+  ['Hot Laps', 'HL'],
+  ['QUALIFYING', 'Qual'],
+  ['Qualifying', 'Qual'],
+  ['HEAT RACE', 'Heat'],
+  ['Heat Race', 'Heat'],
+  ['HEAT', 'Heat'],
+  ['FEATURE', 'Feat.'],
+  ['Feature', 'Feat.'],
+  ['TEST', 'Test'],
+];
+
+function normalizeSessionName(name: string): string {
+  for (const [full, code] of SESSION_NAME_MAP) {
+    if (name.toUpperCase() === full.toUpperCase()) return code;
+    if (name.toUpperCase().startsWith(full.toUpperCase() + ' ')) {
+      const suffix = name.slice(full.length).trim();
+      return `${code} ${suffix}`;
+    }
+  }
+  return name;
+}
+
 interface DashboardViewProps {
   weekends: RaceWeekend[];
   savedSetups: Setup[];
@@ -194,10 +219,10 @@ export default function DashboardView({
                           >
                             <div className="flex items-center gap-3">
                               <div className="bg-surface border border-outline-variant/50 w-10 h-10 rounded flex items-center justify-center shrink-0 group-hover:border-primary transition-all">
-                                <span className="text-[10px] text-on-surface font-mono font-bold leading-tight text-center px-0.5">{s.name}</span>
+                                <span className="text-[10px] text-on-surface font-mono font-bold leading-tight text-center px-0.5">{normalizeSessionName(s.name)}</span>
                               </div>
                               <div>
-                                <div className="font-semibold text-sm text-on-surface uppercase tracking-wide group-hover:text-primary transition-colors">{s.name}</div>
+                                <div className="font-semibold text-sm text-on-surface uppercase tracking-wide group-hover:text-primary transition-colors">{normalizeSessionName(s.name)}</div>
                                 <div className="text-[11px] text-on-surface-variant/80 font-mono">{s.condition}{s.time ? ` • ${s.time}` : ''}</div>
                               </div>
                             </div>

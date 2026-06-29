@@ -38,11 +38,12 @@ interface CornerFormProps {
   data: CornerSetup;
   isRear: boolean;
   tireInventory: TireInventoryItem[];
+  usedTireIds?: string[];
   onFieldChange: (field: keyof CornerSetup, value: string) => void;
   onBatchChange: (updates: Partial<CornerSetup>) => void;
 }
 
-function CornerForm({ cornerLabel, data, isRear, tireInventory, onFieldChange, onBatchChange }: CornerFormProps) {
+function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = [], onFieldChange, onBatchChange }: CornerFormProps) {
   return (
     <div className="bg-surface-container border border-outline-variant flex flex-col rounded overflow-hidden">
       <div className="border-b border-outline-variant px-4 py-2 flex items-center gap-2 bg-surface-container-low">
@@ -70,7 +71,7 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, onFieldChange, o
             className="bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded min-w-[160px]"
           >
             <option value="">-- Select from Inventory --</option>
-            {tireInventory.map(t => (
+            {tireInventory.filter(t => !usedTireIds.includes(t.id) || t.id === (data.tireInventoryId || '')).map(t => (
               <option key={t.id} value={t.id}>#{t.tireNumber} — {t.size} {t.compound}</option>
             ))}
           </select>
@@ -534,18 +535,25 @@ export default function SetupView({
 
                       {/* 4 Corner forms */}
                       <div className="flex flex-col gap-6">
-                        <CornerForm cornerLabel="Left Front Corner" data={setupItem.lf} isRear={false} tireInventory={tires}
-                          onFieldChange={(f, v) => handleCornerChange(setupItem.id, 'lf', f, v)}
-                          onBatchChange={(u) => handleCornerBatchChange(setupItem.id, 'lf', u)} />
-                        <CornerForm cornerLabel="Right Front Corner" data={setupItem.rf} isRear={false} tireInventory={tires}
-                          onFieldChange={(f, v) => handleCornerChange(setupItem.id, 'rf', f, v)}
-                          onBatchChange={(u) => handleCornerBatchChange(setupItem.id, 'rf', u)} />
-                        <CornerForm cornerLabel="Left Rear Corner" data={setupItem.lr} isRear={true} tireInventory={tires}
-                          onFieldChange={(f, v) => handleCornerChange(setupItem.id, 'lr', f, v)}
-                          onBatchChange={(u) => handleCornerBatchChange(setupItem.id, 'lr', u)} />
-                        <CornerForm cornerLabel="Right Rear Corner" data={setupItem.rr} isRear={true} tireInventory={tires}
-                          onFieldChange={(f, v) => handleCornerChange(setupItem.id, 'rr', f, v)}
-                          onBatchChange={(u) => handleCornerBatchChange(setupItem.id, 'rr', u)} />
+                        {(['lf', 'rf', 'lr', 'rr'] as const).map((corner, _, all) => {
+                          const usedTireIds = all
+                            .filter(c => c !== corner)
+                            .map(c => setupItem[c].tireInventoryId)
+                            .filter(Boolean) as string[];
+                          const labels: Record<string, string> = { lf: 'Left Front Corner', rf: 'Right Front Corner', lr: 'Left Rear Corner', rr: 'Right Rear Corner' };
+                          return (
+                            <CornerForm
+                              key={corner}
+                              cornerLabel={labels[corner]}
+                              data={setupItem[corner]}
+                              isRear={corner === 'lr' || corner === 'rr'}
+                              tireInventory={tires}
+                              usedTireIds={usedTireIds}
+                              onFieldChange={(f, v) => handleCornerChange(setupItem.id, corner, f, v)}
+                              onBatchChange={(u) => handleCornerBatchChange(setupItem.id, corner, u)}
+                            />
+                          );
+                        })}
                       </div>
 
                       {/* Attachments */}

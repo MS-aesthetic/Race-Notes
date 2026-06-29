@@ -373,6 +373,17 @@ export default function RaceWeekendView({
         </section>
       )}
 
+      {/* ── Start New Session CTA ────────────────────────────────────────── */}
+      {onNewSession && (
+        <button
+          onClick={onNewSession}
+          className="w-full flex items-center justify-center gap-3 py-4 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-primary font-display font-bold uppercase tracking-wider text-base"
+        >
+          <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
+          Start New Session
+        </button>
+      )}
+
       {/* ── Active Session Editor ─────────────────────────────────────────── */}
       <section className="bg-surface-container rounded-lg border border-outline-variant">
         {/* Collapsible header */}
@@ -474,6 +485,12 @@ export default function RaceWeekendView({
             {(['lf', 'rf', 'lr', 'rr'] as const).map(corner => {
               const selectedTireId = session.tires?.[corner]?.tireId || '';
               const airPressure = session.tires?.[corner]?.airPressure || session.pressures[corner] || '';
+              // Tires used by other corners in this session (exclude current corner)
+              const usedByOthers = (['lf', 'rf', 'lr', 'rr'] as const)
+                .filter(c => c !== corner)
+                .map(c => session.tires?.[c]?.tireId)
+                .filter(Boolean) as string[];
+              const availableTires = tireInventory.filter(t => !usedByOthers.includes(t.id) || t.id === selectedTireId);
               return (
                 <div key={corner} className="bg-[#0e0e0e] border border-outline-variant rounded p-2 space-y-2">
                   <span className="text-[10px] font-bold text-primary uppercase block">{corner.toUpperCase()}</span>
@@ -485,7 +502,7 @@ export default function RaceWeekendView({
                         className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-[10px] px-2 py-1.5 rounded outline-none appearance-none pr-5"
                       >
                         <option value="">-- Select Tire --</option>
-                        {tireInventory.map(t => (
+                        {availableTires.map(t => (
                           <option key={t.id} value={t.id}>#{t.tireNumber} · {t.compound} · {t.size}</option>
                         ))}
                       </select>
@@ -575,17 +592,6 @@ export default function RaceWeekendView({
           <h2 className="text-on-surface font-display font-bold uppercase mb-3 text-sm tracking-wide">
             All Sessions — {currentWeekend.name}
           </h2>
-
-          {/* Prominent new session CTA */}
-          {onNewSession && (
-            <button
-              onClick={onNewSession}
-              className="w-full flex items-center justify-center gap-3 py-4 mb-4 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-primary font-display font-bold uppercase tracking-wider text-base"
-            >
-              <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
-              Start New Session
-            </button>
-          )}
 
           <div className="flex flex-col gap-2">
             {displaySessions.length === 0 && (

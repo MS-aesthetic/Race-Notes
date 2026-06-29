@@ -592,7 +592,7 @@ export default function QuickReferenceView() {
             >
               {CAR_BEHAVIOR_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value} disabled={opt.value === 'select'}>
-                  {opt.group ? `[${opt.group}] ` : ''}{opt.label}
+                  {opt.label}
                 </option>
               ))}
             </select>
