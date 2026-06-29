@@ -1,24 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { ShockSession, ShockCorner, ShockDataPoint } from '../types';
+import { byActiveCar } from '../lib/scope';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Local type aliases (for readability within this file) ────────────────────
 
-type Corner = 'LF' | 'RF' | 'LR' | 'RR';
+type Corner = ShockCorner;
+type DataPoint = ShockDataPoint;
 
-interface DataPoint {
-  height: string; // shock height in inches
-  load: string;   // load in lbs
-}
+// ─── Props ────────────────────────────────────────────────────────────────────
 
-interface ShockSession {
-  id: string;
-  label: string;       // user-defined name / notes
-  corner: Corner;
-  springRate: string;  // e.g. "175"
-  shock: string;       // e.g. "Afco 26-1"
-  date: string;
-  points: DataPoint[];
-  /** Base64 dyno graph photos */
-  photos?: string[];
+interface SmasherLoadsViewProps {
+  /** Car scoping: filters list and stamps new sessions */
+  activeCarId?: string | null;
+  /** When lifted to App.tsx, the full sessions array is passed in */
+  sessions?: ShockSession[];
+  /** When lifted to App.tsx, save handler is passed in */
+  onSave?: (sessions: ShockSession[]) => void;
 }
 
 // ─── Image compression helper ─────────────────────────────────────────────────
@@ -272,10 +269,13 @@ function saveToStorage(sessions: ShockSession[]) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function SmasherLoadsView() {
-  const [sessions, setSessions] = useState<ShockSession[]>(loadFromStorage);
+export default function SmasherLoadsView({ activeCarId = null, sessions: sessionsProp, onSave }: SmasherLoadsViewProps = {}) {
+  // When lifted state is provided use it; otherwise fall back to localStorage.
+  const [localSessions, setLocalSessions] = useState<ShockSession[]>(loadFromStorage);
+  const sessions = sessionsProp ?? localSessions;
+
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
-    () => loadFromStorage()[0]?.id ?? null
+    () => sessions[0]?.id ?? null
   );
 
   // New session form
@@ -292,11 +292,30 @@ export default function SmasherLoadsView() {
   const svgRef = useRef<SVGSVGElement>(null);
 
   const persist = (next: ShockSession[]) => {
-    setSessions(next);
-    saveToStorage(next);
+    if (onSave) {
+      onSave(next); // lifted state path — App.tsx handles localStorage + cloud sync
+    } else {
+      setLocalSessions(next);
+      saveToStorage(next);
+    }
   };
 
-  const activeSession = sessions.find(s => s.id === activeSessionId) ?? null;
+  // Sync local state when sessionsProp changes (e.g. after cloud pull)
+  useEffect(() => {
+    if (sessionsProp !== undefined) {
+      // activeSessionId may be stale; ensure it still exists
+      if (activeSessionId && !sessionsProp.find(s => s.id === activeSessionId)) {
+        setActiveSessionId(sessionsProp[0]?.id ?? null);
+      }
+    }
+  }, [sessionsProp]);
+
+  // Display only sessions belonging to the active car
+  const displayedSessions = byActiveCar(sessions, activeCarId);
+
+  const activeSession = displayedSessions.find(s => s.id === activeSessionId)
+    ?? displayedSessions[0]
+    ?? null;
 
   // ── Create new session ────────────────────────────────────────────────────
 
@@ -310,6 +329,7 @@ export default function SmasherLoadsView() {
       shock: formShock,
       date: new Date().toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }),
       points: [],
+      carId: activeCarId ?? undefined,
     };
     const next = [newSession, ...sessions];
     persist(next);
@@ -406,18 +426,20 @@ export default function SmasherLoadsView() {
           </div>
           <button
             id="new-shock-session-btn"
-            onClick={() => setShowNewForm(true)}
-            className="h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded hover:opacity-90 transition-all flex items-center gap-1.5 flex-shrink-0"
+            onClick={() => { if (activeCarId) setShowNewForm(true); }}
+            disabled={!activeCarId}
+            title={!activeCarId ? 'Add a car in Settings → Garage to start.' : undefined}
+            className={`h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 flex-shrink-0 ${!activeCarId ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-90'}`}
           >
             <span className="material-symbols-outlined text-[15px]">add</span>
             New Session
           </button>
         </div>
 
-        {/* Session selector tabs */}
-        {sessions.length > 0 && (
+        {/* Session selector tabs — filtered to active car */}
+        {displayedSessions.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
-            {sessions.map(s => {
+            {displayedSessions.map(s => {
               const c = CORNER_COLORS[s.corner];
               const isActive = s.id === activeSessionId;
               return (
@@ -439,7 +461,7 @@ export default function SmasherLoadsView() {
       </div>
 
       {/* ── Empty state ── */}
-      {sessions.length === 0 && (
+      {displayedSessions.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
           <span className="material-symbols-outlined text-5xl text-on-surface-variant/30">show_chart</span>
           <p className="text-on-surface-variant text-sm font-mono uppercase">No shock sessions yet</p>

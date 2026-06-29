@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '@supabase/supabase-js';
-import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem } from './types';
+import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem, Car, ShockSession, CAR_TYPES } from './types';
 import {
   INITIAL_SETUP,
   INITIAL_SETUPS,
   INITIAL_WEEKENDS,
   INITIAL_ACTIVE_SESSION,
+  INITIAL_CARS,
+  INITIAL_SHOCK_SESSIONS,
 } from './data';
 
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, AppUser } from './lib/supabase';
-import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud } from './lib/sync';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions } from './lib/sync';
 
 import DashboardView from './components/DashboardView';
 import SetupView from './components/SetupView';
@@ -53,6 +55,77 @@ export default function App() {
   const handleDeleteTireFromCloud = async (tireId: string) => {
     if (user) await deleteTireFromCloud(tireId);
   };
+
+  // ── Cars & Garage ──────────────────────────────────────────────────────────
+  const [cars, setCars] = useState<Car[]>(() => {
+    try { const s = localStorage.getItem('race_notes_cars'); return s ? JSON.parse(s) : INITIAL_CARS; }
+    catch { return INITIAL_CARS; }
+  });
+
+  const [activeCarId, setActiveCarId] = useState<string | null>(() => {
+    return localStorage.getItem('race_notes_active_car');
+  });
+
+  // Lifted smasher/shock-session state (Decision 1: cloud sync)
+  const [shockSessions, setShockSessions] = useState<ShockSession[]>(() => {
+    try { const s = localStorage.getItem('race_notes_shock_graphs'); return s ? JSON.parse(s) : INITIAL_SHOCK_SESSIONS; }
+    catch { return INITIAL_SHOCK_SESSIONS; }
+  });
+
+  const activeCar = cars.find(c => c.id === activeCarId) ?? null;
+
+  // Auto-select first car if activeCarId is missing or dangling
+  useEffect(() => {
+    if (cars.length > 0 && (!activeCarId || !cars.find(c => c.id === activeCarId))) {
+      handleSelectCar(cars[0].id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cars, activeCarId]);
+
+  const handleSaveCars = (updated: Car[]) => {
+    setCars(updated);
+    localStorage.setItem('race_notes_cars', JSON.stringify(updated));
+    if (user) pushCars(updated, user.id, team?.id ?? null, setSyncStatus);
+  };
+
+  const handleSelectCar = (carId: string) => {
+    setActiveCarId(carId);
+    localStorage.setItem('race_notes_active_car', carId);
+    // No data reload — views re-filter on activeCarId
+  };
+
+  const handleSaveShockSessions = (updated: ShockSession[]) => {
+    setShockSessions(updated);
+    localStorage.setItem('race_notes_shock_graphs', JSON.stringify(updated));
+    if (user) pushShockSessions(updated, user.id, setSyncStatus);
+  };
+
+  // handleDeleteCar implemented in Phase 7 — stub here
+  const handleDeleteCar = (carId: string) => {
+    const sc = savedSetups.filter(s => s.carId === carId).length;
+    const tc = tireInventory.filter(t => t.carId === carId).length;
+    const shc = shockSessions.filter(s => s.carId === carId).length;
+    if (sc + tc + shc > 0) {
+      alert('Reassign or delete this car\'s data first.');
+      return;
+    }
+    const updated = cars.filter(c => c.id !== carId);
+    handleSaveCars(updated);
+    deleteCarFromCloud(carId);
+    if (activeCarId === carId) {
+      const next = updated[0] ?? null;
+      if (next) handleSelectCar(next.id);
+      else { setActiveCarId(null); localStorage.removeItem('race_notes_active_car'); }
+    }
+  };
+
+  // Count helpers for GarageView / delete guard
+  const carSetupCount = (carId: string) => savedSetups.filter(s => s.carId === carId).length;
+  const carTireCount = (carId: string) => tireInventory.filter(t => t.carId === carId).length;
+  const carShockCount = (carId: string) => shockSessions.filter(s => s.carId === carId).length;
+
+  // Navigate to Settings → Garage from the active-car chip
+  const [settingsSubTab, setSettingsSubTab] = useState<'account' | 'appearance' | 'export' | 'garage'>('account');
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   const [theme, setTheme] = useState<AppTheme>(() => {
@@ -254,12 +327,80 @@ export default function App() {
         localStorage.setItem('race_notes_tires', JSON.stringify(cloudTires));
       }
 
+      const cloudCars = await pullCars(user.id, setSyncStatus);
+      if (cloudCars.length > 0) {
+        setCars(cloudCars);
+        localStorage.setItem('race_notes_cars', JSON.stringify(cloudCars));
+        // Auto-select first car if no active car set yet
+        const storedActive = localStorage.getItem('race_notes_active_car');
+        if (!storedActive || !cloudCars.find(c => c.id === storedActive)) {
+          handleSelectCar(cloudCars[0].id);
+        }
+      }
+
+      const cloudShock = await pullShockSessions(user.id, setSyncStatus);
+      if (cloudShock.length > 0) {
+        setShockSessions(cloudShock);
+        localStorage.setItem('race_notes_shock_graphs', JSON.stringify(cloudShock));
+      }
+
       setSyncStatus('Synced');
       setTimeout(() => setSyncStatus(''), 3000);
     };
 
     doPull();
   }, [user]);
+
+  // ── One-time backfill: assign legacy data to a default car ────────────────
+  // Runs once after the first login pull (or on initial local load if no user).
+  // Guard with a ref so it never duplicates on re-renders.
+  const didBackfill = useRef(false);
+
+  useEffect(() => {
+    if (didBackfill.current) return;
+    if (cars.length > 0) { didBackfill.current = true; return; } // already has cars
+    const hasLegacyData = savedSetups.length > 0 || tireInventory.length > 0 || shockSessions.length > 0;
+    if (!hasLegacyData) { didBackfill.current = true; return; } // brand-new user
+
+    didBackfill.current = true;
+
+    const guessedType = savedSetups.find(s => s.carType)?.carType || CAR_TYPES[0];
+    const guessedChassis = savedSetups.find(s => s.chassis)?.chassis || 'My Car';
+    const now = new Date().toISOString();
+    const defaultCar: Car = {
+      id: `car-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      userId: user?.id ?? 'local',
+      teamId: team?.id ?? null,
+      carType: guessedType,
+      chassis: guessedChassis,
+      division: '',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Stamp all legacy data with the default car id
+    const stampedSetups = savedSetups.map(s => s.carId ? s : { ...s, carId: defaultCar.id });
+    const stampedTires = tireInventory.map(t => t.carId ? t : { ...t, carId: defaultCar.id });
+    const stampedShock = shockSessions.map(s => s.carId ? s : { ...s, carId: defaultCar.id });
+
+    // Persist setups
+    setSavedSetups(stampedSetups);
+    localStorage.setItem('race_notes_saved_setups', JSON.stringify(stampedSetups));
+    if (user) pushSetups(stampedSetups, user.id, setSyncStatus);
+
+    // Persist tires
+    setTireInventory(stampedTires);
+    localStorage.setItem('race_notes_tires', JSON.stringify(stampedTires));
+    if (user) pushTires(stampedTires, user.id, setSyncStatus);
+
+    // Persist shock sessions
+    handleSaveShockSessions(stampedShock);
+
+    // Register car and select it
+    handleSaveCars([defaultCar]);
+    handleSelectCar(defaultCar.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedSetups, tireInventory, shockSessions, cars]);
 
   const saveSetup = (updatedSetup: Setup) => {
     setSetup(updatedSetup);
@@ -729,6 +870,25 @@ export default function App() {
                   {syncStatus}
                 </span>
               )}
+              {/* Active-car chip */}
+              {activeCar ? (
+                <button
+                  onClick={() => { setSettingsSubTab('garage'); setActiveTab('settings'); }}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary font-mono text-[10px] uppercase tracking-wider font-bold hover:bg-primary/20 transition-colors"
+                  title="Switch car in Garage"
+                >
+                  <span className="material-symbols-outlined text-[12px]">directions_car</span>
+                  <span className="truncate max-w-[80px]">{activeCar.name || `${activeCar.chassis} · ${activeCar.carType}`}</span>
+                </button>
+              ) : cars.length === 0 ? (
+                <button
+                  onClick={() => { setSettingsSubTab('garage'); setActiveTab('settings'); }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-full border border-outline-variant/50 text-on-surface-variant/60 font-mono text-[10px] uppercase tracking-wider hover:border-primary/40 hover:text-primary/70 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[12px]">add</span>
+                  Add Car
+                </button>
+              ) : null}
 {/* +Session moved into RaceWeekendView as a prominent top-center button */}
             </div>
           </div>
@@ -753,6 +913,7 @@ export default function App() {
                   todos={todos}
                   userId={user?.id}
                   team={team}
+                  activeCarId={activeCarId}
                   onStartNewWeekend={() => {
                     setNewWeekendName('');
                     setNewWeekendTrack('');
@@ -782,6 +943,10 @@ export default function App() {
                   tireInventory={tireInventory}
                   onSaveTires={handleSaveTires}
                   onDeleteTireFromCloud={handleDeleteTireFromCloud}
+                  activeCarId={activeCarId}
+                  activeCar={activeCar}
+                  shockSessions={shockSessions}
+                  onSaveShockSessions={handleSaveShockSessions}
                   onSaveSetups={(updatedSetups, activeId) => {
                     setSavedSetups(updatedSetups);
                     localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
@@ -878,6 +1043,15 @@ export default function App() {
                   todos={todos}
                   accounting={accounting}
                   shopping={shopping}
+                  cars={cars}
+                  activeCarId={activeCarId}
+                  onSelectCar={handleSelectCar}
+                  onSaveCars={handleSaveCars}
+                  onDeleteCar={handleDeleteCar}
+                  setupCount={carSetupCount}
+                  tireCount={carTireCount}
+                  shockCount={carShockCount}
+                  initialSubTab={settingsSubTab}
                 />
               )}
 
@@ -1103,7 +1277,8 @@ export default function App() {
                       className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
                     >
                       <option value="">-- No setup selected --</option>
-                      {savedSetups.map(s => (
+                      {/* Decision 3: filter to active car's setups */}
+                      {savedSetups.filter(s => !activeCarId || s.carId === activeCarId).map(s => (
                         <option key={s.id} value={s.id}>{s.chassis}{s.carType ? ` (${s.carType})` : ''}</option>
                       ))}
                     </select>

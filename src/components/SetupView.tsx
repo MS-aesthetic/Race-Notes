@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Setup, CornerSetup, TireInventoryItem } from '../types';
+import { Setup, CornerSetup, TireInventoryItem, Car, ShockSession } from '../types';
 import { INITIAL_SETUP } from '../data';
 import { User } from '@supabase/supabase-js';
 import { uploadAttachment, deleteAttachment } from '../lib/sync';
 import SmasherLoadsView from './SmasherLoadsView';
+import { byActiveCar } from '../lib/scope';
 
 interface SetupViewProps {
   savedSetups: Setup[];
@@ -13,6 +14,11 @@ interface SetupViewProps {
   tireInventory: TireInventoryItem[];
   onSaveTires: (tires: TireInventoryItem[]) => void;
   onDeleteTireFromCloud?: (tireId: string) => void;
+  // Car scoping
+  activeCarId?: string | null;
+  activeCar?: Car | null;
+  shockSessions?: ShockSession[];
+  onSaveShockSessions?: (updated: ShockSession[]) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -207,6 +213,7 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = []
 
 export default function SetupView({
   savedSetups, activeSetupId, onSaveSetups, user, tireInventory, onSaveTires, onDeleteTireFromCloud,
+  activeCarId = null, activeCar = null, shockSessions = [], onSaveShockSessions,
 }: SetupViewProps) {
   const [subTab, setSubTab] = useState<'setups' | 'smasherloads' | 'tires'>('setups');
   const [setups, setSetups] = useState<Setup[]>(savedSetups);
@@ -280,6 +287,8 @@ export default function SetupView({
       id: `setup-rec-${Date.now()}`,
       chassis: name,
       date: new Date().toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }),
+      carType: activeCar?.carType ?? activeSetup.carType,
+      carId: activeCarId ?? undefined,
     };
     const updatedList = [newSetup, ...setups];
     setExpandedId(newSetup.id);
@@ -300,7 +309,7 @@ export default function SetupView({
   const handleCloneSetup = (setupId: string) => {
     const target = setups.find((s) => s.id === setupId);
     if (!target) return;
-    const cloned: Setup = { ...JSON.parse(JSON.stringify(target)), id: `setup-rec-${Date.now()}`, chassis: `${target.chassis} (Copy)` };
+    const cloned: Setup = { ...JSON.parse(JSON.stringify(target)), id: `setup-rec-${Date.now()}`, chassis: `${target.chassis} (Copy)`, carId: activeCarId ?? target.carId };
     setExpandedId(cloned.id);
     updateAndSaveSetups([cloned, ...setups], activeId);
   };
@@ -337,6 +346,7 @@ export default function SetupView({
       durometer: newTire.durometer || '',
       airPressure: newTire.airPressure || '',
       createdAt: now,
+      carId: activeCarId ?? undefined,
     };
     saveTires([tire, ...tires]);
     setNewTire({ wheelBackspacing: '2' });
@@ -363,6 +373,11 @@ export default function SetupView({
     </button>
   );
 
+  // Filter at display time only — never mutate the master arrays.
+  const displayedSetups = byActiveCar(setups, activeCarId);
+  const displayedTires = byActiveCar(tires, activeCarId);
+  const noCar = !activeCarId;
+
   return (
     <div className="space-y-4" id="setup-view-root">
 
@@ -387,22 +402,29 @@ export default function SetupView({
         <div className="space-y-6">
 
           {/* Create New Setup */}
-          <form onSubmit={handleAddNewSetup} className="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-grow">
-              <label className="block text-[10px] uppercase font-bold text-on-surface-variant mb-1 font-mono">Create New Setup</label>
-              <input type="text" placeholder="e.g. Chassis #42 - Slick Track Soft" value={newSetupName}
-                onChange={(e) => setNewSetupName(e.target.value)}
-                className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm px-3 py-2 outline-none rounded" />
+          {noCar ? (
+            <div className="bg-surface-container border border-outline-variant rounded-lg p-4 flex items-center gap-3 text-on-surface-variant">
+              <span className="material-symbols-outlined text-[22px] flex-shrink-0">directions_car</span>
+              <span className="font-mono text-xs">Add a car in <strong className="text-on-surface">Settings → Garage</strong> to start.</span>
             </div>
-            <button type="submit"
-              className="self-end sm:self-auto h-10 px-4 bg-surface-bright border border-outline text-primary hover:bg-primary/10 hover:border-primary uppercase font-mono text-xs font-bold transition-all flex items-center gap-2 rounded">
-              <span className="material-symbols-outlined text-[16px]">add</span>New Setup
-            </button>
-          </form>
+          ) : (
+            <form onSubmit={handleAddNewSetup} className="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+              <div className="flex-grow">
+                <label className="block text-[10px] uppercase font-bold text-on-surface-variant mb-1 font-mono">Create New Setup</label>
+                <input type="text" placeholder="e.g. Chassis #42 - Slick Track Soft" value={newSetupName}
+                  onChange={(e) => setNewSetupName(e.target.value)}
+                  className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm px-3 py-2 outline-none rounded" />
+              </div>
+              <button type="submit"
+                className="self-end sm:self-auto h-10 px-4 bg-surface-bright border border-outline text-primary hover:bg-primary/10 hover:border-primary uppercase font-mono text-xs font-bold transition-all flex items-center gap-2 rounded">
+                <span className="material-symbols-outlined text-[16px]">add</span>New Setup
+              </button>
+            </form>
+          )}
 
-          {/* Accordion list */}
+          {/* Accordion list — filtered to active car */}
           <div className="space-y-4" id="setups-accordion">
-            {setups.map((setupItem) => {
+            {displayedSetups.map((setupItem) => {
               const isExpanded = expandedId === setupItem.id;
               const isActive = activeId === setupItem.id;
               return (
@@ -606,7 +628,7 @@ export default function SetupView({
                               cornerLabel={labels[corner]}
                               data={setupItem[corner]}
                               isRear={corner === 'lr' || corner === 'rr'}
-                              tireInventory={tires}
+                              tireInventory={displayedTires}
                               usedTireIds={usedTireIds}
                               onFieldChange={(f, v) => handleCornerChange(setupItem.id, corner, f, v)}
                               onBatchChange={(u) => handleCornerBatchChange(setupItem.id, corner, u)}
@@ -664,7 +686,13 @@ export default function SetupView({
       )}
 
       {/* ══ SMASHER LOADS TAB ═══════════════════════════════════════════════════ */}
-      {subTab === 'smasherloads' && <SmasherLoadsView />}
+      {subTab === 'smasherloads' && (
+        <SmasherLoadsView
+          activeCarId={activeCarId}
+          sessions={shockSessions}
+          onSave={onSaveShockSessions}
+        />
+      )}
 
       {/* ══ TIRES TAB ═══════════════════════════════════════════════════════════ */}
       {subTab === 'tires' && (
@@ -672,32 +700,38 @@ export default function SetupView({
           <div className="flex justify-between items-center">
             <div>
               <h3 className="font-display font-bold text-lg uppercase text-on-surface tracking-tight">Tire Inventory</h3>
-              <p className="text-[10px] font-mono text-on-surface-variant mt-0.5">{tires.length} tire{tires.length !== 1 ? 's' : ''} logged</p>
+              <p className="text-[10px] font-mono text-on-surface-variant mt-0.5">{displayedTires.length} tire{displayedTires.length !== 1 ? 's' : ''} logged</p>
             </div>
-            <button onClick={() => setShowAddTireForm(true)}
-              className="h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded hover:opacity-90 transition-all flex items-center gap-1.5">
+            <button onClick={() => !noCar && setShowAddTireForm(true)}
+              disabled={noCar}
+              title={noCar ? 'Add a car in Settings → Garage to start.' : undefined}
+              className={`h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 ${noCar ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-90'}`}>
               <span className="material-symbols-outlined text-[15px]">add</span>Add Tire
             </button>
           </div>
 
-          {tires.length === 0 && (
+          {displayedTires.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
               <span className="material-symbols-outlined text-5xl text-on-surface-variant/30">tire_repair</span>
               <p className="text-on-surface-variant text-sm font-mono uppercase">No tires in inventory</p>
               <p className="text-on-surface-variant/60 text-xs max-w-[260px]">Add tires to quickly assign them to setup corners and auto-populate size, compound, and backspacing.</p>
-              <button onClick={() => setShowAddTireForm(true)} className="mt-2 px-4 py-2 bg-primary text-on-primary font-mono text-xs font-bold uppercase rounded hover:opacity-90">
-                + Add First Tire
-              </button>
+              {noCar ? (
+                <p className="mt-2 font-mono text-xs text-on-surface-variant">Add a car in <strong className="text-on-surface">Settings → Garage</strong> to start.</p>
+              ) : (
+                <button onClick={() => setShowAddTireForm(true)} className="mt-2 px-4 py-2 bg-primary text-on-primary font-mono text-xs font-bold uppercase rounded hover:opacity-90">
+                  + Add First Tire
+                </button>
+              )}
             </div>
           )}
 
-          {tires.length > 0 && (() => {
+          {displayedTires.length > 0 && (() => {
             // Unique compounds for filter
-            const compounds = Array.from(new Set(tires.map(t => t.compound).filter(Boolean))).sort();
+            const compounds = Array.from(new Set(displayedTires.map(t => t.compound).filter(Boolean))).sort();
             // Filter
             const filtered = tireCompoundFilter === 'all'
-              ? tires
-              : tires.filter(t => t.compound === tireCompoundFilter);
+              ? displayedTires
+              : displayedTires.filter(t => t.compound === tireCompoundFilter);
             // Sort
             const parseSz = (s: string) => parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
             const sorted = [...filtered].sort((a, b) => {
