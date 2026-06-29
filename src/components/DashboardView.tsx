@@ -73,12 +73,13 @@ export default function DashboardView({
   const uniqueTracks = Array.from(new Set(weekends.map(w => w.track).filter(Boolean))).sort();
   const filteredWeekends = trackFilter ? weekends.filter(w => w.track === trackFilter) : weekends;
 
-  // Open tasks across all todo lists
+  // Open tasks across all real (non-template) todo lists
   const openTaskLists = todos
+    .filter(list => !list.is_template)
     .map(list => ({
       list,
-      openItems: list.items.filter(i => !i.done),
-      assignedToMe: list.items.filter(i => !i.done && userId && i.assignedTo === userId),
+      openItems: (list.items ?? []).filter(i => !i.done),
+      assignedToMe: (list.items ?? []).filter(i => !i.done && userId && i.assignedTo === userId),
     }))
     .filter(entry => entry.openItems.length > 0);
 
