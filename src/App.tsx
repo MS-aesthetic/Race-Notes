@@ -963,6 +963,21 @@ export default function App() {
             </span>
           </button>
 
+          {/* Trackers Button */}
+          <button onClick={() => setActiveTab('trackers')}
+            id="tab-btn-trackers"
+            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
+              activeTab === 'trackers' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+            }`}>
+            <span className="material-symbols-outlined text-[20px]"
+                  style={{ fontVariationSettings: activeTab === 'trackers' ? "'FILL' 1" : "'FILL' 0" }}>
+              monitoring
+            </span>
+            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
+              Trackers
+            </span>
+          </button>
+
           {/* Reference Button */}
           <button
             onClick={() => setActiveTab('quickref')}
@@ -979,21 +994,6 @@ export default function App() {
             </span>
             <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
               Reference
-            </span>
-          </button>
-
-          {/* Trackers Button */}
-          <button onClick={() => setActiveTab('trackers')}
-            id="tab-btn-trackers"
-            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
-              activeTab === 'trackers' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
-            }`}>
-            <span className="material-symbols-outlined text-[20px]"
-                  style={{ fontVariationSettings: activeTab === 'trackers' ? "'FILL' 1" : "'FILL' 0" }}>
-              monitoring
-            </span>
-            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
-              Trackers
             </span>
           </button>
 

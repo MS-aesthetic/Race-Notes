@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-06-29  
+> Last updated: 2026-06-29 (session 4 changes)
 > Branch at time of writing: `feature/session-v2`  
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 
@@ -94,6 +94,9 @@ Tab IDs are string literals stored in `activeTab` state in `App.tsx`.
 | `quickref` | `QuickReferenceView` | Tuning reference guide / adjustment finder |
 | `team` | `TeamView` | Team invite + member list |
 | `settings` | `SettingsView` | Account, theme, export |
+
+**Bottom nav bar order (left → right):** Dashboard · Setups · Sessions · Trackers · Reference · Settings
+(Trackers was swapped to appear before Reference in session 4.)
 
 ---
 
@@ -331,12 +334,13 @@ newWeekendName / Track / Date: string
 ---
 
 ### `RaceWeekendView.tsx`
-Props: `{ user, session, weekends, tireInventory?, onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession? }`
+Props: `{ user, session, weekends, tireInventory?, savedSetups?, onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession? }`
 
-Three visual sections:
+Four visual sections (in order):
 1. **Weekend info** — banner (name, track, date, setup name), GPS/zip weather widget, weekend notes textarea.
-2. **Active session editor** — inline editing of `ActiveSession` (lap times, diagnostics, tires installed per corner, adjustments, photo attachments).
-3. **All sessions list** — expandable session cards for the current weekend. At the TOP of this section: a large dashed-border **"＋ Start New Session"** CTA button that calls `onNewSession`.
+2. **Start New Session CTA** — large dashed-border button between Weekend Info and Active Log. Calls `onNewSession`.
+3. **Active session editor** — collapsible; inline editing of `ActiveSession` (lap times, diagnostics, tires installed per corner, adjustments, photo attachments). Tire dropdowns per corner filter out tires already selected on other corners within the same session. "Import from Setup" button auto-fills corner tires from the bound setup.
+4. **All sessions list** — expandable session cards for the current weekend.
 
 Weekend resolution logic:
 ```ts
@@ -351,12 +355,40 @@ const currentWeekend =
 ---
 
 ### `DashboardView.tsx`
-Weekend list with track filter (full-width stacked on phone). Delete button on each weekend card (calls `onDeleteWeekend`). Quick-action buttons: New Weekend, New Session.
+Weekend list with track filter. Delete button on each weekend card. Quick-action buttons: New Weekend, New Session.
+
+Session rows show full session name as plain text — no badge box. `normalizeSessionName()` helper maps legacy full-type names ("QUALIFYING", "HOT LAPS") to the current short codes ("Qual", "HL") for display only; data is not mutated.
+
+Three collapsible sections below the weekend list:
+- **Setups** — list of saved setups (name, track, date); tap to navigate to setup.
+- **Tires** — inventory in single-line format: `#ID [space] Size | BS | Compound | Duro`. ID in primary color, rest in `text-on-surface`.
+- **Open Tasks** — open to-do items across all lists, with "assigned to me" highlight.
 
 ---
 
 ### `SetupView.tsx`
 Full car setup form (4 corners, pull bar, stagger, gear, notes, screenshots). Contains tire inventory management (`TireInventoryItem` CRUD). Links to `SmasherLoadsView` for shock dyno data.
+
+**Car Setup Info Baseline section** includes:
+- Gear, JBar Length, J-Bar Frame/Pinion Height, Pull Bar holes
+- **Computed stagger** (RF−LF, RR−LR) — auto-calculated from tire sizes
+- **Computed weight calculations** — displayed when all 4 corner Scale Weights are entered:
+  - Nose % = (LF + RF) / Total
+  - Left % = (LF + LR) / Total
+  - Cross % = (LR + RF) / Total
+  - LR Split = LR − RR (in lb)
+  - Total Scale Weight display
+
+**CornerForm** — "Load Weight" field is labelled **Scale Weight (lb)** in the UI. The underlying field key is still `loadWeight` in the `CornerSetup` type.
+
+**Tire uniqueness** — CornerForm tire dropdowns filter out tires already selected on other corners within the same setup. Cross-setup / cross-session reuse is allowed.
+
+**Tire inventory list** — same single-line format as Dashboard: `#ID Size | BS | Compound | Duro`. Size field auto-appends `"` on blur if missing.
+
+---
+
+### `QuickReferenceView.tsx`
+Symptom picker label: **"Symptom"** (not "What is the car doing?"). Option labels are short — no parenthetical descriptions, no `[TIGHTEN]`/`[LOOSEN]` group prefix in the `<select>` options.
 
 ---
 
@@ -513,7 +545,41 @@ git push origin feature/session-v2
 
 ---
 
-## 16. Data Flow Diagram
+## 16. Team Profile (`TeamView.tsx` + Supabase)
+
+**Supabase migration applied:** `ALTER TABLE teams ADD COLUMN IF NOT EXISTS profile_data jsonb;`
+
+**Types (`src/types.ts`):**
+```ts
+interface TeamProfile {
+  racePassUrl?: string;
+  transponderIds?: string;
+  hometown?: string;
+  age?: string;
+  carNumber?: string;
+  division?: string;
+}
+interface Team {
+  id: string; name: string; banner_url?: string; created_at: string;
+  profile?: TeamProfile;
+}
+```
+
+**Supabase helper (`src/lib/supabase.ts`):**
+```ts
+export async function updateTeamProfile(teamId: string, profile: TeamProfile): Promise<boolean>
+```
+`getUserTeam` now maps `profile_data` → `team.profile`.
+
+**TeamView.tsx UI:**
+- Team owner: "Team / Driver Profile" card with edit button → inline form (Car #, Division, Hometown, Age, Transponder ID, MyRacePass URL)
+- Members: read-only view of the same fields
+- MyRacePass URL renders as a clickable link
+- Save calls `updateTeamProfile` directly (no debounce)
+
+---
+
+## 17. Data Flow Diagram
 
 ```
 User action
@@ -533,3 +599,28 @@ On login / page refresh (authenticated):
         ├── mergeIntoLocalStorage(...)     (cloud items overwrite matching local by id)
         └── setState(prev => merge loop)   (same merge applied to React state)
 ```
+
+---
+
+## 18. Recent Changes Log (feature/session-v2)
+
+| Change | File(s) |
+|--------|---------|
+| Session short codes in display (HL, Qual, Heat, Feat.) | `App.tsx` — `buildSessionName`, `SESSION_CODES` |
+| Dashboard: Setups / Tires / Open Tasks collapsible sections | `DashboardView.tsx` |
+| Dashboard: session rows show full name, no badge box | `DashboardView.tsx` |
+| Dashboard: tire rows in single-line format (`#ID Size \| BS \| Compound \| Duro`) | `DashboardView.tsx` |
+| Sessions tab: collapsible active session editor | `RaceWeekendView.tsx` |
+| Sessions tab: air pressure always visible; tire dropdown only if inventory exists | `RaceWeekendView.tsx` |
+| Sessions tab: "Import from Setup" button fills corner tires from bound setup | `RaceWeekendView.tsx` |
+| Sessions tab: "Start New Session" CTA moved between Weekend Info and Active Log | `RaceWeekendView.tsx` |
+| Sessions tab: tire uniqueness — same tire can't be on 2 corners of same session | `RaceWeekendView.tsx` |
+| Reference tab: label "Symptom"; short option labels; no `[TIGHTEN]`/`[LOOSEN]` prefix | `QuickReferenceView.tsx` |
+| Setup: tire uniqueness — same tire can't be on 2 corners of same setup | `SetupView.tsx` |
+| Setup: "JBar" → "JBar Length"; "Load Weight" → "Scale Weight (lb)" | `SetupView.tsx` |
+| Setup: tire inventory single-line format; size auto-appends `"` on blur | `SetupView.tsx` |
+| Setup: calculated weight fields (Nose %, Left %, Cross %, LR Split, Total) | `SetupView.tsx` |
+| Team profile fields: Car #, Division, Hometown, Age, Transponder, MyRacePass URL | `TeamView.tsx`, `types.ts`, `lib/supabase.ts` |
+| Supabase: `profile_data jsonb` column added to `teams` table | migration applied |
+| Bottom nav: Trackers now appears before Reference | `App.tsx` |
+| Delete weekend now syncs correctly to cloud | `App.tsx`, `lib/sync.ts` |

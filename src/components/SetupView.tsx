@@ -21,6 +21,15 @@ const parseTireSize = (s: string): number => {
   return isNaN(n) ? 0 : n;
 };
 
+const parseWeight = (val: string | undefined): number | null => {
+  if (!val) return null;
+  const n = parseFloat(val.replace(/[^0-9.]/g, ''));
+  return isNaN(n) ? null : n;
+};
+
+const computeWeightPct = (num: number, total: number): string =>
+  total > 0 ? (num / total * 100).toFixed(1) + '%' : '—';
+
 const computeStagger = (rightSize: string, leftSize: string): string => {
   const r = parseTireSize(rightSize);
   const l = parseTireSize(leftSize);
@@ -111,7 +120,7 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = []
         {!isRear && (
           <>
             <div>
-              <label className={LBL}>Load Weight (lb)</label>
+              <label className={LBL}>Scale Weight (lb)</label>
               <input type="text" value={data.loadWeight || ''} onChange={e => onFieldChange('loadWeight', e.target.value)} className={INP} />
             </div>
             <div>
@@ -531,6 +540,49 @@ export default function SetupView({
                             </div>
                           ))}
                         </div>
+
+                        {/* Computed weight percentages */}
+                        {(() => {
+                          const lfW = parseWeight(setupItem.lf.loadWeight);
+                          const rfW = parseWeight(setupItem.rf.loadWeight);
+                          const lrW = parseWeight(setupItem.lr.loadWeight);
+                          const rrW = parseWeight(setupItem.rr.loadWeight);
+                          const total = (lfW ?? 0) + (rfW ?? 0) + (lrW ?? 0) + (rrW ?? 0);
+                          const hasAll = lfW !== null && rfW !== null && lrW !== null && rrW !== null;
+                          const noseP  = hasAll ? computeWeightPct((lfW!) + (rfW!), total) : '—';
+                          const leftP  = hasAll ? computeWeightPct((lfW!) + (lrW!), total) : '—';
+                          const crossP = hasAll ? computeWeightPct((lrW!) + (rfW!), total) : '—';
+                          const lrSplit = lrW !== null && rrW !== null ? ((lrW - rrW).toFixed(1) + ' lb') : '—';
+                          return (
+                            <div>
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <span className="material-symbols-outlined text-primary text-[14px]">calculate</span>
+                                <span className="text-[9px] font-mono uppercase font-bold text-on-surface-variant/70 tracking-wider">Weight Calculations</span>
+                                {!hasAll && <span className="text-[9px] font-mono text-on-surface-variant/30 italic">— enter all 4 scale weights</span>}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {[
+                                  { label: 'Nose %', value: noseP, hint: '(LF+RF) / Total' },
+                                  { label: 'Left %', value: leftP, hint: '(LF+LR) / Total' },
+                                  { label: 'Cross %', value: crossP, hint: '(LR+RF) / Total' },
+                                  { label: 'LR Split', value: lrSplit, hint: 'LR − RR' },
+                                ].map(({ label, value, hint }) => (
+                                  <div key={label} className="bg-[#111] border border-outline-variant/40 rounded p-2.5">
+                                    <span className="text-[9px] font-mono uppercase font-bold text-on-surface-variant/70 block">{label}</span>
+                                    <span className="font-mono text-lg font-black text-primary tracking-tight">{value}</span>
+                                    <span className="text-[8px] font-mono text-on-surface-variant/30 block mt-0.5">{hint}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              {hasAll && (
+                                <div className="mt-2 bg-[#111] border border-outline-variant/30 rounded px-3 py-1.5 flex items-center justify-between">
+                                  <span className="text-[9px] font-mono uppercase text-on-surface-variant/60">Total Scale Weight</span>
+                                  <span className="font-mono text-sm font-black text-on-surface">{total.toFixed(0)} lb</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* 4 Corner forms */}
