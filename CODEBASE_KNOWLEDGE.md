@@ -1,316 +1,777 @@
-# Race Notes / Crew Chief — Codebase Knowledge & Documentation
+# CREW CHIEF — Codebase Knowledge File
 
-This document serves as a detailed technical reference for the **Race Notes** PWA (branded in-app as **CREW CHIEF**). It is designed to assist with future development, feature additions, and maintenance of the codebase.
-
----
-
-## 1. Tech Stack Overview
-- **Framework**: React 19 (via Vite 6)
-- **Language**: TypeScript (strict mode enabled)
-- **Styling**: TailwindCSS v4 with `@tailwindcss/vite` plugin (no `tailwind.config.js` — config lives in CSS)
-- **Icons**: Material Symbols Outlined (via Google Fonts in CSS) & `lucide-react`
-- **Animations**: Framer Motion (`motion/react`) for fluid tab transitions
-- **PWA Support**: `vite-plugin-pwa` for manifest generation, Service Worker offline precaching, and Android installability
-- **Mobile Native**: Capacitor 8 wrapping the PWA as an Android app
-- **Backend**: Supabase (Postgres + Auth + Storage + RLS)
-- **Hosting**: Configured for Netlify (`netlify.toml` included)
+> Last updated: 2026-06-29 (session 6 — car profiles)
+> Branch at time of writing: `feature/car-profiles` (cut from `feature/session-v2`)
+> Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 
 ---
 
-## 2. Architecture & State Management
+## 1. App Identity
 
-The application is structured as a single-page React app without a dedicated routing library. Navigation is handled via conditional rendering controlled by the `activeTab` state in `App.tsx`.
+| Field | Value |
+|-------|-------|
+| Brand name | **CREW CHIEF** |
+| Capacitor appId | `com.racenotes.app` |
+| Netlify URL | `https://crew-chief-race-notes.netlify.app` |
+| Platform | PWA + Android APK via Capacitor |
+| Repo root | `C:\Users\maxx\antigravity\Race-Notes` |
 
-**No router.** To add a new tab: add the key to the `activeTab` union type, add a `<button>` in the bottom `<nav>`, and add a conditional render in `<main>`.
+---
 
-**State lives in `App.tsx` only.** All domain state (`setup`, `savedSetups`, `weekends`, `activeSession`, `todos`, `tireInventory`, `theme`) is declared at the top level and passed as props. Views never own persistent state — they receive data + callback props.
+## 2. Tech Stack
 
-### Global State (in `App.tsx`)
-| State | Type | Description |
-|---|---|---|
-| `activeTab` | union | Controls which view is rendered |
-| `setup` | `Setup` | Currently active car setup |
-| `savedSetups` | `Setup[]` | All saved setup configurations |
-| `weekends` | `RaceWeekend[]` | All race weekend events + their sessions |
-| `activeSession` | `ActiveSession` | Live data being entered for the current session |
-| `todos` | `Todo[]` | To-Do checklists |
-| `tireInventory` | `TireInventoryItem[]` | Tracked tire inventory |
-| `theme` | `AppTheme` | Current visual theme (dark/light + accent color) |
-| `user` | `User \| null` | Supabase authenticated user |
-| `profile` | `AppUser \| null` | Extended user profile with display name |
-| `team` | `Team \| null` | The user's current team |
+| Layer | Choice |
+|-------|--------|
+| UI framework | React 19 + TypeScript |
+| Build tool | Vite 6 |
+| Styling | TailwindCSS v4 (`@theme` block in CSS — **no `tailwind.config.js`**) |
+| Animations | Framer Motion (`motion` package) |
+| Mobile | Capacitor 6 (Android only) |
+| Backend / Auth | Supabase (auth + Postgres + Storage) |
+| PWA | `vite-plugin-pwa` + Workbox |
+| Deployment | Netlify CLI (`netlify deploy --prod --dir=dist`) |
 
-### Data Persistence — Dual-Write Pattern
-Every state mutation must update both React state AND `localStorage` simultaneously. Cloud sync (Supabase) is a third, optional step only when `user` is truthy:
+### Font scaling
+Font base size is controlled at runtime via:
 ```ts
-setSavedSetups(updated);
-localStorage.setItem('race_notes_saved_setups', JSON.stringify(updated));
-if (user) pushSetups(updated, user.id, setSyncStatus);
+document.documentElement.style.fontSize = theme.fontSize === 'large' ? '19px' : '16px';
+```
+All Tailwind `rem` sizes scale automatically with this.
+
+### TailwindCSS custom tokens (defined in `src/index.css` `@theme` block)
+Key custom color tokens (set dynamically by theme system in `App.tsx`):
+- `--color-primary` / `--color-on-primary`
+- `--color-surface` / `--color-surface-container` / `--color-surface-bright` / `--color-surface-container-high`
+- `--color-on-surface` / `--color-on-surface-variant`
+- `--color-outline-variant`
+- `--color-primary-fixed`
+
+---
+
+## 3. Project Structure
+
+```
+Race-Notes/
+├── src/
+│   ├── App.tsx                    # Root component — all global state, routing, modals
+│   ├── types.ts                   # All TypeScript interfaces
+│   ├── data.ts                    # INITIAL_* constants (mostly empty arrays)
+│   ├── index.css                  # Global styles + @theme TailwindCSS tokens
+│   ├── components/
+│   │   ├── AuthView.tsx           # Login / signup / profile
+│   │   ├── DashboardView.tsx      # Landing: recent weekends, quick actions
+│   │   ├── ExportView.tsx         # Weekend report + export (sub-tab of Settings)
+│   │   ├── QuickReferenceView.tsx # Dirt-track tuning reference / adjustment finder
+│   │   ├── RaceWeekendView.tsx    # Active session editor + all-sessions list
+│   │   ├── GarageView.tsx         # Car CRUD + active-car selector (inside Settings)
+│   │   ├── SettingsView.tsx       # Account / Style / Export / Garage sub-tabs
+│   │   ├── SetupView.tsx          # Car setup sheet + tire inventory + smasher
+│   │   ├── SmasherLoadsView.tsx   # Shock load data points + dyno graph photos
+│   │   ├── TeamView.tsx           # Team management (invite, roles)
+│   │   ├── ToDoView.tsx           # Shared to-do lists (multi-list)
+│   │   └── TrackersView.tsx       # Accounting + Shopping sub-tabs
+│   └── lib/
+│       ├── supabase.ts            # Supabase client + AppUser type
+│       ├── sync.ts                # Push/pull helpers for cloud sync
+│       └── scope.ts               # byActiveCar filter helper (car-profiles feature)
+├── capacitor.config.ts
+├── vite.config.ts
+├── package.json
+└── android/                       # Capacitor Android project
 ```
 
-### localStorage Keys
-| Key | Content |
-|---|---|
-| `race_notes_setup` | Active `Setup` object |
-| `race_notes_saved_setups` | `Setup[]` array |
-| `race_notes_weekends` | `RaceWeekend[]` array |
-| `race_notes_active_session` | `ActiveSession` object |
-| `race_notes_todos` | `Todo[]` array |
-| `race_notes_tires` | `TireInventoryItem[]` array |
-| `race_notes_theme` | `AppTheme` object |
+---
+
+## 4. App Navigation (tabs)
+
+Tab IDs are string literals stored in `activeTab` state in `App.tsx`.
+
+| Tab ID | Component | Description |
+|--------|-----------|-------------|
+| `dashboard` | `DashboardView` | Home screen — recent weekends, quick-start |
+| `raceweekend` | `RaceWeekendView` | Active session log + all sessions for current weekend |
+| `setups` | `SetupView` | Car setup sheet, tire inventory, smasher load graphs |
+| `trackers` | `TrackersView` | Accounting ledger + shopping list |
+| `todos` | `ToDoView` | To-do lists with team assignment |
+| `quickref` | `QuickReferenceView` | Tuning reference guide / adjustment finder |
+| `team` | `TeamView` | Team invite + member list |
+| `settings` | `SettingsView` | Account, theme, export |
+
+**Bottom nav bar order (left → right):** Dashboard · Setups · Sessions · Trackers · Reference · Settings
+(Trackers was swapped to appear before Reference in session 4.)
 
 ---
 
-## 3. Core Domain Models (`src/types.ts`)
+## 5. TypeScript Interfaces (`src/types.ts`)
+
+### `Car` + `CAR_TYPES` *(feature/car-profiles)*
+```ts
+export const CAR_TYPES = ['Dirt Late Model', 'A Mod', 'B Mod'] as const;
+export type CarType = typeof CAR_TYPES[number] | string; // open-ended for custom values
+
+export interface Car {
+  id: string;          // client-generated UUID
+  teamId?: string | null;
+  userId: string;
+  carType: CarType;
+  chassis: string;
+  division: string;
+  name?: string;
+  createdAt: string;   // ISO
+  updatedAt: string;   // ISO
+}
+```
+**Ownership:** if the user is on a team (`teamId` is set), the car is team-owned and visible to all team members. Otherwise it is user-owned.
+
+### `ShockCorner` / `ShockDataPoint` / `ShockSession` *(feature/car-profiles — promoted from local types)*
+```ts
+export type ShockCorner = 'LF' | 'RF' | 'LR' | 'RR';
+export interface ShockDataPoint { height: string; load: string; }
+export interface ShockSession {
+  id: string; label: string; corner: ShockCorner;
+  springRate: string; shock: string; date: string;
+  points: ShockDataPoint[]; photos?: string[];
+  carId?: string; // car-scoped
+}
+```
+Previously defined as local types inside `SmasherLoadsView.tsx`; now global so `App.tsx` and `sync.ts` can use them.
 
 ### `CornerSetup`
-The most granular model — represents the physical setup of a single wheel corner (LF, RF, LR, RR).
-
-**General fields**: `spring`, `shock`, `loadWeight`, `loadCtoC`, `caster`, `camber`, `tireComp`, `tireSize`, `toe`, `stagger`, `staggerUnit`, `wheelSpacer`, `wheelSpacerUnit`, `tirePress`, `tireInventoryId`, `backspacing`
-
-**Rear-specific fields**: `springHeight`, `load`, `topBarLength`, `bottomBarLength`, `topBarHFrame`, `topBarHBird`, `topBarAngRH`, `topBarAngFD`, `botBarHFrame`, `botBarHBird`, `bottomBarAngle`, `droop`, `preload`, `boundGraphId`
+Per-corner setup data (spring, shock, tire, measurements). All measurement fields are strings for flexibility. Key fields:
+- `spring`, `shock`, `tireComp`, `tireSize`, `tirePress`
+- `tireInventoryId` — links to `TireInventoryItem.id`
+- Rear-specific: `springHeight`, `load`, `topBarLength`, `bottomBarLength`, bar angles, `droop`, `preload`
+- `boundGraphId` — links to a shock dyno graph in SmasherLoadsView
 
 ### `Setup`
-Entire car configuration at a point in time.
-- Metadata: `id`, `chassis`, `track`, `date`, `carType`
-- Four corners: `lf`, `rf`, `lr`, `rr` (each a `CornerSetup`)
-- Global settings: `gear`, `toe`, `jbar`, `jbarFrameHeight`, `jbarPinionHeight`, `frontStagger`, `rearStagger`, `pullBarFrameHole`, `pullBarRearHole`, `pullBarAngle`, `notes`
-- Attachments: `screenshots` — array of Supabase Storage public URLs
+Full car setup sheet. One per entry in the saved setups list.
+```ts
+interface Setup {
+  id: string; chassis: string; track: string; date: string; carType: string;
+  lf: CornerSetup; rf: CornerSetup; lr: CornerSetup; rr: CornerSetup;
+  gear?: string; toe?: string; jbar?: string; jbarFrameHeight?: string; jbarPinionHeight?: string;
+  frontStagger?: string; rearStagger?: string;
+  pullBarFrameHole?: string; pullBarRearHole?: string; pullBarAngle?: string;
+  notes?: string;
+  screenshots?: string[]; // Supabase Storage public URLs
+  carId?: string;          // car-scoped (feature/car-profiles)
+}
+```
 
 ### `TireInventoryItem`
-Tracks physical tires in inventory:
-- `id`, `tireNumber`, `size`, `compound`, `wheelBackspacing` (`'2' | '3' | '4'`), `durometer`
+```ts
+interface TireInventoryItem {
+  id: string; tireNumber: string; size: string; compound: string;
+  wheelBackspacing: '2' | '3' | '4'; durometer: string;
+  carId?: string; // car-scoped (feature/car-profiles)
+}
+```
 
 ### `TireDetails`
-Per-corner tire state on a session:
-- `compound`, `size`, `airPressure`, `tireId?`, `durometer?`, `backSpacing?`
-
-### `SetupAdjustment`
-Mid-session setup change log entry:
-- `id`, `icon`, `label`, `value`
+Tire state as used in an active session (what's physically on the car):
+```ts
+interface TireDetails {
+  compound: string; size: string; airPressure: string;
+  tireId?: string; durometer?: string; backSpacing?: string;
+}
+```
 
 ### `SessionRecord`
-Logged on-track performance (stored inside `RaceWeekend.sessions`):
-- **Identity**: `id`, `type`, `name`, `track`, `condition`, `time`, `weather`, `setupUsed`
-- **Performance**: `bestLap`, `isBest`, `avgLap`, `finishPos`, `gap`, `maxRpm`, `leaderLap`, `leaderGap`
-- **Diagnostics**: `cornerEntry`, `centerApex`, `cornerExit` — each `'TIGHT' | 'NEUTRAL' | 'LOOSE'` with optional notes
-- **Adjustments**: `SetupAdjustment[]`
-- **Tires**: `{ lf, rf, lr, rr: TireDetails }` + `pressures: { lf, rf, lr, rr: string }`
-- **Other**: `competitionNotes`, `screenshots` (Supabase Storage URLs)
+A completed/saved session stored inside `RaceWeekend.sessions[]`.
+```ts
+interface SessionRecord {
+  id: string;
+  type: 'H1' | 'Q1' | 'P2' | 'A-MAIN' | string; // legacy values; new sessions use display string
+  name: string;    // same as type (e.g. "Test", "Test 2", "Heat Race")
+  track: string; condition: string; bestLap: string;
+  isBest?: boolean; avgLap?: string; finishPos?: string;
+  diagnostics?: {
+    cornerEntry: 'TIGHT' | 'NEUTRAL' | 'LOOSE';
+    cornerEntryNotes?: string;
+    centerApex: 'TIGHT' | 'NEUTRAL' | 'LOOSE';
+    centerApexNotes?: string;
+    cornerExit: 'TIGHT' | 'NEUTRAL' | 'LOOSE';
+    cornerExitNotes?: string;
+  };
+  adjustments?: SetupAdjustment[];
+  tires?: { lf: TireDetails; rf: TireDetails; lr: TireDetails; rr: TireDetails; };
+  pressures?: { lf: string; rf: string; lr: string; rr: string; };
+  competitionNotes?: string; weather?: string; time?: string;
+  setupUsed?: string; screenshots?: string[];
+}
+```
+**Note:** `type` and `name` are set to the same full string (e.g. `"Test 2"`). Legacy codes like `'H1'` still exist in the union but are not used for new sessions.
+
+### `WeatherSnapshot`
+```ts
+interface WeatherSnapshot {
+  temp: number; humidity: number; windSpeed: number;
+  condition: string; location: string; fetchedAt: string; // ISO timestamp
+}
+```
 
 ### `RaceWeekend`
-Container grouping multiple `SessionRecord[]` under one event:
-- `id` (format: `wknd-${Date.now()}`), `name`, `track`, `date`, `sessions`
+```ts
+interface RaceWeekend {
+  id: string; name: string; track: string; date: string;
+  sessions: SessionRecord[];
+  notes?: string;            // free-text weekend notes
+  weather?: WeatherSnapshot; // fetched via GPS or zip
+  location?: string;         // human-readable location string
+  setupId?: string;          // bound Setup.id
+  setupName?: string;        // cached chassis name for display
+}
+```
 
 ### `ActiveSession`
-Live-editing mirror of the currently selected session. Changes via `handleUpdateSession` are written back into the matching `SessionRecord` inside `weekends`. Fields mirror `SessionRecord` plus `weekendId` for targeting.
+The in-progress session being edited live. Mirrors most of `SessionRecord` but is a singleton flat object.
+- Stored in `localStorage['race_notes_active_session']`
+- When a session is "saved": it gets appended to the matching `RaceWeekend.sessions[]` array
 
-### `TodoItem`
-- `id`, `text`, `desc?`, `completionNote?`, `completedAt?`, `done`
+### `TodoItem` / `Todo`
+- `TodoItem`: single task with `text`, `done`, optional `assignedTo`/`assignedToName`, optional `weekendId`/`weekendName`
+- `Todo`: a named list containing `TodoItem[]`, owned by a `user_id`
 
-### `Todo`
-- `id`, `user_id`, `title`, `items: TodoItem[]`, `is_template?`, `updated_at`
+### `AccountingEntry`
+```ts
+interface AccountingEntry {
+  id: string; name: string; description?: string;
+  amount: number; type: 'income' | 'expense';
+  payer?: string; payee?: string; date: string;
+  weekendId?: string; weekendName?: string;
+  receiptPhoto?: string; // base64
+}
+```
+
+### `ShoppingItem`
+```ts
+interface ShoppingItem {
+  id: string; name: string; description?: string;
+  cost?: number; purchased: boolean; purchasedAt?: string;
+  weekendId?: string; weekendName?: string;
+}
+```
 
 ### `AppTheme`
-Stored in `race_notes_theme`. Applied to `document.documentElement` via CSS variables:
-- `mode: 'dark' | 'light'`
-- `accent: string` — hex color (default `#ffb3ac`); drives `--color-primary`, `--color-primary-fixed-dim`, `--color-surface-tint`, and a contrast-calculated `--color-on-primary`
-
-### `Team` / `TeamMember`
-- `Team`: `id`, `name`, `banner_url?`, `created_at`
-- `TeamMember`: `team_id`, `user_id`, `role: 'owner' | 'member'`
-
----
-
-## 4. Main UI Components (`src/components/`)
-
-| Component | Tab | Description |
-|---|---|---|
-| `DashboardView.tsx` | `dashboard` | Landing screen; accordion log of race weekends + sessions; active setup summary card |
-| `SetupView.tsx` | `setups` | Engineering interface for creating/editing/cloning setups; accordion per corner; tire inventory management |
-| `RaceWeekendView.tsx` | `raceweekend` | Live session logging; lap times, diagnostics, tire pressure adjustments, photo attachments |
-| `QuickReferenceView.tsx` | `quickref` | Reference guide for dirt track setup terms and tuning info |
-| `ToDoView.tsx` | `todos` | To-Do checklists with template support; completion notes per item |
-| `SettingsView.tsx` | `settings` | Auth (login/register), theme picker, data export/import |
-| `AuthView.tsx` | *(nested in Settings)* | Auth UI — login, register, profile |
-| `TeamView.tsx` | *(nested in Settings)* | Team creation, invite members, team management |
-| `ExportView.tsx` | *(not in nav)* | Formatting and exporting data; available but not linked from bottom nav |
-| `SmasherLoadsView.tsx` | *(not in nav)* | Specialized view; not currently linked from bottom nav |
-
-### Bottom Navigation (6 tabs)
-`dashboard` → `setups` → `raceweekend` → `quickref` → `todos` → `settings`
-
-Tab icons use Material Symbols with `fontVariationSettings: "'FILL' 1"` when active.
-
----
-
-## 5. Styling & Theming
-
-The UI uses a custom **Motorsport Telemetry** dark-theme design system.
-
-- **CSS Variables** (`src/index.css`): Variables map to Tailwind utilities (e.g., `--color-surface: #131313`, `--color-primary: #ffb3ac`). Use semantic Tailwind classes like `bg-surface`, `text-primary`, `border-outline-variant`.
-- **Typography**: `font-sans` = Inter; `font-display` = Space Grotesk (headers); `font-mono` = JetBrains Mono (all numeric/telemetry readouts — use this on all data values)
-- **Effects**: `.scanline` animations and `.status-glow-*` classes mimic physical telemetry dashboards
-- **Layout**: Constrained to `max-w-2xl` centered — optimized for mobile portrait use in the pits. Do not widen.
-- **Theme system**: User can switch dark/light mode and pick an accent color. Applied at runtime via `document.documentElement` CSS variable overrides in `App.tsx`.
-
----
-
-## 6. PWA Integration Details
-
-- **Plugin**: `vite-plugin-pwa` with `generateSW` mode — service worker (`dist/sw.js`) precaches all assets for 100% offline functionality
-- **Manifest**: `theme_color: #131313`, `display: standalone` — launches without browser UI on Android
-- **Icons**: `public/pwa-192x192.png`, `public/pwa-512x512.png`, `public/maskable-icon.png` (15% safe padding for adaptive icons)
-
----
-
-## 7. Cloud Sync & Auth (Phase 2)
-
-Supabase provides cloud persistence and user authentication with a **local-first offline architecture**.
-
-### Authentication (`src/lib/supabase.ts`)
-- `signUp(email, password, displayName)` — registers + auto-creates profile row
-- `signIn(email, password)` — session-based auth with auto-refresh
-- `signOut()` — revokes session
-- `onAuthChange(callback)` — real-time auth state listener
-- `fetchProfile(userId)`, `searchProfiles(query)` — user metadata for sharing
-- `getUserTeam(userId)` — fetch the user's current team
-
-### Local-First Sync Engine (`src/lib/sync.ts`)
-1. **Always write to `localStorage` first** (works offline)
-2. **Debounce push to Supabase** (500ms) when authenticated and online
-3. **Pull on login**: fetch all accessible cloud data, merge using cloud-wins strategy
-
-**Push functions** (all debounced 500ms):
-- `pushSetups(setups, userId, onStatus?)` — sync `Setup[]`
-- `pushWeekends(weekends, userId, onStatus?)` — sync `RaceWeekend[]`
-- `pushActiveSession(session, userId, onStatus?)` — sync live session state
-- `pushTodos(todos, userId, onStatus?)` — sync `Todo[]`
-
-**Pull functions**:
-- `pullAllData(userId, onStatus?)` — fetches setups, weekends, active session; returns merged results
-- `pullTodos(onStatus?)` — fetches `Todo[]` (RLS-filtered)
-- `pullSharedData(userId)` — fetches setups/weekends shared explicitly via `shared_setups` / `shared_weekends` tables
-
-**Merge helper**:
-- `mergeIntoLocalStorage(type, cloudData, localKey)` — cloud overwrites local on conflict (cloud is source of truth when logged in)
-
-**Env vars required** (create `.env.local`):
+```ts
+interface AppTheme {
+  mode: 'dark' | 'light';
+  accent: string;           // hex e.g. "#ffb3ac"
+  fontSize: 'standard' | 'large'; // 16px or 19px base
+}
 ```
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
+
+---
+
+## 6. localStorage Keys
+
+| Key | Stored type | Description |
+|-----|-------------|-------------|
+| `race_notes_setup` | `Setup` | Currently active setup sheet |
+| `race_notes_saved_setups` | `Setup[]` | All saved setups |
+| `race_notes_weekends` | `RaceWeekend[]` | All race weekends + their sessions |
+| `race_notes_active_session` | `ActiveSession` | Session being edited right now |
+| `race_notes_tires` | `TireInventoryItem[]` | Tire inventory |
+| `race_notes_shock_graphs` | `ShockSession[]` | Smasher load graph data — now lifted to App.tsx, synced to cloud |
+| `race_notes_cars` | `Car[]` | All cars (synced to cloud) |
+| `race_notes_active_car` | `string` | Active car ID — **device-local, never synced to Supabase** |
+| `race_notes_todos` | `Todo[]` | To-do lists |
+| `race_notes_accounting` | `AccountingEntry[]` | Accounting ledger entries |
+| `race_notes_shopping` | `ShoppingItem[]` | Shopping list items |
+| `race_notes_theme` | `AppTheme` | User theme preferences |
+
+All keys are read on mount via `useEffect` in `App.tsx`. Cloud data (when logged in) is merged on top of local data.
+
+---
+
+## 7. Cloud Sync (`src/lib/sync.ts`)
+
+### Strategy
+**Local-first**: localStorage is always the primary write target. Supabase is secondary and synced after auth.
+
+### Push functions (local → Supabase)
+All push calls are debounced 500ms via a shared `pushDebounceTimers` Map.
+
+| Function | Supabase table | Behavior |
+|----------|----------------|----------|
+| `pushWeekends(weekends, userId)` | `race_weekends` | upserts all surviving weekends |
+| `pushSetups(setups, userId)` | `setups` | upserts all setups (includes `car_id`) |
+| `pushActiveSession(session, userId)` | `active_sessions` | upserts single row keyed by user_id |
+| `pushTodos(todos, userId)` | `todos` | upserts all todos |
+| `pushTires(tires, userId)` | `tire_inventory` | upserts all tires (includes `car_id`) |
+| `pushCars(cars, userId, teamId)` | `cars` | upserts all cars |
+| `pushShockSessions(sessions, userId)` | `shock_sessions` | upserts all shock sessions |
+| `deleteWeekendFromCloud(weekendId)` | `race_weekends` | **hard-deletes** one row by id (no debounce) |
+| `deleteCarFromCloud(carId)` | `cars` | hard-deletes one car |
+| `deleteShockSessionFromCloud(sessionId)` | `shock_sessions` | hard-deletes one shock session |
+
+### Pull function
+`pullAllData(userId)` — called once on login. Returns setups, weekends, and active session from cloud. App.tsx merges them via `mergeIntoLocalStorage` + setState merge loops.
+
+### `mergeIntoLocalStorage(type, cloudData, localKey)`
+Cloud items always overwrite local items of the same `id`. Local-only items are preserved. Deleted local items re-appear if cloud record was not explicitly deleted.
+
+### CRITICAL GOTCHA — deletion sync
+`pushWeekends` only upserts remaining records; it does **not** delete the removed row from Supabase. When deleting a weekend you **must** also call `deleteWeekendFromCloud(weekendId)` — otherwise the deleted weekend comes back on the next page refresh (pullAllData re-adds it). **This bug was fixed in `feature/session-v2`.**
+
+---
+
+## 8. Supabase Tables
+
+| Table | Key columns | Notes |
+|-------|-------------|-------|
+| `race_weekends` | `id, user_id, name, track, date, sessions (jsonb), updated_at` | sessions array stored as JSONB blob |
+| `setups` | `id, user_id, chassis, track, date, lf/rf/lr/rr (jsonb), screenshots (text[]), car_id (text), updated_at` | `car_id` added in migration 009 |
+| `active_sessions` | `id, user_id, data (jsonb), updated_at` | one row per user |
+| `todos` | `id, user_id, title, items (jsonb), is_template, updated_at` | |
+| `tire_inventory` | `id, user_id, tire_number, size, compound, wheel_backspacing, durometer, car_id (text), created_at, updated_at` | `car_id` added in migration 009 |
+| `cars` | `id (text), user_id, team_id, car_type, chassis, division, name, created_at, updated_at` | migration 009; `id` is text (client-generated UUID) to match local-first pattern |
+| `shock_sessions` | `id (text), user_id, car_id (text), label, corner, spring_rate, shock, date, points (jsonb), photos (text[]), created_at, updated_at` | migration 009; replaces localStorage-only storage |
+| `shared_setups` | `setup_id, shared_with (user_id)` | sharing permissions |
+| `shared_weekends` | `weekend_id, shared_with (user_id)` | sharing permissions |
+| Storage bucket | `race-attachments` | photos/files; path: `{userId}/{entityType}/{entityId}/{timestamp}.{ext}` |
+
+**Migration file:** `supabase/migrations/009_cars.sql`
+**RLS pattern:** all new tables use `in_same_team()` helper — team members can view/update each other's cars, setups, tires, and shock sessions.
+
+---
+
+## 9. Component Details
+
+### `App.tsx`
+The entire app runs from one root component. No React Router — navigation is a single `activeTab` string state.
+
+**Key state variables:**
+```ts
+activeTab: string                    // current tab
+weekends: RaceWeekend[]              // all race weekends
+activeSession: ActiveSession         // the session being edited live
+setup: Setup                         // currently active car setup
+savedSetups: Setup[]                 // all saved setups
+tireInventory: TireInventoryItem[]   // all tires
+user: User | null                    // Supabase auth user
+team: Team | null                    // user's team
+theme: AppTheme                      // dark/light, accent color, font size
+
+// Car profiles (feature/car-profiles)
+cars: Car[]                          // all cars (from race_notes_cars)
+activeCarId: string | null           // active car (from race_notes_active_car, device-local)
+shockSessions: ShockSession[]        // all shock sessions (lifted from SmasherLoadsView)
+settingsSubTab: string               // deep-link target for SettingsView
 ```
-App runs fully offline without these — all Supabase calls are try/catch wrapped.
+
+**Derived:**
+```ts
+const activeCar = cars.find(c => c.id === activeCarId) ?? null;
+```
+
+**Car handlers:**
+- `handleSaveCars(updated)` — persists to `race_notes_cars` + pushCars to cloud
+- `handleSelectCar(carId)` — writes to `race_notes_active_car` (localStorage only, never synced)
+- `handleDeleteCar(carId)` — **blocked** if car owns any setup/tire/shock data; alerts the user; otherwise deletes locally + cloud, selects next car
+- `handleSaveShockSessions(updated)` — persists to `race_notes_shock_graphs` + pushShockSessions to cloud
+
+**Auto-select effect:** on mount and whenever `cars` or `activeCarId` changes, if `activeCarId` is missing or dangling (not in `cars`), auto-selects `cars[0].id`.
+
+**One-time backfill effect (useRef guarded):** runs once after post-login pull if `cars.length === 0`. Creates a `defaultCar` from the first setup's chassis/carType, stamps all legacy setups, tires, and shock sessions with `defaultCar.id`, saves the car, and selects it.
+
+**New-weekend setup picker:** filters `savedSetups` to active car's setups (`s.carId === activeCarId`).
+
+**Header:** active car chip (shows `chassis · carType`) appears when a car is selected; taps to `Settings → Garage`. "Add Car" button appears when `cars.length === 0`.
+
+// New session form
+showNewSessionForm: boolean
+newSessionWeekendId: string
+newSessionType: 'Test'|'Hot Laps'|'Qualifying'|'Heat Race'|'Feature'
+newSessionTimeOfDay: 'current'|'Afternoon'|'Evening'|'Night'
+sessionWeatherStr: string            // formatted weather string for the session
+sessionWeatherLoading / Error / showZip / zipCode
+
+// New weekend form
+showNewWeekendForm: boolean
+newWeekendSetupId: string            // bound setup ID
+newWeekendName / Track / Date: string
+```
+
+**Key handlers:**
+- `handleOpenNewSessionForm(preferWeekendId?)` — resets all session form state, sets `newSessionWeekendId` from the active session's weekendId (or first weekend), opens modal.
+- `handleCreateNewSession(e)` — validates, calls `buildSessionName`, resolves time, saves to `weekends`, pushes to cloud, sets `activeSession`, navigates to `raceweekend` tab.
+- `buildSessionName(type, weekendId)` — auto-numbers sessions ("Test", "Test 2", "Test 3"...).
+- `handleDeleteWeekend(weekendId)` — removes from state + localStorage + calls `deleteWeekendFromCloud(id)` + `pushWeekends(...)`.
+- `handleCreateNewWeekend(e)` — creates weekend with bound setup, then auto-opens session form.
+- `handleUpdateWeekend(updated)` — persists weekend edits (notes, weather, etc.) to state + localStorage + cloud.
+
+**Cloud sync flow:**
+1. Mount: read all data from localStorage into state.
+2. Auth login: `pullAllData` → merge cloud into local → setState.
+3. Data change: write to localStorage immediately, debounced push to Supabase.
 
 ---
 
-## 8. Attachments / Photo Storage (Phase 4)
+### `RaceWeekendView.tsx`
+Props: `{ user, session, weekends, tireInventory?, savedSetups?, onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession? }`
 
-Users can attach photos and PDFs to both sessions and setups, stored in Supabase Storage.
+Four visual sections (in order):
+1. **Weekend info** — banner (name, track, date, setup name), GPS/zip weather widget, weekend notes textarea.
+2. **Start New Session CTA** — large dashed-border button between Weekend Info and Active Log. Calls `onNewSession`.
+3. **Active session editor** — collapsible; inline editing of `ActiveSession` (lap times, diagnostics, tires installed per corner, adjustments, photo attachments). Tire dropdowns per corner filter out tires already selected on other corners within the same session. "Import from Setup" button auto-fills corner tires from the bound setup.
+4. **All sessions list** — expandable session cards for the current weekend.
 
-### Storage Bucket: `race-attachments`
-- **Public bucket** — files are publicly readable via URL
-- **10 MB per file limit**
-- **Allowed types**: `image/jpeg`, `image/png`, `image/webp`, `image/heic`, `image/heif`, `application/pdf`
-- **Path convention**: `{userId}/{sessions|setups}/{entityId}/{timestamp}_{random}.{ext}`
-- Auth required to upload/delete; users can only modify files under their own `{userId}/` prefix
+Weekend resolution logic:
+```ts
+const currentWeekend =
+  weekends.find(w => w.id === session.weekendId) ||
+  weekends.find(w => w.track === session.track) ||
+  weekends[0];
+```
 
-### Sync helpers (`src/lib/sync.ts`)
-- `uploadAttachment(file, userId, entityType, entityId)` — uploads to storage, returns public URL
-- `deleteAttachment(publicUrl)` — deletes from storage given the public URL
-
-### Data model
-- `Setup.screenshots: string[]` — array of public URLs
-- `SessionRecord.screenshots: string[]` — array of public URLs
-- `ActiveSession.screenshots?: string[]` — live session attachment list
-
----
-
-## 9. Teams & To-Do Lists (Phase 3)
-
-Team-based workflows allow crew members to collaborate via Supabase RLS.
-
-### Team Architecture
-- **`teams` table**: Team metadata
-- **`team_members` table**: Maps users to teams with `owner` | `member` roles
-- **`in_same_team(user_a, user_b)` SQL function**: Powers cross-user data visibility in RLS policies
-
-### Team Permissions via RLS
-Setups, weekends, sessions, and todos are automatically visible to all members of the same team — no explicit share buttons needed. The `.select('*')` in pull functions relies on RLS to mask data appropriately.
-
-### Manage Team UI (`TeamView.tsx`, nested inside `SettingsView`)
-- Auto-creates a team with you as owner
-- Sends email invites to new members
-- Syncs automatically to all team members via Postgres RLS policies
-
-### To-Do Lists (`ToDoView.tsx`)
-- Create multiple checklists with `is_template` support
-- Items support `desc` (creation note), `completionNote` (note when checked off), and `completedAt` timestamp
-- Cloud-synced via `pushTodos` / `pullTodos`
+**Tire picker:** Per-corner inventory dropdown + air pressure input. Selecting a tire auto-fills compound, size, durometer, backspacing from the inventory item.
 
 ---
 
-## 10. Tire Inventory
+### `DashboardView.tsx`
+Weekend list with track filter. Delete button on each weekend card. Quick-action buttons: New Weekend, New Session.
 
-Tracks physical tires available in the garage.
+Session rows show full session name as plain text — no badge box. `normalizeSessionName()` helper maps legacy full-type names ("QUALIFYING", "HOT LAPS") to the current short codes ("Qual", "HL") for display only; data is not mutated.
 
-- Managed via `tireInventory: TireInventoryItem[]` state in `App.tsx`
-- Persisted to `race_notes_tires` in localStorage via `handleSaveTires`
-- `TireInventoryItem` fields: `id`, `tireNumber`, `size`, `compound`, `wheelBackspacing` (`'2' | '3' | '4'`), `durometer`
-- Corner setups reference a tire via `CornerSetup.tireInventoryId`
-- Session `TireDetails` includes `tireId?`, `durometer?`, `backSpacing?` for cross-referencing
-
----
-
-## 11. Database Schema (`supabase/migrations/`)
-
-| Migration | Description |
-|---|---|
-| `001_schema.sql` | Base schema: profiles, setups, race_weekends, active_sessions |
-| `002_share_weekends.sql` | `shared_setups` and `shared_weekends` explicit-share tables |
-| `003_teams_and_todos.sql` | `teams`, `team_members`, `todos` tables + `in_same_team()` RLS function |
-| `004_updates.sql` | Schema updates |
-| `005_fix_recursion.sql` | Fix RLS recursion issue |
-| `006_fix_teams_recursion.sql` | Further RLS recursion fix |
-| `007_definitive_team_rls.sql` | Definitive team RLS policy implementation |
-| `008_attachments_bucket.sql` | `race-attachments` Storage bucket + upload/delete RLS policies |
-
-### Key Tables
-- **`profiles`**: `display_name`, `avatar_url`, email. Auto-created on signup via `handle_new_user()` trigger.
-- **`setups`**: Columns for all `Setup` scalar fields; `lf`/`rf`/`lr`/`rr` stored as JSONB.
-- **`race_weekends`**: `name`, `track`, `date`, `sessions` (JSONB array of `SessionRecord[]`).
-- **`active_sessions`**: One row per user (`id = "active-${userId}"`), `data` JSONB.
-- **`todos`**: `title`, `items` (JSONB array of `TodoItem[]`), `is_template`, `updated_at`.
-- **`teams`** / **`team_members`**: Team membership with roles.
-- **`shared_setups`** / **`shared_weekends`**: Explicit per-entity sharing tables.
+Three collapsible sections below the weekend list:
+- **Setups** — list of saved setups (name, track, date); tap to navigate to setup.
+- **Tires** — inventory in single-line format: `#ID [space] Size | BS | Compound | Duro`. ID in primary color, rest in `text-on-surface`.
+- **Open Tasks** — open to-do items across all lists, with "assigned to me" highlight.
 
 ---
 
-## 12. Android / Capacitor
+### `SetupView.tsx`
+Full car setup form (4 corners, pull bar, stagger, gear, notes, screenshots). Contains tire inventory management (`TireInventoryItem` CRUD). Links to `SmasherLoadsView` for shock dyno data.
 
-- **Capacitor 8** wraps the PWA as a native Android app
-- After any web change: `npm run android:sync` to push changes to the native layer
-- Android source is in `android/` — avoid editing native files unless changing permissions or splash screens
-- APK artifact: `race_notes.apk` at project root
+**feature/car-profiles changes:** Accepts `activeCarId?`, `activeCar?`, `shockSessions?`, `onSaveShockSessions?`. New setups and tires are stamped with `carId`. `byActiveCar` filter applied at display time (`displayedSetups`, `displayedTires`). CornerForm receives `displayedTires` so inventory picker only shows active car's tires. "New Setup" form and "Add Tire" button show a prompt ("Add a car in Settings → Garage to start.") and are disabled when no car is active.
+
+**Car Setup Info Baseline section** includes:
+- Gear, JBar Length, J-Bar Frame/Pinion Height, Pull Bar holes
+- **Computed stagger** (RF−LF, RR−LR) — auto-calculated from tire sizes
+- **Computed weight calculations** — displayed when all 4 corner Scale Weights are entered:
+  - Nose % = (LF + RF) / Total
+  - Left % = (LF + LR) / Total
+  - Cross % = (LR + RF) / Total
+  - LR Split = LR − RR (in lb)
+  - Total Scale Weight display
+
+**CornerForm** — "Load Weight" field is labelled **Scale Weight (lb)** in the UI. The underlying field key is still `loadWeight` in the `CornerSetup` type.
+
+**Tire uniqueness** — CornerForm tire dropdowns filter out tires already selected on other corners within the same setup. Cross-setup / cross-session reuse is allowed.
+
+**Tire inventory list** — same single-line format as Dashboard: `#ID Size | BS | Compound | Duro`. Size field auto-appends `"` on blur if missing.
 
 ---
 
-## 13. Developer Workflows
+### `QuickReferenceView.tsx`
+Symptom picker label: **"Symptom"** (not "What is the car doing?"). Option labels are short — no parenthetical descriptions, no `[TIGHTEN]`/`[LOOSEN]` group prefix in the `<select>` options.
 
+---
+
+### `SmasherLoadsView.tsx`
+Shock load graph data entry. Each `ShockSession` (now a global type in `types.ts`, not same as `SessionRecord`) has:
+- Corner + shock ID
+- Data points: height/load pairs — **text inputs with `inputMode="decimal"`**, no stepper buttons
+- Dyno graph photos: base64 JPEG (compressed via canvas). Photos live here, NOT in RaceWeekendView.
+
+**feature/car-profiles changes:** State lifted to App.tsx. Props: `activeCarId?`, `sessions?` (full array from App), `onSave?`. When props are provided the component uses them; falls back to localStorage for backward compatibility. New sessions are stamped with `carId`. `byActiveCar` filter applied at display time. "New Session" button disabled with tooltip when no car is active.
+
+---
+
+### `TrackersView.tsx`
+Sub-tabs: Accounting | Shopping. Entries can be linked to a race weekend via `weekendId`/`weekendName`. Accounting supports a base64 receipt photo.
+
+---
+
+### `SettingsView.tsx`
+Sub-tabs: **Garage | Account | Style | Export**. "Appearance" was renamed to "Style"; "Garage" is a new first tab (feature/car-profiles). Passes `weekends`, `todos`, `accounting`, `shopping` down to `ExportView`. Accepts `initialSubTab?` prop so App.tsx can deep-link directly to Garage (e.g. from the header car chip).
+
+### `GarageView.tsx` *(feature/car-profiles)*
+Rendered inside SettingsView's Garage tab. Manages the `Car[]` array:
+- Active-car selector — button row, highlighted with `border-primary bg-primary/5`
+- Add car form: `CAR_TYPES` dropdown, chassis, division, name
+- Per-car inline edit form
+- Delete button disabled (with tooltip) when the car owns any setups, tires, or shock sessions (`setupCount + tireCount + shockCount > 0`)
+- Auto-selects the first car when a car is first added
+
+---
+
+### `ExportView.tsx`
+Contains a "Weekend Report" tab. Generates a printable HTML report for a selected weekend, including sessions, weather, notes, linked tasks, accounting, and shopping items. Opened as a sub-tab inside Settings.
+
+---
+
+## 10. Session Creation Flow
+
+1. User taps **"Start New Session"** (large button in `RaceWeekendView` or Dashboard quick-action).
+2. `handleOpenNewSessionForm()` in App.tsx resets form state and opens the modal.
+3. Modal shows:
+   - **Weekend selector** — which weekend to attach the session to
+   - **Session type** button picker: `Test | Hot Laps | Qualifying | Heat Race | Feature`
+   - Auto-number preview: "Will be logged as: Test 2"
+   - **Time picker**: Current Time (device clock at submit) | Afternoon | Evening | Night
+   - **Weather widget**: GPS (Nominatim + Open-Meteo) | Zip code fallback
+4. On submit: `handleCreateNewSession` builds name, resolves time, appends to weekend's `sessions[]`, saves to localStorage, pushes to cloud. Sets `activeSession` and navigates to `raceweekend` tab.
+
+### Auto-numbering (`buildSessionName`)
+```ts
+const existing = weekend.sessions.filter(
+  s => s.name === type || s.name.startsWith(`${type} `)
+);
+if (existing.length === 0) return type;       // "Test"
+return `${type} ${existing.length + 1}`;     // "Test 2", "Test 3" ...
+```
+
+---
+
+## 11. Weather Fetch Flow
+
+Used in both session creation (`App.tsx`) and weekend-level weather (`RaceWeekendView.tsx`).
+
+**GPS path:**
+1. `navigator.geolocation.getCurrentPosition` → lat/lon
+2. Nominatim `/reverse` → city/state string
+3. Open-Meteo `/forecast?latitude=&longitude=&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph`
+4. WMO weather code → human string via `weatherCodeToStr()`
+
+**Zip path:**
+1. Nominatim `/search?postalcode=XXXXX&country=US` → lat/lon
+2. Same Open-Meteo call
+
+**APIs (no key required):**
+- `https://nominatim.openstreetmap.org/reverse`
+- `https://nominatim.openstreetmap.org/search`
+- `https://api.open-meteo.com/v1/forecast`
+
+---
+
+## 12. Image Handling
+
+**Compression helper (used in multiple components):**
+```ts
+function compressImage(file: File, maxPx = 1024, quality = 0.82): Promise<string>
+// Returns base64 JPEG data URL
+```
+
+**Storage by entity:**
+| Photo type | Where stored |
+|-----------|-------------|
+| Session screenshots | base64 in `SessionRecord.screenshots[]` → inside `RaceWeekend.sessions` JSONB |
+| Accounting receipts | base64 in `AccountingEntry.receiptPhoto` → in `race_notes_accounting` |
+| Shock dyno graphs | base64 in SmasherLoadsView's `ShockSession.photos[]` → `race_notes_shock_graphs` |
+| Setup photos | Supabase Storage public URLs in `Setup.screenshots[]` |
+
+---
+
+## 13. Build & Deploy Commands
+
+### Development
 ```bash
-npm run dev                   # Dev server at http://localhost:3000 (0.0.0.0)
-npm run build                 # Production Vite build → dist/
-npm run lint                  # TypeScript type-check only (tsc --noEmit)
-npm run android:run           # Build + cap sync + run on connected Android device
-npm run android:build:debug   # Produce debug APK
-npm run android:build:release # Produce release APK
-npm run android:sync          # Sync web assets to native (after web changes)
+npm run dev
+# Vite dev server at localhost:3000
 ```
 
-**HMR note**: `DISABLE_HMR=true` disables hot-reload and file watching (used in AI Studio). Do not modify the `vite.config.ts` server block.
+### Web + Netlify
+```bash
+npm run build        # outputs to dist/
+npm run lint         # tsc --noEmit (type check only — build does NOT type-check)
 
-**IDs**: `RaceWeekend` IDs use `wknd-${Date.now()}`, session IDs use `session-rec-${Date.now()}`. Maintain this pattern for all new entity creation.
+# Deploy (use cmd /c to bypass PowerShell execution policy):
+cmd /c "netlify deploy --prod --dir=dist"
+```
 
-**Session→Weekend sync**: `ActiveSession` is the live-editing mirror of a `SessionRecord`. `handleUpdateSession` writes changes back into the matching record inside `weekends` state. Always use `weekendId` + `id` for precise targeting.
+### Android APK
+```bash
+npm run build
+npx cap sync android
 
-**Setup→Session propagation**: When a `Setup` is saved, its tire pressures and compounds are auto-propagated into `activeSession.pressures` and `activeSession.tires` for engineering consistency.
+# Run Gradle via .bat file to avoid PowerShell timeout:
+# build_apk.bat contents: cd android && gradlew assembleDebug
+# Output: android/app/build/outputs/apk/debug/app-debug.apk
+
+copy android\app\build\outputs\apk\debug\app-debug.apk CrewChief.apk
+```
+
+**Java:** Android Studio bundled JBR (Java 21) at `C:\PROGRA~1\Android\ANDROI~1\jbr`
+
+---
+
+## 14. Git Workflow
+
+**Rule: Never merge a feature branch to master without explicit user approval.**
+
+| Branch | Status |
+|--------|--------|
+| `master` | Production — deployed to Netlify |
+| `feature/session-v2` | Base branch — active development |
+| `feature/car-profiles` | Cut from `feature/session-v2` — **do not merge to master without owner approval** |
+
+Feature branches merged to master (history):
+- `feature/weekend-v2` — weekend report, ExportView, SettingsView weekend props
+
+Standard commit:
+```bash
+git add -A
+git commit -m "feat: description"
+git push origin feature/car-profiles   # or feature/session-v2 as appropriate
+```
+
+---
+
+## 15. Known Issues / Gotchas
+
+| Issue | Root Cause | Status |
+|-------|-----------|--------|
+| Deleted weekends return on refresh | `pushWeekends` upserts but never deletes; `pullAllData` re-adds the cloud record | **Fixed** in `feature/session-v2` — `deleteWeekendFromCloud` now called on delete |
+| +Session button did nothing | Header button called `setNewSessionName` / `setNewSessionWeather` — state vars removed in session-v2 rework; silent JS runtime error swallowed click | **Fixed** — replaced with `handleOpenNewSessionForm()` |
+| Vite build doesn't type-check | Vite/esbuild transpiles only. Run `npm run lint` (`tsc --noEmit`) to catch type errors before pushing | Ongoing — always lint before deploy |
+| TailwindCSS v4 — no config file | All customization is in `src/index.css` `@theme {}` block | Remember this when adding new tokens |
+| Cloud-wins merge on login | `mergeIntoLocalStorage` always lets cloud overwrite local on login. Offline edits made before login may be overwritten if the cloud has a newer `updated_at` | By design — acceptable tradeoff for multi-device sync |
+| Session `type` vs `name` fields | Both set to the same display string. Legacy type union `'H1' | 'Q1' | ...` preserved for backward compat | Don't rely on the `type` field for new logic |
+| `INITIAL_WEEKENDS` | Is an empty array `[]` in `data.ts` — not the cause of persistence bugs | |
+
+---
+
+## 16. Team Profile (`TeamView.tsx` + Supabase)
+
+**Supabase migration applied:** `ALTER TABLE teams ADD COLUMN IF NOT EXISTS profile_data jsonb;`
+
+**Types (`src/types.ts`):**
+```ts
+interface TeamProfile {
+  racePassUrl?: string;
+  transponderIds?: string;
+  hometown?: string;
+  age?: string;
+  carNumber?: string;
+  division?: string;
+}
+interface Team {
+  id: string; name: string; banner_url?: string; created_at: string;
+  profile?: TeamProfile;
+}
+```
+
+**Supabase helper (`src/lib/supabase.ts`):**
+```ts
+export async function updateTeamProfile(teamId: string, profile: TeamProfile): Promise<boolean>
+```
+`getUserTeam` now maps `profile_data` → `team.profile`.
+
+**TeamView.tsx UI:**
+- Team owner: "Team / Driver Profile" card with edit button → inline form (Car #, Division, Hometown, Age, Transponder ID, MyRacePass URL)
+- Members: read-only view of the same fields
+- MyRacePass URL renders as a clickable link
+- Save calls `updateTeamProfile` directly (no debounce)
+
+---
+
+## 17. Data Flow Diagram
+
+```
+User action
+    │
+    ▼
+React state (useState)  ─────────────────────────────────────► UI re-renders
+    │
+    ├──► localStorage.setItem(key, JSON)      (synchronous, immediate)
+    │
+    └──► push*(data, userId)                  (debounced 500ms → Supabase upsert)
+              │
+              └── On delete: also deleteWeekendFromCloud(id)   (immediate)
+
+On login / page refresh (authenticated):
+    pullAllData(userId)
+        │
+        ├── mergeIntoLocalStorage(...)     (cloud items overwrite matching local by id)
+        └── setState(prev => merge loop)   (same merge applied to React state)
+```
+
+---
+
+## 18. Recent Changes Log (feature/session-v2)
+
+| Change | File(s) |
+|--------|---------|
+| Session short codes in display (HL, Qual, Heat, Feat.) | `App.tsx` — `buildSessionName`, `SESSION_CODES` |
+| Dashboard: Setups / Tires / Open Tasks collapsible sections | `DashboardView.tsx` |
+| Dashboard: session rows show full name, no badge box | `DashboardView.tsx` |
+| Dashboard: tire rows in single-line format (`#ID Size \| BS \| Compound \| Duro`) | `DashboardView.tsx` |
+| Sessions tab: collapsible active session editor | `RaceWeekendView.tsx` |
+| Sessions tab: air pressure always visible; tire dropdown only if inventory exists | `RaceWeekendView.tsx` |
+| Sessions tab: "Import from Setup" button fills corner tires from bound setup | `RaceWeekendView.tsx` |
+| Sessions tab: "Start New Session" CTA moved between Weekend Info and Active Log | `RaceWeekendView.tsx` |
+| Sessions tab: tire uniqueness — same tire can't be on 2 corners of same session | `RaceWeekendView.tsx` |
+| Reference tab: label "Symptom"; short option labels; no `[TIGHTEN]`/`[LOOSEN]` prefix | `QuickReferenceView.tsx` |
+| Setup: tire uniqueness — same tire can't be on 2 corners of same setup | `SetupView.tsx` |
+| Setup: "JBar" → "JBar Length"; "Load Weight" → "Scale Weight (lb)" | `SetupView.tsx` |
+| Setup: tire inventory single-line format; size auto-appends `"` on blur | `SetupView.tsx` |
+| Setup: calculated weight fields (Nose %, Left %, Cross %, LR Split, Total) | `SetupView.tsx` |
+| Team profile fields: Car #, Division, Hometown, Age, Transponder, MyRacePass URL | `TeamView.tsx`, `types.ts`, `lib/supabase.ts` |
+| Supabase: `profile_data jsonb` column added to `teams` table | migration applied |
+| Bottom nav: Trackers now appears before Reference | `App.tsx` |
+| Delete weekend now syncs correctly to cloud | `App.tsx`, `lib/sync.ts` |
+| Tire cloud sync: `tire_inventory` Supabase table + RLS; `pushTires`, `pullTires`, `deleteTireFromCloud` | `lib/sync.ts`, `App.tsx` |
+| `TireInventoryItem`: added `airPressure?: string` and `createdAt?: string` fields | `types.ts` |
+| Tire add form: Air Pressure (psi) field; new tires get `createdAt` ISO timestamp | `SetupView.tsx` |
+| Tire list: sort by Newest/Oldest/Size↑/Size↓; filter by Compound | `SetupView.tsx` |
+| Tire list: `airPressure` shown in single-line row if present (both Dashboard and Setups tab) | `SetupView.tsx`, `DashboardView.tsx` |
+| App pulls tires from cloud on login; pushes on every save; deletes from cloud on tire delete | `App.tsx` |
+
+**feature/car-profiles additions:**
+
+| Change | File(s) |
+|--------|---------|
+| `Car`, `CAR_TYPES`, `CarType` types added | `types.ts` |
+| `ShockCorner`, `ShockDataPoint`, `ShockSession` promoted to global types | `types.ts` |
+| `carId?: string` added to `Setup` and `TireInventoryItem` | `types.ts` |
+| `INITIAL_CARS`, `INITIAL_SHOCK_SESSIONS` constants added | `data.ts` |
+| `pushCars`, `pullCars`, `deleteCarFromCloud`, `pushShockSessions`, `pullShockSessions`, `deleteShockSessionFromCloud` | `lib/sync.ts` |
+| `car_id` column mapped in all setup/tire push+pull | `lib/sync.ts` |
+| `byActiveCar` filter helper | `lib/scope.ts` (new) |
+| Supabase migration 009: `cars`, `shock_sessions` tables; `car_id` on `setups` + `tire_inventory` | `supabase/migrations/009_cars.sql` |
+| App: `cars`, `activeCarId`, `shockSessions` state; all car handlers; header chip; backfill effect | `App.tsx` |
+| GarageView component (car CRUD + active-car selector) | `src/components/GarageView.tsx` (new) |
+| SettingsView: Garage tab added (first tab); `initialSubTab?` prop; "Appearance" → "Style" | `SettingsView.tsx` |
+| SetupView: car scoping (`byActiveCar`), `carId` stamping, empty-state guards | `SetupView.tsx` |
+| SmasherLoadsView: state lifted to App; props for sessions + onSave + activeCarId | `SmasherLoadsView.tsx` |
+| DashboardView: `byActiveCar` applied to setups + tires in dashboard panels | `DashboardView.tsx` |
+
+---
+
+## 19. Car Profiles Architecture *(feature/car-profiles)*
+
+### Design: Option A — Relational carId tagging
+One combined dataset. Views filter by active car using `byActiveCar`. The master arrays in App.tsx always hold all items for all cars — filtering happens only at display time, never mutating the source arrays.
+
+### Scoped vs. Global entities
+| Scoped to active car | Global (never car-scoped) |
+|---------------------|--------------------------|
+| `Setup[]` | `RaceWeekend[]` |
+| `TireInventoryItem[]` | `ActiveSession` |
+| `ShockSession[]` | `AccountingEntry[]` |
+| | `ShoppingItem[]` |
+| | `Todo[]` |
+| | `AppTheme` |
+
+### Active car — device-local
+`activeCarId` (from `race_notes_active_car`) is **never synced to Supabase**. Each device/browser independently picks which car is "active." This is intentional — one person might be working on two cars simultaneously on different devices.
+
+### Filter helper (`src/lib/scope.ts`)
+```ts
+export const byActiveCar = <T extends { carId?: string }>(
+  items: T[],
+  carId: string | null,
+): T[] => (carId ? items.filter(i => i.carId === carId) : items);
+```
+When `carId` is `null` (no active car), **all items are returned** — no data is hidden, just unfiltered.
+
+### Deletion policy
+A car **cannot be deleted** if it owns any setup, tire, or shock session data. `handleDeleteCar` in App.tsx checks `carSetupCount + carTireCount + carShockCount > 0` and alerts the user instead of deleting. GarageView's delete button is also disabled with a tooltip showing the counts.
+
+### One-time backfill
+Runs once after the first post-login `doPull` completes, guarded by a `didBackfill` `useRef`. If `cars.length === 0` at that point, it creates a single `defaultCar` from the first setup's chassis/carType and stamps all existing setups, tires, and shock sessions with that car's id. This migrates legacy data seamlessly without user interaction.
+
+### Empty-state guards
+When `activeCarId` is null: "New Setup" form is replaced with a prompt, "Add Tire" and "New Session" buttons are disabled — all say "Add a car in Settings → Garage to start." App.tsx also auto-selects `cars[0]` if `activeCarId` is missing but cars exist.

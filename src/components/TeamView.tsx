@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '@supabase/supabase-js';
-import { Team } from '../types';
+import { Team, TeamProfile } from '../types';
 import {
   AppUser,
   createTeam,
@@ -11,6 +11,7 @@ import {
   deleteTeam,
   removeTeamMember,
   uploadTeamBanner,
+  updateTeamProfile,
 } from '../lib/supabase';
 
 interface TeamViewProps {
@@ -25,6 +26,11 @@ export default function TeamView({ user }: TeamViewProps) {
   const [inviteEmail, setInviteEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Team profile state
+  const [profileDraft, setProfileDraft] = useState<TeamProfile>({});
+  const [profileEditing, setProfileEditing] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
 
   // Is the current user the owner of the loaded team?
   const myMembership = members.find(m => m.id === user.id);
@@ -43,6 +49,7 @@ export default function TeamView({ user }: TeamViewProps) {
       if (userTeam) {
         const teamMbrs = await getTeamMembers(userTeam.id);
         setMembers(teamMbrs);
+        setProfileDraft(userTeam.profile || {});
       } else {
         setMembers([]);
       }
@@ -50,6 +57,20 @@ export default function TeamView({ user }: TeamViewProps) {
       setError(err.message || 'Failed to load team.');
     }
     setLoading(false);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!team) return;
+    setProfileSaving(true);
+    const ok = await updateTeamProfile(team.id, profileDraft);
+    if (ok) {
+      setTeam({ ...team, profile: profileDraft });
+      setProfileEditing(false);
+      setSuccess('Team profile saved.');
+    } else {
+      setError('Failed to save profile.');
+    }
+    setProfileSaving(false);
   };
 
   const handleCreateTeam = async (e: React.FormEvent) => {
@@ -262,6 +283,115 @@ export default function TeamView({ user }: TeamViewProps) {
 
         {error && <span className="text-red-400 text-[10px] uppercase font-mono mt-1">{error}</span>}
         {success && <span className="text-green-400 text-[10px] uppercase font-mono mt-1">{success}</span>}
+
+        {/* TEAM PROFILE */}
+        <div className="border-t border-outline-variant/30 pt-3 mt-1">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] text-on-surface-variant uppercase font-mono tracking-wider">Team / Driver Profile</p>
+            {isOwner && !profileEditing && (
+              <button
+                onClick={() => { setProfileDraft(team.profile || {}); setProfileEditing(true); }}
+                className="text-[10px] font-mono uppercase font-bold text-primary hover:underline flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[13px]">edit</span>
+                Edit
+              </button>
+            )}
+          </div>
+
+          {profileEditing && isOwner ? (
+            <div className="space-y-2">
+              {([
+                { key: 'carNumber',      label: 'Car Number',       placeholder: 'e.g. 4x' },
+                { key: 'division',       label: 'Division',         placeholder: 'e.g. Street Stock' },
+                { key: 'hometown',       label: 'Hometown',         placeholder: 'City, State' },
+                { key: 'age',            label: 'Age',              placeholder: 'e.g. 28' },
+                { key: 'transponderIds', label: 'Transponder ID#',  placeholder: 'e.g. 123456789' },
+                { key: 'racePassUrl',    label: 'MyRacePass URL',   placeholder: 'https://www.myracepass.com/drivers/...' },
+              ] as { key: keyof TeamProfile; label: string; placeholder: string }[]).map(({ key, label, placeholder }) => (
+                <div key={key}>
+                  <label className="block text-[9px] font-mono uppercase text-on-surface-variant/70 mb-0.5 tracking-wider">{label}</label>
+                  <input
+                    type="text"
+                    placeholder={placeholder}
+                    value={profileDraft[key] || ''}
+                    onChange={e => setProfileDraft(prev => ({ ...prev, [key]: e.target.value }))}
+                    className="w-full bg-[#0e0e0e] border border-outline-variant/50 focus:border-primary p-2 text-xs font-mono rounded text-on-surface outline-none"
+                  />
+                </div>
+              ))}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={profileSaving}
+                  className="flex-1 bg-primary text-on-primary font-bold text-[10px] uppercase font-mono py-2 rounded disabled:opacity-50"
+                >
+                  {profileSaving ? 'Saving…' : 'Save Profile'}
+                </button>
+                <button
+                  onClick={() => setProfileEditing(false)}
+                  className="px-4 py-2 border border-outline-variant/50 text-on-surface-variant font-mono text-[10px] uppercase rounded hover:border-outline-variant"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {team.profile && Object.values(team.profile).some(v => v) ? (
+                <>
+                  {team.profile.carNumber && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider">Car #</span>
+                      <span className="font-mono text-xs font-bold text-on-surface">{team.profile.carNumber}</span>
+                    </div>
+                  )}
+                  {team.profile.division && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider">Division</span>
+                      <span className="font-mono text-xs font-bold text-on-surface">{team.profile.division}</span>
+                    </div>
+                  )}
+                  {team.profile.hometown && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider">Hometown</span>
+                      <span className="font-mono text-xs font-bold text-on-surface">{team.profile.hometown}</span>
+                    </div>
+                  )}
+                  {team.profile.age && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider">Age</span>
+                      <span className="font-mono text-xs font-bold text-on-surface">{team.profile.age}</span>
+                    </div>
+                  )}
+                  {team.profile.transponderIds && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider">Transponder</span>
+                      <span className="font-mono text-xs font-bold text-on-surface">{team.profile.transponderIds}</span>
+                    </div>
+                  )}
+                  {team.profile.racePassUrl && (
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider shrink-0">MyRacePass</span>
+                      <a
+                        href={team.profile.racePassUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-[10px] text-primary underline truncate"
+                      >
+                        {team.profile.racePassUrl.replace('https://www.', '')}
+                      </a>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-[10px] font-mono text-on-surface-variant/40 italic">
+                  {isOwner ? 'No profile info yet — tap Edit to add details.' : 'No profile info set.'}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* DANGER ZONE */}
         <div className="border-t border-outline-variant/30 pt-3 mt-2 flex flex-col gap-2">

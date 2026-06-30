@@ -1,5 +1,5 @@
 import { createClient, User, Session } from '@supabase/supabase-js';
-import { Team } from '../types';
+import { Team, TeamProfile } from '../types';
 
 // ---------------------------------------------------------------------------
 // Supabase client singleton – reads keys from Vite env vars (VITE_ prefix)
@@ -239,8 +239,16 @@ export async function getUserTeam(userId: string): Promise<Team | null> {
   }
   if (!data || data.length === 0) return null;
 
-  const t = data[0].teams;
-  return Array.isArray(t) ? (t[0] as Team) : (t as Team);
+  const raw = Array.isArray(data[0].teams) ? data[0].teams[0] : data[0].teams;
+  if (!raw) return null;
+  const t = raw as Record<string, unknown>;
+  return {
+    id: t.id as string,
+    name: t.name as string,
+    banner_url: t.banner_url as string | undefined,
+    created_at: t.created_at as string,
+    profile: (t.profile_data as TeamProfile) || undefined,
+  };
 }
 
 export async function getTeamMembers(teamId: string): Promise<AppUser[]> {
@@ -254,6 +262,15 @@ export async function getTeamMembers(teamId: string): Promise<AppUser[]> {
       role: membership?.role as ('owner' | 'member' | undefined)
     };
   });
+}
+
+export async function updateTeamProfile(teamId: string, profile: TeamProfile): Promise<boolean> {
+  const { error } = await supabase
+    .from('teams')
+    .update({ profile_data: profile })
+    .eq('id', teamId);
+  if (error) { console.warn('updateTeamProfile error:', error.message); return false; }
+  return true;
 }
 
 export async function addTeamMember(teamId: string, memberEmail: string): Promise<boolean> {

@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { ActiveSession, TireDetails, RaceWeekend, SessionRecord, WeatherSnapshot } from '../types';
+import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup } from '../types';
 import { User } from '@supabase/supabase-js';
 
 interface RaceWeekendViewProps {
   user: User | null;
   session: ActiveSession;
   weekends: RaceWeekend[];
+  tireInventory?: TireInventoryItem[];
+  savedSetups?: Setup[];
   onUpdateSession: (updatedSession: ActiveSession) => void;
   onUpdateWeekend: (updated: RaceWeekend) => void;
   onDeleteSession: (weekendId: string, sessionId: string) => void;
   onSelectSession: (session: SessionRecord, weekendId?: string) => void;
+  onNewSession?: () => void;
 }
 
 // ── Weather condition code → label ────────────────────────────────────────────
@@ -54,7 +57,7 @@ function compressImage(file: File, maxPx = 1024, quality = 0.82): Promise<string
 }
 
 export default function RaceWeekendView({
-  session, weekends, onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession,
+  session, weekends, tireInventory = [], savedSetups = [], onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession,
 }: RaceWeekendViewProps) {
   const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
@@ -62,6 +65,7 @@ export default function RaceWeekendView({
   const [weatherError, setWeatherError] = useState('');
   const [showZipInput, setShowZipInput] = useState(false);
   const [zipCode, setZipCode] = useState('');
+  const [editorCollapsed, setEditorCollapsed] = useState(false);
 
   // ── Weekend lookup: prefer weekendId, fall back to track match ───────────────
   const currentWeekend =
@@ -116,18 +120,70 @@ export default function RaceWeekendView({
     onUpdateSession({ ...session, tires: updatedTires, pressures: updatedPressures });
   };
 
+  const handleTireInventorySelect = (corner: 'lf' | 'rf' | 'lr' | 'rr', tireId: string) => {
+    const tire = tireInventory.find(t => t.id === tireId);
+    const currentTires = session.tires || {
+      lf: { compound: '', size: '', airPressure: session.pressures?.lf || '' },
+      rf: { compound: '', size: '', airPressure: session.pressures?.rf || '' },
+      lr: { compound: '', size: '', airPressure: session.pressures?.lr || '' },
+      rr: { compound: '', size: '', airPressure: session.pressures?.rr || '' },
+    };
+    const updated: TireDetails = tire
+      ? {
+          ...currentTires[corner],
+          tireId: tire.id,
+          compound: tire.compound,
+          size: tire.size,
+          durometer: tire.durometer,
+          backSpacing: tire.wheelBackspacing,
+        }
+      : { ...currentTires[corner], tireId: '' };
+    onUpdateSession({ ...session, tires: { ...currentTires, [corner]: updated } });
+  };
+
+  // ── Import tires from bound setup ───────────────────────────────────────────
+
+  const handleImportTiresFromSetup = () => {
+    if (!currentWeekend?.setupId) return;
+    const boundSetup = savedSetups.find(s => s.id === currentWeekend.setupId);
+    if (!boundSetup) return;
+    const currentTires = session.tires || {
+      lf: { compound: '', size: '', airPressure: '' },
+      rf: { compound: '', size: '', airPressure: '' },
+      lr: { compound: '', size: '', airPressure: '' },
+      rr: { compound: '', size: '', airPressure: '' },
+    };
+    const corners = ['lf', 'rf', 'lr', 'rr'] as const;
+    const updatedTires = { ...currentTires };
+    const updatedPressures = { ...session.pressures };
+    for (const corner of corners) {
+      const c = boundSetup[corner];
+      const matchedTire = c.tireInventoryId ? tireInventory.find(t => t.id === c.tireInventoryId) : null;
+      updatedTires[corner] = {
+        ...currentTires[corner],
+        compound: matchedTire?.compound || c.tireComp || currentTires[corner].compound,
+        size: matchedTire?.size || c.tireSize || currentTires[corner].size,
+        tireId: matchedTire?.id || currentTires[corner].tireId,
+        durometer: matchedTire?.durometer || currentTires[corner].durometer,
+        airPressure: c.tirePress || currentTires[corner].airPressure,
+      };
+      updatedPressures[corner] = c.tirePress || updatedPressures[corner];
+    }
+    onUpdateSession({ ...session, tires: updatedTires, pressures: updatedPressures });
+  };
+
   // ── Photo helpers ────────────────────────────────────────────────────────────
 
-  const handleAddPhotos = async (e: React.ChangeEvent<HTMLInputElement>, field: 'screenshots' | 'dynoPhotos') => {
+  const handleAddPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
     const compressed = await Promise.all(Array.from(files).map(f => compressImage(f)));
-    onUpdateSession({ ...session, [field]: [...(session[field] || []), ...compressed] });
+    onUpdateSession({ ...session, screenshots: [...(session.screenshots || []), ...compressed] });
     e.target.value = '';
   };
 
-  const handleDeletePhoto = (field: 'screenshots' | 'dynoPhotos', idx: number) => {
-    onUpdateSession({ ...session, [field]: (session[field] || []).filter((_, i) => i !== idx) });
+  const handleDeletePhoto = (idx: number) => {
+    onUpdateSession({ ...session, screenshots: (session.screenshots || []).filter((_, i) => i !== idx) });
   };
 
   // ── Weather fetch ────────────────────────────────────────────────────────────
@@ -219,6 +275,12 @@ export default function RaceWeekendView({
             <div className="flex-1 min-w-0">
               <h2 className="font-display font-bold uppercase text-base text-on-surface tracking-wide leading-tight">{currentWeekend.name}</h2>
               <p className="font-mono text-xs text-on-surface-variant mt-0.5">{currentWeekend.track} · {currentWeekend.date}</p>
+              {currentWeekend.setupName && (
+                <p className="font-mono text-[10px] text-on-surface-variant/70 mt-0.5 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[12px]">settings_input_component</span>
+                  {currentWeekend.setupName}
+                </p>
+              )}
               <p className="font-mono text-[10px] text-primary uppercase tracking-wider mt-1">
                 {currentWeekend.sessions.length} Session{currentWeekend.sessions.length !== 1 ? 's' : ''} logged
               </p>
@@ -311,9 +373,36 @@ export default function RaceWeekendView({
         </section>
       )}
 
+      {/* ── Start New Session CTA ────────────────────────────────────────── */}
+      {onNewSession && (
+        <button
+          onClick={onNewSession}
+          className="w-full flex items-center justify-center gap-3 py-4 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-primary font-display font-bold uppercase tracking-wider text-base"
+        >
+          <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
+          Start New Session
+        </button>
+      )}
+
       {/* ── Active Session Editor ─────────────────────────────────────────── */}
-      <section className="bg-surface-container rounded-lg p-4 border border-outline-variant">
-        <h2 className="text-primary font-display font-bold uppercase mb-4">Active Log: {session.name}</h2>
+      <section className="bg-surface-container rounded-lg border border-outline-variant">
+        {/* Collapsible header */}
+        <button
+          onClick={() => setEditorCollapsed(v => !v)}
+          className="w-full flex items-center justify-between p-4 hover:bg-surface-container-high transition-colors rounded-t-lg"
+        >
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>edit_note</span>
+            <h2 className="text-primary font-display font-bold uppercase text-sm">Active Log: {session.name}</h2>
+          </div>
+          <span
+            className="material-symbols-outlined text-on-surface-variant transition-transform duration-200"
+            style={{ transform: editorCollapsed ? 'rotate(180deg)' : 'none' }}
+          >expand_less</span>
+        </button>
+
+        {editorCollapsed ? null : (
+        <div className="p-4 pt-0">
 
         {/* Core Inputs */}
         <div className="grid grid-cols-2 gap-4 mb-6">
@@ -377,22 +466,69 @@ export default function RaceWeekendView({
           })}
         </div>
 
-        {/* Tire Readings */}
+        {/* Tire Selection */}
         <div className="pt-4 border-t border-outline-variant/60 mb-6">
-          <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Tire Readings</h3>
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <h3 className="font-mono text-xs uppercase text-on-surface-variant">Tires Installed</h3>
+            {currentWeekend?.setupId && savedSetups.find(s => s.id === currentWeekend.setupId) && (
+              <button
+                type="button"
+                onClick={handleImportTiresFromSetup}
+                className="flex items-center gap-1 text-[10px] font-mono font-bold uppercase px-2 py-1 rounded border border-primary/50 text-primary hover:bg-primary/10 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[13px]">download</span>
+                Import from Setup
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-2">
-            {(['lf', 'rf', 'lr', 'rr'] as const).map(corner => (
-              <div key={corner} className="bg-[#0e0e0e] border border-outline-variant rounded p-2">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[10px] font-bold text-primary uppercase">{corner.toUpperCase()}</span>
-                  <input type="text" className="bg-transparent text-right w-16 font-mono text-xs text-on-surface border-b border-outline-variant focus:outline-none" value={session.tires?.[corner]?.airPressure || session.pressures[corner] || ''} placeholder="PSI" onChange={e => handleTireChange(corner, 'airPressure', e.target.value)} />
+            {(['lf', 'rf', 'lr', 'rr'] as const).map(corner => {
+              const selectedTireId = session.tires?.[corner]?.tireId || '';
+              const airPressure = session.tires?.[corner]?.airPressure || session.pressures[corner] || '';
+              // Tires used by other corners in this session (exclude current corner)
+              const usedByOthers = (['lf', 'rf', 'lr', 'rr'] as const)
+                .filter(c => c !== corner)
+                .map(c => session.tires?.[c]?.tireId)
+                .filter(Boolean) as string[];
+              const availableTires = tireInventory.filter(t => !usedByOthers.includes(t.id) || t.id === selectedTireId);
+              return (
+                <div key={corner} className="bg-[#0e0e0e] border border-outline-variant rounded p-2 space-y-2">
+                  <span className="text-[10px] font-bold text-primary uppercase block">{corner.toUpperCase()}</span>
+                  {tireInventory.length > 0 && (
+                    <div className="relative">
+                      <select
+                        value={selectedTireId}
+                        onChange={e => handleTireInventorySelect(corner, e.target.value)}
+                        className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-[10px] px-2 py-1.5 rounded outline-none appearance-none pr-5"
+                      >
+                        <option value="">-- Select Tire --</option>
+                        {availableTires.map(t => (
+                          <option key={t.id} value={t.id}>#{t.tireNumber} · {t.compound} · {t.size}</option>
+                        ))}
+                      </select>
+                      <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-[12px] text-on-surface-variant pointer-events-none">expand_more</span>
+                    </div>
+                  )}
+                  {selectedTireId && (() => {
+                    const t = tireInventory.find(x => x.id === selectedTireId);
+                    return t ? (
+                      <p className="font-mono text-[9px] text-on-surface-variant/60">{t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS</p>
+                    ) : null;
+                  })()}
+                  <div>
+                    <label className="block text-[9px] font-mono uppercase text-on-surface-variant/60 mb-0.5">Air Pressure (psi)</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g. 11.5"
+                      value={airPressure}
+                      onChange={e => handleTireChange(corner, 'airPressure', e.target.value)}
+                      className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 rounded outline-none"
+                    />
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <input type="text" placeholder="Compound" className="bg-transparent text-xs text-on-surface-variant font-mono w-full border-b border-outline-variant/30" value={session.tires?.[corner]?.compound || ''} onChange={e => handleTireChange(corner, 'compound', e.target.value)} />
-                  <input type="text" placeholder="Size" className="bg-transparent text-xs text-on-surface-variant font-mono w-full border-b border-outline-variant/30" value={session.tires?.[corner]?.size || ''} onChange={e => handleTireChange(corner, 'size', e.target.value)} />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -424,41 +560,13 @@ export default function RaceWeekendView({
           />
         </div>
 
-        {/* Shock Dyno Graphs */}
-        <div className="pt-4 border-t border-outline-variant/60 mb-6">
-          <div className="flex justify-between items-center mb-1">
-            <div>
-              <h3 className="font-mono text-xs uppercase text-on-surface-variant">Shock Dyno Graphs</h3>
-              <p className="font-mono text-[10px] text-on-surface-variant/40">Attach shock dyno output images for this session</p>
-            </div>
-            <label className="text-[10px] uppercase font-mono text-primary font-bold cursor-pointer hover:underline">
-              + Add Graph
-              <input type="file" multiple accept="image/*" className="hidden" onChange={e => handleAddPhotos(e, 'dynoPhotos')} />
-            </label>
-          </div>
-          {(session.dynoPhotos || []).length > 0 ? (
-            <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar mt-2">
-              {session.dynoPhotos!.map((src, i) => (
-                <div key={i} className="relative shrink-0">
-                  <img src={src} alt={`dyno-${i}`} className="h-24 rounded border border-outline-variant object-cover" />
-                  <button onClick={() => handleDeletePhoto('dynoPhotos', i)} className="absolute top-1 right-1 bg-black/60 rounded-full w-5 h-5 flex items-center justify-center text-white hover:bg-black/90">
-                    <span className="material-symbols-outlined text-[12px]">close</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="font-mono text-[11px] text-on-surface-variant/30 italic mt-1">No dyno graphs attached.</p>
-          )}
-        </div>
-
         {/* Attachments / Time Slips */}
         <div className="pt-4 border-t border-outline-variant/60">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-mono text-xs uppercase text-on-surface-variant">Attachments / Time Slips</h3>
             <label className="text-[10px] uppercase font-mono text-primary font-bold cursor-pointer hover:underline">
               + Add Image
-              <input type="file" multiple accept="image/*" className="hidden" onChange={e => handleAddPhotos(e, 'screenshots')} />
+              <input type="file" multiple accept="image/*" className="hidden" onChange={handleAddPhotos} />
             </label>
           </div>
           {(session.screenshots || []).length > 0 && (
@@ -466,7 +574,7 @@ export default function RaceWeekendView({
               {session.screenshots!.map((src, i) => (
                 <div key={i} className="relative shrink-0">
                   <img src={src} alt="attachment" className="h-20 rounded border border-outline-variant object-cover" />
-                  <button onClick={() => handleDeletePhoto('screenshots', i)} className="absolute top-1 right-1 bg-black/60 rounded-full w-5 h-5 flex items-center justify-center text-white hover:bg-black/90">
+                  <button onClick={() => handleDeletePhoto(i)} className="absolute top-1 right-1 bg-black/60 rounded-full w-5 h-5 flex items-center justify-center text-white hover:bg-black/90">
                     <span className="material-symbols-outlined text-[12px]">close</span>
                   </button>
                 </div>
@@ -474,14 +582,17 @@ export default function RaceWeekendView({
             </div>
           )}
         </div>
+        </div>
+        )}
       </section>
 
       {/* ── All Sessions in Weekend ───────────────────────────────────────── */}
       {currentWeekend && (
         <section>
-          <h2 className="text-on-surface font-display font-bold uppercase mb-2 text-sm tracking-wide">
+          <h2 className="text-on-surface font-display font-bold uppercase mb-3 text-sm tracking-wide">
             All Sessions — {currentWeekend.name}
           </h2>
+
           <div className="flex flex-col gap-2">
             {displaySessions.length === 0 && (
               <p className="font-mono text-xs text-on-surface-variant/40 text-center py-4">No sessions logged yet for this weekend.</p>

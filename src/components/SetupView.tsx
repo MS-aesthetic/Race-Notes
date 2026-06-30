@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Setup, CornerSetup, TireInventoryItem } from '../types';
+import { Setup, CornerSetup, TireInventoryItem, Car, ShockSession } from '../types';
 import { INITIAL_SETUP } from '../data';
 import { User } from '@supabase/supabase-js';
 import { uploadAttachment, deleteAttachment } from '../lib/sync';
 import SmasherLoadsView from './SmasherLoadsView';
+import { byActiveCar } from '../lib/scope';
 
 interface SetupViewProps {
   savedSetups: Setup[];
@@ -12,6 +13,12 @@ interface SetupViewProps {
   user?: User | null;
   tireInventory: TireInventoryItem[];
   onSaveTires: (tires: TireInventoryItem[]) => void;
+  onDeleteTireFromCloud?: (tireId: string) => void;
+  // Car scoping
+  activeCarId?: string | null;
+  activeCar?: Car | null;
+  shockSessions?: ShockSession[];
+  onSaveShockSessions?: (updated: ShockSession[]) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -20,6 +27,15 @@ const parseTireSize = (s: string): number => {
   const n = parseFloat((s || '').replace(/[^0-9.]/g, ''));
   return isNaN(n) ? 0 : n;
 };
+
+const parseWeight = (val: string | undefined): number | null => {
+  if (!val) return null;
+  const n = parseFloat(val.replace(/[^0-9.]/g, ''));
+  return isNaN(n) ? null : n;
+};
+
+const computeWeightPct = (num: number, total: number): string =>
+  total > 0 ? (num / total * 100).toFixed(1) + '%' : '—';
 
 const computeStagger = (rightSize: string, leftSize: string): string => {
   const r = parseTireSize(rightSize);
@@ -38,11 +54,12 @@ interface CornerFormProps {
   data: CornerSetup;
   isRear: boolean;
   tireInventory: TireInventoryItem[];
+  usedTireIds?: string[];
   onFieldChange: (field: keyof CornerSetup, value: string) => void;
   onBatchChange: (updates: Partial<CornerSetup>) => void;
 }
 
-function CornerForm({ cornerLabel, data, isRear, tireInventory, onFieldChange, onBatchChange }: CornerFormProps) {
+function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = [], onFieldChange, onBatchChange }: CornerFormProps) {
   return (
     <div className="bg-surface-container border border-outline-variant flex flex-col rounded overflow-hidden">
       <div className="border-b border-outline-variant px-4 py-2 flex items-center gap-2 bg-surface-container-low">
@@ -70,7 +87,7 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, onFieldChange, o
             className="bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded min-w-[160px]"
           >
             <option value="">-- Select from Inventory --</option>
-            {tireInventory.map(t => (
+            {tireInventory.filter(t => !usedTireIds.includes(t.id) || t.id === (data.tireInventoryId || '')).map(t => (
               <option key={t.id} value={t.id}>#{t.tireNumber} — {t.size} {t.compound}</option>
             ))}
           </select>
@@ -110,7 +127,7 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, onFieldChange, o
         {!isRear && (
           <>
             <div>
-              <label className={LBL}>Load Weight (lb)</label>
+              <label className={LBL}>Scale Weight (lb)</label>
               <input type="text" value={data.loadWeight || ''} onChange={e => onFieldChange('loadWeight', e.target.value)} className={INP} />
             </div>
             <div>
@@ -195,7 +212,8 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, onFieldChange, o
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function SetupView({
-  savedSetups, activeSetupId, onSaveSetups, user, tireInventory, onSaveTires,
+  savedSetups, activeSetupId, onSaveSetups, user, tireInventory, onSaveTires, onDeleteTireFromCloud,
+  activeCarId = null, activeCar = null, shockSessions = [], onSaveShockSessions,
 }: SetupViewProps) {
   const [subTab, setSubTab] = useState<'setups' | 'smasherloads' | 'tires'>('setups');
   const [setups, setSetups] = useState<Setup[]>(savedSetups);
@@ -208,6 +226,8 @@ export default function SetupView({
   const [tires, setTires] = useState<TireInventoryItem[]>(tireInventory);
   const [showAddTireForm, setShowAddTireForm] = useState(false);
   const [newTire, setNewTire] = useState<Partial<TireInventoryItem>>({ wheelBackspacing: '2' });
+  const [tireSort, setTireSort] = useState<'newest' | 'oldest' | 'size-asc' | 'size-desc'>('newest');
+  const [tireCompoundFilter, setTireCompoundFilter] = useState<string>('all');
 
   React.useEffect(() => { setSetups(savedSetups); }, [savedSetups]);
   React.useEffect(() => { setTires(tireInventory); }, [tireInventory]);
@@ -267,6 +287,8 @@ export default function SetupView({
       id: `setup-rec-${Date.now()}`,
       chassis: name,
       date: new Date().toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }),
+      carType: activeCar?.carType ?? activeSetup.carType,
+      carId: activeCarId ?? undefined,
     };
     const updatedList = [newSetup, ...setups];
     setExpandedId(newSetup.id);
@@ -287,7 +309,7 @@ export default function SetupView({
   const handleCloneSetup = (setupId: string) => {
     const target = setups.find((s) => s.id === setupId);
     if (!target) return;
-    const cloned: Setup = { ...JSON.parse(JSON.stringify(target)), id: `setup-rec-${Date.now()}`, chassis: `${target.chassis} (Copy)` };
+    const cloned: Setup = { ...JSON.parse(JSON.stringify(target)), id: `setup-rec-${Date.now()}`, chassis: `${target.chassis} (Copy)`, carId: activeCarId ?? target.carId };
     setExpandedId(cloned.id);
     updateAndSaveSetups([cloned, ...setups], activeId);
   };
@@ -314,6 +336,7 @@ export default function SetupView({
 
   const handleAddTire = (e: React.FormEvent) => {
     e.preventDefault();
+    const now = new Date().toISOString();
     const tire: TireInventoryItem = {
       id: `tire-${Date.now()}`,
       tireNumber: newTire.tireNumber || '',
@@ -321,6 +344,9 @@ export default function SetupView({
       compound: newTire.compound || '',
       wheelBackspacing: (newTire.wheelBackspacing as '2' | '3' | '4') || '2',
       durometer: newTire.durometer || '',
+      airPressure: newTire.airPressure || '',
+      createdAt: now,
+      carId: activeCarId ?? undefined,
     };
     saveTires([tire, ...tires]);
     setNewTire({ wheelBackspacing: '2' });
@@ -330,6 +356,7 @@ export default function SetupView({
   const handleDeleteTire = (id: string) => {
     if (!window.confirm('Delete this tire from inventory?')) return;
     saveTires(tires.filter(t => t.id !== id));
+    onDeleteTireFromCloud?.(id);
   };
 
   // ── Sub-tab button helper ─────────────────────────────────────────────────────
@@ -345,6 +372,11 @@ export default function SetupView({
       {label}
     </button>
   );
+
+  // Filter at display time only — never mutate the master arrays.
+  const displayedSetups = byActiveCar(setups, activeCarId);
+  const displayedTires = byActiveCar(tires, activeCarId);
+  const noCar = !activeCarId;
 
   return (
     <div className="space-y-4" id="setup-view-root">
@@ -370,22 +402,29 @@ export default function SetupView({
         <div className="space-y-6">
 
           {/* Create New Setup */}
-          <form onSubmit={handleAddNewSetup} className="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-grow">
-              <label className="block text-[10px] uppercase font-bold text-on-surface-variant mb-1 font-mono">Create New Setup</label>
-              <input type="text" placeholder="e.g. Chassis #42 - Slick Track Soft" value={newSetupName}
-                onChange={(e) => setNewSetupName(e.target.value)}
-                className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm px-3 py-2 outline-none rounded" />
+          {noCar ? (
+            <div className="bg-surface-container border border-outline-variant rounded-lg p-4 flex items-center gap-3 text-on-surface-variant">
+              <span className="material-symbols-outlined text-[22px] flex-shrink-0">directions_car</span>
+              <span className="font-mono text-xs">Add a car in <strong className="text-on-surface">Settings → Garage</strong> to start.</span>
             </div>
-            <button type="submit"
-              className="self-end sm:self-auto h-10 px-4 bg-surface-bright border border-outline text-primary hover:bg-primary/10 hover:border-primary uppercase font-mono text-xs font-bold transition-all flex items-center gap-2 rounded">
-              <span className="material-symbols-outlined text-[16px]">add</span>New Setup
-            </button>
-          </form>
+          ) : (
+            <form onSubmit={handleAddNewSetup} className="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+              <div className="flex-grow">
+                <label className="block text-[10px] uppercase font-bold text-on-surface-variant mb-1 font-mono">Create New Setup</label>
+                <input type="text" placeholder="e.g. Chassis #42 - Slick Track Soft" value={newSetupName}
+                  onChange={(e) => setNewSetupName(e.target.value)}
+                  className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm px-3 py-2 outline-none rounded" />
+              </div>
+              <button type="submit"
+                className="self-end sm:self-auto h-10 px-4 bg-surface-bright border border-outline text-primary hover:bg-primary/10 hover:border-primary uppercase font-mono text-xs font-bold transition-all flex items-center gap-2 rounded">
+                <span className="material-symbols-outlined text-[16px]">add</span>New Setup
+              </button>
+            </form>
+          )}
 
-          {/* Accordion list */}
+          {/* Accordion list — filtered to active car */}
           <div className="space-y-4" id="setups-accordion">
-            {setups.map((setupItem) => {
+            {displayedSetups.map((setupItem) => {
               const isExpanded = expandedId === setupItem.id;
               const isActive = activeId === setupItem.id;
               return (
@@ -492,7 +531,7 @@ export default function SetupView({
                               className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">JBAR</label>
+                            <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">JBar Length</label>
                             <input type="text" placeholder="e.g. #3" value={setupItem.jbar || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'jbar', e.target.value)}
                               className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
@@ -530,22 +569,72 @@ export default function SetupView({
                             </div>
                           ))}
                         </div>
+
+                        {/* Computed weight percentages */}
+                        {(() => {
+                          const lfW = parseWeight(setupItem.lf.loadWeight);
+                          const rfW = parseWeight(setupItem.rf.loadWeight);
+                          const lrW = parseWeight(setupItem.lr.loadWeight);
+                          const rrW = parseWeight(setupItem.rr.loadWeight);
+                          const total = (lfW ?? 0) + (rfW ?? 0) + (lrW ?? 0) + (rrW ?? 0);
+                          const hasAll = lfW !== null && rfW !== null && lrW !== null && rrW !== null;
+                          const noseP  = hasAll ? computeWeightPct((lfW!) + (rfW!), total) : '—';
+                          const leftP  = hasAll ? computeWeightPct((lfW!) + (lrW!), total) : '—';
+                          const crossP = hasAll ? computeWeightPct((lrW!) + (rfW!), total) : '—';
+                          const lrSplit = lrW !== null && rrW !== null ? ((lrW - rrW).toFixed(1) + ' lb') : '—';
+                          return (
+                            <div>
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <span className="material-symbols-outlined text-primary text-[14px]">calculate</span>
+                                <span className="text-[9px] font-mono uppercase font-bold text-on-surface-variant/70 tracking-wider">Weight Calculations</span>
+                                {!hasAll && <span className="text-[9px] font-mono text-on-surface-variant/30 italic">— enter all 4 scale weights</span>}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {[
+                                  { label: 'Nose %', value: noseP, hint: '(LF+RF) / Total' },
+                                  { label: 'Left %', value: leftP, hint: '(LF+LR) / Total' },
+                                  { label: 'Cross %', value: crossP, hint: '(LR+RF) / Total' },
+                                  { label: 'LR Split', value: lrSplit, hint: 'LR − RR' },
+                                ].map(({ label, value, hint }) => (
+                                  <div key={label} className="bg-[#111] border border-outline-variant/40 rounded p-2.5">
+                                    <span className="text-[9px] font-mono uppercase font-bold text-on-surface-variant/70 block">{label}</span>
+                                    <span className="font-mono text-lg font-black text-primary tracking-tight">{value}</span>
+                                    <span className="text-[8px] font-mono text-on-surface-variant/30 block mt-0.5">{hint}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              {hasAll && (
+                                <div className="mt-2 bg-[#111] border border-outline-variant/30 rounded px-3 py-1.5 flex items-center justify-between">
+                                  <span className="text-[9px] font-mono uppercase text-on-surface-variant/60">Total Scale Weight</span>
+                                  <span className="font-mono text-sm font-black text-on-surface">{total.toFixed(0)} lb</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* 4 Corner forms */}
                       <div className="flex flex-col gap-6">
-                        <CornerForm cornerLabel="Left Front Corner" data={setupItem.lf} isRear={false} tireInventory={tires}
-                          onFieldChange={(f, v) => handleCornerChange(setupItem.id, 'lf', f, v)}
-                          onBatchChange={(u) => handleCornerBatchChange(setupItem.id, 'lf', u)} />
-                        <CornerForm cornerLabel="Right Front Corner" data={setupItem.rf} isRear={false} tireInventory={tires}
-                          onFieldChange={(f, v) => handleCornerChange(setupItem.id, 'rf', f, v)}
-                          onBatchChange={(u) => handleCornerBatchChange(setupItem.id, 'rf', u)} />
-                        <CornerForm cornerLabel="Left Rear Corner" data={setupItem.lr} isRear={true} tireInventory={tires}
-                          onFieldChange={(f, v) => handleCornerChange(setupItem.id, 'lr', f, v)}
-                          onBatchChange={(u) => handleCornerBatchChange(setupItem.id, 'lr', u)} />
-                        <CornerForm cornerLabel="Right Rear Corner" data={setupItem.rr} isRear={true} tireInventory={tires}
-                          onFieldChange={(f, v) => handleCornerChange(setupItem.id, 'rr', f, v)}
-                          onBatchChange={(u) => handleCornerBatchChange(setupItem.id, 'rr', u)} />
+                        {(['lf', 'rf', 'lr', 'rr'] as const).map((corner, _, all) => {
+                          const usedTireIds = all
+                            .filter(c => c !== corner)
+                            .map(c => setupItem[c].tireInventoryId)
+                            .filter(Boolean) as string[];
+                          const labels: Record<string, string> = { lf: 'Left Front Corner', rf: 'Right Front Corner', lr: 'Left Rear Corner', rr: 'Right Rear Corner' };
+                          return (
+                            <CornerForm
+                              key={corner}
+                              cornerLabel={labels[corner]}
+                              data={setupItem[corner]}
+                              isRear={corner === 'lr' || corner === 'rr'}
+                              tireInventory={displayedTires}
+                              usedTireIds={usedTireIds}
+                              onFieldChange={(f, v) => handleCornerChange(setupItem.id, corner, f, v)}
+                              onBatchChange={(u) => handleCornerBatchChange(setupItem.id, corner, u)}
+                            />
+                          );
+                        })}
                       </div>
 
                       {/* Attachments */}
@@ -597,7 +686,13 @@ export default function SetupView({
       )}
 
       {/* ══ SMASHER LOADS TAB ═══════════════════════════════════════════════════ */}
-      {subTab === 'smasherloads' && <SmasherLoadsView />}
+      {subTab === 'smasherloads' && (
+        <SmasherLoadsView
+          activeCarId={activeCarId}
+          sessions={shockSessions}
+          onSave={onSaveShockSessions}
+        />
+      )}
 
       {/* ══ TIRES TAB ═══════════════════════════════════════════════════════════ */}
       {subTab === 'tires' && (
@@ -605,51 +700,107 @@ export default function SetupView({
           <div className="flex justify-between items-center">
             <div>
               <h3 className="font-display font-bold text-lg uppercase text-on-surface tracking-tight">Tire Inventory</h3>
-              <p className="text-[10px] font-mono text-on-surface-variant mt-0.5">{tires.length} tire{tires.length !== 1 ? 's' : ''} logged</p>
+              <p className="text-[10px] font-mono text-on-surface-variant mt-0.5">{displayedTires.length} tire{displayedTires.length !== 1 ? 's' : ''} logged</p>
             </div>
-            <button onClick={() => setShowAddTireForm(true)}
-              className="h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded hover:opacity-90 transition-all flex items-center gap-1.5">
+            <button onClick={() => !noCar && setShowAddTireForm(true)}
+              disabled={noCar}
+              title={noCar ? 'Add a car in Settings → Garage to start.' : undefined}
+              className={`h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 ${noCar ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-90'}`}>
               <span className="material-symbols-outlined text-[15px]">add</span>Add Tire
             </button>
           </div>
 
-          {tires.length === 0 && (
+          {displayedTires.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
               <span className="material-symbols-outlined text-5xl text-on-surface-variant/30">tire_repair</span>
               <p className="text-on-surface-variant text-sm font-mono uppercase">No tires in inventory</p>
               <p className="text-on-surface-variant/60 text-xs max-w-[260px]">Add tires to quickly assign them to setup corners and auto-populate size, compound, and backspacing.</p>
-              <button onClick={() => setShowAddTireForm(true)} className="mt-2 px-4 py-2 bg-primary text-on-primary font-mono text-xs font-bold uppercase rounded hover:opacity-90">
-                + Add First Tire
-              </button>
+              {noCar ? (
+                <p className="mt-2 font-mono text-xs text-on-surface-variant">Add a car in <strong className="text-on-surface">Settings → Garage</strong> to start.</p>
+              ) : (
+                <button onClick={() => setShowAddTireForm(true)} className="mt-2 px-4 py-2 bg-primary text-on-primary font-mono text-xs font-bold uppercase rounded hover:opacity-90">
+                  + Add First Tire
+                </button>
+              )}
             </div>
           )}
 
-          {tires.length > 0 && (
-            <div className="space-y-3">
-              {tires.map(tire => (
-                <div key={tire.id} className="bg-surface-container border border-outline-variant rounded-lg p-4 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="bg-primary/15 border border-primary/30 rounded px-2 py-1 flex-shrink-0">
-                      <span className="font-mono text-xs font-black text-primary">#{tire.tireNumber}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-sm font-bold text-on-surface">{tire.size}</span>
-                        <span className="bg-surface border border-outline-variant text-[10px] font-mono px-1.5 py-0.5 rounded text-on-surface-variant uppercase">{tire.compound}</span>
-                      </div>
-                      <div className="text-[10px] font-mono text-on-surface-variant mt-0.5 flex gap-x-3 flex-wrap">
-                        <span>Backspacing: <strong>{tire.wheelBackspacing}"</strong></span>
-                        {tire.durometer && <span>Durometer: <strong>{tire.durometer}</strong></span>}
-                      </div>
-                    </div>
+          {displayedTires.length > 0 && (() => {
+            // Unique compounds for filter
+            const compounds = Array.from(new Set(displayedTires.map(t => t.compound).filter(Boolean))).sort();
+            // Filter
+            const filtered = tireCompoundFilter === 'all'
+              ? displayedTires
+              : displayedTires.filter(t => t.compound === tireCompoundFilter);
+            // Sort
+            const parseSz = (s: string) => parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
+            const sorted = [...filtered].sort((a, b) => {
+              if (tireSort === 'oldest') {
+                return (a.createdAt || a.id).localeCompare(b.createdAt || b.id);
+              }
+              if (tireSort === 'size-asc') return parseSz(a.size) - parseSz(b.size);
+              if (tireSort === 'size-desc') return parseSz(b.size) - parseSz(a.size);
+              // newest (default): most recent first
+              return (b.createdAt || b.id).localeCompare(a.createdAt || a.id);
+            });
+            return (
+              <>
+                {/* Sort + Filter controls */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  <div className="relative flex-1 min-w-[140px]">
+                    <select
+                      value={tireSort}
+                      onChange={e => setTireSort(e.target.value as typeof tireSort)}
+                      className="w-full bg-surface-container border border-outline-variant focus:border-primary text-on-surface font-mono text-[10px] px-2 py-1.5 rounded outline-none appearance-none pr-6"
+                    >
+                      <option value="newest">Sort: Newest</option>
+                      <option value="oldest">Sort: Oldest</option>
+                      <option value="size-asc">Sort: Size ↑</option>
+                      <option value="size-desc">Sort: Size ↓</option>
+                    </select>
+                    <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[12px] text-on-surface-variant pointer-events-none">expand_more</span>
                   </div>
-                  <button onClick={() => handleDeleteTire(tire.id)} className="p-1.5 text-on-surface-variant/50 hover:text-error transition-colors flex-shrink-0" title="Delete tire">
-                    <span className="material-symbols-outlined text-[16px]">delete</span>
-                  </button>
+                  <div className="relative flex-1 min-w-[140px]">
+                    <select
+                      value={tireCompoundFilter}
+                      onChange={e => setTireCompoundFilter(e.target.value)}
+                      className="w-full bg-surface-container border border-outline-variant focus:border-primary text-on-surface font-mono text-[10px] px-2 py-1.5 rounded outline-none appearance-none pr-6"
+                    >
+                      <option value="all">Compound: All</option>
+                      {compounds.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[12px] text-on-surface-variant pointer-events-none">expand_more</span>
+                  </div>
+                  {tireCompoundFilter !== 'all' && (
+                    <button onClick={() => setTireCompoundFilter('all')} className="flex items-center justify-center w-7 h-7 rounded border border-outline-variant bg-surface-container text-on-surface-variant hover:text-on-surface shrink-0">
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
+
+                <div className="space-y-2">
+                  {sorted.length === 0 && (
+                    <p className="text-center text-xs font-mono text-on-surface-variant/40 py-4">No tires match the current filter.</p>
+                  )}
+                  {sorted.map(tire => (
+                    <div key={tire.id} className="bg-surface-container border border-outline-variant rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-3 flex-wrap">
+                          <span className="font-mono text-xs font-bold text-primary shrink-0">#{tire.tireNumber}</span>
+                          <span className="font-mono text-[11px] text-on-surface">
+                            {tire.size}{tire.size && !tire.size.includes('"') ? '"' : ''} <span className="text-outline-variant mx-1">|</span> BS {tire.wheelBackspacing}" <span className="text-outline-variant mx-1">|</span> {tire.compound} <span className="text-outline-variant mx-1">|</span> Duro {tire.durometer || '—'}{tire.airPressure ? <><span className="text-outline-variant mx-1">|</span> {tire.airPressure} psi</> : null}
+                          </span>
+                        </div>
+                      </div>
+                      <button onClick={() => handleDeleteTire(tire.id)} className="p-1.5 text-on-surface-variant/50 hover:text-error transition-colors flex-shrink-0" title="Delete tire">
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
 
           {/* Add Tire Modal */}
           {showAddTireForm && (
@@ -674,6 +825,10 @@ export default function SetupView({
                       <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Size</label>
                       <input type="text" placeholder='e.g. 84.0"' required value={newTire.size || ''}
                         onChange={e => setNewTire(p => ({ ...p, size: e.target.value }))}
+                        onBlur={e => {
+                          const v = e.target.value.trim();
+                          if (v && !v.endsWith('"')) setNewTire(p => ({ ...p, size: v + '"' }));
+                        }}
                         className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
                     </div>
                   </div>
@@ -700,6 +855,12 @@ export default function SetupView({
                         onChange={e => setNewTire(p => ({ ...p, durometer: e.target.value }))}
                         className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Air Pressure (psi)</label>
+                    <input type="text" placeholder="e.g. 10" value={newTire.airPressure || ''}
+                      onChange={e => setNewTire(p => ({ ...p, airPressure: e.target.value }))}
+                      className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
                   </div>
                   <div className="flex gap-2 pt-1 justify-end font-mono text-xs">
                     <button type="button" onClick={() => setShowAddTireForm(false)}

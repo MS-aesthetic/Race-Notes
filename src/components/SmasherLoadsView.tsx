@@ -1,22 +1,46 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { ShockSession, ShockCorner, ShockDataPoint } from '../types';
+import { byActiveCar } from '../lib/scope';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Local type aliases (for readability within this file) ────────────────────
 
-type Corner = 'LF' | 'RF' | 'LR' | 'RR';
+type Corner = ShockCorner;
+type DataPoint = ShockDataPoint;
 
-interface DataPoint {
-  height: string; // shock height in inches
-  load: string;   // load in lbs
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+interface SmasherLoadsViewProps {
+  /** Car scoping: filters list and stamps new sessions */
+  activeCarId?: string | null;
+  /** When lifted to App.tsx, the full sessions array is passed in */
+  sessions?: ShockSession[];
+  /** When lifted to App.tsx, save handler is passed in */
+  onSave?: (sessions: ShockSession[]) => void;
 }
 
-interface ShockSession {
-  id: string;
-  label: string;       // user-defined name / notes
-  corner: Corner;
-  springRate: string;  // e.g. "175"
-  shock: string;       // e.g. "Afco 26-1"
-  date: string;
-  points: DataPoint[];
+// ─── Image compression helper ─────────────────────────────────────────────────
+
+function compressImage(file: File, maxPx = 1400, quality = 0.85): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > height) {
+          if (width > maxPx) { height = Math.round(height * maxPx / width); width = maxPx; }
+        } else {
+          if (height > maxPx) { width = Math.round(width * maxPx / height); height = maxPx; }
+        }
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 // ─── Colour palette per corner ───────────────────────────────────────────────
@@ -245,10 +269,13 @@ function saveToStorage(sessions: ShockSession[]) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function SmasherLoadsView() {
-  const [sessions, setSessions] = useState<ShockSession[]>(loadFromStorage);
+export default function SmasherLoadsView({ activeCarId = null, sessions: sessionsProp, onSave }: SmasherLoadsViewProps = {}) {
+  // When lifted state is provided use it; otherwise fall back to localStorage.
+  const [localSessions, setLocalSessions] = useState<ShockSession[]>(loadFromStorage);
+  const sessions = sessionsProp ?? localSessions;
+
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
-    () => loadFromStorage()[0]?.id ?? null
+    () => sessions[0]?.id ?? null
   );
 
   // New session form
@@ -265,11 +292,30 @@ export default function SmasherLoadsView() {
   const svgRef = useRef<SVGSVGElement>(null);
 
   const persist = (next: ShockSession[]) => {
-    setSessions(next);
-    saveToStorage(next);
+    if (onSave) {
+      onSave(next); // lifted state path — App.tsx handles localStorage + cloud sync
+    } else {
+      setLocalSessions(next);
+      saveToStorage(next);
+    }
   };
 
-  const activeSession = sessions.find(s => s.id === activeSessionId) ?? null;
+  // Sync local state when sessionsProp changes (e.g. after cloud pull)
+  useEffect(() => {
+    if (sessionsProp !== undefined) {
+      // activeSessionId may be stale; ensure it still exists
+      if (activeSessionId && !sessionsProp.find(s => s.id === activeSessionId)) {
+        setActiveSessionId(sessionsProp[0]?.id ?? null);
+      }
+    }
+  }, [sessionsProp]);
+
+  // Display only sessions belonging to the active car
+  const displayedSessions = byActiveCar(sessions, activeCarId);
+
+  const activeSession = displayedSessions.find(s => s.id === activeSessionId)
+    ?? displayedSessions[0]
+    ?? null;
 
   // ── Create new session ────────────────────────────────────────────────────
 
@@ -283,6 +329,7 @@ export default function SmasherLoadsView() {
       shock: formShock,
       date: new Date().toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }),
       points: [],
+      carId: activeCarId ?? undefined,
     };
     const next = [newSession, ...sessions];
     persist(next);
@@ -339,6 +386,27 @@ export default function SmasherLoadsView() {
     persist(next);
   };
 
+  // ── Photo handlers ────────────────────────────────────────────────────────
+  const handleAddPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!activeSession) return;
+    const files = e.target.files;
+    if (!files) return;
+    const compressed = await Promise.all(Array.from(files).map(f => compressImage(f)));
+    const next = sessions.map(s =>
+      s.id === activeSession.id ? { ...s, photos: [...(s.photos || []), ...compressed] } : s
+    );
+    persist(next);
+    e.target.value = '';
+  };
+
+  const handleDeletePhoto = (idx: number) => {
+    if (!activeSession) return;
+    const next = sessions.map(s =>
+      s.id === activeSession.id ? { ...s, photos: (s.photos || []).filter((_, i) => i !== idx) } : s
+    );
+    persist(next);
+  };
+
   const col = activeSession ? CORNER_COLORS[activeSession.corner] : null;
 
   return (
@@ -358,18 +426,20 @@ export default function SmasherLoadsView() {
           </div>
           <button
             id="new-shock-session-btn"
-            onClick={() => setShowNewForm(true)}
-            className="h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded hover:opacity-90 transition-all flex items-center gap-1.5 flex-shrink-0"
+            onClick={() => { if (activeCarId) setShowNewForm(true); }}
+            disabled={!activeCarId}
+            title={!activeCarId ? 'Add a car in Settings → Garage to start.' : undefined}
+            className={`h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 flex-shrink-0 ${!activeCarId ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-90'}`}
           >
             <span className="material-symbols-outlined text-[15px]">add</span>
             New Session
           </button>
         </div>
 
-        {/* Session selector tabs */}
-        {sessions.length > 0 && (
+        {/* Session selector tabs — filtered to active car */}
+        {displayedSessions.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
-            {sessions.map(s => {
+            {displayedSessions.map(s => {
               const c = CORNER_COLORS[s.corner];
               const isActive = s.id === activeSessionId;
               return (
@@ -391,7 +461,7 @@ export default function SmasherLoadsView() {
       </div>
 
       {/* ── Empty state ── */}
-      {sessions.length === 0 && (
+      {displayedSessions.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
           <span className="material-symbols-outlined text-5xl text-on-surface-variant/30">show_chart</span>
           <p className="text-on-surface-variant text-sm font-mono uppercase">No shock sessions yet</p>
@@ -522,8 +592,8 @@ export default function SmasherLoadsView() {
                 </label>
                 <input
                   id="entry-height"
-                  type="number"
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="e.g. 12.50"
                   value={entryHeight}
                   required
@@ -537,8 +607,8 @@ export default function SmasherLoadsView() {
                 </label>
                 <input
                   id="entry-load"
-                  type="number"
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="e.g. 325"
                   value={entryLoad}
                   required
@@ -604,6 +674,42 @@ export default function SmasherLoadsView() {
               </table>
             </div>
           )}
+
+          {/* ── Dyno Graph Photos ── */}
+          <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-outline-variant/40 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[16px]">photo_library</span>
+                <h4 className="font-mono text-xs uppercase font-bold text-on-surface tracking-wider">Dyno Graph Photos</h4>
+              </div>
+              <label className="flex items-center gap-1.5 cursor-pointer h-8 px-3 border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary font-mono text-[10px] uppercase font-bold rounded transition-colors">
+                <span className="material-symbols-outlined text-[14px]">add_photo_alternate</span>
+                Add Photo
+                <input type="file" multiple accept="image/*" className="hidden" onChange={handleAddPhotos} />
+              </label>
+            </div>
+
+            {(!activeSession.photos || activeSession.photos.length === 0) ? (
+              <p className="text-on-surface-variant/40 font-mono text-[11px] italic text-center py-4">
+                No photos yet — attach dyno graph images or printouts here.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {activeSession.photos.map((photo, idx) => (
+                  <div key={idx} className="relative group rounded overflow-hidden border border-outline-variant/50">
+                    <img src={photo} alt={`Dyno photo ${idx + 1}`} className="w-full h-32 object-cover" />
+                    <button
+                      onClick={() => handleDeletePhoto(idx)}
+                      className="absolute top-1 right-1 bg-black/70 hover:bg-error text-white rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 

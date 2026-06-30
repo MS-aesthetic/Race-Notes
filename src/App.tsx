@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '@supabase/supabase-js';
-import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem } from './types';
+import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem, Car, ShockSession, CAR_TYPES } from './types';
 import {
   INITIAL_SETUP,
   INITIAL_SETUPS,
   INITIAL_WEEKENDS,
   INITIAL_ACTIVE_SESSION,
+  INITIAL_CARS,
+  INITIAL_SHOCK_SESSIONS,
 } from './data';
 
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, AppUser } from './lib/supabase';
-import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos } from './lib/sync';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions } from './lib/sync';
 
 import DashboardView from './components/DashboardView';
 import SetupView from './components/SetupView';
@@ -47,7 +49,83 @@ export default function App() {
   const handleSaveTires = (updated: TireInventoryItem[]) => {
     setTireInventory(updated);
     localStorage.setItem('race_notes_tires', JSON.stringify(updated));
+    if (user) pushTires(updated, user.id);
   };
+
+  const handleDeleteTireFromCloud = async (tireId: string) => {
+    if (user) await deleteTireFromCloud(tireId);
+  };
+
+  // ── Cars & Garage ──────────────────────────────────────────────────────────
+  const [cars, setCars] = useState<Car[]>(() => {
+    try { const s = localStorage.getItem('race_notes_cars'); return s ? JSON.parse(s) : INITIAL_CARS; }
+    catch { return INITIAL_CARS; }
+  });
+
+  const [activeCarId, setActiveCarId] = useState<string | null>(() => {
+    return localStorage.getItem('race_notes_active_car');
+  });
+
+  // Lifted smasher/shock-session state (Decision 1: cloud sync)
+  const [shockSessions, setShockSessions] = useState<ShockSession[]>(() => {
+    try { const s = localStorage.getItem('race_notes_shock_graphs'); return s ? JSON.parse(s) : INITIAL_SHOCK_SESSIONS; }
+    catch { return INITIAL_SHOCK_SESSIONS; }
+  });
+
+  const activeCar = cars.find(c => c.id === activeCarId) ?? null;
+
+  // Auto-select first car if activeCarId is missing or dangling
+  useEffect(() => {
+    if (cars.length > 0 && (!activeCarId || !cars.find(c => c.id === activeCarId))) {
+      handleSelectCar(cars[0].id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cars, activeCarId]);
+
+  const handleSaveCars = (updated: Car[]) => {
+    setCars(updated);
+    localStorage.setItem('race_notes_cars', JSON.stringify(updated));
+    if (user) pushCars(updated, user.id, team?.id ?? null, setSyncStatus);
+  };
+
+  const handleSelectCar = (carId: string) => {
+    setActiveCarId(carId);
+    localStorage.setItem('race_notes_active_car', carId);
+    // No data reload — views re-filter on activeCarId
+  };
+
+  const handleSaveShockSessions = (updated: ShockSession[]) => {
+    setShockSessions(updated);
+    localStorage.setItem('race_notes_shock_graphs', JSON.stringify(updated));
+    if (user) pushShockSessions(updated, user.id, setSyncStatus);
+  };
+
+  // handleDeleteCar implemented in Phase 7 — stub here
+  const handleDeleteCar = (carId: string) => {
+    const sc = savedSetups.filter(s => s.carId === carId).length;
+    const tc = tireInventory.filter(t => t.carId === carId).length;
+    const shc = shockSessions.filter(s => s.carId === carId).length;
+    if (sc + tc + shc > 0) {
+      alert('Reassign or delete this car\'s data first.');
+      return;
+    }
+    const updated = cars.filter(c => c.id !== carId);
+    handleSaveCars(updated);
+    deleteCarFromCloud(carId);
+    if (activeCarId === carId) {
+      const next = updated[0] ?? null;
+      if (next) handleSelectCar(next.id);
+      else { setActiveCarId(null); localStorage.removeItem('race_notes_active_car'); }
+    }
+  };
+
+  // Count helpers for GarageView / delete guard
+  const carSetupCount = (carId: string) => savedSetups.filter(s => s.carId === carId).length;
+  const carTireCount = (carId: string) => tireInventory.filter(t => t.carId === carId).length;
+  const carShockCount = (carId: string) => shockSessions.filter(s => s.carId === carId).length;
+
+  // Navigate to Settings → Garage from the active-car chip
+  const [settingsSubTab, setSettingsSubTab] = useState<'account' | 'appearance' | 'export' | 'garage'>('account');
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   const [theme, setTheme] = useState<AppTheme>(() => {
@@ -94,13 +172,21 @@ export default function App() {
   const [newWeekendTrack, setNewWeekendTrack] = useState('');
   const [newWeekendDate, setNewWeekendDate] = useState('');
 
+  // New weekend form — setup binding
+  const [newWeekendSetupId, setNewWeekendSetupId] = useState('');
+
   const [showNewSessionForm, setShowNewSessionForm] = useState(false);
   const [newSessionWeekendId, setNewSessionWeekendId] = useState(INITIAL_WEEKENDS[0]?.id || '');
   const [newSessionTrack, setNewSessionTrack] = useState('');
-  const [newSessionName, setNewSessionName] = useState('');
-  const [newSessionType, setNewSessionType] = useState('');
+  const [newSessionType, setNewSessionType] = useState<'Test' | 'Hot Laps' | 'Qualifying' | 'Heat Race' | 'Feature'>('Test');
   const [newSessionCond, setNewSessionCond] = useState('');
-  const [newSessionWeather, setNewSessionWeather] = useState('');
+  const [newSessionTimeOfDay, setNewSessionTimeOfDay] = useState<'current' | 'Afternoon' | 'Evening' | 'Night'>('current');
+  // Session weather fetch state
+  const [sessionWeatherStr, setSessionWeatherStr] = useState('');
+  const [sessionWeatherLoading, setSessionWeatherLoading] = useState(false);
+  const [sessionWeatherError, setSessionWeatherError] = useState('');
+  const [showSessionZipInput, setShowSessionZipInput] = useState(false);
+  const [sessionZipCode, setSessionZipCode] = useState('');
 
   // Clock state matching real timing context
   const [timeStr, setTimeStr] = useState('11:20 AM');
@@ -235,12 +321,86 @@ export default function App() {
         localStorage.setItem('race_notes_todos', JSON.stringify(cloudTodos));
       }
 
+      const cloudTires = await pullTires(user.id, setSyncStatus);
+      if (cloudTires.length > 0) {
+        setTireInventory(cloudTires);
+        localStorage.setItem('race_notes_tires', JSON.stringify(cloudTires));
+      }
+
+      const cloudCars = await pullCars(user.id, setSyncStatus);
+      if (cloudCars.length > 0) {
+        setCars(cloudCars);
+        localStorage.setItem('race_notes_cars', JSON.stringify(cloudCars));
+        // Auto-select first car if no active car set yet
+        const storedActive = localStorage.getItem('race_notes_active_car');
+        if (!storedActive || !cloudCars.find(c => c.id === storedActive)) {
+          handleSelectCar(cloudCars[0].id);
+        }
+      }
+
+      const cloudShock = await pullShockSessions(user.id, setSyncStatus);
+      if (cloudShock.length > 0) {
+        setShockSessions(cloudShock);
+        localStorage.setItem('race_notes_shock_graphs', JSON.stringify(cloudShock));
+      }
+
       setSyncStatus('Synced');
       setTimeout(() => setSyncStatus(''), 3000);
     };
 
     doPull();
   }, [user]);
+
+  // ── One-time backfill: assign legacy data to a default car ────────────────
+  // Runs once after the first login pull (or on initial local load if no user).
+  // Guard with a ref so it never duplicates on re-renders.
+  const didBackfill = useRef(false);
+
+  useEffect(() => {
+    if (didBackfill.current) return;
+    if (cars.length > 0) { didBackfill.current = true; return; } // already has cars
+    const hasLegacyData = savedSetups.length > 0 || tireInventory.length > 0 || shockSessions.length > 0;
+    if (!hasLegacyData) { didBackfill.current = true; return; } // brand-new user
+
+    didBackfill.current = true;
+
+    const guessedType = savedSetups.find(s => s.carType)?.carType || CAR_TYPES[0];
+    const guessedChassis = savedSetups.find(s => s.chassis)?.chassis || 'My Car';
+    const now = new Date().toISOString();
+    const defaultCar: Car = {
+      id: `car-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      userId: user?.id ?? 'local',
+      teamId: team?.id ?? null,
+      carType: guessedType,
+      chassis: guessedChassis,
+      division: '',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Stamp all legacy data with the default car id
+    const stampedSetups = savedSetups.map(s => s.carId ? s : { ...s, carId: defaultCar.id });
+    const stampedTires = tireInventory.map(t => t.carId ? t : { ...t, carId: defaultCar.id });
+    const stampedShock = shockSessions.map(s => s.carId ? s : { ...s, carId: defaultCar.id });
+
+    // Persist setups
+    setSavedSetups(stampedSetups);
+    localStorage.setItem('race_notes_saved_setups', JSON.stringify(stampedSetups));
+    if (user) pushSetups(stampedSetups, user.id, setSyncStatus);
+
+    // Persist tires
+    setTireInventory(stampedTires);
+    localStorage.setItem('race_notes_tires', JSON.stringify(stampedTires));
+    if (user) pushTires(stampedTires, user.id, setSyncStatus);
+
+    // Persist shock sessions
+    handleSaveShockSessions(stampedShock);
+
+    // Register car and select it
+    handleSaveCars([defaultCar]);
+    handleSelectCar(defaultCar.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedSetups, tireInventory, shockSessions, cars]);
 
   const saveSetup = (updatedSetup: Setup) => {
     setSetup(updatedSetup);
@@ -343,16 +503,120 @@ export default function App() {
     });
   };
 
+  // ── Session weather helpers ──────────────────────────────────────────────────
+
+  const weatherCodeToStr = (code: number): string => {
+    if (code === 0) return 'Clear';
+    if (code <= 3) return 'Partly Cloudy';
+    if (code <= 9) return 'Fog';
+    if (code <= 29) return 'Rain';
+    if (code <= 39) return 'Snow';
+    if (code <= 59) return 'Drizzle';
+    if (code <= 69) return 'Rain';
+    if (code <= 79) return 'Snow';
+    if (code <= 84) return 'Rain Showers';
+    if (code <= 94) return 'Thunderstorm';
+    return 'Severe Storm';
+  };
+
+  const fetchSessionWeatherFromCoords = async (lat: number, lon: number) => {
+    let location = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+    try {
+      const geo = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+      const gj = await geo.json();
+      const city = gj.address?.city || gj.address?.town || gj.address?.village || gj.address?.county || '';
+      const state = gj.address?.state_code || '';
+      if (city || state) location = [city, state].filter(Boolean).join(', ');
+    } catch { /* keep coords */ }
+    const wr = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`);
+    const wj = await wr.json();
+    const temp = Math.round(wj.current.temperature_2m);
+    const cond = weatherCodeToStr(wj.current.weather_code);
+    setSessionWeatherStr(`${temp}°F, ${cond} — ${location}`);
+    setSessionWeatherLoading(false);
+  };
+
+  const handleSessionGPSWeather = () => {
+    setSessionWeatherLoading(true); setSessionWeatherError(''); setSessionWeatherStr('');
+    if (!navigator.geolocation) {
+      setSessionWeatherError('GPS not available.'); setSessionWeatherLoading(false); setShowSessionZipInput(true); return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        try { await fetchSessionWeatherFromCoords(pos.coords.latitude, pos.coords.longitude); }
+        catch { setSessionWeatherError('Could not fetch weather.'); setSessionWeatherLoading(false); }
+      },
+      err => {
+        setSessionWeatherError(err.code === 1 ? 'Location denied — enter zip code.' : 'Could not get location.');
+        setSessionWeatherLoading(false); setShowSessionZipInput(true);
+      },
+      { timeout: 10000 }
+    );
+  };
+
+  const handleSessionZipWeather = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sessionZipCode.trim()) return;
+    setSessionWeatherLoading(true); setSessionWeatherError('');
+    try {
+      const gr = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${sessionZipCode.trim()}&country=US&format=json&limit=1`);
+      const gj = await gr.json();
+      if (!gj.length) { setSessionWeatherError('Zip not found.'); setSessionWeatherLoading(false); return; }
+      await fetchSessionWeatherFromCoords(parseFloat(gj[0].lat), parseFloat(gj[0].lon));
+      setShowSessionZipInput(false); setSessionZipCode('');
+    } catch { setSessionWeatherError('Could not fetch weather.'); setSessionWeatherLoading(false); }
+  };
+
+  // ── Open session creation form ────────────────────────────────────────────────
+
+  const handleOpenNewSessionForm = (preferWeekendId?: string) => {
+    const targetId = preferWeekendId || activeSession.weekendId || (weekends[0]?.id ?? '');
+    if (targetId) setNewSessionWeekendId(targetId);
+    setNewSessionType('Test');
+    setNewSessionCond('');
+    setSessionWeatherStr('');
+    setSessionWeatherError('');
+    setShowSessionZipInput(false);
+    setSessionZipCode('');
+    setNewSessionTimeOfDay('current');
+    setShowNewSessionForm(true);
+  };
+
+  // ── Session type → short code mapping ────────────────────────────────────────
+
+  const SESSION_CODES: Record<string, string> = {
+    'Test': 'Test',
+    'Hot Laps': 'HL',
+    'Qualifying': 'Qual',
+    'Heat Race': 'Heat',
+    'Feature': 'Feat.',
+  };
+
+  // ── Auto-number session name ─────────────────────────────────────────────────
+
+  const buildSessionName = (type: string, weekendId: string): string => {
+    const code = SESSION_CODES[type] ?? type;
+    const weekend = weekends.find(w => w.id === weekendId);
+    if (!weekend) return code;
+    const existing = weekend.sessions.filter(s => s.name === code || s.name.startsWith(`${code} `));
+    if (existing.length === 0) return code;
+    return `${code} ${existing.length + 1}`;
+  };
+
   const handleCreateNewWeekend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWeekendName.trim() || !newWeekendTrack.trim()) return;
+
+    const boundSetup = savedSetups.find(s => s.id === newWeekendSetupId) || null;
 
     const newWknd: RaceWeekend = {
       id: `wknd-${Date.now()}`,
       name: newWeekendName,
       track: newWeekendTrack,
       date: newWeekendDate || new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
-      sessions: []
+      sessions: [],
+      setupId: boundSetup?.id,
+      setupName: boundSetup?.chassis,
     };
 
     setWeekends((prev) => {
@@ -407,13 +671,21 @@ export default function App() {
       },
     };
 
+    // Auto-number session name
+    const sessionName = buildSessionName(newSessionType, newSessionWeekendId);
+
+    // Resolve time
+    const resolvedTime = newSessionTimeOfDay === 'current'
+      ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : newSessionTimeOfDay;
+
     const nextSession: ActiveSession = {
-      name: newSessionName.toUpperCase() || 'SESSION',
+      name: sessionName,
       track: targetWeekend.track,
-      setupUsed: setup.chassis.toUpperCase(),
+      setupUsed: setup.chassis || 'Default Setup',
       condition: newSessionCond || '',
-      weather: newSessionWeather || '',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      weather: sessionWeatherStr || '',
+      time: resolvedTime,
       bestLap: '',
       avgLap: '',
       finishPos: '',
@@ -438,8 +710,8 @@ export default function App() {
 
     const newRecord: SessionRecord = {
       id: `session-rec-${Date.now()}`,
-      type: newSessionType.toUpperCase() || 'SESS',
-      name: newSessionName || 'Session',
+      type: sessionName,
+      name: sessionName,
       track: targetWeekend.track,
       condition: newSessionCond,
       bestLap: '',
@@ -461,9 +733,9 @@ export default function App() {
       tires: defaultTires,
       pressures: defaultPressures,
       competitionNotes: '',
-      time: nextSession.time,
-      weather: nextSession.weather,
-      setupUsed: nextSession.setupUsed,
+      time: resolvedTime,
+      weather: sessionWeatherStr || '',
+      setupUsed: setup.chassis || 'Default Setup',
       screenshots: []
     };
 
@@ -484,10 +756,13 @@ export default function App() {
     localStorage.setItem('race_notes_active_session', JSON.stringify(nextSession));
 
     setShowNewSessionForm(false);
-    setNewSessionName('');
-    setNewSessionType('');
+    setNewSessionType('Test');
     setNewSessionCond('');
-    setNewSessionWeather('');
+    setSessionWeatherStr('');
+    setSessionWeatherError('');
+    setShowSessionZipInput(false);
+    setSessionZipCode('');
+    setNewSessionTimeOfDay('current');
     setActiveTab('raceweekend');
   };
 
@@ -496,6 +771,8 @@ export default function App() {
     const updated = weekends.filter(w => w.id !== weekendId);
     setWeekends(updated);
     localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
+    // Hard-delete from cloud so it doesn't come back on next sync pull
+    deleteWeekendFromCloud(weekendId);
     if (user) pushWeekends(updated, user.id);
   };
 
@@ -593,24 +870,26 @@ export default function App() {
                   {syncStatus}
                 </span>
               )}
-              {activeTab === 'raceweekend' && (
+              {/* Active-car chip */}
+              {activeCar ? (
                 <button
-                  onClick={() => {
-                    if (weekends.length > 0) {
-                      setNewSessionWeekendId(weekends[0].id);
-                    }
-                    setNewSessionName('');
-                    setNewSessionType('');
-                    setNewSessionCond('');
-                    setNewSessionWeather('');
-                    setShowNewSessionForm(true);
-                  }}
-                  id="top-action-new-session"
-                  className="font-mono text-[10px] text-primary hover:text-primary-fixed uppercase hover:bg-surface-container-high transition-colors px-2 py-1 active:opacity-80 border border-outline-variant/60 font-semibold rounded-sm"
+                  onClick={() => { setSettingsSubTab('garage'); setActiveTab('settings'); }}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary font-mono text-[10px] uppercase tracking-wider font-bold hover:bg-primary/20 transition-colors"
+                  title="Switch car in Garage"
                 >
-                  + SESSION
+                  <span className="material-symbols-outlined text-[12px]">directions_car</span>
+                  <span className="truncate max-w-[80px]">{activeCar.name || `${activeCar.chassis} · ${activeCar.carType}`}</span>
                 </button>
-              )}
+              ) : cars.length === 0 ? (
+                <button
+                  onClick={() => { setSettingsSubTab('garage'); setActiveTab('settings'); }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-full border border-outline-variant/50 text-on-surface-variant/60 font-mono text-[10px] uppercase tracking-wider hover:border-primary/40 hover:text-primary/70 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[12px]">add</span>
+                  Add Car
+                </button>
+              ) : null}
+{/* +Session moved into RaceWeekendView as a prominent top-center button */}
             </div>
           </div>
         </header>
@@ -628,30 +907,30 @@ export default function App() {
             >
               {activeTab === 'dashboard' && (
                 <DashboardView
-                  setup={setup}
                   weekends={weekends}
+                  savedSetups={savedSetups}
+                  tireInventory={tireInventory}
+                  todos={todos}
+                  userId={user?.id}
                   team={team}
+                  activeCarId={activeCarId}
                   onStartNewWeekend={() => {
                     setNewWeekendName('');
                     setNewWeekendTrack('');
                     setNewWeekendDate(new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
                     setShowNewWeekendForm(true);
                   }}
-                  onStartNewSession={() => {
-                    if (weekends.length > 0) {
-                      setNewSessionWeekendId(weekends[0].id);
-                    }
-                    setNewSessionName('');
-                    setNewSessionType('');
-                    setNewSessionCond('');
-                    setNewSessionWeather('');
-                    setShowNewSessionForm(true);
-                  }}
-                  onEditSetup={() => setActiveTab('setups')}
+                  onStartNewSession={() => handleOpenNewSessionForm()}
                   onSelectSession={(rec, weekendId) => {
                     handleSelectRecentSession(rec, weekendId || '');
                     setActiveTab('raceweekend');
                   }}
+                  onSelectSetup={(setupId) => {
+                    const found = savedSetups.find(s => s.id === setupId);
+                    if (found) setSetup(found);
+                    setActiveTab('setups');
+                  }}
+                  onGoToTodos={() => setActiveTab('todos')}
                   onDeleteWeekend={handleDeleteWeekend}
                 />
               )}
@@ -663,6 +942,11 @@ export default function App() {
                   user={user}
                   tireInventory={tireInventory}
                   onSaveTires={handleSaveTires}
+                  onDeleteTireFromCloud={handleDeleteTireFromCloud}
+                  activeCarId={activeCarId}
+                  activeCar={activeCar}
+                  shockSessions={shockSessions}
+                  onSaveShockSessions={handleSaveShockSessions}
                   onSaveSetups={(updatedSetups, activeId) => {
                     setSavedSetups(updatedSetups);
                     localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
@@ -736,10 +1020,13 @@ export default function App() {
                   user={user}
                   session={activeSession}
                   weekends={weekends}
+                  tireInventory={tireInventory}
+                  savedSetups={savedSetups}
                   onUpdateSession={handleUpdateSession}
                   onUpdateWeekend={handleUpdateWeekend}
                   onDeleteSession={handleDeleteSession}
                   onSelectSession={(rec, weekendId) => handleSelectRecentSession(rec, weekendId)}
+                  onNewSession={() => handleOpenNewSessionForm(activeSession.weekendId)}
                 />
               )}
 
@@ -756,6 +1043,15 @@ export default function App() {
                   todos={todos}
                   accounting={accounting}
                   shopping={shopping}
+                  cars={cars}
+                  activeCarId={activeCarId}
+                  onSelectCar={handleSelectCar}
+                  onSaveCars={handleSaveCars}
+                  onDeleteCar={handleDeleteCar}
+                  setupCount={carSetupCount}
+                  tireCount={carTireCount}
+                  shockCount={carShockCount}
+                  initialSubTab={settingsSubTab}
                 />
               )}
 
@@ -853,6 +1149,21 @@ export default function App() {
             </span>
           </button>
 
+          {/* Trackers Button */}
+          <button onClick={() => setActiveTab('trackers')}
+            id="tab-btn-trackers"
+            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
+              activeTab === 'trackers' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+            }`}>
+            <span className="material-symbols-outlined text-[20px]"
+                  style={{ fontVariationSettings: activeTab === 'trackers' ? "'FILL' 1" : "'FILL' 0" }}>
+              monitoring
+            </span>
+            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
+              Trackers
+            </span>
+          </button>
+
           {/* Reference Button */}
           <button
             onClick={() => setActiveTab('quickref')}
@@ -869,21 +1180,6 @@ export default function App() {
             </span>
             <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
               Reference
-            </span>
-          </button>
-
-          {/* Trackers Button */}
-          <button onClick={() => setActiveTab('trackers')}
-            id="tab-btn-trackers"
-            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
-              activeTab === 'trackers' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
-            }`}>
-            <span className="material-symbols-outlined text-[20px]"
-                  style={{ fontVariationSettings: activeTab === 'trackers' ? "'FILL' 1" : "'FILL' 0" }}>
-              monitoring
-            </span>
-            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
-              Trackers
             </span>
           </button>
 
@@ -969,6 +1265,28 @@ export default function App() {
                 />
               </div>
 
+              {savedSetups.length > 0 && (
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">
+                    Bind a Setup (optional)
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={newWeekendSetupId}
+                      onChange={e => setNewWeekendSetupId(e.target.value)}
+                      className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
+                    >
+                      <option value="">-- No setup selected --</option>
+                      {/* Decision 3: filter to active car's setups */}
+                      {savedSetups.filter(s => !activeCarId || s.carId === activeCarId).map(s => (
+                        <option key={s.id} value={s.id}>{s.chassis}{s.carType ? ` (${s.carType})` : ''}</option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[14px]">expand_more</span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-2 justify-end text-xs font-mono">
                 <button
                   type="button"
@@ -1022,64 +1340,62 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleCreateNewSession} className="space-y-3">
+              <form onSubmit={handleCreateNewSession} className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
+                {/* Weekend selector */}
                 <div>
-                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
-                    Select Race Weekend
-                  </label>
-                  <select
-                    value={newSessionWeekendId}
-                    onChange={(e) => {
-                      setNewSessionWeekendId(e.target.value);
-                      const selected = weekends.find(w => w.id === e.target.value);
-                      if (selected) {
-                        setNewSessionTrack(selected.track);
-                      }
-                    }}
-                    className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
-                  >
-                    {weekends.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({w.track})
-                      </option>
+                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Race Weekend</label>
+                  <div className="relative">
+                    <select
+                      value={newSessionWeekendId}
+                      onChange={(e) => {
+                        setNewSessionWeekendId(e.target.value);
+                        const selected = weekends.find(w => w.id === e.target.value);
+                        if (selected) setNewSessionTrack(selected.track);
+                      }}
+                      className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
+                    >
+                      {weekends.map((w) => (
+                        <option key={w.id} value={w.id}>{w.name} ({w.track})</option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[14px]">expand_more</span>
+                  </div>
+                </div>
+
+                {/* Session type */}
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">Session Type</label>
+                  <div className="grid grid-cols-5 gap-1">
+                    {([
+                      { key: 'Test', code: 'Test' },
+                      { key: 'Hot Laps', code: 'HL' },
+                      { key: 'Qualifying', code: 'Qual' },
+                      { key: 'Heat Race', code: 'Heat' },
+                      { key: 'Feature', code: 'Feat.' },
+                    ] as const).map(({ key, code }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        title={key}
+                        onClick={() => setNewSessionType(key)}
+                        className={`py-2 px-1 rounded border font-mono text-[10px] font-bold uppercase transition-all text-center leading-tight ${
+                          newSessionType === key
+                            ? 'bg-primary/20 border-primary text-primary'
+                            : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                        }`}
+                      >{code}</button>
                     ))}
-                  </select>
+                  </div>
+                  {newSessionWeekendId && (
+                    <p className="font-mono text-[10px] text-on-surface-variant/50 mt-1">
+                      Will be named: <span className="text-primary font-bold">{buildSessionName(newSessionType, newSessionWeekendId)}</span>
+                    </p>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">
-                      Session Name
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Heat 1"
-                      value={newSessionName}
-                      onChange={(e) => setNewSessionName(e.target.value)}
-                      className="w-full bg-[#141414] text-xs text-on-surface p-2 border border-outline-variant focus:border-primary rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">
-                      Label Tag (Type)
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      maxLength={8}
-                      placeholder="e.g. H1"
-                      value={newSessionType}
-                      onChange={(e) => setNewSessionType(e.target.value)}
-                      className="w-full bg-[#141414] text-xs text-on-surface p-2 border border-outline-variant focus:border-primary rounded font-mono"
-                    />
-                  </div>
-                </div>
-
+                {/* Surface conditions */}
                 <div>
-                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">
-                    Surface Conditions
-                  </label>
+                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">Surface Conditions</label>
                   <input
                     type="text"
                     required
@@ -1090,17 +1406,80 @@ export default function App() {
                   />
                 </div>
 
+                {/* Time of Day */}
                 <div>
-                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">
-                    Weather Temp/Conditions
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 78°F, Clear"
-                    value={newSessionWeather}
-                    onChange={(e) => setNewSessionWeather(e.target.value)}
-                    className="w-full bg-[#141414] text-xs text-on-surface p-2 border border-outline-variant focus:border-primary rounded"
-                  />
+                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">Time of Day</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {([
+                      { value: 'current', label: 'Current Time' },
+                      { value: 'Afternoon', label: 'Afternoon' },
+                      { value: 'Evening', label: 'Evening' },
+                      { value: 'Night', label: 'Night' },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setNewSessionTimeOfDay(opt.value)}
+                        className={`py-2 px-1 rounded border font-mono text-[9px] font-bold uppercase transition-all text-center leading-tight ${
+                          newSessionTimeOfDay === opt.value
+                            ? 'bg-primary/20 border-primary text-primary'
+                            : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                        }`}
+                      >{opt.label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Weather */}
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">Weather (optional)</label>
+                  <div className="flex gap-2 mb-2">
+                    <button
+                      type="button"
+                      onClick={handleSessionGPSWeather}
+                      disabled={sessionWeatherLoading}
+                      className="flex items-center gap-1 text-[10px] font-mono font-bold uppercase px-2.5 py-1.5 rounded border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">my_location</span>
+                      {sessionWeatherLoading ? 'Fetching…' : 'GPS'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSessionZipInput(v => !v)}
+                      className={`flex items-center gap-1 text-[10px] font-mono font-bold uppercase px-2.5 py-1.5 rounded border transition-colors ${showSessionZipInput ? 'border-primary text-primary bg-primary/10' : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'}`}
+                    >
+                      <span className="material-symbols-outlined text-[13px]">pin_drop</span>
+                      Zip
+                    </button>
+                    {sessionWeatherStr && (
+                      <button type="button" onClick={() => { setSessionWeatherStr(''); setSessionWeatherError(''); }} className="ml-auto text-[10px] font-mono text-on-surface-variant/50 hover:text-error">clear</button>
+                    )}
+                  </div>
+                  {showSessionZipInput && (
+                    <form onSubmit={handleSessionZipWeather} className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={5}
+                        placeholder="ZIP code"
+                        value={sessionZipCode}
+                        onChange={e => setSessionZipCode(e.target.value)}
+                        className="flex-1 bg-[#141414] border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-xs text-on-surface outline-none"
+                      />
+                      <button type="submit" disabled={sessionWeatherLoading} className="bg-primary text-on-primary px-3 py-2 rounded font-mono text-[10px] font-bold uppercase disabled:opacity-50">
+                        {sessionWeatherLoading ? '…' : 'Get'}
+                      </button>
+                    </form>
+                  )}
+                  {sessionWeatherError && <p className="font-mono text-[11px] text-red-400 mb-1">{sessionWeatherError}</p>}
+                  {sessionWeatherStr ? (
+                    <div className="bg-[#141414] border border-primary/30 rounded px-3 py-2 font-mono text-xs text-on-surface flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>cloud</span>
+                      {sessionWeatherStr}
+                    </div>
+                  ) : (
+                    <p className="font-mono text-[10px] text-on-surface-variant/40 italic">No weather fetched — session will log without it.</p>
+                  )}
                 </div>
 
                 <div className="flex gap-2 pt-2 justify-end text-xs font-mono">
@@ -1115,7 +1494,7 @@ export default function App() {
                     type="submit"
                     className="px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
                   >
-                    INITIALIZE SESSION
+                    START SESSION
                   </button>
                 </div>
               </form>
