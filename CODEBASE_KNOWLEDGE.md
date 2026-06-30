@@ -1,7 +1,7 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-06-29 (session 6 — car profiles)
-> Branch at time of writing: `feature/car-profiles` (cut from `feature/session-v2`)
+> Last updated: 2026-06-30 (session 7 — bug fixes & sessions accordion)
+> Branch at time of writing: `master` (all features merged — car-profiles, session-v2, weekend-v2)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 
 ---
@@ -409,13 +409,13 @@ newWeekendName / Track / Date: string
 ---
 
 ### `RaceWeekendView.tsx`
-Props: `{ user, session, weekends, tireInventory?, savedSetups?, onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession? }`
+Props: `{ user, session, weekends, tireInventory?, savedSetups?, onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession?, onNewWeekend? }`
 
-Four visual sections (in order):
+Five visual sections (in order):
 1. **Weekend info** — banner (name, track, date, setup name), GPS/zip weather widget, weekend notes textarea.
-2. **Start New Session CTA** — large dashed-border button between Weekend Info and Active Log. Calls `onNewSession`.
+2. **Dual CTAs** — "New Weekend" + "New Session" buttons side-by-side (both dashed-border). `onNewWeekend` opens the weekend form; `onNewSession` opens the session form.
 3. **Active session editor** — collapsible; inline editing of `ActiveSession` (lap times, diagnostics, tires installed per corner, adjustments, photo attachments). Tire dropdowns per corner filter out tires already selected on other corners within the same session. "Import from Setup" button auto-fills corner tires from the bound setup.
-4. **All sessions list** — expandable session cards for the current weekend.
+4. **All Weekends accordion** — ALL weekends shown (sorted newest → oldest by date), each collapsible. Inside each: session cards with Load/Delete buttons. The active weekend starts expanded. `expandedWeekendIds` is a `Set<string>` state.
 
 Weekend resolution logic:
 ```ts
@@ -486,6 +486,12 @@ Sub-tabs: Accounting | Shopping. Entries can be linked to a race weekend via `we
 
 ### `SettingsView.tsx`
 Sub-tabs: **Garage | Account | Style | Export**. "Appearance" was renamed to "Style"; "Garage" is a new first tab (feature/car-profiles). Passes `weekends`, `todos`, `accounting`, `shopping` down to `ExportView`. Accepts `initialSubTab?` prop so App.tsx can deep-link directly to Garage (e.g. from the header car chip).
+
+**Clear All Data** (session 7): Account tab now has a "Danger Zone" section at the bottom. Two-step confirm ("Clear All Data" → "Are you sure?"). Calls `onClearAllData?: () => Promise<void>` prop, implemented in App.tsx as `handleClearAllData`:
+- Removes all 11 `race_notes_*` localStorage keys
+- Deletes all user rows from Supabase: `weekends`, `setups`, `tire_inventory`, `cars`, `shock_sessions`
+- Resets all relevant React state to empty arrays / null
+- Auto-cancels confirm if user doesn't confirm within 5 seconds
 
 ### `GarageView.tsx` *(feature/car-profiles)*
 Rendered inside SettingsView's Garage tab. Manages the `Car[]` array:
@@ -593,7 +599,22 @@ npx cap sync android
 copy android\app\build\outputs\apk\debug\app-debug.apk CrewChief.apk
 ```
 
-**Java:** Android Studio bundled JBR (Java 21) at `C:\PROGRA~1\Android\ANDROI~1\jbr`
+**Java:** Java 21 required (as of @capacitor/filesystem@8). Installed at:
+`C:\Program Files\Microsoft\jdk-21.0.11.10-hotspot`
+Set JAVA_HOME before building:
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-21.0.11.10-hotspot"
+$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+```
+
+**versionCode:** `3`, versionName `"3.0"` (as of session 7 — bump with every APK that needs to install over a previous version)
+
+**Android permissions required** (`android/app/src/main/AndroidManifest.xml`):
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+```
 
 ---
 
@@ -603,18 +624,20 @@ copy android\app\build\outputs\apk\debug\app-debug.apk CrewChief.apk
 
 | Branch | Status |
 |--------|--------|
-| `master` | Production — deployed to Netlify |
-| `feature/session-v2` | Base branch — active development |
-| `feature/car-profiles` | Cut from `feature/session-v2` — **do not merge to master without owner approval** |
+| `master` | Production — all features merged here; deployed to Netlify |
 
-Feature branches merged to master (history):
-- `feature/weekend-v2` — weekend report, ExportView, SettingsView weekend props
+Feature branches merged to master (history, newest first):
+- `feature/car-profiles` — Car entity, GarageView, byActiveCar scoping, shock sync (session 6)
+- `feature/session-v2` — Session modal rework, weekend reports, tire inventory
+- `feature/weekend-v2` — Weekend report, ExportView, SettingsView weekend props
+
+**RULE: Never merge a feature branch to master without explicit owner approval.**
 
 Standard commit:
 ```bash
 git add -A
 git commit -m "feat: description"
-git push origin feature/car-profiles   # or feature/session-v2 as appropriate
+git push
 ```
 
 ---
@@ -623,13 +646,17 @@ git push origin feature/car-profiles   # or feature/session-v2 as appropriate
 
 | Issue | Root Cause | Status |
 |-------|-----------|--------|
-| Deleted weekends return on refresh | `pushWeekends` upserts but never deletes; `pullAllData` re-adds the cloud record | **Fixed** in `feature/session-v2` — `deleteWeekendFromCloud` now called on delete |
+| Deleted weekends return on refresh | `pushWeekends` upserts but never deletes; `pullAllData` re-adds the cloud record | **Fixed** — `deleteWeekendFromCloud` now called on delete |
 | +Session button did nothing | Header button called `setNewSessionName` / `setNewSessionWeather` — state vars removed in session-v2 rework; silent JS runtime error swallowed click | **Fixed** — replaced with `handleOpenNewSessionForm()` |
+| Task click from Dashboard navigates blank | `onGoToTodos={() => setActiveTab('todos')}` — `'todos'` is not a valid tab ID; correct ID is `'trackers'` | **Fixed** (session 7) |
+| GPS "Location Denied" on Android | `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` missing from AndroidManifest.xml | **Fixed** (session 7) |
+| Sessions tab only shows active weekend | `RaceWeekendView` only rendered `currentWeekend.sessions` | **Fixed** (session 7) — full accordion with all weekends |
+| Ghost weekend on new session | `newSessionWeekendId` persisted stale ID from deleted weekends | **Fixed** (session 7) — `handleOpenNewSessionForm` validates against `weekends` array |
+| APK requires Java 21 | `@capacitor/filesystem@8` added `jvmToolchain(21)` | **Fixed** — install JDK 21 via `winget install Microsoft.OpenJDK.21` |
 | Vite build doesn't type-check | Vite/esbuild transpiles only. Run `npm run lint` (`tsc --noEmit`) to catch type errors before pushing | Ongoing — always lint before deploy |
 | TailwindCSS v4 — no config file | All customization is in `src/index.css` `@theme {}` block | Remember this when adding new tokens |
-| Cloud-wins merge on login | `mergeIntoLocalStorage` always lets cloud overwrite local on login. Offline edits made before login may be overwritten if the cloud has a newer `updated_at` | By design — acceptable tradeoff for multi-device sync |
+| Cloud-wins merge on login | `mergeIntoLocalStorage` always lets cloud overwrite local on login. Offline edits made before login may be overwritten | By design — acceptable tradeoff for multi-device sync |
 | Session `type` vs `name` fields | Both set to the same display string. Legacy type union `'H1' | 'Q1' | ...` preserved for backward compat | Don't rely on the `type` field for new logic |
-| `INITIAL_WEEKENDS` | Is an empty array `[]` in `data.ts` — not the cause of persistence bugs | |
 
 ---
 
