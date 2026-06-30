@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import AuthView from './AuthView';
 import ExportView from './ExportView';
 import GarageView from './GarageView';
@@ -28,6 +28,7 @@ interface SettingsViewProps {
   tireCount: (carId: string) => number;
   shockCount: (carId: string) => number;
   initialSubTab?: 'account' | 'appearance' | 'export' | 'garage';
+  onClearAllData?: () => Promise<void>;
 }
 
 const ACCENT_PRESETS = [
@@ -39,8 +40,10 @@ const ACCENT_PRESETS = [
   { label: 'Cyan',        hex: '#7de8e8' },
 ];
 
-export default function SettingsView({ user, profile, onAuthChange, setup, activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], shopping = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab }: SettingsViewProps) {
+export default function SettingsView({ user, profile, onAuthChange, setup, activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], shopping = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, onClearAllData }: SettingsViewProps) {
   const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export' | 'garage'>(initialSubTab ?? 'account');
+  const [clearStep, setClearStep] = useState<0 | 1 | 2>(0); // 0=idle, 1=confirm, 2=clearing
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   return (
     <div className="flex flex-col gap-4 h-full">
@@ -86,7 +89,65 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
           />
         )}
 
-        {subTab === 'account' && <AuthView user={user} profile={profile} onAuthChange={onAuthChange} />}
+        {subTab === 'account' && (
+          <div className="flex flex-col gap-4 pb-8">
+            <AuthView user={user} profile={profile} onAuthChange={onAuthChange} />
+
+            {/* ── Danger Zone ──────────────────────────────────────────────── */}
+            <div className="bg-surface-container border border-red-500/30 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-red-400 text-lg">warning</span>
+                <h3 className="font-display font-bold uppercase text-sm text-red-400 tracking-wide">Danger Zone</h3>
+              </div>
+              <p className="text-[11px] text-on-surface-variant font-mono">
+                Permanently deletes all your weekends, setups, tires, cars, and shock data — both on this device and from the cloud. This cannot be undone.
+              </p>
+
+              {clearStep === 0 && (
+                <button
+                  onClick={() => {
+                    setClearStep(1);
+                    // auto-reset after 5 s if not confirmed
+                    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+                    clearTimerRef.current = setTimeout(() => setClearStep(0), 5000);
+                  }}
+                  className="w-full py-2 rounded-lg border border-red-500/50 text-red-400 font-mono text-xs uppercase tracking-wider hover:bg-red-500/10 transition-colors"
+                >
+                  Clear All Data
+                </button>
+              )}
+
+              {clearStep === 1 && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-mono text-red-400 text-center font-bold">Are you sure? This cannot be undone.</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setClearStep(0); if (clearTimerRef.current) clearTimeout(clearTimerRef.current); }}
+                      className="flex-1 py-2 rounded-lg border border-outline-variant text-on-surface-variant font-mono text-xs uppercase tracking-wider hover:bg-surface transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+                        setClearStep(2);
+                        await onClearAllData?.();
+                        setClearStep(0);
+                      }}
+                      className="flex-1 py-2 rounded-lg bg-red-500/20 border border-red-500 text-red-400 font-mono text-xs uppercase tracking-wider font-bold hover:bg-red-500/30 transition-colors"
+                    >
+                      Yes, Delete Everything
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {clearStep === 2 && (
+                <p className="text-xs font-mono text-on-surface-variant text-center py-2">Clearing…</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {subTab === 'appearance' && (
           <div className="space-y-5 pb-8">

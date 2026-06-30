@@ -119,6 +119,40 @@ export default function App() {
     }
   };
 
+  // ── Clear All Data ────────────────────────────────────────────────────────────
+  const handleClearAllData = async () => {
+    const LOCAL_KEYS = [
+      'race_notes_setup', 'race_notes_saved_setups', 'race_notes_weekends',
+      'race_notes_active_session', 'race_notes_todos', 'race_notes_tires',
+      'race_notes_accounting', 'race_notes_shopping', 'race_notes_cars',
+      'race_notes_active_car', 'race_notes_shock_graphs',
+    ];
+    LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
+
+    // Wipe Supabase rows for this user
+    if (user) {
+      try {
+        await Promise.all([
+          supabase.from('weekends').delete().eq('user_id', user.id),
+          supabase.from('setups').delete().eq('user_id', user.id),
+          supabase.from('tire_inventory').delete().eq('user_id', user.id),
+          supabase.from('cars').delete().eq('user_id', user.id),
+          supabase.from('shock_sessions').delete().eq('user_id', user.id),
+        ]);
+      } catch (e) { console.warn('Clear cloud data error:', e); }
+    }
+
+    // Reset all in-memory state
+    setSavedSetups([]);
+    setWeekends([]);
+    setTireInventory([]);
+    setCars([]);
+    setShockSessions([]);
+    setActiveCarId(null);
+    setActiveSession(INITIAL_ACTIVE_SESSION);
+    setSyncStatus('All data cleared');
+  };
+
   // Count helpers for GarageView / delete guard
   const carSetupCount = (carId: string) => savedSetups.filter(s => s.carId === carId).length;
   const carTireCount = (carId: string) => tireInventory.filter(t => t.carId === carId).length;
@@ -570,7 +604,10 @@ export default function App() {
   // ── Open session creation form ────────────────────────────────────────────────
 
   const handleOpenNewSessionForm = (preferWeekendId?: string) => {
-    const targetId = preferWeekendId || activeSession.weekendId || (weekends[0]?.id ?? '');
+    // Validate the preferred ID exists; fall back to most recent weekend
+    const validIds = new Set(weekends.map(w => w.id));
+    const candidate = preferWeekendId || activeSession.weekendId || newSessionWeekendId;
+    const targetId = (candidate && validIds.has(candidate)) ? candidate : (weekends[weekends.length - 1]?.id ?? '');
     if (targetId) setNewSessionWeekendId(targetId);
     setNewSessionType('Test');
     setNewSessionCond('');
@@ -930,7 +967,7 @@ export default function App() {
                     if (found) setSetup(found);
                     setActiveTab('setups');
                   }}
-                  onGoToTodos={() => setActiveTab('todos')}
+                  onGoToTodos={() => setActiveTab('trackers')}
                   onDeleteWeekend={handleDeleteWeekend}
                 />
               )}
@@ -1027,6 +1064,12 @@ export default function App() {
                   onDeleteSession={handleDeleteSession}
                   onSelectSession={(rec, weekendId) => handleSelectRecentSession(rec, weekendId)}
                   onNewSession={() => handleOpenNewSessionForm(activeSession.weekendId)}
+                  onNewWeekend={() => {
+                    setNewWeekendName('');
+                    setNewWeekendTrack('');
+                    setNewWeekendDate(new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
+                    setShowNewWeekendForm(true);
+                  }}
                 />
               )}
 
@@ -1052,6 +1095,7 @@ export default function App() {
                   tireCount={carTireCount}
                   shockCount={carShockCount}
                   initialSubTab={settingsSubTab}
+                  onClearAllData={handleClearAllData}
                 />
               )}
 

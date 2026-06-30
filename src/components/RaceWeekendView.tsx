@@ -13,6 +13,7 @@ interface RaceWeekendViewProps {
   onDeleteSession: (weekendId: string, sessionId: string) => void;
   onSelectSession: (session: SessionRecord, weekendId?: string) => void;
   onNewSession?: () => void;
+  onNewWeekend?: () => void;
 }
 
 // ── Weather condition code → label ────────────────────────────────────────────
@@ -57,7 +58,7 @@ function compressImage(file: File, maxPx = 1024, quality = 0.82): Promise<string
 }
 
 export default function RaceWeekendView({
-  session, weekends, tireInventory = [], savedSetups = [], onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession,
+  session, weekends, tireInventory = [], savedSetups = [], onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession, onNewWeekend,
 }: RaceWeekendViewProps) {
   const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
@@ -66,6 +67,9 @@ export default function RaceWeekendView({
   const [showZipInput, setShowZipInput] = useState(false);
   const [zipCode, setZipCode] = useState('');
   const [editorCollapsed, setEditorCollapsed] = useState(false);
+  const [expandedWeekendIds, setExpandedWeekendIds] = useState<Set<string>>(
+    () => new Set([weekends.find(w => w.id === session.weekendId)?.id ?? weekends[0]?.id ?? ''].filter(Boolean))
+  );
 
   // ── Weekend lookup: prefer weekendId, fall back to track match ───────────────
   const currentWeekend =
@@ -373,15 +377,28 @@ export default function RaceWeekendView({
         </section>
       )}
 
-      {/* ── Start New Session CTA ────────────────────────────────────────── */}
-      {onNewSession && (
-        <button
-          onClick={onNewSession}
-          className="w-full flex items-center justify-center gap-3 py-4 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-primary font-display font-bold uppercase tracking-wider text-base"
-        >
-          <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
-          Start New Session
-        </button>
+      {/* ── CTAs: New Weekend + New Session ──────────────────────────────── */}
+      {(onNewWeekend || onNewSession) && (
+        <div className="flex gap-3">
+          {onNewWeekend && (
+            <button
+              onClick={onNewWeekend}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-outline-variant hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-on-surface-variant hover:text-primary font-display font-bold uppercase tracking-wider text-sm"
+            >
+              <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
+              New Weekend
+            </button>
+          )}
+          {onNewSession && (
+            <button
+              onClick={onNewSession}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-primary font-display font-bold uppercase tracking-wider text-sm"
+            >
+              <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
+              New Session
+            </button>
+          )}
+        </div>
       )}
 
       {/* ── Active Session Editor ─────────────────────────────────────────── */}
@@ -586,69 +603,106 @@ export default function RaceWeekendView({
         )}
       </section>
 
-      {/* ── All Sessions in Weekend ───────────────────────────────────────── */}
-      {currentWeekend && (
+      {/* ── All Weekends (each collapsible, all sessions inside) ─────────── */}
+      {weekends.length > 0 && (
         <section>
           <h2 className="text-on-surface font-display font-bold uppercase mb-3 text-sm tracking-wide">
-            All Sessions — {currentWeekend.name}
+            All Weekends
           </h2>
 
-          <div className="flex flex-col gap-2">
-            {displaySessions.length === 0 && (
-              <p className="font-mono text-xs text-on-surface-variant/40 text-center py-4">No sessions logged yet for this weekend.</p>
-            )}
-            {displaySessions.map((sx) => {
-              const isActive = sx.id === session.id;
+          <div className="flex flex-col gap-3">
+            {[...weekends].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(wk => {
+              const isActiveWk = wk.id === currentWeekend?.id;
+              const isWkExpanded = expandedWeekendIds.has(wk.id);
+              const wkSessions = wk.sessions || [];
               return (
-                <div key={sx.id} className={`bg-surface-container border rounded-lg overflow-hidden ${isActive ? 'border-primary/50' : 'border-outline-variant'}`}>
+                <div key={wk.id} className={`bg-surface-container border rounded-lg overflow-hidden ${isActiveWk ? 'border-primary/50' : 'border-outline-variant'}`}>
+                  {/* Weekend header */}
                   <button
-                    className="w-full p-3 flex justify-between items-center text-left"
-                    onClick={() => setExpandedSessionId(expandedSessionId === sx.id ? null : sx.id)}
+                    className="w-full p-3 flex justify-between items-center text-left hover:bg-surface-container-high transition-colors"
+                    onClick={() => setExpandedWeekendIds(prev => {
+                      const next = new Set(prev);
+                      next.has(wk.id) ? next.delete(wk.id) : next.add(wk.id);
+                      return next;
+                    })}
                   >
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-primary font-bold">{sx.name}</span>
-                        {isActive && <span className="font-mono text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-bold">Active</span>}
+                        <span className="font-mono text-xs font-bold text-on-surface">{wk.name}</span>
+                        {isActiveWk && <span className="font-mono text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-bold">Active</span>}
                       </div>
-                      <span className="font-mono text-[10px] text-on-surface-variant">Best: {sx.bestLap || '--'} | Finish: {sx.finishPos || '--'}</span>
+                      <span className="font-mono text-[10px] text-on-surface-variant">
+                        {wk.track}{wk.date ? ` · ${wk.date}` : ''} · {wkSessions.length} session{wkSessions.length !== 1 ? 's' : ''}
+                      </span>
                     </div>
                     <span className="material-symbols-outlined text-on-surface-variant">
-                      {expandedSessionId === sx.id ? 'expand_less' : 'expand_more'}
+                      {isWkExpanded ? 'expand_less' : 'expand_more'}
                     </span>
                   </button>
 
-                  {expandedSessionId === sx.id && (
-                    <div className="p-3 bg-[#0e0e0e] border-t border-outline-variant/30 text-xs font-mono text-on-surface-variant space-y-2">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Session Details</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onSelectSession(sx, currentWeekend.id); }}
-                            className="flex items-center gap-1.5 px-3 py-1 bg-surface-bright hover:bg-surface-container-high border border-outline-variant rounded transition-colors text-[10px] font-bold uppercase font-mono text-on-surface cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined text-[14px] text-primary">edit</span>
-                            Load
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onDeleteSession(currentWeekend.id, sx.id); }}
-                            className="flex items-center gap-1.5 px-3 py-1 border border-outline-variant hover:border-red-500/50 hover:bg-red-900/20 rounded transition-colors text-[10px] font-bold uppercase font-mono text-on-surface-variant hover:text-red-400 cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">delete</span>
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                      <p><strong>Config:</strong> {sx.setupUsed || '—'}</p>
-                      <p><strong>Conditions:</strong> {sx.condition}</p>
-                      <p><strong>Notes:</strong> {sx.competitionNotes || 'None'}</p>
-                      {sx.adjustments && sx.adjustments.length > 0 && (
-                        <div>
-                          <strong>Adjustments:</strong>
-                          <ul className="list-disc pl-4 mt-1">
-                            {sx.adjustments.map((a: any) => <li key={a.id}>{a.label} {a.value}</li>)}
-                          </ul>
-                        </div>
+                  {/* Sessions inside this weekend */}
+                  {isWkExpanded && (
+                    <div className="border-t border-outline-variant/30">
+                      {wkSessions.length === 0 && (
+                        <p className="font-mono text-xs text-on-surface-variant/40 text-center py-3">No sessions yet.</p>
                       )}
+                      {wkSessions.map(sx => {
+                        const isActiveSx = sx.id === session.id;
+                        return (
+                          <div key={sx.id} className={`border-b border-outline-variant/20 last:border-0 ${isActiveSx ? 'bg-primary/5' : ''}`}>
+                            <button
+                              className="w-full p-3 flex justify-between items-center text-left"
+                              onClick={() => setExpandedSessionId(expandedSessionId === sx.id ? null : sx.id)}
+                            >
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs text-primary font-bold">{sx.name}</span>
+                                  {isActiveSx && <span className="font-mono text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-bold">Active</span>}
+                                </div>
+                                <span className="font-mono text-[10px] text-on-surface-variant">Best: {sx.bestLap || '--'} | Finish: {sx.finishPos || '--'}</span>
+                              </div>
+                              <span className="material-symbols-outlined text-on-surface-variant">
+                                {expandedSessionId === sx.id ? 'expand_less' : 'expand_more'}
+                              </span>
+                            </button>
+
+                            {expandedSessionId === sx.id && (
+                              <div className="p-3 bg-[#0e0e0e] border-t border-outline-variant/30 text-xs font-mono text-on-surface-variant space-y-2">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Session Details</span>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); onSelectSession(sx, wk.id); }}
+                                      className="flex items-center gap-1.5 px-3 py-1 bg-surface-bright hover:bg-surface-container-high border border-outline-variant rounded transition-colors text-[10px] font-bold uppercase font-mono text-on-surface cursor-pointer"
+                                    >
+                                      <span className="material-symbols-outlined text-[14px] text-primary">edit</span>
+                                      Load
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); onDeleteSession(wk.id, sx.id); }}
+                                      className="flex items-center gap-1.5 px-3 py-1 border border-outline-variant hover:border-red-500/50 hover:bg-red-900/20 rounded transition-colors text-[10px] font-bold uppercase font-mono text-on-surface-variant hover:text-red-400 cursor-pointer"
+                                    >
+                                      <span className="material-symbols-outlined text-[14px]">delete</span>
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                                <p><strong>Config:</strong> {sx.setupUsed || '—'}</p>
+                                <p><strong>Conditions:</strong> {sx.condition}</p>
+                                <p><strong>Notes:</strong> {sx.competitionNotes || 'None'}</p>
+                                {sx.adjustments && sx.adjustments.length > 0 && (
+                                  <div>
+                                    <strong>Adjustments:</strong>
+                                    <ul className="list-disc pl-4 mt-1">
+                                      {sx.adjustments.map((a: any) => <li key={a.id}>{a.label} {a.value}</li>)}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
