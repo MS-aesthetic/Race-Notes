@@ -28,11 +28,17 @@ You are an expert developer helping build **CREW CHIEF**, a React + TypeScript P
 
 ## Build & deploy workflow
 
+> **DEPLOY RULE — default to PREVIEW.** Always deploy to a Netlify **preview/draft**
+> (`netlify deploy --dir=dist`). Only run a **production** deploy
+> (`netlify deploy --prod --dir=dist`) when Maxx **explicitly** says to push to
+> production. The site is **not** connected to Git continuous deployment, so
+> `git push` never deploys anything — every deploy is a manual CLI step.
+
 ```powershell
-# Web build + preview deploy
+# Web build + preview deploy (DEFAULT)
 npm run build
-netlify deploy --dir=dist          # preview
-netlify deploy --prod --dir=dist   # production
+netlify deploy --dir=dist          # preview  ← default, use this
+netlify deploy --prod --dir=dist   # production ← ONLY when Maxx explicitly asks
 
 # Android APK
 $env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-21.0.11.10-hotspot"
