@@ -236,10 +236,11 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
                 <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Font Size</label>
                 <p className="text-[10px] font-mono text-on-surface-variant/60 mt-0.5">Scales all text and UI elements throughout the app.</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 {([
-                  { value: 'standard', icon: 'format_size', label: 'Standard', desc: '16px base' },
-                  { value: 'large',    icon: 'text_increase', label: 'Large',    desc: '19px base' },
+                  { value: 'standard', icon: 'format_size', label: 'Standard', desc: '1x scale' },
+                  { value: 'large',    icon: 'text_increase', label: 'Large',    desc: '1.15x scale' },
+                  { value: 'xlarge',   icon: 'text_increase', label: 'X-Large',  desc: '1.32x scale' },
                 ] as const).map(opt => {
                   const active = (theme.fontSize ?? 'standard') === opt.value;
                   return (

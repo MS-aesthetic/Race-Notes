@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ShockSession, ShockCorner, ShockDataPoint } from '../types';
 import { byActiveCar } from '../lib/scope';
+import { buildComparisonRows, downloadComparisonCsv } from '../lib/shockCompare';
 
 // ─── Local type aliases (for readability within this file) ────────────────────
 
@@ -206,6 +207,108 @@ function ShockLineChart({ session, svgRef }: ChartProps) {
   );
 }
 
+// ─── Compare / Overlay Chart (multiple sessions on one graph) ────────────────
+
+const COMPARE_PALETTE = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#84cc16'];
+
+export function sessionCompareColor(index: number): string {
+  return COMPARE_PALETTE[index % COMPARE_PALETTE.length];
+}
+
+interface CompareChartProps {
+  sessions: ShockSession[];
+}
+
+function ShockCompareChart({ sessions }: CompareChartProps) {
+  const W = 340, H = 240;
+  const PAD = { top: 18, right: 20, bottom: 44, left: 54 };
+  const innerW = W - PAD.left - PAD.right;
+  const innerH = H - PAD.top - PAD.bottom;
+
+  const series = sessions
+    .map((session, i) => ({
+      session,
+      color: sessionCompareColor(i),
+      points: session.points
+        .map(p => ({ x: parseFloat(p.load), y: parseFloat(p.height) }))
+        .filter(p => !isNaN(p.x) && !isNaN(p.y))
+        .sort((a, b) => a.x - b.x),
+    }))
+    .filter(s => s.points.length >= 2);
+
+  if (series.length === 0) {
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', background: '#111' }}>
+        <text x={W / 2} y={H / 2} textAnchor="middle" fill="#555" fontSize="11" fontFamily="monospace">
+          Select 2+ sessions with at least 2 data points each
+        </text>
+      </svg>
+    );
+  }
+
+  const allX = series.flatMap(s => s.points.map(p => p.x));
+  const allY = series.flatMap(s => s.points.map(p => p.y));
+  const xMin = Math.min(...allX), xMax = Math.max(...allX);
+  const yMin = Math.min(...allY), yMax = Math.max(...allY);
+  const xRange = xMax - xMin || 1;
+  const yRange = yMax - yMin || 1;
+
+  const toSvg = (x: number, y: number) => ({
+    sx: PAD.left + ((x - xMin) / xRange) * innerW,
+    sy: PAD.top + (1 - (y - yMin) / yRange) * innerH,
+  });
+
+  const xTicks = 5, yTicks = 4;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', background: '#111', borderRadius: 6 }}>
+      {/* Grid */}
+      {Array.from({ length: yTicks + 1 }).map((_, i) => {
+        const y = PAD.top + (i / yTicks) * innerH;
+        const val = yMax - (i / yTicks) * yRange;
+        return (
+          <g key={`gy-${i}`}>
+            <line x1={PAD.left} y1={y} x2={PAD.left + innerW} y2={y} stroke="#222" strokeWidth="1" />
+            <text x={PAD.left - 5} y={y + 4} textAnchor="end" fill="#666" fontSize="9" fontFamily="monospace">{val.toFixed(2)}</text>
+          </g>
+        );
+      })}
+      {Array.from({ length: xTicks + 1 }).map((_, i) => {
+        const x = PAD.left + (i / xTicks) * innerW;
+        const val = xMin + (i / xTicks) * xRange;
+        return (
+          <g key={`gx-${i}`}>
+            <line x1={x} y1={PAD.top} x2={x} y2={PAD.top + innerH} stroke="#222" strokeWidth="1" />
+            <text x={x} y={PAD.top + innerH + 14} textAnchor="middle" fill="#666" fontSize="9" fontFamily="monospace">{Math.round(val)}</text>
+          </g>
+        );
+      })}
+
+      {/* Axes */}
+      <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + innerH} stroke="#444" strokeWidth="1.5" />
+      <line x1={PAD.left} y1={PAD.top + innerH} x2={PAD.left + innerW} y2={PAD.top + innerH} stroke="#444" strokeWidth="1.5" />
+
+      {/* One polyline + points per session */}
+      {series.map(s => {
+        const poly = s.points.map(p => { const { sx, sy } = toSvg(p.x, p.y); return `${sx},${sy}`; }).join(' ');
+        return (
+          <g key={s.session.id}>
+            <polyline points={poly} fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            {s.points.map((p, i) => {
+              const { sx, sy } = toSvg(p.x, p.y);
+              return <circle key={i} cx={sx} cy={sy} r={3} fill={s.color} />;
+            })}
+          </g>
+        );
+      })}
+
+      {/* Axis labels */}
+      <text x={PAD.left + innerW / 2} y={H - 4} textAnchor="middle" fill="#888" fontSize="9" fontFamily="monospace" fontWeight="bold">LOAD (lb)</text>
+      <text x={12} y={PAD.top + innerH / 2} textAnchor="middle" fill="#888" fontSize="9" fontFamily="monospace" fontWeight="bold" transform={`rotate(-90, 12, ${PAD.top + innerH / 2})`}>HEIGHT (in)</text>
+    </svg>
+  );
+}
+
 // ─── CSV Export ───────────────────────────────────────────────────────────────
 
 function exportCsv(session: ShockSession) {
@@ -289,6 +392,10 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
   const [entryHeight, setEntryHeight] = useState('');
   const [entryLoad, setEntryLoad] = useState('');
 
+  // Compare / overlay mode
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+
   const svgRef = useRef<SVGSVGElement>(null);
 
   const persist = (next: ShockSession[]) => {
@@ -311,7 +418,13 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
   }, [sessionsProp]);
 
   // Display only sessions belonging to the active car
-  const displayedSessions = byActiveCar(sessions, activeCarId);
+  const displayedSessions = byActiveCar<ShockSession>(sessions, activeCarId);
+
+  const toggleCompareId = (id: string) => {
+    setCompareIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const compareSessions = displayedSessions.filter(s => compareIds.includes(s.id));
+  const comparisonRows = compareSessions.length >= 2 ? buildComparisonRows(compareSessions) : [];
 
   const activeSession = displayedSessions.find(s => s.id === activeSessionId)
     ?? displayedSessions[0]
@@ -424,16 +537,29 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
               Shock height vs. load — per corner
             </p>
           </div>
-          <button
-            id="new-shock-session-btn"
-            onClick={() => { if (activeCarId) setShowNewForm(true); }}
-            disabled={!activeCarId}
-            title={!activeCarId ? 'Add a car in Settings → Garage to start.' : undefined}
-            className={`h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 flex-shrink-0 ${!activeCarId ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-90'}`}
-          >
-            <span className="material-symbols-outlined text-[15px]">add</span>
-            New Session
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {displayedSessions.length > 1 && (
+              <button
+                onClick={() => setCompareMode(prev => !prev)}
+                className={`h-9 px-3 font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 border ${
+                  compareMode ? 'bg-primary/15 text-primary border-primary/40' : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: compareMode ? "'FILL' 1" : "'FILL' 0" }}>compare_arrows</span>
+                Compare
+              </button>
+            )}
+            <button
+              id="new-shock-session-btn"
+              onClick={() => { if (activeCarId) setShowNewForm(true); }}
+              disabled={!activeCarId}
+              title={!activeCarId ? 'Add a car in Settings → Garage to start.' : undefined}
+              className={`h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 flex-shrink-0 ${!activeCarId ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-90'}`}
+            >
+              <span className="material-symbols-outlined text-[15px]">add</span>
+              New Session
+            </button>
+          </div>
         </div>
 
         {/* Session selector tabs — filtered to active car */}
@@ -460,8 +586,116 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
         )}
       </div>
 
+      {/* ── Compare / Overlay mode ── */}
+      {compareMode && displayedSessions.length > 0 && (
+        <div className="space-y-4">
+          {/* Session picker */}
+          <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[10px] font-bold uppercase text-on-surface-variant tracking-wider">
+                Select sessions to overlay ({compareSessions.length} selected)
+              </span>
+            </div>
+            <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+              {displayedSessions.map(s => {
+                const idx = compareIds.indexOf(s.id);
+                const isSelected = idx !== -1;
+                const c = CORNER_COLORS[s.corner];
+                return (
+                  <label
+                    key={s.id}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded border cursor-pointer transition-all ${
+                      isSelected ? 'border-primary/40 bg-primary/5' : 'border-outline-variant/40 hover:border-outline-variant'
+                    }`}
+                  >
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleCompareId(s.id)} className="accent-primary" />
+                    {isSelected && (
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: sessionCompareColor(idx) }} />
+                    )}
+                    <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border ${c.badge} flex-shrink-0`}>{s.corner}</span>
+                    <span className="font-mono text-xs text-on-surface truncate flex-1">
+                      {s.label || s.shock} {s.springRate && `· ${s.springRate} lb/in`}
+                    </span>
+                    <span className="font-mono text-[10px] text-on-surface-variant/60 flex-shrink-0">{s.date}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {compareSessions.length < 2 ? (
+            <p className="text-center text-xs font-mono text-on-surface-variant/50 py-6">Select at least 2 sessions above to overlay them.</p>
+          ) : (
+            <>
+              {/* Overlay chart */}
+              <div className="bg-[#111] border border-outline-variant rounded-lg overflow-hidden">
+                <div className="px-4 py-2 border-b border-outline-variant/50 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-primary">compare_arrows</span>
+                  <span className="font-mono text-[10px] font-bold uppercase text-on-surface">Overlay — {compareSessions.length} sessions</span>
+                </div>
+                <div className="p-2">
+                  <ShockCompareChart sessions={compareSessions} />
+                </div>
+                {/* Legend */}
+                <div className="px-4 py-2.5 border-t border-outline-variant/50 flex flex-wrap gap-x-4 gap-y-1.5">
+                  {compareSessions.map((s, i) => (
+                    <div key={s.id} className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: sessionCompareColor(i) }} />
+                      <span className="font-mono text-[10px] text-on-surface-variant">{s.corner} {s.label || s.shock}{s.springRate ? ` (${s.springRate} lb/in)` : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Interpolated comparison table */}
+              <div className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
+                <div className="px-4 py-2 border-b border-outline-variant/50 flex items-center justify-between gap-2">
+                  <span className="font-mono text-[10px] font-bold uppercase text-on-surface">Comparison Table (interpolated)</span>
+                  <button
+                    onClick={() => downloadComparisonCsv(compareSessions)}
+                    className="h-7 px-2.5 border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-outline font-mono text-[9px] uppercase font-bold rounded transition-all flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">download</span>
+                    CSV
+                  </button>
+                </div>
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-outline-variant/40">
+                        <th className="text-left px-3 py-2 text-[10px] uppercase text-on-surface-variant font-bold whitespace-nowrap">Height (in)</th>
+                        {compareSessions.map((s, i) => (
+                          <th key={s.id} className="text-right px-3 py-2 text-[10px] uppercase font-bold whitespace-nowrap" style={{ color: sessionCompareColor(i) }}>
+                            {s.corner} {s.label || s.shock}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comparisonRows.map((row, r) => (
+                        <tr key={row.height} className={`border-b border-outline-variant/20 last:border-none ${r % 2 === 0 ? 'bg-transparent' : 'bg-white/[0.02]'}`}>
+                          <td className="px-3 py-1.5 text-on-surface-variant/70">{row.height}"</td>
+                          {row.values.map((v, i) => (
+                            <td key={i} className="px-3 py-1.5 text-right text-on-surface">
+                              {v === null ? <span className="text-on-surface-variant/30">—</span> : `${v.toFixed(1)} lb`}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="px-4 py-2 text-[9px] font-mono text-on-surface-variant/50 border-t border-outline-variant/30">
+                  Values are linearly interpolated between each session's own measured points — "—" means that height is outside what was measured for that session.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* ── Empty state ── */}
-      {displayedSessions.length === 0 && (
+      {!compareMode && displayedSessions.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
           <span className="material-symbols-outlined text-5xl text-on-surface-variant/30">show_chart</span>
           <p className="text-on-surface-variant text-sm font-mono uppercase">No shock sessions yet</p>
@@ -478,7 +712,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
       )}
 
       {/* ── Active session view ── */}
-      {activeSession && col && (
+      {!compareMode && activeSession && col && (
         <div className="space-y-4">
 
           {/* Session metadata card */}

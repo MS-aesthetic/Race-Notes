@@ -85,6 +85,27 @@ body {
   overflow-x: hidden;
 }
 
+/* ─── UI scale (Settings → Font Size) ───────────────────────────────────────
+   Applied as `zoom` (not root font-size) so it scales the app uniformly —
+   including the many fixed-px utility classes — and renders identically on
+   the installed PWA (Chrome) vs. the Capacitor APK (Android WebView), since
+   both are Chromium and handle `zoom` the same way. Scoped to the app shell
+   (not html/body) so it doesn't fight the fixed 100dvh/overflow:hidden
+   safe-area lock below — the shell's own flex layout + its scrollable
+   <main> absorb the size change instead. */
+#applet-main-body,
+#applet-auth-gate {
+  zoom: var(--ui-zoom, 1);
+}
+
+/* Normalize Chrome's automatic text-inflation so it never diverges between
+   the installed PWA and the Capacitor WebView — our own --ui-zoom is the
+   only thing controlling scale. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 html[data-theme="light"] body {
   background-color: var(--color-background);
   color: var(--color-on-surface);

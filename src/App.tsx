@@ -196,8 +196,13 @@ export default function App() {
     const b = parseInt(hex.slice(5, 7), 16) || 0;
     const luma = 0.299 * r + 0.587 * g + 0.114 * b;
     root.style.setProperty('--color-on-primary', luma > 160 ? '#1a0003' : '#ffffff');
-    // Font scale
-    root.style.fontSize = theme.fontSize === 'large' ? '19px' : '16px';
+    // UI scale — zoom (not root font-size) so it scales fixed-px utility
+    // classes and rem-based ones uniformly, and renders identically on the
+    // installed PWA (Chrome) vs the Capacitor APK (Android WebView) — both
+    // Chromium, both respect `zoom` the same way.
+    root.style.fontSize = '16px';
+    const ZOOM: Record<AppTheme['fontSize'], number> = { standard: 1, large: 1.15, xlarge: 1.32 };
+    root.style.setProperty('--ui-zoom', String(ZOOM[theme.fontSize] ?? 1));
   }, [theme]);
 
   // ---- Auth & Cloud Sync State ----

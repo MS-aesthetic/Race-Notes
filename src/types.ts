@@ -364,6 +364,8 @@ export interface AppTheme {
   mode: 'dark' | 'light';
   /** Hex color string e.g. "#ffb3ac" */
   accent: string;
-  /** UI font scale — 'standard' (16px base) or 'large' (19px base) */
-  fontSize: 'standard' | 'large';
+  /** UI scale — applied as a CSS zoom factor so it renders identically on
+   *  the installed PWA (Chrome) and the Capacitor APK (Android WebView),
+   *  both Chromium-based. 'standard' | 'large' | 'xlarge'. */
+  fontSize: 'standard' | 'large' | 'xlarge';
 }
