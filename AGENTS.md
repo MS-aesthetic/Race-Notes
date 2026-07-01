@@ -6,7 +6,9 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 
 ## Architecture
 
-**No router.** Navigation is entirely tab-based: `activeTab` state in `src/App.tsx` conditionally renders one of seven view components. To add a new tab: add the tab key to the `activeTab` union type, add a `<button>` in the bottom `<nav>`, and add a conditional render in `<main>`.
+**No router.** Navigation is entirely tab-based: `activeTab` state in `src/App.tsx` conditionally renders one of six view components — `'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'trackers'` (verified 2026-07-01). There is **no `'todos'` tab and no `'team'` tab** — todos live inside `TrackersView`'s Todos sub-tab (alongside Accounting/Shopping), and `TeamView.tsx`/`ToDoView.tsx` exist as files but are unwired/orphaned (not imported by `App.tsx`). To add a new tab: add the tab key to the `activeTab` union type, add a `<button>` in the bottom `<nav>`, and add a conditional render in `<main>`.
+
+**Mandatory login gate (added 2026-07).** The app requires sign-in before any tab renders. `isUnlocked = !!user || hasLocalAcct` in `App.tsx` gates the entire UI behind `<AuthView />`. `hasLocalAccount()`/`rememberLocalAccount()` in `src/lib/supabase.ts` maintain a `race_notes_registered_user` localStorage flag independent of live Supabase session validity, so the app stays usable **offline** on a device that has logged in before — only explicit sign-out clears the flag. Google OAuth (web + native, via `signInWithGoogle()`) is available alongside email/password.
 
 **State lives in `App.tsx` only.** All domain state (`setup`, `savedSetups`, `weekends`, `activeSession`, `todos`) is declared at the top level and passed as props. Views never own persistent state — they receive data + callback props. Do not introduce `useContext` or external stores without a strong reason.
 
@@ -26,8 +28,10 @@ if (user) pushSetups(updated, user.id, setSyncStatus);
 | `src/types.ts` | All TypeScript interfaces — start here to understand domain models |
 | `src/data.ts` | `INITIAL_SETUP`, `INITIAL_SETUPS`, `INITIAL_WEEKENDS`, `INITIAL_ACTIVE_SESSION` defaults |
 | `src/App.tsx` | Global state, all mutation handlers, tab routing, new-weekend/session modals |
-| `src/lib/supabase.ts` | Supabase client singleton + auth helpers (`signIn`, `signUp`, `fetchProfile`, `getUserTeam`) |
+| `src/lib/supabase.ts` | Supabase client singleton + auth helpers (`signIn`, `signUp`, `fetchProfile`, `getUserTeam`, `signInWithGoogle`, `hasLocalAccount`/`rememberLocalAccount`) |
 | `src/lib/sync.ts` | Push/pull functions — `pushSetups`, `pushWeekends`, `pushTodos`, `pullAllData` |
+| `src/lib/tireHistory.ts` | Derives tire usage history from weekend/session data; CSV + printable report export |
+| `src/lib/shockCompare.ts` | Linear interpolation + comparison table for overlaying multiple shock-load graphs |
 | `supabase/migrations/` | Full DB schema history — read these before touching cloud data shapes |
 
 ---
@@ -51,6 +55,14 @@ if (user) pushSetups(updated, user.id, setSyncStatus);
 | `race_notes_weekends` | `RaceWeekend[]` array |
 | `race_notes_active_session` | `ActiveSession` object |
 | `race_notes_todos` | `Todo[]` array |
+| `race_notes_tires` | `TireInventoryItem[]` array |
+| `race_notes_shock_graphs` | `ShockSession[]` array |
+| `race_notes_cars` | `Car[]` array |
+| `race_notes_active_car` | active car ID string — **device-local, never synced to Supabase** |
+| `race_notes_accounting` | `AccountingEntry[]` array |
+| `race_notes_shopping` | `ShoppingItem[]` array |
+| `race_notes_theme` | `AppTheme` object (`fontSize: 'standard' \| 'large' \| 'xlarge'`, drives CSS `--ui-zoom`) |
+| `race_notes_registered_user` | durable "device has logged in before" flag powering offline-resilient auth gate (see Architecture above) |
 
 ---
 
@@ -98,6 +110,9 @@ App runs fully offline without these — Supabase calls are wrapped in try/catch
 ## Android / Capacitor
 
 - Capacitor 8 wraps the PWA as a native Android app. After any web change: `npm run android:sync` to push to native.
-- Android source is in `android/` — avoid editing native files unless changing permissions or splash screens.
-- The built APK artifact is `race_notes.apk` at project root.
+- Android source is in `android/` — avoid editing native files unless changing permissions or splash screens. Exception: `MainActivity`'s deep-link intent-filter (`com.racenotes.app://auth-callback`) is required for native Google OAuth — don't remove it.
+- Target API 36 (Android 16), AGP 8.9.1, Gradle 8.11.1 — bumped ahead of Google Play's Aug 31, 2026 API-36 requirement.
+- The built APK artifact is `race_notes.apk` at project root (also see `CrewChief.apk` naming used in some build scripts).
+- `android/app/build.gradle` (versionCode/versionName, keystore password) is **gitignored** — changes there never show up in git history. **This value has been observed reverting unexpectedly outside of any known process** — always re-check the live file before assuming its versionCode.
+- Real builds/git pushes for this repo should go through **Windows-MCP PowerShell** (real Windows Git Credential Manager), not a Linux sandbox — sandboxes typically lack git push credentials and can produce spurious `tsc`/build artifacts on cross-platform mounts.
 

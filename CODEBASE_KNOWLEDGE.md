@@ -1,8 +1,23 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-06-30 (session 7 — bug fixes & sessions accordion)
-> Branch at time of writing: `master` (all features merged — car-profiles, session-v2, weekend-v2)
+> Last updated: 2026-07-01 (session 8 — Google OAuth, mandatory auth gate, tire usage history, shock-compare, 3-tier zoom sizing, Android API 36)
+> Branch at time of writing: `master` (all features merged — car-profiles, session-v2, weekend-v2, session-8 features below)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
+
+## 0. Session 8 Summary (read this first)
+
+Everything below this point that isn't already reflected elsewhere in this doc was added/changed in session 8:
+
+1. **Google OAuth** (web + native Android) — sign in/register with Google, in addition to email/password. See §7a.
+2. **Mandatory auth gate** — the app now requires a login before any tab is usable, but stays usable **offline** on a device that has logged in at least once. See §7b.
+3. **Tire usage history** — derived (no new DB table) tracking of which session/track/corner/session-type each tire was used in, with lap estimates, CSV export, and a printable report. See §20.
+4. **Shock load compare/overlay** — compare multiple `ShockSession` graphs on one chart plus an interpolated table, with CSV export. See §21.
+5. **3-tier zoom-based UI sizing** (Standard / Large / X-Large) replacing the old 2-tier font-size system, for parity between the installed PWA and the APK. See §22.
+6. **Android API 36 / AGP 8.9.1 / Gradle 8.11.1** readiness bump for the Aug 31, 2026 Google Play requirement. See §13.
+7. **Bug fix:** "Clear All Data" now actually clears todos/accounting/shopping (previously left them stale). See §15.
+8. **Build/deploy tooling note:** real builds, git pushes, and Netlify/Android deploys for this repo should be done via **Windows-MCP PowerShell** (acts on the real Windows machine) — the Cowork Linux sandbox (`mcp__workspace__bash`) cannot push to git (no credential helper) and has had spurious EPERM/tsc artifacts on this repo's cross-platform mount. Use the sandbox for read-only inspection only.
+9. **Unresolved anomaly:** across this session, `android/app/build.gradle`'s `versionCode`/`versionName` was found reverted to old values twice, and once a just-created source file (`src/lib/tireHistory.ts`) was found staged for deletion in git, with no corresponding action taken by the assistant. Root cause unknown — suspected a concurrent process/another AI session touching the same working copy. If you're a fresh agent picking this up: **verify `android/app/build.gradle`'s current `versionCode` against git/user before trusting any value written here**, and be alert for unexplained working-tree changes.
+10. **Orphaned components:** `src/components/TeamView.tsx` and `src/components/ToDoView.tsx` exist in the repo but are **not imported/rendered anywhere in `App.tsx`** as of session 8 (team management and standalone todos were apparently folded into `TrackersView.tsx`, which now has a Todos sub-tab alongside Accounting/Shopping — see §4 and §9 `TrackersView.tsx`). Don't assume these files are live UI without checking `App.tsx` imports first.
 
 ---
 
@@ -26,17 +41,26 @@
 | Build tool | Vite 6 |
 | Styling | TailwindCSS v4 (`@theme` block in CSS — **no `tailwind.config.js`**) |
 | Animations | Framer Motion (`motion` package) |
-| Mobile | Capacitor 6 (Android only) |
-| Backend / Auth | Supabase (auth + Postgres + Storage) |
+| Mobile | Capacitor 8 (Android only) |
+| Backend / Auth | Supabase (auth + Postgres + Storage), Google OAuth via Supabase provider (session 8) |
 | PWA | `vite-plugin-pwa` + Workbox |
-| Deployment | Netlify CLI (`netlify deploy --prod --dir=dist`) |
+| Deployment | Netlify CLI — `netlify deploy --prod --dir=dist` (production) or `netlify deploy --dir=dist` (preview/draft, prints a `Draft URL`) |
 
-### Font scaling
-Font base size is controlled at runtime via:
+### UI scaling — 3-tier `zoom` system (session 8, replaces old font-size approach)
+The old approach (`document.documentElement.style.fontSize = theme.fontSize === 'large' ? '19px' : '16px'`) is **gone**. Root font size is now a constant `16px`. Scaling is done with the CSS `zoom` property instead, applied to the app shell:
+
 ```ts
-document.documentElement.style.fontSize = theme.fontSize === 'large' ? '19px' : '16px';
+// App.tsx theme effect
+root.style.fontSize = '16px'; // constant now
+const ZOOM: Record<AppTheme['fontSize'], number> = { standard: 1, large: 1.15, xlarge: 1.32 };
+root.style.setProperty('--ui-zoom', String(ZOOM[theme.fontSize] ?? 1));
 ```
-All Tailwind `rem` sizes scale automatically with this.
+```css
+/* src/index.css */
+#applet-main-body, #applet-auth-gate { zoom: var(--ui-zoom, 1); }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+```
+`AppTheme.fontSize` is now `'standard' | 'large' | 'xlarge'` (3 options, was 2). `zoom` was chosen over scaling root `font-size` because: (1) it scales fixed-`px` Tailwind classes too, not just `rem`-based ones, and (2) it's Chromium-specific but supported identically by Android WebView and mobile Chrome, which is what fixed the "installed PWA looks smaller than the APK" bug — both render through Chromium's `zoom` implementation the same way. `text-size-adjust: 100%` prevents Chrome's automatic text-inflation from double-scaling things on top of `zoom`. See `SettingsView.tsx` Style tab for the 3-option picker (`grid-cols-3`: Standard 1x / Large 1.15x / X-Large 1.32x).
 
 ### TailwindCSS custom tokens (defined in `src/index.css` `@theme` block)
 Key custom color tokens (set dynamically by theme system in `App.tsx`):
@@ -71,9 +95,11 @@ Race-Notes/
 │   │   ├── ToDoView.tsx           # Shared to-do lists (multi-list)
 │   │   └── TrackersView.tsx       # Accounting + Shopping sub-tabs
 │   └── lib/
-│       ├── supabase.ts            # Supabase client + AppUser type
+│       ├── supabase.ts            # Supabase client + AppUser type + auth helpers (incl. Google OAuth, session 8)
 │       ├── sync.ts                # Push/pull helpers for cloud sync
-│       └── scope.ts               # byActiveCar filter helper (car-profiles feature)
+│       ├── scope.ts               # byActiveCar filter helper (car-profiles feature)
+│       ├── tireHistory.ts         # Tire usage history derivation + CSV/report export (session 8, new)
+│       └── shockCompare.ts        # Shock-graph interpolation + comparison table + CSV export (session 8, new)
 ├── capacitor.config.ts
 ├── vite.config.ts
 ├── package.json
@@ -84,21 +110,24 @@ Race-Notes/
 
 ## 4. App Navigation (tabs)
 
-Tab IDs are string literals stored in `activeTab` state in `App.tsx`.
+Tab IDs are string literals stored in `activeTab` state in `App.tsx`. **Current type** (verified session 8):
+```ts
+useState<'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'trackers'>('dashboard')
+```
+**There is no `'todos'` tab and no `'team'` tab** — do not add navigation code that references either.
 
 | Tab ID | Component | Description |
 |--------|-----------|-------------|
 | `dashboard` | `DashboardView` | Home screen — recent weekends, quick-start |
 | `raceweekend` | `RaceWeekendView` | Active session log + all sessions for current weekend |
-| `setups` | `SetupView` | Car setup sheet, tire inventory, smasher load graphs |
-| `trackers` | `TrackersView` | Accounting ledger + shopping list |
-| `todos` | `ToDoView` | To-do lists with team assignment |
+| `setups` | `SetupView` | Car setup sheet, tire inventory (incl. usage history), smasher load graphs |
+| `trackers` | `TrackersView` | Sub-tabs: **Accounting · Shopping · Todos** (todos live here, not a separate top-level tab) |
 | `quickref` | `QuickReferenceView` | Tuning reference guide / adjustment finder |
-| `team` | `TeamView` | Team invite + member list |
-| `settings` | `SettingsView` | Account, theme, export |
+| `settings` | `SettingsView` | Account, theme, export, garage |
 
-**Bottom nav bar order (left → right):** Dashboard · Setups · Sessions · Trackers · Reference · Settings
-(Trackers was swapped to appear before Reference in session 4.)
+**Bottom nav bar order (left → right):** Dashboard · Setups · Sessions · Trackers · Reference · Settings.
+
+**Note:** `src/components/TeamView.tsx` and `src/components/ToDoView.tsx` still exist as files but are **not imported by `App.tsx`** (confirmed via grep, session 8) — they're orphaned/unwired. Todo list functionality is provided through `TrackersView.tsx`'s Todos sub-tab instead.
 
 ---
 
@@ -257,9 +286,19 @@ interface ShoppingItem {
 interface AppTheme {
   mode: 'dark' | 'light';
   accent: string;           // hex e.g. "#ffb3ac"
-  fontSize: 'standard' | 'large'; // 16px or 19px base
+  fontSize: 'standard' | 'large' | 'xlarge'; // session 8: 3 tiers, drives --ui-zoom (1 / 1.15 / 1.32), see §2
 }
 ```
+
+### Session types / lap estimates (session 8, `types.ts`)
+```ts
+export const SESSION_TYPES = ['Test', 'Hot Laps', 'Qualifying', 'Heat Race', 'Feature'] as const;
+export type SessionType = typeof SESSION_TYPES[number];
+export const SESSION_TYPE_LAPS: Record<SessionType, number> = {
+  Test: 5, 'Hot Laps': 5, Qualifying: 3, 'Heat Race': 10, Feature: 30,
+};
+```
+`SessionRecord` and `ActiveSession` both gained an optional `sessionType?: SessionType` field. Used by `src/lib/tireHistory.ts` to compute estimated laps per tire usage. For sessions saved before this field existed, `inferSessionType()` in `tireHistory.ts` falls back to a regex match on the legacy `name`/`type` string (e.g. "Heat", "A-MAIN", "Qual", "HL", "Test") and flags the result with a `*` in the UI to indicate it's inferred, not stored.
 
 ---
 
@@ -279,6 +318,7 @@ interface AppTheme {
 | `race_notes_accounting` | `AccountingEntry[]` | Accounting ledger entries |
 | `race_notes_shopping` | `ShoppingItem[]` | Shopping list items |
 | `race_notes_theme` | `AppTheme` | User theme preferences |
+| `race_notes_registered_user` | serialized minimal user record | **Session 8, new.** Durable "this device has logged in before" flag, independent of live Supabase session validity/expiry. Set by `rememberLocalAccount(user)` on any successful login/session-restore; only cleared by explicit `signOut()`. Powers the offline-resilient auth gate — see §7b. |
 
 All keys are read on mount via `useEffect` in `App.tsx`. Cloud data (when logged in) is merged on top of local data.
 
@@ -313,6 +353,46 @@ Cloud items always overwrite local items of the same `id`. Local-only items are 
 
 ### CRITICAL GOTCHA — deletion sync
 `pushWeekends` only upserts remaining records; it does **not** delete the removed row from Supabase. When deleting a weekend you **must** also call `deleteWeekendFromCloud(weekendId)` — otherwise the deleted weekend comes back on the next page refresh (pullAllData re-adds it). **This bug was fixed in `feature/session-v2`.**
+
+---
+
+## 7a. Google OAuth (session 8, new)
+
+**`src/lib/supabase.ts`:**
+- Client config now sets `flowType: 'pkce'`, `detectSessionInUrl: true` (was `false`).
+- `NATIVE_AUTH_CALLBACK_URL = 'com.racenotes.app://auth-callback'` — custom URL scheme for native OAuth return.
+- `signInWithGoogle()` — on web, does a normal `supabase.auth.signInWithOAuth` redirect. On native (Capacitor), opens the OAuth URL in the system browser via `@capacitor/browser`'s `Browser.open` with `skipBrowserRedirect: true`, so the app itself doesn't navigate away.
+- `handleNativeAuthCallback(url)` — called when the OS hands the app back the `com.racenotes.app://auth-callback` deep link; extracts the auth code and calls `supabase.auth.exchangeCodeForSession`.
+
+**`src/App.tsx`:** a `useEffect` (native-only) registers `CapacitorApp.addListener('appUrlOpen', ...)` (from `@capacitor/app`) which pipes the returned URL into `handleNativeAuthCallback`.
+
+**`android/app/src/main/AndroidManifest.xml`:** `MainActivity` has a second `<intent-filter>` for `VIEW` + `BROWSABLE`/`DEFAULT` with `<data android:scheme="com.racenotes.app" android:host="auth-callback" />` so Android routes that deep link back into the app.
+
+**`src/components/AuthView.tsx`:** "Continue with Google" button (inline Google "G" SVG) below a divider under the email/password form, calling `handleGoogleSignIn` → `signInWithGoogle()`.
+
+**Supabase side:** Google provider configured directly in the Supabase dashboard (project `swblfeayxoprodhwxqak`) with a Client ID/Secret from Google Auth Platform (formerly "OAuth consent screen"). Migration `supabase/migrations/002_oauth_profile_metadata.sql` updates the `public.handle_new_user()` trigger to populate `display_name`/`avatar_url` from OAuth metadata (`full_name`/`name`/`avatar_url`/`picture`), `ON CONFLICT (id) DO NOTHING`.
+
+**Dependencies added:** `@capacitor/app@^8.1.0`, `@capacitor/browser@^8.0.3` (`package.json`).
+
+**Confirmed working** end-to-end on both Netlify (web redirect flow) and Android (native browser + deep-link flow).
+
+---
+
+## 7b. Mandatory Auth Gate + Offline Resilience (session 8, new)
+
+The app used to be usable without logging in. As of session 8, **login is required to use any tab**, but the app must still work **offline** once a device has logged in at least once (racing pits often have no signal).
+
+**Mechanism (`src/lib/supabase.ts` + `src/App.tsx`):**
+- `REGISTERED_USER_KEY = 'race_notes_registered_user'` — a localStorage flag completely independent of Supabase's live session/token state.
+- `rememberLocalAccount(user)` — writes the flag; called from `initAuth()` and the `onAuthChange` listener whenever a session is successfully restored or a sign-in succeeds. **Never cleared on a null/expired session** — only `signOut()` clears it (via `rememberLocalAccount(null)`), so a Supabase token expiring while offline does not lock the user out.
+- `hasLocalAccount()` — reads the flag.
+- In `App.tsx`: `const isUnlocked = !!user || hasLocalAcct;`
+  - If `!authReady` → minimal splash screen.
+  - If `!isUnlocked` → full-screen `id="applet-auth-gate"` shell (header + centered `<AuthView />`) — no tabs render, no data is shown.
+  - Otherwise the normal app renders (`id="applet-main-body"`).
+- Explicit "Sign Out" in Settings calls `signOut()`, which clears both the live Supabase session **and** the local `hasLocalAccount` flag, re-locking the device.
+
+**Why not just check `user`:** relying solely on live Supabase session state would lock a legitimate, previously-logged-in user out the moment their token needs to refresh while offline in the pits. The local flag decouples "has this device ever authenticated" from "is the cloud session currently valid," which is what makes true offline use possible after first login.
 
 ---
 
@@ -462,6 +542,10 @@ Full car setup form (4 corners, pull bar, stagger, gear, notes, screenshots). Co
 
 **Tire inventory list** — same single-line format as Dashboard: `#ID Size | BS | Compound | Duro`. Size field auto-appends `"` on blur if missing.
 
+**Tire usage history (session 8, new):** tire rows are now expandable (click to toggle `expandedTireId` state). Expanding a tire shows total estimated laps plus a per-usage list (date, track, session name, corner badge, session type with a `*` suffix if the type was inferred rather than stored — see §5 Session types). Header of the Tires tab gains CSV/Report export buttons (`downloadTireUsageCsv`, `printTireUsageReport` from `src/lib/tireHistory.ts`), shown whenever the active car has at least one tire. `weekends?: RaceWeekend[]` is a new prop on `SetupView` (default `[]`) so it can derive usage from session data without a new DB table. See §20 for the full feature writeup.
+
+**Fixed bug (session 8):** `byActiveCar<Setup>(setups, activeCarId)` and `byActiveCar<TireInventoryItem>(tires, activeCarId)` now pass explicit type arguments. The bare (un-parameterized) calls were silently collapsing TypeScript's inferred `T` down to the bare constraint `{carId?: string}`, which caused a large cascade of `tsc` errors throughout this file (Vite/esbuild doesn't type-check, so the app worked fine at runtime regardless — but `npm run lint` was broken). If you see similar `tsc` errors after touching `byActiveCar` call sites elsewhere, apply the same fix: pass the item type explicitly, e.g. `byActiveCar<ShockSession>(sessions, activeCarId)`.
+
 ---
 
 ### `QuickReferenceView.tsx`
@@ -475,7 +559,9 @@ Shock load graph data entry. Each `ShockSession` (now a global type in `types.ts
 - Data points: height/load pairs — **text inputs with `inputMode="decimal"`**, no stepper buttons
 - Dyno graph photos: base64 JPEG (compressed via canvas). Photos live here, NOT in RaceWeekendView.
 
-**feature/car-profiles changes:** State lifted to App.tsx. Props: `activeCarId?`, `sessions?` (full array from App), `onSave?`. When props are provided the component uses them; falls back to localStorage for backward compatibility. New sessions are stamped with `carId`. `byActiveCar` filter applied at display time. "New Session" button disabled with tooltip when no car is active.
+**feature/car-profiles changes:** State lifted to App.tsx. Props: `activeCarId?`, `sessions?` (full array from App), `onSave?`. When props are provided the component uses them; falls back to localStorage for backward compatibility. New sessions are stamped with `carId`. `byActiveCar` filter applied at display time (also fixed to `byActiveCar<ShockSession>(...)` explicit-generic, session 8 — see the same gotcha noted under `SetupView.tsx` above). "New Session" button disabled with tooltip when no car is active.
+
+**Compare/overlay mode (session 8, new):** header gains a "Compare" toggle button, shown once there are 2+ sessions for the active car. Compare panel: a checkbox session picker (color dot + corner badge per session, colors from a fixed 8-color `COMPARE_PALETTE`, exported as `sessionCompareColor(index)`), a multi-series overlay chart (`ShockCompareChart` component — reuses the single-session `ShockLineChart`'s axis/grid styling but with a combined min/max domain across all selected sessions), and an interpolated comparison table below it. The original single-session view is gated behind `!compareMode &&`. See §21 for the interpolation logic.
 
 ---
 
@@ -487,10 +573,10 @@ Sub-tabs: Accounting | Shopping. Entries can be linked to a race weekend via `we
 ### `SettingsView.tsx`
 Sub-tabs: **Garage | Account | Style | Export**. "Appearance" was renamed to "Style"; "Garage" is a new first tab (feature/car-profiles). Passes `weekends`, `todos`, `accounting`, `shopping` down to `ExportView`. Accepts `initialSubTab?` prop so App.tsx can deep-link directly to Garage (e.g. from the header car chip).
 
-**Clear All Data** (session 7): Account tab now has a "Danger Zone" section at the bottom. Two-step confirm ("Clear All Data" → "Are you sure?"). Calls `onClearAllData?: () => Promise<void>` prop, implemented in App.tsx as `handleClearAllData`:
-- Removes all 11 `race_notes_*` localStorage keys
-- Deletes all user rows from Supabase: `weekends`, `setups`, `tire_inventory`, `cars`, `shock_sessions`
-- Resets all relevant React state to empty arrays / null
+**Clear All Data** (session 7, fixed session 8): Account tab has a "Danger Zone" section at the bottom. Two-step confirm ("Clear All Data" → "Are you sure?"). Calls `onClearAllData?: () => Promise<void>` prop, implemented in App.tsx as `handleClearAllData`:
+- Removes all `race_notes_*` localStorage keys
+- Deletes all user rows from Supabase: `weekends`, `setups`, `tire_inventory`, `cars`, `shock_sessions`, and (**session 8 fix**) `todos`
+- Resets all relevant React state to empty arrays / null, including (**session 8 fix**) `todos`, `accounting`, `shopping` — previously these three were never reset in-memory, so old items stayed visible on screen after a "clear" even though other data cleared correctly
 - Auto-cancels confirm if user doesn't confirm within 5 seconds
 
 ### `GarageView.tsx` *(feature/car-profiles)*
@@ -578,22 +664,30 @@ npm run dev
 # Vite dev server at localhost:3000
 ```
 
+**Session 8 note — where to run these:** the Cowork Linux sandbox (`mcp__workspace__bash`) cannot push to git (no credential helper available there) and has produced spurious build/type-check artifacts on this repo's cross-platform mount. Use **Windows-MCP PowerShell** (operates on the real Windows machine, real Git Credential Manager) for any command below that pushes, builds, or deploys for real. The sandbox is fine for read-only inspection (`grep`, `cat`, `wc -l`, etc.).
+
 ### Web + Netlify
 ```bash
 npm run build        # outputs to dist/
 npm run lint         # tsc --noEmit (type check only — build does NOT type-check)
 
-# Deploy (use cmd /c to bypass PowerShell execution policy):
-cmd /c "netlify deploy --prod --dir=dist"
+# Production deploy:
+netlify deploy --prod --dir=dist
+# Preview/draft deploy (does not touch production, prints a "Draft URL"):
+netlify deploy --dir=dist
 ```
+Netlify MCP tools are also available in this environment (`mcp__<netlify-connector-id>__netlify-*`) but the CLI via PowerShell has been the more predictable path used so far. When sharing a preview deploy with the user, always restate the actual Draft URL directly in the chat message — don't just say "see the build output above."
 
 ### Android APK
 ```bash
 npm run build
 npx cap sync android
 
-# Run Gradle via .bat file to avoid PowerShell timeout:
-# build_apk.bat contents: cd android && gradlew assembleDebug
+# Gradle regularly exceeds a single PowerShell tool call's response window (~20-45s).
+# Launch it detached and poll the log instead of waiting synchronously:
+#   [System.Diagnostics.Process]::Start(...) redirecting to build_log.txt
+#   then poll with `Get-Content -Tail` after `Start-Sleep`
+# cd android && gradlew clean assembleDebug   (use `clean` for extra safety against stale artifacts)
 # Output: android/app/build/outputs/apk/debug/app-debug.apk
 
 copy android\app\build\outputs\apk\debug\app-debug.apk CrewChief.apk
@@ -607,7 +701,14 @@ $env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-21.0.11.10-hotspot"
 $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 ```
 
-**versionCode:** `3`, versionName `"3.0"` (as of session 7 — bump with every APK that needs to install over a previous version)
+**versionCode / versionName:** last verified `6` / `"3.3"` (checked directly in `android/app/build.gradle` on 2026-07-01). **Re-verify this before trusting it** — see the unresolved anomaly note in §0: this value has been found silently reverted to old values (e.g. back to `3`/`"3.0"`) more than once during session 8, by a process other than the assistant. Bump both values with every APK build meant to install over a previous version.
+
+**`android/app/build.gradle` is gitignored** (`.gitignore` has a `build.gradle` entry that matches this path specifically) and contains the release keystore password in plaintext (`CrewChief2024!`). This means: (1) version bumps here are **local-only and never appear in git history/commits**, and (2) don't assume `git log`/`git diff` will show version history for this file — check the live file directly.
+
+**Android API 36 readiness (session 8):** bumped ahead of Google Play's Aug 31, 2026 Android 16 (API 36) requirement deadline.
+- `android/variables.gradle`: `compileSdkVersion` / `targetSdkVersion` 35 → 36
+- `android/build.gradle` (and a duplicate, seemingly-unused copy at repo root `build.gradle` — kept in sync anyway): AGP classpath `8.3.2` → `8.9.1`
+- `android/gradle/wrapper/gradle-wrapper.properties`: Gradle `8.7` → `8.11.1`
 
 **Android permissions required** (`android/app/src/main/AndroidManifest.xml`):
 ```xml
@@ -615,6 +716,7 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 ```
+Plus (session 8, for native Google OAuth deep-link return) a second `<intent-filter>` on `MainActivity` — see §7a.
 
 ---
 
@@ -657,6 +759,11 @@ git push
 | TailwindCSS v4 — no config file | All customization is in `src/index.css` `@theme {}` block | Remember this when adding new tokens |
 | Cloud-wins merge on login | `mergeIntoLocalStorage` always lets cloud overwrite local on login. Offline edits made before login may be overwritten | By design — acceptable tradeoff for multi-device sync |
 | Session `type` vs `name` fields | Both set to the same display string. Legacy type union `'H1' | 'Q1' | ...` preserved for backward compat | Don't rely on the `type` field for new logic |
+| "Clear All Data" left todos/accounting/shopping visible | `handleClearAllData` never reset those three React state arrays, and never deleted cloud `todos` rows | **Fixed session 8** — see §9 SettingsView |
+| `byActiveCar<T>()` generic collapses to `{carId?: string}` on bare calls | TypeScript infers the constraint type instead of the array's element type when no explicit type argument is given | **Fixed session 8** at all known call sites — always pass the type explicitly, e.g. `byActiveCar<Setup>(...)` |
+| PWA (Add to Home Screen) rendered noticeably smaller than the APK | No cross-platform UI-scale normalization; root font-size approach didn't fully account for Chrome's own text-inflation behavior | **Fixed session 8** — `zoom`-based 3-tier sizing, see §2 and §22 |
+| `android/app/build.gradle` versionCode/versionName reverting unexpectedly; once a new source file was found staged for deletion | **Unresolved** — suspected concurrent process/other AI session touching the same working copy; not caused by this assistant | **Open** — re-verify current values before trusting them; watch for unexplained working-tree changes (see §0) |
+| Sandbox (`mcp__workspace__bash`) can't push to git; occasional spurious `tsc`/build errors there | No git credential helper in the Linux sandbox; cross-platform mount quirks | **Known limitation** — use Windows-MCP PowerShell for real builds/pushes on this repo |
 
 ---
 
@@ -802,3 +909,81 @@ Runs once after the first post-login `doPull` completes, guarded by a `didBackfi
 
 ### Empty-state guards
 When `activeCarId` is null: "New Setup" form is replaced with a prompt, "Add Tire" and "New Session" buttons are disabled — all say "Add a car in Settings → Garage to start." App.tsx also auto-selects `cars[0]` if `activeCarId` is missing but cars exist.
+
+---
+
+## 20. Tire Usage History (session 8)
+
+**Goal:** for each tire in inventory, show which sessions it was used in, at which track, on which corner, in which session type, and an estimated lap count — without adding a new Supabase table (derived entirely from existing `RaceWeekend`/`SessionRecord` data).
+
+**`src/lib/tireHistory.ts` (new file):**
+```ts
+inferSessionType(session: SessionRecord): SessionType | null
+// Falls back to regex matching on the legacy name/type string when sessionType wasn't stored
+// (e.g. "Heat" → Heat Race, "A-MAIN" → Feature, "Qual" → Qualifying, "HL" → Hot Laps, "Test" → Test).
+
+estimatedLapsFor(session: SessionRecord): number
+// SESSION_TYPE_LAPS[inferSessionType(session)] ?? 0
+
+interface TireUsageRecord {
+  weekendId, weekendName, track, date,
+  sessionId, sessionName,
+  corner: ShockCorner,          // which corner the tire was mounted on for that session
+  sessionType: SessionType | null,
+  inferred: boolean,            // true if sessionType came from inferSessionType() rather than a stored field
+  laps: number,
+}
+
+getTireUsageHistory(tireId: string, weekends: RaceWeekend[]): TireUsageRecord[]
+getTireTotalLaps(tireId: string, weekends: RaceWeekend[]): number
+getAllTireUsage(weekends: RaceWeekend[]): Record<string, TireUsageRecord[]>   // keyed by tireId, for bulk export
+
+buildTireUsageCsv(tires: TireInventoryItem[], weekends: RaceWeekend[]): string
+downloadTireUsageCsv(tires, weekends): void   // Blob + object URL download
+
+buildTireUsageReportHtml(tires, weekends): string  // styled printable HTML, window.onload = () => window.print()
+printTireUsageReport(tires, weekends): void         // window.open + write + trigger print
+```
+
+**How a tire's corner/session is determined:** it walks each `SessionRecord.tires` (per-corner `TireDetails`, each carrying a `tireId`) across every `RaceWeekend.sessions[]`, and for every corner where `tireDetails.tireId === targetTireId`, emits one `TireUsageRecord`.
+
+**UI:** in `SetupView.tsx`'s Tires tab — see §9 `SetupView.tsx` for the expandable-row and export-button details.
+
+---
+
+## 21. Shock Load Compare/Overlay (session 8)
+
+**Goal:** compare/overlay multiple `ShockSession` "smasher load" graphs (e.g. before/after a spring change) as both a chart and a table, interpolating between each session's own real datapoints so the table isn't limited to whatever heights happen to coincide across sessions.
+
+**`src/lib/shockCompare.ts` (new file):**
+```ts
+interpolateLoadAtHeight(session: ShockSession, height: number): number | null
+// Sorts session.points by height, does linear interpolation between the two nearest
+// real points. Returns null if the session has no data or `height` falls outside
+// that session's own measured range — deliberately does NOT extrapolate.
+
+interface ComparisonRow { height: number; values: (number | null)[]; }
+
+buildComparisonRows(sessions: ShockSession[]): ComparisonRow[]
+// Rows = the UNION of every distinct height value across all selected sessions
+// (rounded to 2 decimals), sorted ascending — not an arbitrary fixed grid.
+// Each row's `values` array has one interpolated (or null) load per session,
+// in the same order as the `sessions` array passed in.
+
+buildComparisonCsv(sessions: ShockSession[]): string
+downloadComparisonCsv(sessions: ShockSession[]): void
+```
+
+**UI:** `src/components/SmasherLoadsView.tsx` — see §9 `SmasherLoadsView.tsx` for the Compare toggle, `ShockCompareChart`, `COMPARE_PALETTE`/`sessionCompareColor(index)`, and the comparison table + CSV export button.
+
+---
+
+## 22. 3-Tier Zoom-Based UI Sizing (session 8)
+
+See §2 "UI scaling — 3-tier `zoom` system" for the full mechanism (constant `16px` root font-size + CSS `zoom` on the app shell driven by `--ui-zoom`).
+
+**Why this was needed:** the user reported the PWA (installed via Chrome "Add to Home Screen") rendered noticeably smaller than the same app packaged as an APK, and that even the APK could stand to be a bit larger for pit-side use on small phones in bright sunlight. Root `font-size` scaling alone didn't fully solve either problem — some UI used fixed-`px` Tailwind classes that don't scale with `rem`, and Chrome's own text-inflation behavior interacted unpredictably with a root font-size change.
+
+**Fix:** switch to CSS `zoom` on the two possible app-shell roots (`#applet-main-body` for the normal app, `#applet-auth-gate` for the pre-login screen — see §7b), add a 3rd sizing tier (Standard 1x / Large 1.15x / X-Large 1.32x, X-Large being new), and normalize Chrome's text-inflation with `text-size-adjust: 100%`. Because `zoom` is a Chromium-specific property implemented identically by both Android WebView (APK) and mobile Chrome (PWA), this also fixed the cross-platform inconsistency — both now scale through the exact same rendering path.
+
+**`SettingsView.tsx` Style tab:** the font-size picker grid changed from `grid-cols-2` to `grid-cols-3` to fit the new third option.
