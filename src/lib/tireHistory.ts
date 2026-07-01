@@ -85,6 +85,20 @@ export function getTireTotalLaps(usage: TireUsageRecord[]): number {
   return usage.reduce((sum, r) => sum + r.estimatedLaps, 0);
 }
 
+/** Derive and stamp lifecycle fields onto tire inventory from weekend/session data.
+ *  Call this after any session is saved or updated so heatCycles/usageDates stay in sync. */
+export function syncTireLifecycle(tires: TireInventoryItem[], weekends: RaceWeekend[]): TireInventoryItem[] {
+  return tires.map(tire => {
+    const usage = getTireUsageHistory(tire.id, weekends);
+    const usageDates = [...new Set(usage.map(u => u.date))].sort();
+    return {
+      ...tire,
+      usageDates,
+      heatCycles: usageDates.length,
+    };
+  });
+}
+
 /** All usage rows for every tire, keyed by tireId — one pass over weekends. */
 export function getAllTireUsage(tires: TireInventoryItem[], weekends: RaceWeekend[]): Map<string, TireUsageRecord[]> {
   const map = new Map<string, TireUsageRecord[]>();

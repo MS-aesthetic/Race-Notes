@@ -355,6 +355,10 @@ export default function SetupView({
       airPressure: newTire.airPressure || '',
       createdAt: now,
       carId: activeCarId ?? undefined,
+      dateAdded: now,
+      initialAgeDays: Number(newTire.initialAgeDays) || 0,
+      usageDates: [],
+      heatCycles: 0,
     };
     saveTires([tire, ...tires]);
     setNewTire({ wheelBackspacing: '2' });
@@ -809,6 +813,11 @@ export default function SetupView({
                     const isTireExpanded = expandedTireId === tire.id;
                     const usage = isTireExpanded ? getTireUsageHistory(tire.id, weekends) : [];
                     const totalLaps = isTireExpanded ? getTireTotalLaps(usage) : 0;
+                    // Lifecycle data for collapsed row
+                    const tireAgeDays = tire.dateAdded
+                      ? Math.floor((Date.now() - new Date(tire.dateAdded).getTime()) / 86400000) + (tire.initialAgeDays ?? 0)
+                      : (tire.initialAgeDays ?? 0);
+                    const isAging = (tire.heatCycles ?? 0) >= 8 || tireAgeDays >= 90;
                     return (
                       <div key={tire.id} className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
                         <div
@@ -821,6 +830,17 @@ export default function SetupView({
                               <span className="font-mono text-[11px] text-on-surface">
                                 {tire.size}{tire.size && !tire.size.includes('"') ? '"' : ''} <span className="text-outline-variant mx-1">|</span> BS {tire.wheelBackspacing}" <span className="text-outline-variant mx-1">|</span> {tire.compound} <span className="text-outline-variant mx-1">|</span> Duro {tire.durometer || '—'}{tire.airPressure ? <><span className="text-outline-variant mx-1">|</span> {tire.airPressure} psi</> : null}
                               </span>
+                            </div>
+                            {/* Lifecycle data compact row */}
+                            <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-on-surface-variant/60">
+                              <span>🔥 {tire.heatCycles ?? 0} cycles</span>
+                              <span className="text-outline-variant/40">|</span>
+                              <span>🏁 {getTireTotalLaps(getTireUsageHistory(tire.id, weekends))} laps</span>
+                              <span className="text-outline-variant/40">|</span>
+                              <span>📅 {tireAgeDays}d</span>
+                              {isAging && (
+                                <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-bold uppercase bg-yellow-900/40 text-yellow-400">Aging</span>
+                              )}
                             </div>
                           </div>
                           <span className="material-symbols-outlined text-on-surface-variant/50 text-[18px] flex-shrink-0">
@@ -886,7 +906,7 @@ export default function SetupView({
                       <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Tire #</label>
                       <input type="text" placeholder="e.g. 42" required value={newTire.tireNumber || ''}
                         onChange={e => setNewTire(p => ({ ...p, tireNumber: e.target.value }))}
-                        className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
+                        className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
                     </div>
                     <div>
                       <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Size</label>
@@ -896,7 +916,7 @@ export default function SetupView({
                           const v = e.target.value.trim();
                           if (v && !v.endsWith('"')) setNewTire(p => ({ ...p, size: v + '"' }));
                         }}
-                        className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
+                        className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
                     </div>
                   </div>
                   <div>
@@ -931,14 +951,14 @@ export default function SetupView({
                     })()}
                     <input type="text" placeholder="Tap above or type a new compound" required value={newTire.compound || ''}
                       onChange={e => setNewTire(p => ({ ...p, compound: e.target.value }))}
-                      className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded" />
+                      className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Wheel Backspacing</label>
                       <select value={newTire.wheelBackspacing || '2'}
                         onChange={e => setNewTire(p => ({ ...p, wheelBackspacing: e.target.value as '2' | '3' | '4' }))}
-                        className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono">
+                        className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono">
                         <option value="2">2"</option>
                         <option value="3">3"</option>
                         <option value="4">4"</option>
@@ -948,14 +968,20 @@ export default function SetupView({
                       <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Durometer</label>
                       <input type="text" placeholder="e.g. 55" value={newTire.durometer || ''}
                         onChange={e => setNewTire(p => ({ ...p, durometer: e.target.value }))}
-                        className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
+                        className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
                     </div>
                   </div>
                   <div>
                     <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Air Pressure (psi)</label>
                     <input type="text" placeholder="e.g. 10" value={newTire.airPressure || ''}
                       onChange={e => setNewTire(p => ({ ...p, airPressure: e.target.value }))}
-                      className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
+                      className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Age (days, for used tires)</label>
+                    <input type="number" min="0" placeholder="0" value={newTire.initialAgeDays ?? ''}
+                      onChange={e => setNewTire(p => ({ ...p, initialAgeDays: Number(e.target.value) || 0 }))}
+                      className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded font-mono" />
                   </div>
                   <div className="flex gap-2 pt-1 justify-end font-mono text-xs">
                     <button type="button" onClick={() => setShowAddTireForm(false)}

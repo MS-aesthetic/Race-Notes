@@ -16,6 +16,7 @@ import {
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, AppUser } from './lib/supabase';
 import AuthView from './components/AuthView';
 import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions } from './lib/sync';
+import { syncTireLifecycle } from './lib/tireHistory';
 
 import DashboardView from './components/DashboardView';
 import SetupView from './components/SetupView';
@@ -871,6 +872,13 @@ export default function App() {
       } : w);
       localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
       if (user) pushWeekends(updated, user.id);
+      
+      // Sync tire lifecycle (heat cycles, usage dates) from updated weekend data
+      const lifecycled = syncTireLifecycle(tireInventory, updated);
+      setTireInventory(lifecycled);
+      localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
+      if (user) pushTires(lifecycled, user.id);
+      
       return updated;
     });
 
@@ -910,6 +918,12 @@ export default function App() {
     if (activeSession.id === sessionId) {
       setActiveSession(prev => ({ ...prev, id: undefined, weekendId: undefined }));
     }
+    
+    // Sync tire lifecycle after session deletion
+    const lifecycled = syncTireLifecycle(tireInventory, updated);
+    setTireInventory(lifecycled);
+    localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
+    if (user) pushTires(lifecycled, user.id);
   };
 
   const handleUpdateWeekend = (updated: RaceWeekend) => {
@@ -917,6 +931,12 @@ export default function App() {
     setWeekends(updatedList);
     localStorage.setItem('race_notes_weekends', JSON.stringify(updatedList));
     if (user) pushWeekends(updatedList, user.id);
+    
+    // Sync tire lifecycle after weekend update (sessions may have changed)
+    const lifecycled = syncTireLifecycle(tireInventory, updatedList);
+    setTireInventory(lifecycled);
+    localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
+    if (user) pushTires(lifecycled, user.id);
   };
 
   const handleSelectRecentSession = (rec: SessionRecord, weekendId: string) => {
