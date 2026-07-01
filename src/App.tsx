@@ -240,6 +240,14 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setup, savedSetups, weekends, activeSession, tireInventory, cars, shockSessions, todos, accounting, shopping]);
 
+  // Auto-dismiss any sync status so a message can never get "stuck" on screen.
+  // 'Syncing...' is left alone (it's replaced by 'Synced' when the pull finishes).
+  useEffect(() => {
+    if (!syncStatus || syncStatus === 'Syncing...') return;
+    const t = setTimeout(() => setSyncStatus(''), 2500);
+    return () => clearTimeout(t);
+  }, [syncStatus]);
+
   // Modal / forms tracking state
   const [showNewWeekendForm, setShowNewWeekendForm] = useState(false);
   const [newWeekendName, setNewWeekendName] = useState('');
@@ -1046,11 +1054,17 @@ export default function App() {
           </div>
         </header>
 
-        {/* Prominent Saved / sync toast — bottom-center, above the nav bar */}
-        {(savedFlash || syncStatus) && (() => {
-          const msg = savedFlash ? 'Saved' : syncStatus;
-          const isSuccess = savedFlash || /synced|saved|pulled|cleared/i.test(syncStatus);
-          const isBusy = !savedFlash && /sync(ing)?\.\.\.|pulling/i.test(syncStatus);
+        {/* Single brief Saved / sync toast — bottom-center, above the nav bar.
+            Only three states surface: local "Saved", initial "Syncing…", and
+            "Synced". The chatty per-entity "X synced to cloud" push messages are
+            intentionally NOT shown (they just quietly clear via the auto-dismiss
+            effect) so users see at most one short confirmation per action. */}
+        {(() => {
+          const isBusy = !savedFlash && syncStatus === 'Syncing...';
+          const isSynced = !savedFlash && syncStatus === 'Synced';
+          if (!savedFlash && !isBusy && !isSynced) return null;
+          const msg = savedFlash ? 'Saved' : isBusy ? 'Syncing…' : 'Synced';
+          const isSuccess = savedFlash || isSynced;
           return (
             <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[60] pointer-events-none px-4 w-full max-w-md flex justify-center">
               <div

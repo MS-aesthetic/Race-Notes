@@ -369,12 +369,12 @@ export default function SetupView({
   const SubTabBtn = ({ tab, label, icon }: { tab: typeof subTab; label: string; icon: string }) => (
     <button
       onClick={() => setSubTab(tab)}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-mono text-[10px] uppercase font-bold border transition-all ${
-        subTab === tab ? 'bg-primary/15 text-primary border-primary/40' : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+      className={`flex-1 flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-lg font-mono text-[11px] uppercase font-bold border-2 transition-all min-h-[60px] ${
+        subTab === tab ? 'bg-primary/15 text-primary border-primary/50' : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
       }`}
     >
-      <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: subTab === tab ? "'FILL' 1" : "'FILL' 0" }}>{icon}</span>
-      {label}
+      <span className="material-symbols-outlined text-[26px] leading-none" style={{ fontVariationSettings: subTab === tab ? "'FILL' 1" : "'FILL' 0" }}>{icon}</span>
+      <span className="leading-none text-center">{label}</span>
     </button>
   );
 
@@ -395,9 +395,9 @@ export default function SetupView({
             Autosaver Active — Changes saved automatically live trackside
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="grid grid-cols-3 gap-2">
           <SubTabBtn tab="setups" label="Setups" icon="settings_input_component" />
-          <SubTabBtn tab="smasherloads" label="Smasher Loads" icon="show_chart" />
+          <SubTabBtn tab="smasherloads" label="Loads" icon="show_chart" />
           <SubTabBtn tab="tires" label="Tires" icon="tire_repair" />
         </div>
       </div>
