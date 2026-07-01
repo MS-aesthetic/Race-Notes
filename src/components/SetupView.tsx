@@ -317,7 +317,23 @@ export default function SetupView({
   const handleCloneSetup = (setupId: string) => {
     const target = setups.find((s) => s.id === setupId);
     if (!target) return;
-    const cloned: Setup = { ...JSON.parse(JSON.stringify(target)), id: `setup-rec-${Date.now()}`, chassis: `${target.chassis} (Copy)`, carId: activeCarId ?? target.carId };
+    const today = new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    const cloned: Setup = {
+      ...JSON.parse(JSON.stringify(target)),
+      id: `setup-rec-${Date.now()}`,
+      chassis: `${target.chassis} (Copy)`,
+      date: today,
+      carId: activeCarId ?? target.carId,
+      screenshots: [], // clear stale photos on clone
+    };
+    // If cloning to a different car, clear tire inventory links (tire IDs are car-scoped)
+    const crossCar = activeCarId && target.carId !== activeCarId;
+    if (crossCar) {
+      cloned.lf = { ...cloned.lf, tireInventoryId: undefined };
+      cloned.rf = { ...cloned.rf, tireInventoryId: undefined };
+      cloned.lr = { ...cloned.lr, tireInventoryId: undefined };
+      cloned.rr = { ...cloned.rr, tireInventoryId: undefined };
+    }
     setExpandedId(cloned.id);
     updateAndSaveSetups([cloned, ...setups], activeId);
   };
