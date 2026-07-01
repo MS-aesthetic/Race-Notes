@@ -125,6 +125,20 @@ export interface TireInventoryItem {
   carId?: string;
 }
 
+// ─── Session type / lap estimates ─────────────────────────────────────────────
+
+export const SESSION_TYPES = ['Test', 'Hot Laps', 'Qualifying', 'Heat Race', 'Feature'] as const;
+export type SessionType = typeof SESSION_TYPES[number];
+
+/** Estimated laps run per session type — used for tire-life / usage reporting. */
+export const SESSION_TYPE_LAPS: Record<SessionType, number> = {
+  'Test': 5,
+  'Hot Laps': 5,
+  'Qualifying': 3,
+  'Heat Race': 10,
+  'Feature': 30,
+};
+
 export interface TireDetails {
   compound: string;
   size: string;
@@ -137,6 +151,10 @@ export interface TireDetails {
 export interface SessionRecord {
   id: string;
   type: 'H1' | 'Q1' | 'P2' | 'A-MAIN' | string;
+  /** Structured session type — used for tire usage / lap estimate reporting.
+   *  Sessions logged before this field existed won't have it set; consumers
+   *  should fall back to inferring from `name`/`type`. */
+  sessionType?: SessionType;
   name: string;
   track: string;
   condition: string;
@@ -215,6 +233,8 @@ export interface SetupAdjustment {
 export interface ActiveSession {
   id?: string;
   weekendId?: string;
+  /** Structured session type — used for tire usage / lap estimate reporting. */
+  sessionType?: SessionType;
   name: string;
   track: string;
   setupUsed: string;

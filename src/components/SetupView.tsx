@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Setup, CornerSetup, TireInventoryItem, Car, ShockSession } from '../types';
+import { Setup, CornerSetup, TireInventoryItem, Car, ShockSession, RaceWeekend } from '../types';
 import { INITIAL_SETUP } from '../data';
 import { User } from '@supabase/supabase-js';
 import { uploadAttachment, deleteAttachment } from '../lib/sync';
 import SmasherLoadsView from './SmasherLoadsView';
 import { byActiveCar } from '../lib/scope';
+import { getTireUsageHistory, getTireTotalLaps, downloadTireUsageCsv, printTireUsageReport } from '../lib/tireHistory';
 
 interface SetupViewProps {
   savedSetups: Setup[];
@@ -19,6 +20,8 @@ interface SetupViewProps {
   activeCar?: Car | null;
   shockSessions?: ShockSession[];
   onSaveShockSessions?: (updated: ShockSession[]) => void;
+  /** Needed to derive per-tire usage history (which sessions/tracks/corners used each tire). */
+  weekends?: RaceWeekend[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -213,7 +216,7 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = []
 
 export default function SetupView({
   savedSetups, activeSetupId, onSaveSetups, user, tireInventory, onSaveTires, onDeleteTireFromCloud,
-  activeCarId = null, activeCar = null, shockSessions = [], onSaveShockSessions,
+  activeCarId = null, activeCar = null, shockSessions = [], onSaveShockSessions, weekends = [],
 }: SetupViewProps) {
   const [subTab, setSubTab] = useState<'setups' | 'smasherloads' | 'tires'>('setups');
   const [setups, setSetups] = useState<Setup[]>(savedSetups);
@@ -228,6 +231,7 @@ export default function SetupView({
   const [newTire, setNewTire] = useState<Partial<TireInventoryItem>>({ wheelBackspacing: '2' });
   const [tireSort, setTireSort] = useState<'newest' | 'oldest' | 'size-asc' | 'size-desc'>('newest');
   const [tireCompoundFilter, setTireCompoundFilter] = useState<string>('all');
+  const [expandedTireId, setExpandedTireId] = useState<string | null>(null);
 
   React.useEffect(() => { setSetups(savedSetups); }, [savedSetups]);
   React.useEffect(() => { setTires(tireInventory); }, [tireInventory]);
@@ -374,8 +378,8 @@ export default function SetupView({
   );
 
   // Filter at display time only — never mutate the master arrays.
-  const displayedSetups = byActiveCar(setups, activeCarId);
-  const displayedTires = byActiveCar(tires, activeCarId);
+  const displayedSetups = byActiveCar<Setup>(setups, activeCarId);
+  const displayedTires = byActiveCar<TireInventoryItem>(tires, activeCarId);
   const noCar = !activeCarId;
 
   return (
@@ -702,12 +706,28 @@ export default function SetupView({
               <h3 className="font-display font-bold text-lg uppercase text-on-surface tracking-tight">Tire Inventory</h3>
               <p className="text-[10px] font-mono text-on-surface-variant mt-0.5">{displayedTires.length} tire{displayedTires.length !== 1 ? 's' : ''} logged</p>
             </div>
-            <button onClick={() => !noCar && setShowAddTireForm(true)}
-              disabled={noCar}
-              title={noCar ? 'Add a car in Settings → Garage to start.' : undefined}
-              className={`h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 ${noCar ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-90'}`}>
-              <span className="material-symbols-outlined text-[15px]">add</span>Add Tire
-            </button>
+            <div className="flex items-center gap-2">
+              {displayedTires.length > 0 && (
+                <>
+                  <button onClick={() => downloadTireUsageCsv(displayedTires, weekends)}
+                    title="Download CSV of every tire's usage history"
+                    className="h-9 px-3 border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-outline font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[15px]">download</span>CSV
+                  </button>
+                  <button onClick={() => printTireUsageReport(displayedTires, weekends)}
+                    title="Open a printable tire usage report"
+                    className="h-9 px-3 border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-outline font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[15px]">print</span>Report
+                  </button>
+                </>
+              )}
+              <button onClick={() => !noCar && setShowAddTireForm(true)}
+                disabled={noCar}
+                title={noCar ? 'Add a car in Settings → Garage to start.' : undefined}
+                className={`h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 ${noCar ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-90'}`}>
+                <span className="material-symbols-outlined text-[15px]">add</span>Add Tire
+              </button>
+            </div>
           </div>
 
           {displayedTires.length === 0 && (
@@ -782,21 +802,65 @@ export default function SetupView({
                   {sorted.length === 0 && (
                     <p className="text-center text-xs font-mono text-on-surface-variant/40 py-4">No tires match the current filter.</p>
                   )}
-                  {sorted.map(tire => (
-                    <div key={tire.id} className="bg-surface-container border border-outline-variant rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-3 flex-wrap">
-                          <span className="font-mono text-xs font-bold text-primary shrink-0">#{tire.tireNumber}</span>
-                          <span className="font-mono text-[11px] text-on-surface">
-                            {tire.size}{tire.size && !tire.size.includes('"') ? '"' : ''} <span className="text-outline-variant mx-1">|</span> BS {tire.wheelBackspacing}" <span className="text-outline-variant mx-1">|</span> {tire.compound} <span className="text-outline-variant mx-1">|</span> Duro {tire.durometer || '—'}{tire.airPressure ? <><span className="text-outline-variant mx-1">|</span> {tire.airPressure} psi</> : null}
+                  {sorted.map(tire => {
+                    const isTireExpanded = expandedTireId === tire.id;
+                    const usage = isTireExpanded ? getTireUsageHistory(tire.id, weekends) : [];
+                    const totalLaps = isTireExpanded ? getTireTotalLaps(usage) : 0;
+                    return (
+                      <div key={tire.id} className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
+                        <div
+                          onClick={() => setExpandedTireId(isTireExpanded ? null : tire.id)}
+                          className="px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-surface-container-high transition-colors"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-baseline gap-3 flex-wrap">
+                              <span className="font-mono text-xs font-bold text-primary shrink-0">#{tire.tireNumber}</span>
+                              <span className="font-mono text-[11px] text-on-surface">
+                                {tire.size}{tire.size && !tire.size.includes('"') ? '"' : ''} <span className="text-outline-variant mx-1">|</span> BS {tire.wheelBackspacing}" <span className="text-outline-variant mx-1">|</span> {tire.compound} <span className="text-outline-variant mx-1">|</span> Duro {tire.durometer || '—'}{tire.airPressure ? <><span className="text-outline-variant mx-1">|</span> {tire.airPressure} psi</> : null}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="material-symbols-outlined text-on-surface-variant/50 text-[18px] flex-shrink-0">
+                            {isTireExpanded ? 'expand_less' : 'expand_more'}
                           </span>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteTire(tire.id); }} className="p-1.5 text-on-surface-variant/50 hover:text-error transition-colors flex-shrink-0" title="Delete tire">
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                          </button>
                         </div>
+
+                        {isTireExpanded && (
+                          <div className="border-t border-outline-variant/60 bg-surface-container-low px-4 py-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="font-mono text-[10px] uppercase text-on-surface-variant tracking-wider">
+                                Usage History — <span className="text-primary font-bold">{totalLaps} est. laps</span> across {usage.length} session{usage.length !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                            {usage.length === 0 ? (
+                              <p className="text-[11px] font-mono text-on-surface-variant/50 py-2">Not used in any logged session yet.</p>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {usage.map((row, i) => (
+                                  <div key={`${row.sessionId}-${row.corner}-${i}`} className="flex items-center justify-between gap-2 text-[11px] font-mono bg-surface rounded px-2.5 py-1.5 border border-outline-variant/30">
+                                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                      <span className="text-on-surface-variant/70 shrink-0">{row.date}</span>
+                                      <span className="text-on-surface truncate">{row.track}</span>
+                                      <span className="text-outline-variant">|</span>
+                                      <span className="text-on-surface-variant/70">{row.sessionName}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold uppercase">{row.corner.toUpperCase()}</span>
+                                      <span className="text-on-surface-variant/70">{row.sessionType}{row.sessionTypeInferred ? '*' : ''}</span>
+                                      <span className="text-on-surface font-bold">{row.estimatedLaps} laps</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <button onClick={() => handleDeleteTire(tire.id)} className="p-1.5 text-on-surface-variant/50 hover:text-error transition-colors flex-shrink-0" title="Delete tire">
-                        <span className="material-symbols-outlined text-[16px]">delete</span>
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             );

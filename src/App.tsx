@@ -141,6 +141,7 @@ export default function App() {
           supabase.from('tire_inventory').delete().eq('user_id', user.id),
           supabase.from('cars').delete().eq('user_id', user.id),
           supabase.from('shock_sessions').delete().eq('user_id', user.id),
+          supabase.from('todos').delete().eq('user_id', user.id),
         ]);
       } catch (e) { console.warn('Clear cloud data error:', e); }
     }
@@ -153,6 +154,9 @@ export default function App() {
     setShockSessions([]);
     setActiveCarId(null);
     setActiveSession(INITIAL_ACTIVE_SESSION);
+    setTodos([]);
+    setAccounting([]);
+    setShopping([]);
     setSyncStatus('All data cleared');
   };
 
@@ -743,6 +747,7 @@ export default function App() {
       : newSessionTimeOfDay;
 
     const nextSession: ActiveSession = {
+      sessionType: newSessionType,
       name: sessionName,
       track: targetWeekend.track,
       setupUsed: setup.chassis || 'Default Setup',
@@ -774,6 +779,7 @@ export default function App() {
     const newRecord: SessionRecord = {
       id: `session-rec-${Date.now()}`,
       type: sessionName,
+      sessionType: newSessionType,
       name: sessionName,
       track: targetWeekend.track,
       condition: newSessionCond,
@@ -1057,6 +1063,7 @@ export default function App() {
                   activeCar={activeCar}
                   shockSessions={shockSessions}
                   onSaveShockSessions={handleSaveShockSessions}
+                  weekends={weekends}
                   onSaveSetups={(updatedSetups, activeId) => {
                     setSavedSetups(updatedSetups);
                     localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
