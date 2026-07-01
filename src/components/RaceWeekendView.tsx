@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup } from '../types';
 import { User } from '@supabase/supabase-js';
+import { sortBySize } from '../lib/tireSize';
 
 interface RaceWeekendViewProps {
   user: User | null;
@@ -507,7 +508,7 @@ export default function RaceWeekendView({
                 .filter(c => c !== corner)
                 .map(c => session.tires?.[c]?.tireId)
                 .filter(Boolean) as string[];
-              const availableTires = tireInventory.filter(t => !usedByOthers.includes(t.id) || t.id === selectedTireId);
+              const availableTires = sortBySize(tireInventory.filter(t => !usedByOthers.includes(t.id) || t.id === selectedTireId));
               return (
                 <div key={corner} className="bg-[#0e0e0e] border border-outline-variant rounded p-2 space-y-2">
                   <span className="text-[10px] font-bold text-primary uppercase block">{corner.toUpperCase()}</span>

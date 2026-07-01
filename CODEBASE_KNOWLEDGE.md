@@ -652,6 +652,28 @@ function compressImage(file: File, maxPx = 1024, quality = 0.82): Promise<string
 | Session screenshots | base64 in `SessionRecord.screenshots[]` → inside `RaceWeekend.sessions` JSONB |
 | Accounting receipts | base64 in `AccountingEntry.receiptPhoto` → in `race_notes_accounting` |
 | Shock dyno graphs | base64 in SmasherLoadsView's `ShockSession.photos[]` → `race_notes_shock_graphs` |
+
+---
+
+## 20. Session 9 — In-app Guide, tire-size parsing, compound quick-pick
+
+**Tire size parsing (`src/lib/tireSize.ts`, new).**
+Racers enter sizes as decimals (`86.5`) or whole+fraction (`86 1/2`, `86-1/2`), sometimes with a trailing inch mark. `parseTireSize()` normalizes all of these to a number; `compareTireSize()` is an ascending comparator (unparseable sizes sort last); `sortBySize()` returns a size-sorted copy of any `{ size?: string }[]`.
+
+- Every tire **picker dropdown** is now size-sorted:
+  - `SetupView.tsx` `CornerForm` inventory `<select>` → wrapped in `sortBySize(...)`.
+  - `RaceWeekendView.tsx` per-corner `availableTires` → wrapped in `sortBySize(...)`.
+- `SetupView.tsx` inventory-list Size↑/Size↓ sort switched from the old digits-only `parseSz` (decimals only) to `compareTireSize` so fractions sort correctly.
+
+**Compound quick-pick (`SetupView.tsx`, Add Tire modal).**
+Above the compound text input, tappable chips list every distinct compound already present in `tires`. Tapping a chip fills the field; the user can still type a brand-new compound. Removes retyping known compounds. Chips are ≥32px tall for touch.
+
+**In-app Guide (`src/components/GuideView.tsx`, new).**
+Accordion of collapsible topic headers (Requiring an account, Creating a team, Adding a car, Creating a setup, Creating a weekend, Logging a session, Adding tires, Adding spring smasher graphs, Adding tasks, Assigning tasks, Adding shopping). Each header expands step-by-step instructions + optional tip. Big touch targets (≥56px header), `aria-expanded`/`aria-controls`/`role="region"` for accessibility. Wired as a new **Guide** sub-tab in `SettingsView.tsx` (subTab union now includes `'guide'`, and `initialSubTab` too). **No dashboard tab** — lives under Settings only.
+
+**Canonical user-facing copy:** `docs/USER_GUIDE.md` mirrors the Guide content — keep both in sync when flows change.
+
+**Context files:** `AGENTS.md` refreshed to the 2026-07-01 revision.
 | Setup photos | Supabase Storage public URLs in `Setup.screenshots[]` |
 
 ---

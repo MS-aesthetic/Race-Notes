@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import AuthView from './AuthView';
 import ExportView from './ExportView';
 import GarageView from './GarageView';
+import GuideView from './GuideView';
 import { User } from '@supabase/supabase-js';
 import { AppUser } from '../lib/supabase';
 import { Setup, ActiveSession, AppTheme, RaceWeekend, AccountingEntry, ShoppingItem, Todo, Car } from '../types';
@@ -27,7 +28,7 @@ interface SettingsViewProps {
   setupCount: (carId: string) => number;
   tireCount: (carId: string) => number;
   shockCount: (carId: string) => number;
-  initialSubTab?: 'account' | 'appearance' | 'export' | 'garage';
+  initialSubTab?: 'account' | 'appearance' | 'export' | 'garage' | 'guide';
   onClearAllData?: () => Promise<void>;
 }
 
@@ -41,7 +42,7 @@ const ACCENT_PRESETS = [
 ];
 
 export default function SettingsView({ user, profile, onAuthChange, setup, activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], shopping = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, onClearAllData }: SettingsViewProps) {
-  const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export' | 'garage'>(initialSubTab ?? 'account');
+  const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>(initialSubTab ?? 'account');
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0); // 0=idle, 1=confirm, 2=clearing
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -72,6 +73,12 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
           className={`flex-1 py-2 rounded-md transition-all ${subTab === 'export' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
         >
           Export
+        </button>
+        <button
+          onClick={() => setSubTab('guide')}
+          className={`flex-1 py-2 rounded-md transition-all ${subTab === 'guide' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+        >
+          Guide
         </button>
       </div>
 
@@ -312,6 +319,8 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
         )}
 
         {subTab === 'export' && <ExportView setup={setup} activeSession={activeSession} weekends={weekends} todos={todos} accounting={accounting} shopping={shopping} />}
+
+        {subTab === 'guide' && <GuideView />}
       </div>
     </div>
   );

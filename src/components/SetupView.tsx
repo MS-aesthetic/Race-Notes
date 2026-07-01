@@ -6,6 +6,7 @@ import { uploadAttachment, deleteAttachment } from '../lib/sync';
 import SmasherLoadsView from './SmasherLoadsView';
 import { byActiveCar } from '../lib/scope';
 import { getTireUsageHistory, getTireTotalLaps, downloadTireUsageCsv, printTireUsageReport } from '../lib/tireHistory';
+import { compareTireSize, sortBySize } from '../lib/tireSize';
 
 interface SetupViewProps {
   savedSetups: Setup[];
@@ -90,7 +91,7 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = []
             className="bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded min-w-[160px]"
           >
             <option value="">-- Select from Inventory --</option>
-            {tireInventory.filter(t => !usedTireIds.includes(t.id) || t.id === (data.tireInventoryId || '')).map(t => (
+            {sortBySize(tireInventory.filter(t => !usedTireIds.includes(t.id) || t.id === (data.tireInventoryId || ''))).map(t => (
               <option key={t.id} value={t.id}>#{t.tireNumber} — {t.size} {t.compound}</option>
             ))}
           </select>
@@ -752,14 +753,13 @@ export default function SetupView({
             const filtered = tireCompoundFilter === 'all'
               ? displayedTires
               : displayedTires.filter(t => t.compound === tireCompoundFilter);
-            // Sort
-            const parseSz = (s: string) => parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
+            // Sort — size sorts handle both decimals ("86.5") and fractions ("86 1/2")
             const sorted = [...filtered].sort((a, b) => {
               if (tireSort === 'oldest') {
                 return (a.createdAt || a.id).localeCompare(b.createdAt || b.id);
               }
-              if (tireSort === 'size-asc') return parseSz(a.size) - parseSz(b.size);
-              if (tireSort === 'size-desc') return parseSz(b.size) - parseSz(a.size);
+              if (tireSort === 'size-asc') return compareTireSize(a.size, b.size);
+              if (tireSort === 'size-desc') return compareTireSize(b.size, a.size);
               // newest (default): most recent first
               return (b.createdAt || b.id).localeCompare(a.createdAt || a.id);
             });
@@ -898,7 +898,35 @@ export default function SetupView({
                   </div>
                   <div>
                     <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Compound</label>
-                    <input type="text" placeholder="e.g. D20 / Medium" required value={newTire.compound || ''}
+                    {/* Quick-pick: tap a compound you've used before, or type a new one below. */}
+                    {(() => {
+                      const knownCompounds = Array.from(
+                        new Set<string>(tires.map(t => (t.compound || '').trim()).filter(Boolean))
+                      ).sort((a, b) => a.localeCompare(b));
+                      if (knownCompounds.length === 0) return null;
+                      return (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {knownCompounds.map(c => {
+                            const active = (newTire.compound || '').trim().toLowerCase() === c.toLowerCase();
+                            return (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => setNewTire(p => ({ ...p, compound: c }))}
+                                className={`px-3 py-1.5 rounded-full text-[11px] font-mono font-bold border transition-colors min-h-[32px] ${
+                                  active
+                                    ? 'bg-primary/15 border-primary text-primary'
+                                    : 'bg-surface-container border-outline-variant text-on-surface-variant hover:border-outline'
+                                }`}
+                              >
+                                {c}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                    <input type="text" placeholder="Tap above or type a new compound" required value={newTire.compound || ''}
                       onChange={e => setNewTire(p => ({ ...p, compound: e.target.value }))}
                       className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded" />
                   </div>
