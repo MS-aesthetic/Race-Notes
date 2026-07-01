@@ -166,7 +166,7 @@ export default function App() {
   const carShockCount = (carId: string) => shockSessions.filter(s => s.carId === carId).length;
 
   // Navigate to Settings → Garage from the active-car chip
-  const [settingsSubTab, setSettingsSubTab] = useState<'account' | 'appearance' | 'export' | 'garage'>('account');
+  const [settingsSubTab, setSettingsSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>('account');
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   const [theme, setTheme] = useState<AppTheme>(() => {
@@ -201,7 +201,7 @@ export default function App() {
     // installed PWA (Chrome) vs the Capacitor APK (Android WebView) — both
     // Chromium, both respect `zoom` the same way.
     root.style.fontSize = '16px';
-    const ZOOM: Record<AppTheme['fontSize'], number> = { standard: 1, large: 1.15, xlarge: 1.32 };
+    const ZOOM: Record<AppTheme['fontSize'], number> = { standard: 1, large: 1.15, xlarge: 1.45, xxlarge: 1.7 };
     root.style.setProperty('--ui-zoom', String(ZOOM[theme.fontSize] ?? 1));
   }, [theme]);
 
@@ -213,6 +213,33 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [hasLocalAcct, setHasLocalAcct] = useState<boolean>(() => hasLocalAccount());
   const [syncStatus, setSyncStatus] = useState('');
+
+  // ── "Saved" flash toast ──────────────────────────────────────────────────
+  // Local-first writes are instant; this gives users clear, prominent
+  // confirmation that their data was captured — even fully offline.
+  const [savedFlash, setSavedFlash] = useState(false);
+  const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashReadyRef = useRef(false);      // false until initial hydration settles
+  const suppressPullRef = useRef(false);    // true during cloud pulls
+  const flashSaved = () => {
+    setSavedFlash(true);
+    if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
+    savedFlashTimer.current = setTimeout(() => setSavedFlash(false), 1900);
+  };
+  // Enable flashes only after the initial localStorage hydration has settled,
+  // so loading the app doesn't count as a "save".
+  useEffect(() => {
+    const t = setTimeout(() => { flashReadyRef.current = true; }, 800);
+    return () => clearTimeout(t);
+  }, []);
+  // Fire on any change to the core datasets — covers every save path (online
+  // or offline) without wiring each individual handler.
+  useEffect(() => {
+    if (!flashReadyRef.current || suppressPullRef.current) return;
+    flashSaved();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setup, savedSetups, weekends, activeSession, tireInventory, cars, shockSessions, todos, accounting, shopping]);
+
   // Modal / forms tracking state
   const [showNewWeekendForm, setShowNewWeekendForm] = useState(false);
   const [newWeekendName, setNewWeekendName] = useState('');
@@ -350,6 +377,7 @@ export default function App() {
 
     // Pull cloud data and merge into localStorage
     const doPull = async () => {
+      suppressPullRef.current = true; // don't show "Saved" for cloud-pull state updates
       setSyncStatus('Syncing...');
       const data = await pullAllData(user.id, setSyncStatus);
 
@@ -415,6 +443,8 @@ export default function App() {
 
       setSyncStatus('Synced');
       setTimeout(() => setSyncStatus(''), 3000);
+      // Re-enable "Saved" flashes after pull-driven state settles.
+      setTimeout(() => { suppressPullRef.current = false; }, 800);
     };
 
     doPull();
@@ -983,14 +1013,15 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-2">
-              {/* Sync status indicator */}
-              {syncStatus && (
-                <span className={`font-mono text-[9px] uppercase tracking-wider ${
-                  syncStatus === 'Synced' ? 'text-green-400' : 'text-on-surface-variant/60'
-                }`}>
-                  {syncStatus}
-                </span>
-              )}
+              {/* Help / Guide */}
+              <button
+                onClick={() => { setSettingsSubTab('guide'); setActiveTab('settings'); }}
+                aria-label="Open the how-to guide"
+                title="How to use CREW CHIEF"
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-outline-variant/60 text-on-surface-variant hover:text-primary hover:border-primary/50 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">help</span>
+              </button>
               {/* Active-car chip */}
               {activeCar ? (
                 <button
@@ -1014,6 +1045,32 @@ export default function App() {
             </div>
           </div>
         </header>
+
+        {/* Prominent Saved / sync toast — bottom-center, above the nav bar */}
+        {(savedFlash || syncStatus) && (() => {
+          const msg = savedFlash ? 'Saved' : syncStatus;
+          const isSuccess = savedFlash || /synced|saved|pulled|cleared/i.test(syncStatus);
+          const isBusy = !savedFlash && /sync(ing)?\.\.\.|pulling/i.test(syncStatus);
+          return (
+            <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[60] pointer-events-none px-4 w-full max-w-md flex justify-center">
+              <div
+                role="status"
+                aria-live="polite"
+                className={`flex items-center gap-2.5 px-5 py-3 rounded-full shadow-2xl border-2 font-display font-bold text-sm tracking-wide animate-fade-in ${
+                  isSuccess
+                    ? 'bg-green-500 border-green-300 text-black'
+                    : 'bg-surface-container border-outline-variant text-on-surface'
+                }`}
+                style={{ boxShadow: isSuccess ? '0 8px 30px rgba(34,197,94,0.45)' : undefined }}
+              >
+                <span className={`material-symbols-outlined text-xl ${isBusy ? 'animate-spin' : ''}`} style={{ fontVariationSettings: "'FILL' 1" }}>
+                  {isSuccess ? 'check_circle' : isBusy ? 'progress_activity' : 'cloud'}
+                </span>
+                {msg}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Core Main Active Canvas Area */}
         <main className="flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto pb-6 custom-scrollbar">

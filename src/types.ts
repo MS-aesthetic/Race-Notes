@@ -366,6 +366,6 @@ export interface AppTheme {
   accent: string;
   /** UI scale — applied as a CSS zoom factor so it renders identically on
    *  the installed PWA (Chrome) and the Capacitor APK (Android WebView),
-   *  both Chromium-based. 'standard' | 'large' | 'xlarge'. */
-  fontSize: 'standard' | 'large' | 'xlarge';
+   *  both Chromium-based. 'standard' | 'large' | 'xlarge' | 'xxlarge'. */
+  fontSize: 'standard' | 'large' | 'xlarge' | 'xxlarge';
 }

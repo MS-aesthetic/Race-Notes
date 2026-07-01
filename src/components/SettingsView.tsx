@@ -232,7 +232,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
                   className="w-10 h-10 rounded border border-outline-variant cursor-pointer bg-transparent shrink-0"
                   title="Pick any accent color"
                 />
-                <span className="font-mono text-sm text-on-surface uppercase tracking-widest flex-1">{theme.accent.toUpperCase()}</span>
+                <span className="font-mono text-xs text-on-surface-variant flex-1">Tap to pick any color</span>
                 <div className="w-8 h-8 rounded-full border-2 border-outline-variant shrink-0" style={{ backgroundColor: theme.accent }} />
               </div>
             </div>
@@ -243,11 +243,12 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
                 <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Font Size</label>
                 <p className="text-[10px] font-mono text-on-surface-variant/60 mt-0.5">Scales all text and UI elements throughout the app.</p>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {([
-                  { value: 'standard', icon: 'format_size', label: 'Standard', desc: '1x scale' },
+                  { value: 'standard', icon: 'format_size',   label: 'Standard', desc: '1x scale' },
                   { value: 'large',    icon: 'text_increase', label: 'Large',    desc: '1.15x scale' },
-                  { value: 'xlarge',   icon: 'text_increase', label: 'X-Large',  desc: '1.32x scale' },
+                  { value: 'xlarge',   icon: 'text_increase', label: 'X-Large',  desc: '1.45x scale' },
+                  { value: 'xxlarge',  icon: 'text_increase', label: 'XX-Large', desc: '1.7x scale' },
                 ] as const).map(opt => {
                   const active = (theme.fontSize ?? 'standard') === opt.value;
                   return (
@@ -275,36 +276,6 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
                     </button>
                   );
                 })}
-              </div>
-              {/* Live preview */}
-              <div className="border border-outline-variant/40 rounded-lg p-3 space-y-1 bg-surface">
-                <p className="text-[10px] font-mono uppercase text-on-surface-variant font-bold tracking-wider">Preview at current scale</p>
-                <p className="text-xs font-mono text-on-surface">Small label — 0.75rem</p>
-                <p className="text-sm font-mono text-on-surface">Body text — 0.875rem</p>
-                <p className="text-base font-mono text-primary font-bold">Heading — 1rem</p>
-              </div>
-            </div>
-
-            {/* Live preview strip */}
-            <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-2">
-              <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Live Preview</label>
-              <div className="flex gap-2 flex-wrap items-center">
-                <span
-                  className="px-3 py-1 rounded-full text-xs font-mono font-bold"
-                  style={{ backgroundColor: theme.accent + '22', color: theme.accent, border: `1px solid ${theme.accent}55` }}
-                >
-                  Active Label
-                </span>
-                <span className="px-3 py-1 rounded text-xs font-mono font-bold bg-surface border border-outline-variant text-on-surface">
-                  Neutral
-                </span>
-                <button
-                  className="px-3 py-1 rounded text-xs font-mono font-bold"
-                  style={{ backgroundColor: theme.accent, color: '#1a0003' }}
-                >
-                  Button
-                </button>
-                <span className="font-mono text-xs font-bold" style={{ color: theme.accent }}>Data readout</span>
               </div>
             </div>
 
