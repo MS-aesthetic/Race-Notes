@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem, Car, ShockSession, CAR_TYPES } from './types';
 import {
   INITIAL_SETUP,
@@ -11,7 +13,8 @@ import {
   INITIAL_SHOCK_SESSIONS,
 } from './data';
 
-import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, AppUser } from './lib/supabase';
+import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, AppUser } from './lib/supabase';
+import AuthView from './components/AuthView';
 import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions } from './lib/sync';
 
 import DashboardView from './components/DashboardView';
@@ -199,6 +202,7 @@ export default function App() {
   const [team, setTeam] = useState<import('./types').Team | null>(null);
   const [teamMembers, setTeamMembers] = useState<AppUser[]>([]);
   const [authReady, setAuthReady] = useState(false);
+  const [hasLocalAcct, setHasLocalAcct] = useState<boolean>(() => hasLocalAccount());
   const [syncStatus, setSyncStatus] = useState('');
   // Modal / forms tracking state
   const [showNewWeekendForm, setShowNewWeekendForm] = useState(false);
@@ -273,6 +277,8 @@ export default function App() {
         const currentUser = data.session?.user ?? null;
         setUser(currentUser);
         if (currentUser) {
+          rememberLocalAccount(currentUser);
+          setHasLocalAcct(true);
           const p = await fetchProfile(currentUser.id);
           setProfile(p);
           const t = await getUserTeam(currentUser.id);
@@ -283,7 +289,9 @@ export default function App() {
           }
         }
       } catch {
-        // Supabase not configured yet – continue in offline mode
+        // Supabase unreachable (offline) – fall back to the local "registered
+        // on this device" flag so the user isn't kicked out of a working
+        // offline session. hasLocalAcct already reflects this from initial state.
       }
       setAuthReady(true);
     };
@@ -292,6 +300,12 @@ export default function App() {
     const unsub = onAuthChange(async (newUser) => {
       setUser(newUser);
       if (newUser) {
+        // Only a *positive* session ever writes the local flag here. A null
+        // newUser can mean "explicit sign-out" OR "offline token refresh
+        // failed" – we don't want the latter to lock the user out, so
+        // clearing the flag is left to the explicit signOut() call instead.
+        rememberLocalAccount(newUser);
+        setHasLocalAcct(true);
         const p = await fetchProfile(newUser.id);
         setProfile(p);
         const t = await getUserTeam(newUser.id);
@@ -304,9 +318,21 @@ export default function App() {
         setProfile(null);
         setTeam(null);
         setTeamMembers([]);
+        setHasLocalAcct(hasLocalAccount());
       }
     });
     return () => { unsub?.data?.subscription?.unsubscribe?.(); };
+  }, []);
+
+  // ---- Auth: catch the Google sign-in deep link on native Android ----
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const listenerPromise = CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+      handleNativeAuthCallback(url).catch(err =>
+        console.warn('Native Google sign-in callback failed:', err)
+      );
+    });
+    return () => { listenerPromise.then(l => l.remove()); };
   }, []);
 
   // ---- Cloud sync: pull on login, push on data changes ----
@@ -879,6 +905,53 @@ export default function App() {
     };
     setActiveSession(restoredSession);
   };
+
+  // ---- Auth gate: registration/sign-in is required to use the app. -------
+  // `authReady` flips true as soon as the (local, non-blocking) session
+  // check finishes. `hasLocalAcct` is our own durable flag (see
+  // rememberLocalAccount) so a device that has signed in before keeps
+  // working with no signal — only an explicit sign-out re-locks the gate.
+  const isUnlocked = !!user || hasLocalAcct;
+
+  if (!authReady) {
+    return (
+      <div className="h-full w-full bg-[#0e0e0e] flex items-center justify-center">
+        <span className="material-symbols-outlined text-primary text-3xl animate-pulse">headset_mic</span>
+      </div>
+    );
+  }
+
+  if (!isUnlocked) {
+    return (
+      <div className="h-full w-full bg-[#0e0e0e] text-on-surface font-sans flex flex-col items-center justify-start p-0" id="applet-auth-gate">
+        <div
+          id="viewport-chassis"
+          className="w-full max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl mx-auto bg-background h-full flex flex-col shadow-none md:shadow-2xl md:border-x border-outline-variant/20"
+        >
+          <header className="bg-surface w-full top-0 sticky border-b border-outline-variant z-40">
+            <div className="flex items-center gap-1.5 px-4 md:px-6 py-3">
+              <span className="material-symbols-outlined text-primary text-xl">headset_mic</span>
+              <h1 className="font-display font-bold tracking-tight text-base text-primary uppercase">
+                CREW CHIEF
+              </h1>
+            </div>
+          </header>
+          <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto">
+            <div className="w-full max-w-sm">
+              <p className="text-center text-on-surface-variant text-xs leading-relaxed mb-6">
+                Register or sign in to start tracking setups, sessions, and race weekends.
+                <br />
+                <span className="text-on-surface-variant/50">
+                  Once you've signed in on this device, the app keeps working with no signal.
+                </span>
+              </p>
+              <AuthView user={null} profile={null} onAuthChange={(u) => setUser(u)} />
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-full bg-[#0e0e0e] text-on-surface font-sans flex flex-col items-center justify-start p-0" id="applet-main-body">

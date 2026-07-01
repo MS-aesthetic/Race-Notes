@@ -1,4 +1,5 @@
 import { createClient, User, Session } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
 import { Team, TeamProfile } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -13,9 +14,46 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // PKCE + detectSessionInUrl let the web build finish the Google OAuth
+    // round-trip automatically when Supabase redirects back with ?code=...
+    detectSessionInUrl: true,
+    flowType: 'pkce',
   },
 });
+
+// Custom URL scheme (registered in AndroidManifest.xml) used to bounce back
+// into the native Android app after the system browser finishes Google sign-in.
+export const NATIVE_AUTH_CALLBACK_URL = 'com.racenotes.app://auth-callback';
+
+// ---------------------------------------------------------------------------
+// Local "has this device ever registered/signed in" flag.
+//
+// Crew Chief is local-first and must keep working at the track with no
+// signal. Supabase sessions carry a JWT that expires (~1hr) and normally
+// tries to refresh over the network; if that refresh fails while offline we
+// don't want to boot the user back to the sign-in screen. This flag is our
+// own durable record, separate from Supabase's live session, that this
+// device has completed registration/login at least once. It's only cleared
+// on an explicit sign-out.
+// ---------------------------------------------------------------------------
+export const REGISTERED_USER_KEY = 'race_notes_registered_user';
+
+export function rememberLocalAccount(user: User | null) {
+  if (typeof window === 'undefined') return;
+  if (user) {
+    window.localStorage.setItem(
+      REGISTERED_USER_KEY,
+      JSON.stringify({ id: user.id, email: user.email })
+    );
+  } else {
+    window.localStorage.removeItem(REGISTERED_USER_KEY);
+  }
+}
+
+export function hasLocalAccount(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!window.localStorage.getItem(REGISTERED_USER_KEY);
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,10 +96,55 @@ export async function signIn(email: string, password: string) {
   return data;
 }
 
-/** Sign out */
+/**
+ * Sign in / register with Google.
+ * - Web: redirects the whole page to Google, then back to the app.
+ * - Native (Android/Capacitor): opens the system browser via @capacitor/browser
+ *   and skips the in-app redirect; the round trip is completed by
+ *   `handleNativeAuthCallback` when the app catches the custom-scheme deep link.
+ */
+export async function signInWithGoogle() {
+  const isNative = Capacitor.isNativePlatform();
+  const redirectTo = isNative ? NATIVE_AUTH_CALLBACK_URL : window.location.origin;
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo,
+      skipBrowserRedirect: isNative,
+    },
+  });
+  if (error) throw error;
+
+  if (isNative && data?.url) {
+    const { Browser } = await import('@capacitor/browser');
+    await Browser.open({ url: data.url });
+  }
+}
+
+/**
+ * Finish the native Google OAuth round trip. Call this from the
+ * `App` plugin's `appUrlOpen` listener with the deep-link URL it hands back.
+ * No-op if the URL isn't our auth callback scheme.
+ */
+export async function handleNativeAuthCallback(url: string): Promise<boolean> {
+  if (!url.startsWith(NATIVE_AUTH_CALLBACK_URL)) return false;
+  try {
+    const { error } = await supabase.auth.exchangeCodeForSession(url);
+    if (error) throw error;
+    return true;
+  } finally {
+    const { Browser } = await import('@capacitor/browser');
+    await Browser.close().catch(() => {});
+  }
+}
+
+/** Sign out. This is the only thing that clears the local "registered on
+ * this device" flag – losing network access should never sign someone out. */
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+  rememberLocalAccount(null);
 }
 
 /** Get the current session (returns null if not logged in) */

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '@supabase/supabase-js';
-import { signUp, signIn, signOut, AppUser } from '../lib/supabase';
+import { signUp, signIn, signOut, signInWithGoogle, AppUser } from '../lib/supabase';
 import TeamView from './TeamView';
 
 interface AuthViewProps {
@@ -62,6 +62,19 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await signInWithGoogle();
+      // Web: the browser is about to navigate away to Google.
+      // Native: the system browser opens; loading resets once we return.
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Google sign-in failed');
       setLoading(false);
     }
   };
@@ -294,6 +307,33 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
               : 'Create Account'}
         </button>
       </form>
+
+      {/* Divider */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-px bg-outline-variant/30" />
+        <span className="text-[10px] font-mono uppercase text-on-surface-variant/50 tracking-wider">or</span>
+        <div className="flex-1 h-px bg-outline-variant/30" />
+      </div>
+
+      {/* Google sign-in */}
+      <button
+        type="button"
+        onClick={handleGoogleSignIn}
+        disabled={loading}
+        className="w-full py-2.5 px-4 bg-surface border border-outline-variant/50 text-on-surface
+                   font-mono text-xs font-bold uppercase tracking-wider rounded-md
+                   flex items-center justify-center gap-2
+                   hover:bg-surface-container transition-colors active:scale-[0.98]
+                   disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+      >
+        <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.4-.4-3.5z"/>
+          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 6.1 29.5 4 24 4c-7.7 0-14.4 4.4-17.7 10.7z"/>
+          <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.2C29.4 35.3 26.8 36 24 36c-5.3 0-9.7-3.1-11.3-7.6l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1 2.8-2.9 5.1-5.4 6.6l6.3 5.2C39.9 36.9 44 31.4 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+        </svg>
+        {loading ? 'Please wait...' : 'Continue with Google'}
+      </button>
 
       {/* Skip / offline notice */}
       <p className="text-[10px] text-on-surface-variant/50 text-center leading-relaxed font-mono">
