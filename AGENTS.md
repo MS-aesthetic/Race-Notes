@@ -2,10 +2,25 @@
 
 AI coding agent guide for the **Race Notes** PWA — a professional motorsport logbook and pit-side crew-chief tool for dirt-track racing.
 
+> **📋 Active feature roadmap:** [`plan.md`](./plan.md) — read this FIRST before starting any feature work. It defines 13 workstreams (WS-A through WS-M), their execution order, dependencies, and the shared data-model foundation that must land first.
+>
+> **📚 Full reference:** [`CODEBASE_KNOWLEDGE.md`](./CODEBASE_KNOWLEDGE.md) — comprehensive technical reference (types, tables, localStorage keys, component details, gotchas, session history).
+
 ---
 
-## Deployment (READ FIRST)
+## Branch & Deploy Workflow (READ FIRST)
 
+> **BRANCH RULE — all feature work on `preview`.** Never commit feature work directly to `master`. Create `preview` from `master` if it doesn't exist:
+> ```bash
+> git checkout -b preview master   # only if preview doesn't exist yet
+> ```
+>
+> ```bash
+> git checkout preview
+> # ...make changes...
+> git push origin preview
+> ```
+>
 > **DEPLOY RULE — default to PREVIEW.** Always deploy to a Netlify **preview/draft**
 > (`netlify deploy --dir=dist`). Only run a **production** deploy
 > (`netlify deploy --prod --dir=dist`) when Maxx **explicitly** says "push to
@@ -14,11 +29,12 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 > - The Netlify site is **NOT connected to Git continuous deployment** (`repo_url`
 >   is empty). Therefore `git push` **never** deploys anything — every deploy is a
 >   manual Netlify CLI step run from Windows PowerShell.
-> - Pushing to `master` on GitHub and deploying to Netlify are **two separate
->   actions**. Do both only when asked; otherwise a GitHub push does not change
->   the live site.
+> - Pushing to GitHub and deploying to Netlify are **two separate actions**. Do both
+>   only when asked; otherwise a GitHub push does not change the live site.
 > - Production publishes require account credits (paid plan). Preview/draft deploys
 >   are the normal iteration loop.
+> - **NEVER merge `preview` → `master`** unless Maxx **explicitly** says "merge to
+>   master" / "push to production".
 
 ---
 
@@ -41,10 +57,54 @@ if (user) pushSetups(updated, user.id, setSyncStatus);
 
 ---
 
+## Definition of Done (every feature / fix)
+
+Before marking any workstream complete, verify ALL of the following:
+
+1. **`npm run lint`** (`tsc --noEmit`) introduces **zero new** type errors. Baseline has **3 known pre-existing** errors (two `File`-typed upload args in `RaceWeekendView`/`SmasherLoadsView`, one `key`-on-`CornerForm`) — do not add more on top.
+2. **`npm run build`** succeeds on Windows.
+3. **Deployed to a Netlify preview URL** and visually verified (hard-refresh / incognito to beat the PWA service-worker cache).
+4. **Works offline** (local-first dual-write) and, when logged in, syncs to Supabase.
+5. **Respects light and dark themes** and the font-scale zoom (standard/large/xlarge).
+6. **Car scoping intact** — setups, tires, shock sessions scoped via `byActiveCar()`; weekends, todos, accounting, shopping are global.
+7. **No data loss** — dual-write everywhere; deletions call `delete*FromCloud(id)` in addition to the upsert push.
+8. **Existing data migrates** with sane defaults (new optional fields default to empty/null).
+
+---
+
+## Workstream Coordination (from `plan.md`)
+
+`src/App.tsx` and `src/types.ts` are **hot shared files** that most workstreams touch. To avoid conflicts:
+
+- **Do WS-A (Data Model & Migrations Foundation) FIRST** — it adds all new fields/types and empty Supabase columns so downstream agents don't fight over `types.ts`.
+- When two agents must edit `App.tsx`, edit **different regions** and keep diffs small.
+- Prefer extracting new logic into new files (`src/lib/*`, `src/components/*`) and wiring with minimal lines in `App.tsx`.
+
+### Suggested execution order
+```
+WS-A  Data model + migrations  ──►  WS-C Tire lifecycle
+                               ├──►  WS-B Setup diff
+                               ├──►  WS-F Task↔weekend
+                               └──►  WS-G Exports (depends on C, E, F data)
+WS-D  Carry-over setup            (parallel; light App.tsx touch)
+WS-E  Weather history/forecast    (parallel; App.tsx weekend-create region)
+WS-H  Settings default+bigger menu(parallel; SettingsView only)
+WS-I  Font default 1.15           (parallel; tiny)
+WS-J  Reference overhaul          (parallel; QuickReferenceView only)
+WS-K  Light mode fixes            (parallel; index.css only)
+WS-L  Session track-condition     (parallel; App.tsx session-form region)
+WS-M  Dashboard nav fixes         (parallel; DashboardView + small App.tsx)
+```
+Low-conflict quick wins (H, I, J, K, M) can start immediately — see [`plan.md`](./plan.md) for full details on each.
+
+---
+
 ## Key Files
 
 | File | Purpose |
 |---|---|
+| `plan.md` | **Active feature roadmap** — 13 workstreams, execution order, dependencies, definition of done. Read FIRST. |
+| `CODEBASE_KNOWLEDGE.md` | Comprehensive technical reference — types, tables, localStorage keys, component details, gotchas, all session history. |
 | `src/types.ts` | All TypeScript interfaces — start here to understand domain models |
 | `src/data.ts` | `INITIAL_SETUP`, `INITIAL_SETUPS`, `INITIAL_WEEKENDS`, `INITIAL_ACTIVE_SESSION` defaults |
 | `src/App.tsx` | Global state, all mutation handlers, tab routing, new-weekend/session modals, header (`?` help button), Saved toast |
@@ -137,5 +197,6 @@ App runs fully offline without these — Supabase calls are wrapped in try/catch
 - Android source is in `android/` — avoid editing native files unless changing permissions or splash screens. Exception: `MainActivity`'s deep-link intent-filter (`com.racenotes.app://auth-callback`) is required for native Google OAuth — don't remove it.
 - Target API 36 (Android 16), AGP 8.9.1, Gradle 8.11.1 — bumped ahead of Google Play's Aug 31, 2026 API-36 requirement.
 - The built APK artifact is `race_notes.apk` at project root (also see `CrewChief.apk` naming used in some build scripts). Also copied to Google Drive as `CrewChief-preview.apk` (both `G:\My Drive\` and `G:\My Drive\Google AI Studio\`).
+- **Bump `versionCode` and `versionName`** in `android/app/build.gradle` with every APK build meant to install over a previous version.
 - `android/app/build.gradle` (versionCode/versionName, keystore password) is **gitignored** — changes there never show up in git history. **This value has been observed reverting unexpectedly outside of any known process** — always re-check the live file before assuming its versionCode.
 - Real builds/git pushes for this repo should go through **Windows-MCP PowerShell** (real Windows Git Credential Manager), not a Linux sandbox — sandboxes typically lack git push credentials and can produce spurious `tsc`/build artifacts on cross-platform mounts. **Never write repo files through a Linux mount** (`cp`/`>` over `/sessions/.../mnt/...`) — it can produce null-byte-corrupted files. Use the host-side file tools.

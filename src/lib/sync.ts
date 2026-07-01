@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Setup, RaceWeekend, ActiveSession, SessionRecord, Todo, TireInventoryItem, Car, ShockSession } from '../types';
+import { Setup, RaceWeekend, ActiveSession, SessionRecord, Todo, TireInventoryItem, Car, ShockSession, WeatherHistoryDay, WeatherSnapshot } from '../types';
 
 // ---------------------------------------------------------------------------
 // Local-First Sync Engine
@@ -67,6 +67,13 @@ export function pushWeekends(weekends: RaceWeekend[], userId: string, onStatus?:
         track: w.track,
         date: w.date,
         sessions: w.sessions,
+        notes: w.notes || '',
+        weather: w.weather || null,
+        location: w.location || '',
+        setup_id: w.setupId || null,
+        setup_name: w.setupName || '',
+        weather_history: w.weatherHistory || null,
+        weather_forecast: w.weatherForecast || null,
         updated_at: new Date().toISOString(),
       }));
       const { error } = await supabase.from('race_weekends').upsert(rows, { onConflict: 'id' });
@@ -154,6 +161,13 @@ export async function pullAllData(
         track: (r.track as string) || '',
         date: (r.date as string) || '',
         sessions: (r.sessions as SessionRecord[]) || [],
+        notes: (r.notes as string) || undefined,
+        weather: (r.weather as WeatherSnapshot) || undefined,
+        location: (r.location as string) || undefined,
+        setupId: (r.setup_id as string) || undefined,
+        setupName: (r.setup_name as string) || undefined,
+        weatherHistory: (r.weather_history as WeatherHistoryDay[]) || undefined,
+        weatherForecast: (r.weather_forecast as WeatherHistoryDay[]) || undefined,
       }));
     }
     onStatus?.(`Pulled ${results.weekends.length} weekends from cloud`);
@@ -320,6 +334,10 @@ export function pushTires(tires: TireInventoryItem[], userId: string, onStatus?:
         air_pressure: t.airPressure || '',
         car_id: t.carId ?? null,
         created_at: t.createdAt || new Date().toISOString(),
+        date_added: t.dateAdded || null,
+        initial_age_days: t.initialAgeDays ?? 0,
+        usage_dates: t.usageDates || [],
+        heat_cycles: t.heatCycles ?? 0,
         updated_at: new Date().toISOString(),
       }));
       const { error } = await supabase.from('tire_inventory').upsert(rows, { onConflict: 'id' });
@@ -349,6 +367,10 @@ export async function pullTires(userId: string, onStatus?: SyncCallback): Promis
       airPressure: (r.air_pressure as string) || undefined,
       createdAt: (r.created_at as string) || undefined,
       carId: (r.car_id as string) ?? undefined,
+      dateAdded: (r.date_added as string) || undefined,
+      initialAgeDays: (r.initial_age_days as number) ?? 0,
+      usageDates: (r.usage_dates as string[]) || [],
+      heatCycles: (r.heat_cycles as number) ?? 0,
     }));
   } catch (e) {
     console.warn('Sync: pullTires failed', e);
@@ -490,7 +512,16 @@ export function pushTodos(todos: Todo[], userId: string, onStatus?: SyncCallback
   if (pushDebounceTimers.has(key)) clearTimeout(pushDebounceTimers.get(key)!);
   pushDebounceTimers.set(key, setTimeout(async () => {
     try {
-      const rows = todos.map(t => ({ ...t, user_id: userId, updated_at: new Date().toISOString() }));
+      const rows = todos.map(t => ({
+        id: t.id,
+        user_id: userId,
+        title: t.title,
+        items: t.items,
+        is_template: t.is_template ?? false,
+        weekend_id: t.weekendId || null,
+        weekend_name: t.weekendName || null,
+        updated_at: new Date().toISOString(),
+      }));
       await supabase.from('todos').upsert(rows, { onConflict: 'id' });
       onStatus?.('To-Dos synced');
     } catch {}
@@ -499,8 +530,20 @@ export function pushTodos(todos: Todo[], userId: string, onStatus?: SyncCallback
 
 export async function pullTodos(onStatus?: SyncCallback): Promise<Todo[]> {
   const { data } = await supabase.from('todos').select('*').order('updated_at', { ascending: false });
-  if (data) onStatus?.(`Pulled ${data.length} To-Do lists`);
-  return (data as any) || [];
+  if (data) {
+    onStatus?.(`Pulled ${data.length} To-Do lists`);
+    return (data as any[]).map((r: Record<string, unknown>) => ({
+      id: r.id as string,
+      user_id: (r.user_id as string) || '',
+      title: (r.title as string) || '',
+      items: (r.items as Todo['items']) || [],
+      is_template: (r.is_template as boolean) || false,
+      weekendId: (r.weekend_id as string) || undefined,
+      weekendName: (r.weekend_name as string) || undefined,
+      updated_at: (r.updated_at as string) || new Date().toISOString(),
+    }));
+  }
+  return [];
 }
 
 // ---------------------------------------------------------------------------

@@ -123,6 +123,14 @@ export interface TireInventoryItem {
   createdAt?: string;
   /** Car profile this tire belongs to */
   carId?: string;
+  /** ISO date when the tire was added to inventory */
+  dateAdded?: string;
+  /** User-entered age (days) at the time the tire was added — for used-tire import */
+  initialAgeDays?: number;
+  /** ISO dates when this tire was mounted in a session (deduped) */
+  usageDates?: string[];
+  /** Auto-derived: length of usageDates; persisted for fast display */
+  heatCycles?: number;
 }
 
 // ─── Session type / lap estimates ─────────────────────────────────────────────
@@ -206,6 +214,17 @@ export interface WeatherSnapshot {
   fetchedAt: string;
 }
 
+/** A single day's weather data — used for history & forecast strips */
+export interface WeatherHistoryDay {
+  date: string;          // ISO yyyy-mm-dd
+  tempMaxF?: number;
+  tempMinF?: number;
+  precipIn?: number;     // total precipitation inches
+  windMph?: number;
+  code?: number;         // WMO weather code
+  summary?: string;      // human-readable description
+}
+
 export interface RaceWeekend {
   id: string;
   name: string;
@@ -221,6 +240,10 @@ export interface RaceWeekend {
   /** Setup bound to this weekend */
   setupId?: string;
   setupName?: string;
+  /** Weather history for the 7 days leading up to race day */
+  weatherHistory?: WeatherHistoryDay[];
+  /** Weather forecast for race day + a few days out */
+  weatherForecast?: WeatherHistoryDay[];
 }
 
 export interface SetupAdjustment {
@@ -301,6 +324,9 @@ export interface Todo {
   items: TodoItem[];
   is_template?: boolean;
   updated_at: string;
+  /** Optional link to a race weekend (list-level association) */
+  weekendId?: string;
+  weekendName?: string;
 }
 
 export interface TeamProfile {
