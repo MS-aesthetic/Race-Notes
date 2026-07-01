@@ -1287,6 +1287,7 @@ export default function App() {
                   shockCount={carShockCount}
                   initialSubTab={settingsSubTab}
                   onClearAllData={handleClearAllData}
+                  tireInventory={tireInventory}
                 />
               )}
 

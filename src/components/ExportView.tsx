@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Setup, ActiveSession, RaceWeekend, AccountingEntry, ShoppingItem, Todo } from '../types';
+import { Setup, ActiveSession, RaceWeekend, AccountingEntry, ShoppingItem, Todo, TireInventoryItem } from '../types';
 import { User } from '@supabase/supabase-js';
 import { pullSharedData } from '../lib/sync';
 
@@ -13,9 +13,10 @@ interface ExportViewProps {
   todos?: Todo[];
   accounting?: AccountingEntry[];
   shopping?: ShoppingItem[];
+  tireInventory?: TireInventoryItem[];
 }
 
-export default function ExportView({ user = null, setup, activeSession, onImportSetup, onImportWeekend, weekends = [], todos = [], accounting = [], shopping = [] }: ExportViewProps) {
+export default function ExportView({ user = null, setup, activeSession, onImportSetup, onImportWeekend, weekends = [], todos = [], accounting = [], shopping = [], tireInventory = [] }: ExportViewProps) {
   const [cloudSync, setCloudSync] = useState(true);
   const [sharedSetups, setSharedSetups] = useState<Setup[]>([]);
   const [sharedWeekends, setSharedWeekends] = useState<RaceWeekend[]>([]);
@@ -592,6 +593,58 @@ export default function ExportView({ user = null, setup, activeSession, onImport
 
           </div>
         ))}
+      </div>
+
+      {/* Quick Exports */}
+      <div className="mt-8 pt-8 border-t border-outline-variant space-y-4">
+        <h2 className="font-display text-xl uppercase font-bold text-on-surface">Quick Exports</h2>
+        <p className="text-on-surface-variant font-mono text-xs">Download data as CSV files.</p>
+
+        <div className="grid grid-cols-2 gap-3">
+          {/* Tire CSV export */}
+          <button
+            onClick={() => {
+              const header = 'Tire #,Size,Compound,BS,Duro,PSI,Heat Cycles,Est Laps,Age (days)';
+              const rows = (tireInventory || []).map(t => {
+                const age = t.dateAdded
+                  ? Math.floor((Date.now() - new Date(t.dateAdded).getTime()) / 86400000) + (t.initialAgeDays ?? 0)
+                  : (t.initialAgeDays ?? 0);
+                return [t.tireNumber, t.size, t.compound, t.wheelBackspacing, t.durometer, t.airPressure || '', t.heatCycles ?? 0, 0, age].join(',');
+              });
+              const csv = [header, ...rows].join('\n');
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = `CrewChief_Tires_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click(); URL.revokeObjectURL(url);
+            }}
+            className="py-3 px-3 bg-surface-container border border-outline-variant rounded-lg font-mono text-xs uppercase font-bold text-on-surface hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[16px]">table</span>
+            Tires CSV
+          </button>
+
+          {/* Accounting CSV export */}
+          <button
+            onClick={() => {
+              const header = 'Date,Name,Description,Amount,Type,Payer,Payee,Weekend';
+              const rows = accounting.map(e =>
+                [e.date, e.name, e.description || '', String(e.amount), e.type, e.payer || '', e.payee || '', e.weekendName || '']
+                  .map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+              );
+              const csv = [header, ...rows].join('\n');
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = `CrewChief_Accounting_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click(); URL.revokeObjectURL(url);
+            }}
+            className="py-3 px-3 bg-surface-container border border-outline-variant rounded-lg font-mono text-xs uppercase font-bold text-on-surface hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[16px]">table</span>
+            Accounting CSV
+          </button>
+        </div>
       </div>
     </div>
   );

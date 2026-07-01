@@ -545,6 +545,7 @@ export default function TrackersView({
             onSaveTodos={onSaveTodos}
             teamMembers={teamMembers}
             currentUserId={currentUserId}
+            weekends={weekends}
           />
         )}
         {subTab === 'accounting' && (

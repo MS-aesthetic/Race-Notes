@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Todo, TodoItem } from '../types';
+import { Todo, TodoItem, RaceWeekend } from '../types';
 import { AppUser } from '../lib/supabase';
 
 // ── Completion confirmation modal ─────────────────────────────────────────
@@ -86,6 +86,7 @@ interface ToDoViewProps {
   onSaveTodos: (t: Todo[]) => void;
   teamMembers?: AppUser[];
   currentUserId?: string | null;
+  weekends?: RaceWeekend[];
 }
 
 export default function ToDoView({
@@ -93,6 +94,7 @@ export default function ToDoView({
   onSaveTodos,
   teamMembers = [],
   currentUserId = null,
+  weekends = [],
 }: ToDoViewProps) {
   const normalTodos = todos.filter(t => !t.is_template);
   const templates   = todos.filter(t => t.is_template);
@@ -284,6 +286,29 @@ export default function ToDoView({
         >
           {normalTodos.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
         </select>
+
+        {/* Weekend association */}
+        {weekends.length > 0 && (
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] uppercase font-mono text-on-surface-variant font-bold shrink-0">Weekend</label>
+            <select
+              className="flex-1 bg-surface-container border border-outline-variant p-1.5 rounded text-xs font-mono"
+              value={activeTodo?.weekendId || ''}
+              onChange={e => {
+                const wid = e.target.value;
+                const w = weekends.find(wk => wk.id === wid);
+                onSaveTodos(todos.map(t =>
+                  t.id === selectedId ? { ...t, weekendId: wid || undefined, weekendName: w?.name || undefined, updated_at: new Date().toISOString() } : t
+                ));
+              }}
+            >
+              <option value="">General / none</option>
+              {weekends.map(w => (
+                <option key={w.id} value={w.id}>{w.name} — {w.track} {w.date}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="border-t border-outline-variant/30 pt-3 mt-1 flex flex-col gap-2">
           <label className="text-[10px] uppercase font-mono text-on-surface-variant font-bold">Create New List</label>

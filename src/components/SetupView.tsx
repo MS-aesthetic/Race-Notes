@@ -4,6 +4,7 @@ import { INITIAL_SETUP } from '../data';
 import { User } from '@supabase/supabase-js';
 import { uploadAttachment, deleteAttachment } from '../lib/sync';
 import SmasherLoadsView from './SmasherLoadsView';
+import SetupDiffView from './SetupDiffView';
 import { byActiveCar } from '../lib/scope';
 import { getTireUsageHistory, getTireTotalLaps, downloadTireUsageCsv, printTireUsageReport } from '../lib/tireHistory';
 import { compareTireSize, sortBySize } from '../lib/tireSize';
@@ -236,6 +237,7 @@ export default function SetupView({
   const [tireSort, setTireSort] = useState<'newest' | 'oldest' | 'size-asc' | 'size-desc'>('newest');
   const [tireCompoundFilter, setTireCompoundFilter] = useState<string>('all');
   const [expandedTireId, setExpandedTireId] = useState<string | null>(null);
+  const [showCompare, setShowCompare] = useState(false);
 
   React.useEffect(() => { setSetups(savedSetups); }, [savedSetups]);
   React.useEffect(() => { setTires(tireInventory); }, [tireInventory]);
@@ -418,10 +420,22 @@ export default function SetupView({
             Autosaver Active — Changes saved automatically live trackside
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <SubTabBtn tab="setups" label="Setups" icon="settings_input_component" />
           <SubTabBtn tab="smasherloads" label="Loads" icon="show_chart" />
           <SubTabBtn tab="tires" label="Tires" icon="tire_repair" />
+          <button
+            onClick={() => setShowCompare(true)}
+            disabled={displayedSetups.length < 2}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-lg font-mono text-[11px] uppercase font-bold border-2 transition-all min-h-[60px] ${
+              displayedSetups.length < 2
+                ? 'border-outline-variant/30 text-on-surface-variant/30 cursor-not-allowed'
+                : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[26px] leading-none">compare_arrows</span>
+            <span className="leading-none text-center">Compare</span>
+          </button>
         </div>
       </div>
 
@@ -1009,6 +1023,14 @@ export default function SetupView({
             </div>
           )}
         </div>
+      )}
+
+      {/* Setup Compare modal */}
+      {showCompare && (
+        <SetupDiffView
+          setups={displayedSetups}
+          onClose={() => setShowCompare(false)}
+        />
       )}
     </div>
   );
