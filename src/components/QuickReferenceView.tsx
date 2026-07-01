@@ -555,7 +555,7 @@ export default function QuickReferenceView() {
   const isTighten = activeGroup?.type === 'tighten';
   const isDrive   = activeGroup?.type === 'drive';
   const accentClass = isTighten ? 'text-[#ff5555]' : isDrive ? 'text-tertiary' : 'text-primary';
-  const bgAccent    = isTighten ? 'bg-[#ba1a20]/10 border-[#ba1a20]/30' : isDrive ? 'bg-tertiary/10 border-tertiary/30' : 'bg-primary/10 border-primary/30';
+  const bgAccent    = isTighten ? 'bg-[#ba1a20]/10 border-red-900/30' : isDrive ? 'bg-tertiary/10 border-tertiary/30' : 'bg-primary/10 border-primary/30';
 
   const condInfo = trackCondition !== 'all' ? TRACK_CONDITION_INFO[trackCondition as Exclude<TrackCondition,'all'>] : null;
 
@@ -784,7 +784,7 @@ export default function QuickReferenceView() {
           <span className="material-symbols-outlined text-on-surface-variant">{shockOpen ? 'expand_less' : 'expand_more'}</span>
         </button>
         {shockOpen && (
-          <div className="border-t border-outline-variant/60 bg-[#0a0a0a] p-4 space-y-4">
+          <div className="border-t border-outline-variant/60 bg-surface p-4 space-y-4">
             {/* GRT Matrix */}
             <div>
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest mb-2">Shock Adjustment Matrix — Priority Order by Condition</p>
@@ -918,45 +918,47 @@ export default function QuickReferenceView() {
               </div>
             </div>
 
-            {/* Baseline specs */}
-            <div className="space-y-2">
-              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Baseline Specs — Modified &amp; Late Model (4-Bar)</p>
-              <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono text-on-surface-variant">
-                <div className="bg-surface-container border border-outline-variant/30 rounded p-2">
-                  <p className="text-on-surface font-bold mb-1 uppercase text-[9px]">Springs (IMCA/UMP)</p>
-                  <p>LF: 600 lbs · RF: 650 lbs (UMP)</p>
-                  <p>LR: 200 lbs · RR: 175 lbs</p>
+            {/* ── ADJUSTMENT REFERENCE: Tire Pressure, Springs & Weight ── */}
+            <div className="space-y-3">
+              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Quick Adjustment Reference — Dirt Modified &amp; Late Model</p>
+              <p className="text-[9px] text-on-surface-variant/60 font-mono">Starting points. Change <strong className="text-on-surface-variant">one thing at a time</strong>, then re-scale and re-check.</p>
+
+              {/* Tire Pressure */}
+              <div className="bg-surface-container border border-outline-variant/40 rounded p-3 space-y-2">
+                <p className="text-[10px] uppercase font-bold text-on-surface tracking-wider">Tire Pressure per Corner</p>
+                <p className="text-[9px] text-on-surface-variant">Lower = more grip at that corner. Higher = less grip, more stability. Adjust <strong className="text-on-surface">1–2 psi</strong> at a time.</p>
+                <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">RF ↑</span><p className="text-on-surface-variant">Frees car through middle (helps <strong className="text-on-surface">tight</strong>)</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">RF ↓</span><p className="text-on-surface-variant">Adds front grip (helps <strong className="text-on-surface">push/tight-in</strong>)</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">LF ↑</span><p className="text-on-surface-variant">Calms over-steering entry</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">LF ↓</span><p className="text-on-surface-variant">Adds LF bite/steering (helps <strong className="text-on-surface">tight-in</strong>)</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">RR ↑</span><p className="text-on-surface-variant">Less RR grip → looser off (helps <strong className="text-on-surface">tight-off</strong>)</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">RR ↓</span><p className="text-on-surface-variant">Adds forward bite (helps <strong className="text-on-surface">loose-off</strong>)</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">LR ↑</span><p className="text-on-surface-variant">Reduces bite (helps <strong className="text-on-surface">tight-in from too much LR</strong>)</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">LR ↓</span><p className="text-on-surface-variant">Adds LR bite/forward drive (helps <strong className="text-on-surface">loose-off</strong>)</p></div>
                 </div>
-                <div className="bg-surface-container border border-outline-variant/30 rounded p-2">
-                  <p className="text-on-surface font-bold mb-1 uppercase text-[9px]">Ride Heights (IMCA)</p>
-                  <p>LF: 8" · RF: 7¾"</p>
-                  <p>LR: 11¼" · RR: 10¾"</p>
+              </div>
+
+              {/* Spring Rates */}
+              <div className="bg-surface-container border border-outline-variant/40 rounded p-3 space-y-2">
+                <p className="text-[10px] uppercase font-bold text-on-surface tracking-wider">Spring Rate per Corner</p>
+                <p className="text-[9px] text-on-surface-variant">Front steps ≈ <strong className="text-on-surface">25–50 lb/in</strong>; Rear steps ≈ <strong className="text-on-surface">10–25 lb/in</strong>. Re-scale after every change.</p>
+                <div className="grid grid-cols-1 gap-1.5 text-[10px] font-mono">
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-[#ff5555] font-bold">Tight on Entry</span><p className="text-on-surface-variant">Soften <strong className="text-on-surface">LF</strong> and/or stiffen <strong className="text-on-surface">RF</strong> (≈25–50). Also: RF −25–50 or RR +25. Re-check toe & crossweight.</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">Loose on Entry</span><p className="text-on-surface-variant">Stiffen <strong className="text-on-surface">LF</strong> and/or soften <strong className="text-on-surface">RF</strong>.</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-[#ff5555] font-bold">Tight off (Exit)</span><p className="text-on-surface-variant">Soften <strong className="text-on-surface">LR</strong> and/or stiffen <strong className="text-on-surface">RR</strong>; or soften LF. Verify throttle application.</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">Loose off (Exit)</span><p className="text-on-surface-variant">Stiffen <strong className="text-on-surface">LR</strong> to calm rotation. Commonly: stiffen RR 25 or soften LR 25. Check rear steer & shock rebound.</p></div>
                 </div>
-                <div className="bg-surface-container border border-outline-variant/30 rounded p-2">
-                  <p className="text-on-surface font-bold mb-1 uppercase text-[9px]">4-Bar Lengths & Angles</p>
-                  <p>LR Lower: 14⅛" @ 5-6° up</p>
-                  <p>LR Upper: 16⅛" @ 21-23° up</p>
-                  <p>RR Lower: 14⅛" @ level</p>
-                  <p>RR Upper: 16⅛" @ 17-19° up</p>
-                </div>
-                <div className="bg-surface-container border border-outline-variant/30 rounded p-2">
-                  <p className="text-on-surface font-bold mb-1 uppercase text-[9px]">Weights & Wedge</p>
-                  <p>Left Side: 52–53%</p>
-                  <p>Rear: 55–56% (Mod) / 53.5–54% (LM)</p>
-                  <p>Wedge: 15–25 lbs LR (Mod)</p>
-                  <p>Wedge: ~120 lbs LR (Late Model open)</p>
-                </div>
-                <div className="bg-surface-container border border-outline-variant/30 rounded p-2">
-                  <p className="text-on-surface font-bold mb-1 uppercase text-[9px]">J-Bar Split</p>
-                  <p>IMCA tires: 3" split</p>
-                  <p>UMP/Wissota: 3½"–4" split</p>
-                  <p>Late Model: 6½" split</p>
-                </div>
-                <div className="bg-surface-container border border-outline-variant/30 rounded p-2">
-                  <p className="text-on-surface font-bold mb-1 uppercase text-[9px]">Air Pressure (Late Model)</p>
-                  <p>LF: 10 · RF: 12</p>
-                  <p>LR: 8 · RR: 10 (baseline)</p>
-                  <p>Stagger Rear: 4"–5"</p>
+              </div>
+
+              {/* Weight Distribution */}
+              <div className="bg-surface-container border border-outline-variant/40 rounded p-3 space-y-2">
+                <p className="text-[10px] uppercase font-bold text-on-surface tracking-wider">Weight Distribution &amp; Crossweight (Wedge)</p>
+                <p className="text-[9px] text-on-surface-variant">Crossweight = LR% + RF%. Raising ride height at a corner <strong className="text-on-surface">adds</strong> weight there AND at the diagonal opposite.</p>
+                <div className="grid grid-cols-1 gap-1.5 text-[10px] font-mono">
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-[#ff5555] font-bold">More Wedge</span><p className="text-on-surface-variant">More push into/through middle, but LR carries more → drives off better. <strong className="text-on-surface">Too much</strong> = loose into & through middle.</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">Too Little Wedge</span><p className="text-on-surface-variant">Tight into and through the middle.</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-on-surface font-bold">Dirt Starting Window</span><p className="text-on-surface-variant">Left-side ≈ <strong className="text-on-surface">53.5–55%</strong>. Roughly <strong className="text-on-surface">75–125 lb of wedge</strong>. Adjust to track/tackiness.</p></div>
                 </div>
               </div>
             </div>
@@ -980,7 +982,7 @@ export default function QuickReferenceView() {
           <span className="material-symbols-outlined text-on-surface-variant">{fourLinkOpen ? 'expand_less' : 'expand_more'}</span>
         </button>
         {fourLinkOpen && (
-          <div className="border-t border-outline-variant/60 bg-[#0a0a0a] p-4 space-y-4 text-[11px] font-mono">
+          <div className="border-t border-outline-variant/60 bg-surface p-4 space-y-4 text-[11px] font-mono">
 
             {/* Quick-read angle key */}
             <div className="flex gap-3 text-[10px]">
@@ -998,7 +1000,7 @@ export default function QuickReferenceView() {
             <div className="space-y-1.5">
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">LR Lower Bar (Controls Hike-Up Speed &amp; Rear Steer)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                <div className="bg-surface-container border border-[#ba1a20]/30 rounded p-2.5 space-y-1">
+                <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
                   <p className="text-[#ff5555] font-bold text-[10px] uppercase">Steeper Angle (raise chassis / lower birdcage)</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Faster LR chassis hike-up under acceleration</li>
@@ -1021,7 +1023,7 @@ export default function QuickReferenceView() {
             <div className="space-y-1.5">
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">LR Upper Bar / Drive Bar (Controls Anti-Squat &amp; Forward Bite)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                <div className="bg-surface-container border border-[#ba1a20]/30 rounded p-2.5 space-y-1">
+                <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
                   <p className="text-[#ff5555] font-bold text-[10px] uppercase">Steeper Angle (raise chassis / lower birdcage)</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Maximum anti-squat — LR tire mechanically clamped into track</li>
@@ -1044,7 +1046,7 @@ export default function QuickReferenceView() {
             <div className="space-y-1.5">
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">RR Lower Bar (Controls Entry Roll Steer)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                <div className="bg-surface-container border border-[#ba1a20]/30 rounded p-2.5 space-y-1">
+                <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
                   <p className="text-[#ff5555] font-bold text-[10px] uppercase">Steeper Angle</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>More RR roll steer on corner entry → forces RR wheel forward</li>
@@ -1067,7 +1069,7 @@ export default function QuickReferenceView() {
             <div className="space-y-1.5">
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">RR Upper Bar (RR Anti-Squat &amp; Side Bite)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                <div className="bg-surface-container border border-[#ba1a20]/30 rounded p-2.5 space-y-1">
+                <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
                   <p className="text-[#ff5555] font-bold text-[10px] uppercase">Steeper Angle</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>More RR anti-squat — loads RR tire harder under power</li>
@@ -1121,17 +1123,6 @@ export default function QuickReferenceView() {
               </div>
             </div>
 
-            {/* Baseline reference angles */}
-            <div className="bg-surface-container border border-outline-variant/40 rounded p-3 space-y-1.5">
-              <p className="text-[10px] uppercase font-bold text-on-surface tracking-wider">Baseline Bar Lengths &amp; Angles</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-on-surface-variant">
-                <div><p className="text-on-surface font-bold">LR Lower</p><p>14⅛" @ 5–6° up</p></div>
-                <div><p className="text-on-surface font-bold">LR Upper</p><p>16⅛" @ 21–23° up</p></div>
-                <div><p className="text-on-surface font-bold">RR Lower</p><p>14⅛" @ level</p></div>
-                <div><p className="text-on-surface font-bold">RR Upper</p><p>16⅛" @ 17–19° up</p></div>
-              </div>
-            </div>
-
           </div>
         )}
       </section>
@@ -1152,13 +1143,13 @@ export default function QuickReferenceView() {
           <span className="material-symbols-outlined text-on-surface-variant">{jBarOpen ? 'expand_less' : 'expand_more'}</span>
         </button>
         {jBarOpen && (
-          <div className="border-t border-outline-variant/60 bg-[#0a0a0a] p-4 space-y-4 text-[11px] font-mono">
+          <div className="border-t border-outline-variant/60 bg-surface p-4 space-y-4 text-[11px] font-mono">
 
             {/* Frame / Chassis Side */}
             <div className="space-y-1.5">
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Frame / Chassis Side — Controls Corner Entry</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                <div className="bg-surface-container border border-[#ba1a20]/30 rounded p-2.5 space-y-1">
+                <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
                   <p className="text-[#ff5555] font-bold text-[10px] uppercase">Raise Frame Mount</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Raises rear roll center</li>
@@ -1183,7 +1174,7 @@ export default function QuickReferenceView() {
             <div className="space-y-1.5">
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Pinion / Axle Side — Controls Corner Exit &amp; Forward Bite</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                <div className="bg-surface-container border border-[#ba1a20]/30 rounded p-2.5 space-y-1">
+                <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
                   <p className="text-[#ff5555] font-bold text-[10px] uppercase">Lower Pinion Mount (Steepen Rake)</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Steeper J-bar rake angle under power</li>
@@ -1209,7 +1200,7 @@ export default function QuickReferenceView() {
             <div className="space-y-1.5">
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Overall Height — Moving Both Ends Equally</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                <div className="bg-surface-container border border-[#ba1a20]/30 rounded p-2.5 space-y-1">
+                <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
                   <p className="text-[#ff5555] font-bold text-[10px] uppercase">Raise Both Ends</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Higher overall roll center</li>
@@ -1264,7 +1255,7 @@ export default function QuickReferenceView() {
           <span className="material-symbols-outlined text-on-surface-variant">{calcOpen ? 'expand_less' : 'expand_more'}</span>
         </button>
         {calcOpen && (
-          <div className="p-4 border-t border-outline-variant/60 bg-[#0a0a0a] space-y-4">
+          <div className="p-4 border-t border-outline-variant/60 bg-surface space-y-4">
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-[9px] font-mono uppercase text-on-surface-variant mb-1 font-bold tracking-wider">Top Gear</label>

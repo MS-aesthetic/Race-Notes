@@ -147,6 +147,11 @@ export const SESSION_TYPE_LAPS: Record<SessionType, number> = {
   'Feature': 30,
 };
 
+// ─── Track condition presets (WS-L) ───────────────────────────────────────────
+
+export const TRACK_CONDITION_PRESETS = ['Wet/Green', 'Tacky/Heavy', 'Cleaned Off', 'Rubbered Up', 'Dry Slick'] as const;
+export type TrackConditionPreset = typeof TRACK_CONDITION_PRESETS[number];
+
 export interface TireDetails {
   compound: string;
   size: string;
@@ -166,6 +171,10 @@ export interface SessionRecord {
   name: string;
   track: string;
   condition: string;
+  /** Track-condition preset from the dropdown (WS-L) */
+  trackConditionPreset?: TrackConditionPreset;
+  /** Free-text condition notes supplementing the preset (WS-L) */
+  conditionNotes?: string;
   bestLap: string;
   isBest?: boolean;
   avgLap?: string;
@@ -262,6 +271,10 @@ export interface ActiveSession {
   track: string;
   setupUsed: string;
   condition: string;
+  /** Track-condition preset from the dropdown (WS-L) */
+  trackConditionPreset?: TrackConditionPreset;
+  /** Free-text condition notes supplementing the preset (WS-L) */
+  conditionNotes?: string;
   weather: string;
   time: string;
   bestLap: string;

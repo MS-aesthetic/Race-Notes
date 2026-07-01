@@ -54,7 +54,7 @@ function CompletionModal({ item, onConfirm, onCancel }: CompletionModalProps) {
             value={note}
             onChange={e => setNote(e.target.value)}
             rows={3}
-            className="w-full bg-[#0e0e0e] border border-outline-variant focus:border-primary text-sm text-on-surface font-mono p-2.5 rounded outline-none resize-none"
+            className="w-full bg-surface-container border border-outline-variant focus:border-primary text-sm text-on-surface font-mono p-2.5 rounded outline-none resize-none"
           />
         </div>
 
@@ -278,7 +278,7 @@ export default function ToDoView({
       <div className="flex flex-col gap-2 bg-surface p-3 rounded-lg border border-outline-variant/50">
         <label className="text-[10px] uppercase font-mono text-on-surface-variant font-bold">Select Active List</label>
         <select
-          className="bg-[#0e0e0e] border border-outline-variant p-2 rounded text-sm font-mono w-full"
+          className="bg-surface-container border border-outline-variant p-2 rounded text-sm font-mono w-full"
           value={selectedId || ''}
           onChange={e => setSelectedId(e.target.value)}
         >
@@ -292,13 +292,13 @@ export default function ToDoView({
               type="text"
               placeholder="Title"
               required
-              className="flex-1 min-w-[120px] p-2 text-sm bg-[#0e0e0e] border border-outline-variant rounded font-mono"
+              className="flex-1 min-w-[120px] p-2 text-sm bg-surface-container border border-outline-variant rounded font-mono"
               value={newTitle}
               onChange={e => setNewTitle(e.target.value)}
             />
             {templates.length > 0 && (
               <select
-                className="p-2 text-sm bg-[#0e0e0e] border border-outline-variant rounded font-mono max-w-[140px]"
+                className="p-2 text-sm bg-surface-container border border-outline-variant rounded font-mono max-w-[140px]"
                 value={selectedTemplateId}
                 onChange={e => setSelectedTemplateId(e.target.value)}
               >
@@ -352,7 +352,7 @@ export default function ToDoView({
               <input
                 type="text"
                 placeholder="What needs to be done?"
-                className="flex-1 p-2 bg-[#0e0e0e] border border-outline-variant/50 focus:border-primary text-sm font-mono rounded outline-none"
+                className="flex-1 p-2 bg-surface-container border border-outline-variant/50 focus:border-primary text-sm font-mono rounded outline-none"
                 value={newItemText}
                 onChange={e => setNewItemText(e.target.value)}
               />
@@ -387,7 +387,7 @@ export default function ToDoView({
               <textarea
                 placeholder="Optional task notes..."
                 rows={2}
-                className="w-full p-2 bg-[#0e0e0e] border border-outline-variant/50 focus:border-primary text-xs font-mono rounded outline-none resize-none text-on-surface-variant"
+                className="w-full p-2 bg-surface-container border border-outline-variant/50 focus:border-primary text-xs font-mono rounded outline-none resize-none text-on-surface-variant"
                 value={newItemDesc}
                 onChange={e => setNewItemDesc(e.target.value)}
               />
@@ -399,7 +399,7 @@ export default function ToDoView({
                 <select
                   value={newItemAssignee}
                   onChange={e => setNewItemAssignee(e.target.value)}
-                  className="flex-1 p-2 bg-[#0e0e0e] border border-outline-variant/50 focus:border-primary text-xs font-mono rounded outline-none"
+                  className="flex-1 p-2 bg-surface-container border border-outline-variant/50 focus:border-primary text-xs font-mono rounded outline-none"
                 >
                   <option value="">Unassigned</option>
                   {teamMembers.map(m => (
@@ -436,7 +436,7 @@ export default function ToDoView({
                       className={`relative flex items-start gap-3 p-3 rounded border transition-colors ${
                         isAssignedToMe
                           ? 'bg-primary/5 border-primary/40 hover:border-primary/70'
-                          : 'bg-[#0e0e0e] border-outline-variant/30 hover:border-primary/30'
+                          : 'bg-surface-container border-outline-variant/30 hover:border-primary/30'
                       }`}
                     >
                       {/* Left accent stripe for my tasks */}
@@ -497,7 +497,7 @@ export default function ToDoView({
                 {displayDone.map(item => (
                   <div
                     key={item.id}
-                    className="flex items-start gap-3 p-3 bg-[#0e0e0e]/50 rounded border border-outline-variant/20"
+                    className="flex items-start gap-3 p-3 bg-surface-container/50 rounded border border-outline-variant/20"
                   >
                     <input
                       type="checkbox"

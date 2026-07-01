@@ -23,6 +23,8 @@ interface SetupViewProps {
   onSaveShockSessions?: (updated: ShockSession[]) => void;
   /** Needed to derive per-tire usage history (which sessions/tracks/corners used each tire). */
   weekends?: RaceWeekend[];
+  /** Deep-link into a specific sub-tab (e.g. from Dashboard Tires panel). */
+  initialSubTab?: 'setups' | 'smasherloads' | 'tires';
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -73,7 +75,7 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = []
       <div className="p-4 grid grid-cols-2 gap-4">
 
         {/* Tire from Inventory picker */}
-        <div className="col-span-2 bg-[#111] p-2 rounded border border-outline-variant/30 flex items-center justify-between gap-2">
+        <div className="col-span-2 bg-surface-container p-2 rounded border border-outline-variant/30 flex items-center justify-between gap-2">
           <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant flex-shrink-0">Tire from Inventory</label>
           <select
             value={data.tireInventoryId || ''}
@@ -98,7 +100,7 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = []
         </div>
 
         {/* Bound Smasher Graph */}
-        <div className="col-span-2 bg-[#111] p-2 rounded border border-outline-variant/30 flex items-center justify-between">
+        <div className="col-span-2 bg-surface-container p-2 rounded border border-outline-variant/30 flex items-center justify-between">
           <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant">Bound Smasher Graph</label>
           <select value={data.boundGraphId || ''} onChange={(e) => onFieldChange('boundGraphId', e.target.value)}
             className="bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded min-w-[120px]">
@@ -218,8 +220,9 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = []
 export default function SetupView({
   savedSetups, activeSetupId, onSaveSetups, user, tireInventory, onSaveTires, onDeleteTireFromCloud,
   activeCarId = null, activeCar = null, shockSessions = [], onSaveShockSessions, weekends = [],
+  initialSubTab,
 }: SetupViewProps) {
-  const [subTab, setSubTab] = useState<'setups' | 'smasherloads' | 'tires'>('setups');
+  const [subTab, setSubTab] = useState<'setups' | 'smasherloads' | 'tires'>(initialSubTab ?? 'setups');
   const [setups, setSetups] = useState<Setup[]>(savedSetups);
   const [activeId, setActiveId] = useState<string>(activeSetupId);
   const [expandedId, setExpandedId] = useState<string | null>(activeSetupId);
@@ -568,7 +571,7 @@ export default function SetupView({
                             { label: 'Front Stagger (RF − LF)', value: setupItem.frontStagger || computeStagger(setupItem.rf.tireSize, setupItem.lf.tireSize) },
                             { label: 'Rear Stagger (RR − LR)', value: setupItem.rearStagger || computeStagger(setupItem.rr.tireSize, setupItem.lr.tireSize) },
                           ].map(({ label, value }) => (
-                            <div key={label} className="bg-[#111] border border-outline-variant/40 rounded p-2.5">
+                            <div key={label} className="bg-surface-container border border-outline-variant/40 rounded p-2.5">
                               <span className="text-[9px] font-mono uppercase font-bold text-on-surface-variant/70 block">{label}</span>
                               <span className="font-mono text-lg font-black text-primary tracking-tight">{value || <span className="text-on-surface-variant/40 text-xs font-normal">— enter tire sizes</span>}</span>
                             </div>
@@ -601,7 +604,7 @@ export default function SetupView({
                                   { label: 'Cross %', value: crossP, hint: '(LR+RF) / Total' },
                                   { label: 'LR Split', value: lrSplit, hint: 'LR − RR' },
                                 ].map(({ label, value, hint }) => (
-                                  <div key={label} className="bg-[#111] border border-outline-variant/40 rounded p-2.5">
+                                  <div key={label} className="bg-surface-container border border-outline-variant/40 rounded p-2.5">
                                     <span className="text-[9px] font-mono uppercase font-bold text-on-surface-variant/70 block">{label}</span>
                                     <span className="font-mono text-lg font-black text-primary tracking-tight">{value}</span>
                                     <span className="text-[8px] font-mono text-on-surface-variant/30 block mt-0.5">{hint}</span>
@@ -609,7 +612,7 @@ export default function SetupView({
                                 ))}
                               </div>
                               {hasAll && (
-                                <div className="mt-2 bg-[#111] border border-outline-variant/30 rounded px-3 py-1.5 flex items-center justify-between">
+                                <div className="mt-2 bg-surface-container border border-outline-variant/30 rounded px-3 py-1.5 flex items-center justify-between">
                                   <span className="text-[9px] font-mono uppercase text-on-surface-variant/60">Total Scale Weight</span>
                                   <span className="font-mono text-sm font-black text-on-surface">{total.toFixed(0)} lb</span>
                                 </div>

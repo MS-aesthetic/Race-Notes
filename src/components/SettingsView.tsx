@@ -42,41 +42,41 @@ const ACCENT_PRESETS = [
 ];
 
 export default function SettingsView({ user, profile, onAuthChange, setup, activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], shopping = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, onClearAllData }: SettingsViewProps) {
-  const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>(initialSubTab ?? 'account');
+  const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>(initialSubTab ?? 'garage');
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0); // 0=idle, 1=confirm, 2=clearing
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   return (
     <div className="flex flex-col gap-4 h-full">
-      {/* Sub-tab bar */}
-      <div className="flex bg-surface rounded-lg p-0.5 border border-outline-variant/30 text-xs font-mono uppercase tracking-wider">
+      {/* Sub-tab bar */}      
+      <div className="flex bg-surface rounded-lg p-0.5 border border-outline-variant/30 text-sm font-sans overflow-x-auto">
         <button
           onClick={() => setSubTab('garage')}
-          className={`flex-1 py-2 rounded-md transition-all ${subTab === 'garage' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'garage' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
         >
           Garage
         </button>
         <button
           onClick={() => setSubTab('account')}
-          className={`flex-1 py-2 rounded-md transition-all ${subTab === 'account' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'account' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
         >
           Account
         </button>
         <button
           onClick={() => setSubTab('appearance')}
-          className={`flex-1 py-2 rounded-md transition-all ${subTab === 'appearance' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'appearance' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
         >
           Style
         </button>
         <button
           onClick={() => setSubTab('export')}
-          className={`flex-1 py-2 rounded-md transition-all ${subTab === 'export' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'export' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
         >
           Export
         </button>
         <button
           onClick={() => setSubTab('guide')}
-          className={`flex-1 py-2 rounded-md transition-all ${subTab === 'guide' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'guide' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
         >
           Guide
         </button>
@@ -281,7 +281,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
 
             {/* Reset */}
             <button
-              onClick={() => onThemeChange({ mode: 'dark', accent: '#ffb3ac', fontSize: 'standard' })}
+              onClick={() => onThemeChange({ mode: 'dark', accent: '#ffb3ac', fontSize: 'large' })}
               className="w-full py-2 border border-outline-variant text-on-surface-variant font-mono text-xs uppercase rounded hover:border-outline transition-colors"
             >
               Reset to Defaults

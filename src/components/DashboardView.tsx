@@ -39,6 +39,7 @@ interface DashboardViewProps {
   onSelectSession: (session: SessionRecord, weekendId?: string) => void;
   onSelectSetup: (setupId: string) => void;
   onGoToTodos: () => void;
+  onGoToTires?: () => void;
   onDeleteWeekend: (weekendId: string) => void;
   activeCarId?: string | null;
 }
@@ -55,6 +56,7 @@ export default function DashboardView({
   onSelectSession,
   onSelectSetup,
   onGoToTodos,
+  onGoToTires,
   onDeleteWeekend,
   activeCarId = null,
 }: DashboardViewProps) {
@@ -215,7 +217,7 @@ export default function DashboardView({
                   </div>
 
                   {isExpanded && (
-                    <div className="divide-y divide-outline-variant/30 bg-[#161616]/30">
+                    <div className="divide-y divide-outline-variant/30 bg-surface-container/30">
                       {weekend.sessions.length === 0 ? (
                         <div className="p-4 text-xs font-mono text-center text-on-surface-variant/50">No sessions logged yet.</div>
                       ) : (
@@ -294,7 +296,7 @@ export default function DashboardView({
       {/* TIRES */}
       <section>
         <button
-          onClick={() => setTiresOpen(v => !v)}
+          onClick={() => onGoToTires ? onGoToTires() : setTiresOpen(v => !v)}
           className="w-full flex items-center justify-between p-3 bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors"
         >
           <div className="flex items-center gap-2">
@@ -304,12 +306,11 @@ export default function DashboardView({
             </span>
           </div>
           <span
-            className="material-symbols-outlined text-on-surface-variant transition-transform duration-200"
-            style={{ transform: tiresOpen ? 'rotate(180deg)' : 'none' }}
-          >expand_more</span>
+            className="material-symbols-outlined text-on-surface-variant"
+          >chevron_right</span>
         </button>
 
-        {tiresOpen && (
+        {!onGoToTires && tiresOpen && (
           <div className="mt-1 border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
             {displayedTires.length === 0 ? (
               <div className="p-4 text-center text-xs font-mono text-on-surface-variant/50">No tires in inventory — add tires under Setups.</div>

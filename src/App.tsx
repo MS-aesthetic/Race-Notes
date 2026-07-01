@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
-import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem, Car, ShockSession, CAR_TYPES } from './types';
+import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem, Car, ShockSession, CAR_TYPES, TRACK_CONDITION_PRESETS, TrackConditionPreset } from './types';
 import {
   INITIAL_SETUP,
   INITIAL_SETUPS,
@@ -166,7 +166,9 @@ export default function App() {
   const carShockCount = (carId: string) => shockSessions.filter(s => s.carId === carId).length;
 
   // Navigate to Settings → Garage from the active-car chip
-  const [settingsSubTab, setSettingsSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>('account');
+  const [settingsSubTab, setSettingsSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>('garage');
+  // Deep-link into SetupView sub-tabs from Dashboard
+  const [setupSubTab, setSetupSubTab] = useState<'setups' | 'smasherloads' | 'tires'>('setups');
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   const [theme, setTheme] = useState<AppTheme>(() => {
@@ -174,7 +176,7 @@ export default function App() {
       const saved = localStorage.getItem('race_notes_theme');
       if (saved) return JSON.parse(saved);
     } catch {}
-    return { mode: 'dark', accent: '#ffb3ac', fontSize: 'standard' };
+    return { mode: 'dark', accent: '#ffb3ac', fontSize: 'large' };
   });
 
   const handleThemeChange = (updated: AppTheme) => {
@@ -262,6 +264,8 @@ export default function App() {
   const [newSessionTrack, setNewSessionTrack] = useState('');
   const [newSessionType, setNewSessionType] = useState<'Test' | 'Hot Laps' | 'Qualifying' | 'Heat Race' | 'Feature'>('Test');
   const [newSessionCond, setNewSessionCond] = useState('');
+  const [newSessionTrackCondition, setNewSessionTrackCondition] = useState<TrackConditionPreset | ''>('');
+  const [newSessionConditionNotes, setNewSessionConditionNotes] = useState('');
   const [newSessionTimeOfDay, setNewSessionTimeOfDay] = useState<'current' | 'Afternoon' | 'Evening' | 'Night'>('current');
   // Session weather fetch state
   const [sessionWeatherStr, setSessionWeatherStr] = useState('');
@@ -684,6 +688,8 @@ export default function App() {
     if (targetId) setNewSessionWeekendId(targetId);
     setNewSessionType('Test');
     setNewSessionCond('');
+    setNewSessionTrackCondition('');
+    setNewSessionConditionNotes('');
     setSessionWeatherStr('');
     setSessionWeatherError('');
     setShowSessionZipInput(false);
@@ -795,6 +801,8 @@ export default function App() {
       track: targetWeekend.track,
       setupUsed: setup.chassis || 'Default Setup',
       condition: newSessionCond || '',
+      trackConditionPreset: newSessionTrackCondition || undefined,
+      conditionNotes: newSessionConditionNotes || undefined,
       weather: sessionWeatherStr || '',
       time: resolvedTime,
       bestLap: '',
@@ -826,6 +834,8 @@ export default function App() {
       name: sessionName,
       track: targetWeekend.track,
       condition: newSessionCond,
+      trackConditionPreset: newSessionTrackCondition || undefined,
+      conditionNotes: newSessionConditionNotes || undefined,
       bestLap: '',
       avgLap: '',
       finishPos: '',
@@ -964,7 +974,7 @@ export default function App() {
 
   if (!authReady) {
     return (
-      <div className="h-full w-full bg-[#0e0e0e] flex items-center justify-center">
+      <div className="h-full w-full bg-surface flex items-center justify-center">
         <span className="material-symbols-outlined text-primary text-3xl animate-pulse">headset_mic</span>
       </div>
     );
@@ -972,7 +982,7 @@ export default function App() {
 
   if (!isUnlocked) {
     return (
-      <div className="h-full w-full bg-[#0e0e0e] text-on-surface font-sans flex flex-col items-center justify-start p-0" id="applet-auth-gate">
+      <div className="h-full w-full bg-surface text-on-surface font-sans flex flex-col items-center justify-start p-0" id="applet-auth-gate">
         <div
           id="viewport-chassis"
           className="w-full max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl mx-auto bg-background h-full flex flex-col shadow-none md:shadow-2xl md:border-x border-outline-variant/20"
@@ -1003,7 +1013,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-full w-full bg-[#0e0e0e] text-on-surface font-sans flex flex-col items-center justify-start p-0" id="applet-main-body">
+    <div className="h-full w-full bg-surface text-on-surface font-sans flex flex-col items-center justify-start p-0" id="applet-main-body">
 
       {/* Main Core Layout Viewport Container suitable for PWA deployment */}
       <div
@@ -1123,6 +1133,10 @@ export default function App() {
                     setActiveTab('setups');
                   }}
                   onGoToTodos={() => setActiveTab('trackers')}
+                  onGoToTires={() => {
+                    setSetupSubTab('tires');
+                    setActiveTab('setups');
+                  }}
                   onDeleteWeekend={handleDeleteWeekend}
                 />
               )}
@@ -1140,6 +1154,7 @@ export default function App() {
                   shockSessions={shockSessions}
                   onSaveShockSessions={handleSaveShockSessions}
                   weekends={weekends}
+                  initialSubTab={setupSubTab}
                   onSaveSetups={(updatedSetups, activeId) => {
                     setSavedSetups(updatedSetups);
                     localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
@@ -1406,7 +1421,7 @@ export default function App() {
 
       {/* NEW WEEKEND FORM DIALOG */}
       {showNewWeekendForm && (
-        <div className="fixed inset-0 bg-[#000000d5] backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in shadow-2xl">
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in shadow-2xl">
           <div className="bg-surface border-2 border-outline rounded-lg p-6 max-w-sm w-full space-y-4 shadow-2xl relative text-on-surface">
             <button
               onClick={() => setShowNewWeekendForm(false)}
@@ -1424,7 +1439,7 @@ export default function App() {
 
             <form onSubmit={handleCreateNewWeekend} className="space-y-3">
               <div>
-                <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">
+                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
                   Weekend Event Name
                 </label>
                 <input
@@ -1433,12 +1448,12 @@ export default function App() {
                   placeholder="e.g. Knoxville Nationals"
                   value={newWeekendName}
                   onChange={(e) => setNewWeekendName(e.target.value)}
-                  className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+                  className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">
+                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
                   Track Name / Speedway
                 </label>
                 <input
@@ -1447,12 +1462,12 @@ export default function App() {
                   placeholder="e.g. Knoxville Raceway"
                   value={newWeekendTrack}
                   onChange={(e) => setNewWeekendTrack(e.target.value)}
-                  className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+                  className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">
+                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
                   Date Range
                 </label>
                 <input
@@ -1461,20 +1476,20 @@ export default function App() {
                   placeholder="e.g. June 12-14, 2026"
                   value={newWeekendDate}
                   onChange={(e) => setNewWeekendDate(e.target.value)}
-                  className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+                  className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
                 />
               </div>
 
               {savedSetups.length > 0 && (
                 <div>
-                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">
+                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
                     Bind a Setup (optional)
                   </label>
                   <div className="relative">
                     <select
                       value={newWeekendSetupId}
                       onChange={e => setNewWeekendSetupId(e.target.value)}
-                      className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
+                      className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
                     >
                       <option value="">-- No setup selected --</option>
                       {/* Decision 3: filter to active car's setups */}
@@ -1491,7 +1506,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowNewWeekendForm(false)}
-                  className="px-3 py-2 border border-outline-variant hover:bg-[#1a1a1a] text-on-surface-variant uppercase cursor-pointer rounded"
+                  className="px-3 py-2 border border-outline-variant hover:bg-surface-container-high text-on-surface-variant uppercase cursor-pointer rounded"
                 >
                   Cancel
                 </button>
@@ -1509,7 +1524,7 @@ export default function App() {
 
       {/* NEW SESSION FORM DIALOG / DRAWER POPUP */}
       {showNewSessionForm && (
-        <div className="fixed inset-0 bg-[#000000d5] backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in shadow-2xl">
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in shadow-2xl">
           <div className="bg-surface border-2 border-outline rounded-lg p-6 max-w-sm w-full space-y-4 shadow-2xl relative text-on-surface">
             <button
               onClick={() => setShowNewSessionForm(false)}
@@ -1528,7 +1543,7 @@ export default function App() {
             {weekends.length === 0 ? (
               <div className="text-center py-4 space-y-3">
                 <p className="text-xs text-on-surface-variant uppercase font-mono">No race weekends found.</p>
-                <p className="text-[11px] text-[#aeaaae] mb-2">Create a Race Weekend event first to log sessions under it!</p>
+                <p className="text-[11px] text-on-surface-variant/60 mb-2">Create a Race Weekend event first to log sessions under it!</p>
                 <button
                   onClick={() => {
                     setShowNewSessionForm(false);
@@ -1552,7 +1567,7 @@ export default function App() {
                         const selected = weekends.find(w => w.id === e.target.value);
                         if (selected) setNewSessionTrack(selected.track);
                       }}
-                      className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
+                      className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
                     >
                       {weekends.map((w) => (
                         <option key={w.id} value={w.id}>{w.name} ({w.track})</option>
@@ -1564,7 +1579,7 @@ export default function App() {
 
                 {/* Session type */}
                 <div>
-                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">Session Type</label>
+                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Session Type</label>
                   <div className="grid grid-cols-5 gap-1">
                     {([
                       { key: 'Test', code: 'Test' },
@@ -1593,22 +1608,43 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Surface conditions */}
+                {/* Track Condition Presets (WS-L) */}
                 <div>
-                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">Surface Conditions</label>
+                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Track Condition</label>
+                  <div className="grid grid-cols-3 gap-1 mb-2">
+                    {TRACK_CONDITION_PRESETS.map(preset => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setNewSessionTrackCondition(p => p === preset ? '' : preset)}
+                        className={`py-2 px-1 rounded border font-mono text-[10px] font-bold transition-all text-center leading-tight ${
+                          newSessionTrackCondition === preset
+                            ? 'bg-primary/20 border-primary text-primary'
+                            : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                        }`}
+                      >{preset}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Surface conditions / free-text notes */}
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Surface Notes (free text)</label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g. Tacky Clay"
-                    value={newSessionCond}
-                    onChange={(e) => setNewSessionCond(e.target.value)}
-                    className="w-full bg-[#141414] text-xs text-on-surface p-2 border border-outline-variant focus:border-primary rounded"
+                    placeholder="e.g. Rough, Dusty, One Lane..."
+                    value={newSessionConditionNotes}
+                    onChange={(e) => setNewSessionConditionNotes(e.target.value)}
+                    className="w-full bg-surface-container text-xs text-on-surface p-2 border border-outline-variant focus:border-primary rounded"
                   />
                 </div>
 
+                {/* Legacy condition field — kept for backward compat but deprecated */}
+                <input type="hidden" value={newSessionCond} />
+
                 {/* Time of Day */}
                 <div>
-                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">Time of Day</label>
+                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Time of Day</label>
                   <div className="grid grid-cols-4 gap-1">
                     {([
                       { value: 'current', label: 'Current Time' },
@@ -1632,7 +1668,7 @@ export default function App() {
 
                 {/* Weather */}
                 <div>
-                  <label className="block text-[11px] font-mono uppercase text-[#aca9a8] mb-1">Weather (optional)</label>
+                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Weather (optional)</label>
                   <div className="flex gap-2 mb-2">
                     <button
                       type="button"
@@ -1664,7 +1700,7 @@ export default function App() {
                         placeholder="ZIP code"
                         value={sessionZipCode}
                         onChange={e => setSessionZipCode(e.target.value)}
-                        className="flex-1 bg-[#141414] border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-xs text-on-surface outline-none"
+                        className="flex-1 bg-surface-container border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-xs text-on-surface outline-none"
                       />
                       <button type="submit" disabled={sessionWeatherLoading} className="bg-primary text-on-primary px-3 py-2 rounded font-mono text-[10px] font-bold uppercase disabled:opacity-50">
                         {sessionWeatherLoading ? '…' : 'Get'}
@@ -1673,7 +1709,7 @@ export default function App() {
                   )}
                   {sessionWeatherError && <p className="font-mono text-[11px] text-red-400 mb-1">{sessionWeatherError}</p>}
                   {sessionWeatherStr ? (
-                    <div className="bg-[#141414] border border-primary/30 rounded px-3 py-2 font-mono text-xs text-on-surface flex items-center gap-2">
+                    <div className="bg-surface-container border border-primary/30 rounded px-3 py-2 font-mono text-xs text-on-surface flex items-center gap-2">
                       <span className="material-symbols-outlined text-primary text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>cloud</span>
                       {sessionWeatherStr}
                     </div>
@@ -1686,7 +1722,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setShowNewSessionForm(false)}
-                    className="px-3 py-2 border border-outline-variant hover:bg-[#1a1a1a] text-[#cac7c6] uppercase cursor-pointer rounded"
+                    className="px-3 py-2 border border-outline-variant hover:bg-surface-container-high text-on-surface-variant uppercase cursor-pointer rounded"
                   >
                     Cancel
                   </button>

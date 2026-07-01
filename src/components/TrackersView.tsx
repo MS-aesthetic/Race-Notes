@@ -52,7 +52,7 @@ function WeekendPicker({ weekends, value, onChange }: { weekends: RaceWeekend[];
           const w = weekends.find(w => w.id === e.target.value);
           onChange(e.target.value, w?.name || '');
         }}
-        className="flex-1 p-2 bg-[#0e0e0e] border border-outline-variant/50 focus:border-primary text-xs font-mono rounded outline-none"
+        className="flex-1 p-2 bg-surface-container border border-outline-variant/50 focus:border-primary text-xs font-mono rounded outline-none"
       >
         <option value="">No Weekend (general)</option>
         {weekends.map(w => <option key={w.id} value={w.id}>{w.name} — {w.track}</option>)}
@@ -199,24 +199,24 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
           {/* Name + Amount */}
           <div className="flex gap-2">
             <input required placeholder="Name *" value={name} onChange={e => setName(e.target.value)}
-              className="flex-1 p-2.5 bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+              className="flex-1 p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
             <div className="relative">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-on-surface-variant text-sm">$</span>
               <input required type="number" min="0.01" step="0.01" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)}
-                className="w-28 pl-6 pr-2 py-2.5 bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+                className="w-28 pl-6 pr-2 py-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
             </div>
           </div>
 
           {/* Description */}
           <textarea placeholder="Description (optional)" rows={2} value={desc} onChange={e => setDesc(e.target.value)}
-            className="w-full p-2.5 bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none resize-none" />
+            className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none resize-none" />
 
           {/* Payer / Payee */}
           <div className="grid grid-cols-2 gap-2">
             <input placeholder={type === 'income' ? 'From (payer)' : 'Paid by (payer)'} value={payer} onChange={e => setPayer(e.target.value)}
-              className="p-2.5 bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+              className="p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
             <input placeholder={type === 'income' ? 'To (payee)' : 'Paid to (payee)'} value={payee} onChange={e => setPayee(e.target.value)}
-              className="p-2.5 bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+              className="p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
           </div>
 
           {/* Weekend link */}
@@ -387,7 +387,7 @@ function ShoppingTab({ items, onSave, weekends }: { items: ShoppingItem[]; onSav
             placeholder="Item name *"
             value={name}
             onChange={e => setName(e.target.value)}
-            className="flex-1 p-2.5 bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none"
+            className="flex-1 p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none"
           />
           <div className="relative">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-on-surface-variant text-sm">$</span>
@@ -398,7 +398,7 @@ function ShoppingTab({ items, onSave, weekends }: { items: ShoppingItem[]; onSav
               placeholder="Cost"
               value={cost}
               onChange={e => setCost(e.target.value)}
-              className="w-24 pl-6 pr-2 py-2.5 bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none"
+              className="w-24 pl-6 pr-2 py-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none"
             />
           </div>
           <button
@@ -417,7 +417,7 @@ function ShoppingTab({ items, onSave, weekends }: { items: ShoppingItem[]; onSav
             rows={2}
             value={desc}
             onChange={e => setDesc(e.target.value)}
-            className="w-full p-2.5 bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none resize-none"
+            className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none resize-none"
           />
         )}
         <WeekendPicker weekends={weekends} value={weekendId} onChange={(id, name) => { setWeekendId(id); setWeekendName(name); }} />
@@ -463,7 +463,7 @@ function ShoppingTab({ items, onSave, weekends }: { items: ShoppingItem[]; onSav
 
           {/* Purchased */}
           {bought.map(item => (
-            <div key={item.id} className="flex items-start gap-3 p-3 bg-[#0e0e0e]/40 border border-outline-variant/20 rounded-lg">
+            <div key={item.id} className="flex items-start gap-3 p-3 bg-surface-container/40 border border-outline-variant/20 rounded-lg">
               <input
                 type="checkbox"
                 checked={true}

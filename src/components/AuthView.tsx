@@ -235,7 +235,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}
               placeholder="Your racing name"
-              className="w-full bg-[#0e0e0e] border border-outline-variant/50 rounded-md px-3 py-2.5
+              className="w-full bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
                          text-sm text-on-surface placeholder:text-on-surface-variant/40
                          focus:border-primary/50 focus:outline-none font-mono"
               autoComplete="name"
@@ -253,7 +253,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
             onChange={e => setEmail(e.target.value)}
             placeholder="racer@example.com"
             required
-            className="w-full bg-[#0e0e0e] border border-outline-variant/50 rounded-md px-3 py-2.5
+            className="w-full bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
                        text-sm text-on-surface placeholder:text-on-surface-variant/40
                        focus:border-primary/50 focus:outline-none font-mono"
             autoComplete="email"
@@ -271,7 +271,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
             placeholder="••••••••"
             required
             minLength={6}
-            className="w-full bg-[#0e0e0e] border border-outline-variant/50 rounded-md px-3 py-2.5
+            className="w-full bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
                        text-sm text-on-surface placeholder:text-on-surface-variant/40
                        focus:border-primary/50 focus:outline-none font-mono"
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
@@ -295,7 +295,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 px-4 bg-primary text-[#0e0e0e] font-mono text-xs font-bold 
+          className="w-full py-2.5 px-4 bg-primary text-on-primary font-mono text-xs font-bold 
                      uppercase tracking-wider rounded-md
                      hover:brightness-110 transition-all active:scale-[0.98]
                      disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"

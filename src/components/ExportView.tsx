@@ -476,7 +476,7 @@ export default function ExportView({ user = null, setup, activeSession, onImport
               <select
                 value={selectedWeekendId}
                 onChange={e => setSelectedWeekendId(e.target.value)}
-                className="w-full bg-[#0e0e0e] border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-3 rounded-lg outline-none appearance-none cursor-pointer pr-8"
+                className="w-full bg-surface-container border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-3 rounded-lg outline-none appearance-none cursor-pointer pr-8"
               >
                 {weekends.map(w => (
                   <option key={w.id} value={w.id}>{w.name} — {w.track} ({w.date})</option>
