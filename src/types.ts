@@ -408,3 +408,203 @@ export interface AppTheme {
    *  both Chromium-based. 'standard' | 'large' | 'xlarge' | 'xxlarge'. */
   fontSize: 'standard' | 'large' | 'xlarge' | 'xxlarge';
 }
+
+// ===========================================================================
+// v2 feature batch (plan-v2.md) — WS-N Data Model Foundation
+// ===========================================================================
+
+// ---- Maintenance / ERP (WS-N/O/P) -----------------------------------------
+
+export const MAINTENANCE_CATEGORIES = [
+  'Oil', 'Motor', 'Transmission', 'Bearings', 'Shocks', 'Rear End', 'Trailer', 'Other',
+] as const;
+export type MaintenanceCategory = typeof MAINTENANCE_CATEGORIES[number] | string;
+
+/** How a component's service interval is measured */
+export type MaintenanceIntervalType = 'laps' | 'sessions' | 'races' | 'days';
+
+/** Usage fraction at which a component is flagged "due" (before overdue) */
+export const MAINTENANCE_DUE_THRESHOLD = 0.8;
+
+/**
+ * A tracked part / service item (oil, motor, bearings, trailer, ...).
+ * scope 'car'  → filtered by byActiveCar (carId required)
+ * scope 'rig'  → truck/trailer/global — never car-filtered
+ * localStorage: race_notes_maintenance · Supabase: maintenance_components
+ */
+export interface MaintenanceComponent {
+  id: string;
+  scope: 'car' | 'rig';
+  carId?: string;
+  name: string;                       // e.g. "Engine oil", "LR bearing"
+  category: MaintenanceCategory;
+  intervalType: MaintenanceIntervalType;
+  intervalValue: number;              // e.g. 250 (laps), 3 (races), 60 (days)
+  /** ISO — usage is derived from sessions/weekends AFTER this timestamp */
+  lastServicedAt: string;
+  /** Manual counter for items that can't be derived from session data */
+  manualUnits?: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Service history entry — logging one resets the component's counter.
+ *  localStorage: race_notes_maintenance_logs · Supabase: maintenance_logs */
+export interface MaintenanceLog {
+  id: string;
+  componentId: string;
+  date: string;                       // ISO
+  type: 'service' | 'replace' | 'inspect';
+  notes?: string;
+  cost?: number;
+  /** Link into the accounting ledger when the service created an expense */
+  accountingEntryId?: string;
+  /** Usage snapshot at time of service (for history display) */
+  usedAtService?: number;
+  doneBy?: string;
+  doneByName?: string;
+}
+
+/** Derived status for display (computed in src/lib/maintenance.ts) */
+export interface MaintenanceStatus {
+  used: number;
+  limit: number;
+  pct: number;                        // 0..n (can exceed 1)
+  state: 'ok' | 'due' | 'overdue';
+}
+
+// ---- Pre-race checklists (WS-N/Q/R) ---------------------------------------
+
+export const CHECKLIST_CATEGORIES = [
+  'Supplies', 'Trailer Loading', 'Truck Loading', 'Car Prep', 'Custom',
+] as const;
+export type ChecklistCategory = typeof CHECKLIST_CATEGORIES[number] | string;
+
+export interface ChecklistTemplateItem {
+  id: string;
+  text: string;
+}
+
+/** Reusable checklist template.
+ *  localStorage: race_notes_checklist_templates · Supabase: checklist_templates */
+export interface ChecklistTemplate {
+  id: string;
+  name: string;
+  category: ChecklistCategory;
+  items: ChecklistTemplateItem[];
+  updatedAt: string;
+}
+
+export interface ChecklistItemState {
+  id: string;
+  text: string;
+  done: boolean;
+  doneBy?: string;                    // user_id
+  doneByName?: string;                // cached display name (offline)
+  doneAt?: string;                    // ISO
+}
+
+/** Per-weekend checklist instance (snapshot copy of a template, or ad-hoc).
+ *  localStorage: race_notes_weekend_checklists · Supabase: weekend_checklists */
+export interface WeekendChecklist {
+  id: string;
+  weekendId?: string;                 // nulled if the weekend is deleted
+  weekendName?: string;
+  templateId?: string;
+  name: string;
+  category: ChecklistCategory;
+  items: ChecklistItemState[];
+  updatedAt: string;
+}
+
+// ---- Location sharing & push (WS-N/S/T/U) ----------------------------------
+
+/** Supabase: push_tokens (owner-only RLS; Edge Function reads via service role) */
+export interface PushTokenRecord {
+  userId: string;
+  token: string;
+  platform: 'android' | 'web';
+  deviceId: string;
+  updatedAt: string;
+}
+
+export type AppNotificationType = 'ping' | 'come_here' | 'system';
+
+/** Supabase: notifications (team-scoped RLS; delivered via FCM + Realtime) */
+export interface AppNotification {
+  id: string;
+  toUser: string;
+  fromUser?: string;
+  fromUserName?: string;
+  teamId?: string;
+  type: AppNotificationType;
+  title: string;
+  body: string;
+  /** e.g. { lat, lng, label } for come_here targets */
+  data?: Record<string, unknown>;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+/** Live, ephemeral team member location (NOT part of local-first sync —
+ *  written directly + subscribed via Supabase Realtime; TTL via expires_at).
+ *  Supabase: team_locations */
+export interface TeamLocation {
+  userId: string;
+  userName?: string;
+  teamId: string;
+  lat: number;
+  lng: number;
+  heading?: number;
+  speedMph?: number;
+  /** Optional status label, e.g. "On the way to the track" */
+  label?: string;
+  updatedAt: string;
+  expiresAt: string;
+}
+
+// ---- Truck directions (WS-N/V/W/X) -----------------------------------------
+
+/** Rig profile used for HERE truck routing restrictions.
+ *  localStorage: race_notes_truck_profile (+ mirrored into Team.profile) */
+export interface TruckProfile {
+  grossWeightLb?: number;
+  heightIn?: number;
+  lengthIn?: number;
+  widthIn?: number;
+  axleCount?: number;
+  trailerCount?: number;
+  /** Saved home base / shop origin */
+  homeBase?: { lat: number; lng: number; label: string };
+}
+
+export interface TripStop {
+  id: string;
+  kind: 'truck_stop' | 'rest_area' | 'custom';
+  name: string;
+  lat: number;
+  lng: number;
+  /** Meters from route start, for along-route ordering */
+  distAlongRouteM?: number;
+  selected?: boolean;                 // include in navigation handoff
+}
+
+/** A planned truck route (HERE), cached locally to preserve API quota.
+ *  localStorage: race_notes_trips · Supabase: saved_trips */
+export interface SavedTrip {
+  id: string;
+  weekendId?: string;
+  weekendName?: string;
+  origin: { lat: number; lng: number; label: string };
+  destination: { lat: number; lng: number; label: string };
+  /** Decoded route geometry [lat, lng][] (from HERE flexible polyline) */
+  polyline?: [number, number][];
+  distanceM?: number;
+  durationS?: number;
+  /** Raw HERE notices (grade warnings, restrictions) for display */
+  notices?: string[];
+  stops: TripStop[];
+  createdAt: string;
+  updatedAt: string;
+}
