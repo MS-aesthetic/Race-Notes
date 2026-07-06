@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
-import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem, Car, ShockSession, CAR_TYPES, TRACK_CONDITION_PRESETS, TrackConditionPreset, MaintenanceComponent, MaintenanceLog } from './types';
+import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem, Car, ShockSession, CAR_TYPES, TRACK_CONDITION_PRESETS, TrackConditionPreset, MaintenanceComponent, MaintenanceLog, ChecklistTemplate, WeekendChecklist } from './types';
 import {
   INITIAL_SETUP,
   INITIAL_SETUPS,
@@ -15,7 +15,8 @@ import {
 
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, AppUser } from './lib/supabase';
 import AuthView from './components/AuthView';
-import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, pushMaintenanceLogs, pullMaintenanceLogs } from './lib/sync';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, pushMaintenanceLogs, pullMaintenanceLogs, pushChecklistTemplates, pullChecklistTemplates, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
+import { instantiateTemplate, materializeStarterTemplate, checklistProgress } from './lib/checklists';
 import { syncTireLifecycle } from './lib/tireHistory';
 
 import DashboardView from './components/DashboardView';
@@ -68,6 +69,14 @@ export default function App() {
 
   const [activeCarId, setActiveCarId] = useState<string | null>(() => {
     return localStorage.getItem('race_notes_active_car');
+  });
+
+  // ── Checklists (WS-R) ────────────────────────────────────────────────
+  const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(() => {
+    try { const s = localStorage.getItem('race_notes_checklist_templates'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const [weekendChecklists, setWeekendChecklists] = useState<WeekendChecklist[]>(() => {
+    try { const s = localStorage.getItem('race_notes_weekend_checklists'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
 
   // ── Maintenance / ERP (WS-P) ──────────────────────────────────────────────
@@ -125,6 +134,18 @@ export default function App() {
     if (user) pushMaintenanceLogs(updated, user.id, setSyncStatus);
   };
 
+  const handleSaveChecklistTemplates = (updated: ChecklistTemplate[]) => {
+    setChecklistTemplates(updated);
+    localStorage.setItem('race_notes_checklist_templates', JSON.stringify(updated));
+    if (user) pushChecklistTemplates(updated, user.id, setSyncStatus);
+  };
+
+  const handleSaveWeekendChecklists = (updated: WeekendChecklist[]) => {
+    setWeekendChecklists(updated);
+    localStorage.setItem('race_notes_weekend_checklists', JSON.stringify(updated));
+    if (user) pushWeekendChecklists(updated, user.id, setSyncStatus);
+  };
+
   // handleDeleteCar implemented in Phase 7 — stub here
   const handleDeleteCar = (carId: string) => {
     const sc = savedSetups.filter(s => s.carId === carId).length;
@@ -152,6 +173,7 @@ export default function App() {
       'race_notes_accounting', 'race_notes_shopping', 'race_notes_cars',
       'race_notes_active_car', 'race_notes_shock_graphs',
       'race_notes_maintenance', 'race_notes_maintenance_logs',
+      'race_notes_checklist_templates', 'race_notes_weekend_checklists',
     ];
     LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
 
@@ -182,6 +204,8 @@ export default function App() {
     setShopping([]);
     setMaintenance([]);
     setMaintenanceLogs([]);
+    setChecklistTemplates([]);
+    setWeekendChecklists([]);
     setSyncStatus('All data cleared');
   };
 
@@ -265,7 +289,7 @@ export default function App() {
     if (!flashReadyRef.current || suppressPullRef.current) return;
     flashSaved();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setup, savedSetups, weekends, activeSession, tireInventory, cars, shockSessions, todos, accounting, shopping, maintenance, maintenanceLogs]);
+  }, [setup, savedSetups, weekends, activeSession, tireInventory, cars, shockSessions, todos, accounting, shopping, maintenance, maintenanceLogs, checklistTemplates, weekendChecklists]);
 
   // Auto-dismiss any sync status so a message can never get "stuck" on screen.
   // 'Syncing...' is left alone (it's replaced by 'Synced' when the pull finishes).
@@ -487,6 +511,17 @@ export default function App() {
       if (cloudMaintLogs.length > 0) {
         setMaintenanceLogs(cloudMaintLogs);
         localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(cloudMaintLogs));
+      }
+
+      const cloudClTemplates = await pullChecklistTemplates(setSyncStatus);
+      if (cloudClTemplates.length > 0) {
+        setChecklistTemplates(cloudClTemplates);
+        localStorage.setItem('race_notes_checklist_templates', JSON.stringify(cloudClTemplates));
+      }
+      const cloudWkndChecklists = await pullWeekendChecklists(setSyncStatus);
+      if (cloudWkndChecklists.length > 0) {
+        setWeekendChecklists(cloudWkndChecklists);
+        localStorage.setItem('race_notes_weekend_checklists', JSON.stringify(cloudWkndChecklists));
       }
 
       setSyncStatus('Synced');
@@ -939,6 +974,11 @@ export default function App() {
     // Hard-delete from cloud so it doesn't come back on next sync pull
     deleteWeekendFromCloud(weekendId);
     if (user) pushWeekends(updated, user.id);
+    // Null out weekendId on any checklists that belonged to this weekend (preserve the lists)
+    const updatedChecklists = weekendChecklists.map(c =>
+      c.weekendId === weekendId ? { ...c, weekendId: undefined, weekendName: undefined } : c
+    );
+    handleSaveWeekendChecklists(updatedChecklists);
   };
 
   const handleDeleteSession = (weekendId: string, sessionId: string) => {
@@ -1298,6 +1338,9 @@ export default function App() {
                     setNewWeekendDate(new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
                     setShowNewWeekendForm(true);
                   }}
+                  checklistTemplates={checklistTemplates}
+                  weekendChecklists={weekendChecklists}
+                  onSaveWeekendChecklists={handleSaveWeekendChecklists}
                 />
               )}
 
@@ -1361,6 +1404,8 @@ export default function App() {
                   savedSetups={savedSetups}
                   activeCarId={activeCarId}
                   initialSubTab={trackersSubTab}
+                  checklistTemplates={checklistTemplates}
+                  onSaveChecklistTemplates={handleSaveChecklistTemplates}
                 />
               )}
             </motion.div>

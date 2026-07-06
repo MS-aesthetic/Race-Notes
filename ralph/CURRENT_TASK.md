@@ -1,6 +1,60 @@
-# Current Task — WS-P: Maintenance UI — COMPLETE, see STATE.md
+# Current Task — WS-R: Checklist UI (weekend checklists + template manager)
 
-**Status:** PASS 93 · commit 47da05b
+**Workstream:** WS-R — Checklist UI
+**Attempt:** 1
+**Files (Primary):** `src/components/RaceWeekendView.tsx`, `src/components/TrackersView.tsx`
+**Files (Secondary):** `src/App.tsx`
+
+## Scope
+
+Wire the WS-Q `checklists.ts` engine into UI.
+
+### App.tsx
+1. Add `ChecklistTemplate, WeekendChecklist` to type imports.
+2. Import sync fns: `pushChecklistTemplates, pullChecklistTemplates, pushWeekendChecklists, pullWeekendChecklists`.
+3. Import engine fns: `instantiateTemplate, materializeStarterTemplate, checklistProgress` from `./lib/checklists`.
+4. Add state: `checklistTemplates: ChecklistTemplate[]`, `weekendChecklists: WeekendChecklist[]`.
+5. Add handlers: `handleSaveChecklistTemplates`, `handleSaveWeekendChecklists`.
+6. Pull in cloud sync.
+7. Pass `checklistTemplates, weekendChecklists, onSaveWeekendChecklists` to `<RaceWeekendView>`.
+8. Pass `checklistTemplates, onSaveChecklistTemplates` to `<TrackersView>`.
+9. Add `checklistTemplates, weekendChecklists` to Saved-toast watch list.
+10. In `handleDeleteWeekend`: null out `weekendId` on checklists belonging to that weekend (set weekendId to undefined, preserve the list).
+
+### RaceWeekendView.tsx (primary)
+1. Add props: `checklistTemplates?: ChecklistTemplate[]`, `weekendChecklists?: WeekendChecklist[]`, `onSaveWeekendChecklists?: (c: WeekendChecklist[]) => void`.
+2. Import `ChecklistTemplate, WeekendChecklist` from `../types`; `instantiateTemplate, checklistProgress` from `../lib/checklists`.
+3. Inside the Weekend Info Banner section (after the weekend-notes textarea, before `</section>`): add a **Checklists** collapsible sub-section.
+   - Shows each attached checklist as a row: name + `done/total` progress ring + tap to expand items.
+   - Expanded: shows each `ChecklistItemState` row with checkbox; checking stamps `doneAt + doneBy = user?.id`.
+   - "+ Add checklist" button → small sheet modal: lists available templates + "Blank" option.
+   - Blank option creates a new WeekendChecklist with empty items array that can be extended.
+   - Delete icon per checklist (removes from weekendChecklists by id).
+
+### TrackersView.tsx (primary)
+1. Add `'checklists'` to `SubTab` type.
+2. Add props: `checklistTemplates: ChecklistTemplate[]`, `onSaveChecklistTemplates: (t: ChecklistTemplate[]) => void`.
+3. Add "Checklists" tab to `SUB_TABS`.
+4. Implement inline `<ChecklistsTab>` component:
+   - Lists templates with name, item count, edit/delete.
+   - Edit: toggle expanded to show item list + add/remove/reorder items.
+   - "Add template" form (name, category).
+   - "Use starter templates" button if no templates yet — calls `materializeStarterTemplate` on each STARTER_TEMPLATE.
+
+## Out of scope
+- New-weekend flow template picker (modal post-create) — skip for now.
+- Offline team-sync reordering — items just persisted as-is.
+
+## Acceptance criteria
+- [ ] Checklists section appears in RaceWeekendView weekend banner; shows progress per checklist.
+- [ ] Can attach a template to a weekend, check off items (doneAt stamped).
+- [ ] Template manager in Trackers → Checklists: CRUD works, starter templates offered.
+- [ ] Weekend delete nulls weekendId on associated checklists (list preserved).
+- [ ] `npm run lint` — baseline 3 errors only.
+- [ ] `npm run build` — succeeds.
+
+## Human prerequisites
+None.
 
 **Workstream:** WS-P — Maintenance UI
 **Attempt:** 1

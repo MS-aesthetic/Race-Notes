@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup } from '../types';
+import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, ChecklistTemplate, WeekendChecklist } from '../types';
 import { User } from '@supabase/supabase-js';
 import { sortBySize } from '../lib/tireSize';
+import { instantiateTemplate, checklistProgress } from '../lib/checklists';
 
 interface RaceWeekendViewProps {
   user: User | null;
@@ -15,6 +16,9 @@ interface RaceWeekendViewProps {
   onSelectSession: (session: SessionRecord, weekendId?: string) => void;
   onNewSession?: () => void;
   onNewWeekend?: () => void;
+  checklistTemplates?: ChecklistTemplate[];
+  weekendChecklists?: WeekendChecklist[];
+  onSaveWeekendChecklists?: (c: WeekendChecklist[]) => void;
 }
 
 // ── Weather condition code → label ────────────────────────────────────────────
@@ -58,8 +62,187 @@ function compressImage(file: File, maxPx = 1024, quality = 0.82): Promise<string
   });
 }
 
+// ── Checklists section (inline component) ─────────────────────────────────────
+
+function ChecklistsSection({
+  weekendId, weekendName, allChecklists, templates, userId, onSave,
+}: {
+  weekendId: string;
+  weekendName: string;
+  allChecklists: WeekendChecklist[];
+  templates: ChecklistTemplate[];
+  userId?: string;
+  onSave: (c: WeekendChecklist[]) => void;
+}) {
+  const uid = (p: string) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+  const mine = allChecklists.filter(c => c.weekendId === weekendId);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
+
+  const toggleItem = (checklistId: string, itemId: string) => {
+    const updated = allChecklists.map(c => {
+      if (c.id !== checklistId) return c;
+      return {
+        ...c,
+        updatedAt: new Date().toISOString(),
+        items: c.items.map(it =>
+          it.id !== itemId ? it :
+          it.done
+            ? { ...it, done: false, doneAt: undefined, doneBy: undefined, doneByName: undefined }
+            : { ...it, done: true, doneAt: new Date().toISOString(), doneBy: userId }
+        ),
+      };
+    });
+    onSave(updated);
+  };
+
+  const attachTemplate = (template: ChecklistTemplate) => {
+    const cl = instantiateTemplate(template, weekendId, weekendName);
+    onSave([...allChecklists, cl]);
+    setShowPicker(false);
+    setExpandedId(cl.id);
+  };
+
+  const addBlank = () => {
+    const cl: WeekendChecklist = {
+      id: uid('chk'),
+      weekendId,
+      weekendName,
+      name: 'New Checklist',
+      category: 'Custom',
+      items: [],
+      updatedAt: new Date().toISOString(),
+    };
+    onSave([...allChecklists, cl]);
+    setShowPicker(false);
+    setExpandedId(cl.id);
+  };
+
+  const deleteChecklist = (id: string) => {
+    if (!window.confirm('Remove this checklist?')) return;
+    onSave(allChecklists.filter(c => c.id !== id));
+  };
+
+  return (
+    <div className="p-4 border-t border-outline-variant/40">
+      <div className="flex items-center justify-between mb-3">
+        <span className="font-mono text-[10px] uppercase font-bold text-on-surface-variant tracking-wider">Checklists</span>
+        <button
+          onClick={() => setShowPicker(v => !v)}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary font-mono text-[10px] uppercase font-bold transition-colors"
+        >
+          <span className="material-symbols-outlined text-[13px]">{showPicker ? 'close' : 'add'}</span>
+          Add
+        </button>
+      </div>
+
+      {/* Template picker */}
+      {showPicker && (
+        <div className="mb-3 bg-surface-container-high border border-outline-variant rounded-lg overflow-hidden">
+          {templates.length > 0 ? (
+            <>
+              {templates.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => attachTemplate(t)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-primary/10 transition-colors border-b border-outline-variant/30 last:border-0 text-left"
+                >
+                  <span className="font-mono text-xs text-on-surface">{t.name}</span>
+                  <span className="font-mono text-[10px] text-on-surface-variant">{t.items.length} items</span>
+                </button>
+              ))}
+            </>
+          ) : (
+            <p className="px-3 py-3 font-mono text-[10px] text-on-surface-variant/50 italic">
+              No templates yet — create them in Trackers → Checklists.
+            </p>
+          )}
+          <button
+            onClick={addBlank}
+            className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-surface-container transition-colors border-t border-outline-variant/30 text-on-surface-variant"
+          >
+            <span className="material-symbols-outlined text-[14px]">add_circle</span>
+            <span className="font-mono text-xs">Blank checklist</span>
+          </button>
+        </div>
+      )}
+
+      {/* Checklist rows */}
+      {mine.length === 0 && !showPicker ? (
+        <p className="font-mono text-[10px] text-on-surface-variant/40 italic">No checklists for this weekend yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {mine.map(cl => {
+            const prog = checklistProgress(cl);
+            const pct = Math.round(prog.pct * 100);
+            const isExpanded = expandedId === cl.id;
+            return (
+              <div key={cl.id} className="bg-surface rounded-lg border border-outline-variant overflow-hidden">
+                <button
+                  onClick={() => setExpandedId(isExpanded ? null : cl.id)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-surface-container-high transition-colors text-left"
+                >
+                  {/* Progress ring (simple text ring) */}
+                  <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center shrink-0 font-mono text-[10px] font-bold ${pct >= 100 ? 'border-green-500 text-green-400' : pct > 0 ? 'border-primary text-primary' : 'border-outline-variant text-on-surface-variant'}`}>
+                    {prog.done}/{prog.total}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-mono text-xs font-semibold text-on-surface block truncate">{cl.name}</span>
+                    <span className={`font-mono text-[10px] ${pct >= 100 ? 'text-green-400' : 'text-on-surface-variant/50'}`}>
+                      {pct >= 100 ? '✓ Complete' : `${pct}%`}
+                    </span>
+                  </div>
+                  <span className="material-symbols-outlined text-on-surface-variant/50 text-[16px] transition-transform duration-200"
+                    style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>expand_more</span>
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteChecklist(cl.id); }}
+                    className="material-symbols-outlined text-[15px] text-on-surface-variant/30 hover:text-red-400 shrink-0"
+                  >close</button>
+                </button>
+                {isExpanded && (
+                  <div className="border-t border-outline-variant/40 divide-y divide-outline-variant/20">
+                    {cl.items.length === 0 ? (
+                      <p className="px-4 py-3 font-mono text-[10px] text-on-surface-variant/40 italic">No items in this checklist.</p>
+                    ) : (
+                      cl.items.map(item => (
+                        <button
+                          key={item.id}
+                          onClick={() => toggleItem(cl.id, item.id)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container transition-colors text-left"
+                        >
+                          <span className={`material-symbols-outlined text-[18px] ${item.done ? 'text-green-500' : 'text-outline-variant'}`}
+                            style={{ fontVariationSettings: item.done ? "'FILL' 1" : "'FILL' 0" }}>
+                            {item.done ? 'check_circle' : 'radio_button_unchecked'}
+                          </span>
+                          <span className={`font-mono text-xs flex-1 ${item.done ? 'line-through text-on-surface-variant/40' : 'text-on-surface'}`}>
+                            {item.text}
+                          </span>
+                          {item.doneAt && (
+                            <span className="font-mono text-[9px] text-on-surface-variant/30 shrink-0">
+                              {new Date(item.doneAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main RaceWeekendView ──────────────────────────────────────────────────────
+
 export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession, onNewWeekend,
+  user,
+  checklistTemplates = [], weekendChecklists = [], onSaveWeekendChecklists,
 }: RaceWeekendViewProps) {
   const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
@@ -375,6 +558,18 @@ export default function RaceWeekendView({
               onChange={e => handleWeekendNotes(e.target.value)}
             />
           </div>
+
+          {/* Checklists */}
+          {onSaveWeekendChecklists && (
+            <ChecklistsSection
+              weekendId={currentWeekend.id}
+              weekendName={currentWeekend.name}
+              allChecklists={weekendChecklists}
+              templates={checklistTemplates}
+              userId={user?.id}
+              onSave={onSaveWeekendChecklists}
+            />
+          )}
         </section>
       )}
 

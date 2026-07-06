@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Todo, AccountingEntry, ShoppingItem, RaceWeekend, MaintenanceComponent, MaintenanceLog, Setup, MaintenanceCategory, MAINTENANCE_CATEGORIES, MaintenanceIntervalType } from '../types';
+import { Todo, AccountingEntry, ShoppingItem, RaceWeekend, MaintenanceComponent, MaintenanceLog, Setup, MaintenanceCategory, MAINTENANCE_CATEGORIES, MaintenanceIntervalType, ChecklistTemplate, CHECKLIST_CATEGORIES } from '../types';
 import { AppUser } from '../lib/supabase';
 import { getComponentStatus, applyServiceLog, DEFAULT_COMPONENTS } from '../lib/maintenance';
+import { STARTER_TEMPLATES, materializeStarterTemplate } from '../lib/checklists';
 import ToDoView from './ToDoView';
 
 // ── Sub-tab type (declared early; used in Props and component) ───────────────
 
-type SubTab = 'tasks' | 'accounting' | 'shopping' | 'service';
+type SubTab = 'tasks' | 'accounting' | 'shopping' | 'service' | 'checklists';
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,8 @@ interface TrackersViewProps {
   onSaveMaintenanceLogs: (l: MaintenanceLog[]) => void;
   savedSetups: Setup[];
   activeCarId: string | null;
+  checklistTemplates: ChecklistTemplate[];
+  onSaveChecklistTemplates: (t: ChecklistTemplate[]) => void;
   initialSubTab?: SubTab;
 }
 
@@ -815,6 +818,183 @@ function ServiceTab({
   );
 }
 
+// ── Checklists Tab (template manager) ────────────────────────────────────────
+
+function ChecklistsTab({
+  templates, onSaveTemplates,
+}: {
+  templates: ChecklistTemplate[];
+  onSaveTemplates: (t: ChecklistTemplate[]) => void;
+}) {
+  const uid = (p: string) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addName, setAddName] = useState('');
+  const [addCategory, setAddCategory] = useState<string>('Custom');
+  const [newItemText, setNewItemText] = useState<Record<string, string>>({});
+
+  const addStarterTemplates = () => {
+    const materialized = STARTER_TEMPLATES.map(s => materializeStarterTemplate(s));
+    onSaveTemplates([...templates, ...materialized]);
+  };
+
+  const handleAddTemplate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addName.trim()) return;
+    const now = new Date().toISOString();
+    const tmpl: ChecklistTemplate = {
+      id: uid('tmpl'),
+      name: addName.trim(),
+      category: addCategory,
+      items: [],
+      updatedAt: now,
+    };
+    onSaveTemplates([...templates, tmpl]);
+    setExpandedId(tmpl.id);
+    setAddName(''); setAddCategory('Custom'); setShowAddForm(false);
+  };
+
+  const deleteTemplate = (id: string) => {
+    if (!window.confirm('Delete this template?')) return;
+    onSaveTemplates(templates.filter(t => t.id !== id));
+    if (expandedId === id) setExpandedId(null);
+  };
+
+  const addItem = (templateId: string) => {
+    const text = (newItemText[templateId] || '').trim();
+    if (!text) return;
+    onSaveTemplates(templates.map(t => t.id !== templateId ? t : {
+      ...t,
+      updatedAt: new Date().toISOString(),
+      items: [...t.items, { id: uid('tmpli'), text }],
+    }));
+    setNewItemText(prev => ({ ...prev, [templateId]: '' }));
+  };
+
+  const removeItem = (templateId: string, itemId: string) => {
+    onSaveTemplates(templates.map(t => t.id !== templateId ? t : {
+      ...t,
+      updatedAt: new Date().toISOString(),
+      items: t.items.filter(i => i.id !== itemId),
+    }));
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Header actions */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => setShowAddForm(v => !v)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary font-mono text-[11px] uppercase font-bold transition-colors"
+        >
+          <span className="material-symbols-outlined text-[15px]">{showAddForm ? 'close' : 'add'}</span>
+          {showAddForm ? 'Cancel' : 'New Template'}
+        </button>
+        {templates.length === 0 && !showAddForm && (
+          <button
+            onClick={addStarterTemplates}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 border border-primary/40 text-primary font-mono text-[11px] uppercase font-bold hover:bg-primary/20 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[15px]">auto_awesome</span>
+            Use Starters
+          </button>
+        )}
+      </div>
+
+      {/* Add template form */}
+      {showAddForm && (
+        <form onSubmit={handleAddTemplate} className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+          <input required placeholder="Template name *" value={addName} onChange={e => setAddName(e.target.value)}
+            className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+          <div>
+            <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">Category</label>
+            <select value={addCategory} onChange={e => setAddCategory(e.target.value)}
+              className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-xs outline-none">
+              {(CHECKLIST_CATEGORIES as readonly string[]).map(c => <option key={c} value={c}>{c}</option>)}
+              <option value="Custom">Custom</option>
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="flex-1 py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80">Create Template</button>
+            <button type="button" onClick={() => setShowAddForm(false)} className="px-4 py-2.5 border border-outline-variant rounded-lg font-mono text-xs text-on-surface-variant">Cancel</button>
+          </div>
+        </form>
+      )}
+
+      {/* Empty state */}
+      {templates.length === 0 && !showAddForm && (
+        <div className="text-center py-10 space-y-2 text-on-surface-variant/40">
+          <span className="material-symbols-outlined text-4xl block">fact_check</span>
+          <p className="font-mono text-xs">No templates yet.</p>
+          <p className="font-mono text-[10px]">Use starter templates or create your own.</p>
+        </div>
+      )}
+
+      {/* Template list */}
+      <div className="space-y-2">
+        {templates.map(tmpl => {
+          const isExpanded = expandedId === tmpl.id;
+          return (
+            <div key={tmpl.id} className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
+              <button
+                onClick={() => setExpandedId(isExpanded ? null : tmpl.id)}
+                className="w-full flex items-center gap-3 px-3 py-3 hover:bg-surface-container-high transition-colors text-left"
+              >
+                <span className="material-symbols-outlined text-primary text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>fact_check</span>
+                <div className="flex-1 min-w-0">
+                  <span className="font-mono text-sm font-semibold text-on-surface block truncate">{tmpl.name}</span>
+                  <span className="font-mono text-[10px] text-on-surface-variant/50">{tmpl.category} · {tmpl.items.length} items</span>
+                </div>
+                <span className="material-symbols-outlined text-on-surface-variant/50 text-[16px] transition-transform duration-200"
+                  style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>expand_more</span>
+                <button
+                  onClick={e => { e.stopPropagation(); deleteTemplate(tmpl.id); }}
+                  className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-red-400 shrink-0"
+                >close</button>
+              </button>
+              {isExpanded && (
+                <div className="border-t border-outline-variant/40">
+                  {/* Items list */}
+                  <div className="divide-y divide-outline-variant/20">
+                    {tmpl.items.length === 0 && (
+                      <p className="px-4 py-2 font-mono text-[10px] text-on-surface-variant/40 italic">No items yet. Add below.</p>
+                    )}
+                    {tmpl.items.map(item => (
+                      <div key={item.id} className="flex items-center gap-2 px-4 py-2">
+                        <span className="material-symbols-outlined text-outline-variant text-[15px]">drag_indicator</span>
+                        <span className="flex-1 font-mono text-xs text-on-surface">{item.text}</span>
+                        <button
+                          onClick={() => removeItem(tmpl.id, item.id)}
+                          className="material-symbols-outlined text-[14px] text-on-surface-variant/30 hover:text-red-400"
+                        >close</button>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Add item */}
+                  <div className="flex items-center gap-2 p-3 border-t border-outline-variant/40">
+                    <input
+                      placeholder="Add item…"
+                      value={newItemText[tmpl.id] || ''}
+                      onChange={e => setNewItemText(prev => ({ ...prev, [tmpl.id]: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem(tmpl.id); } }}
+                      className="flex-1 p-2 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-xs outline-none"
+                    />
+                    <button
+                      onClick={() => addItem(tmpl.id)}
+                      className="bg-primary text-on-primary px-3 py-2 rounded font-bold text-sm shrink-0"
+                    >+</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── TrackersView ──────────────────────────────────────────────────────────────
 
 const SUB_TABS: { id: SubTab; label: string; icon: string }[] = [
@@ -822,6 +1002,7 @@ const SUB_TABS: { id: SubTab; label: string; icon: string }[] = [
   { id: 'accounting', label: 'Accounting', icon: 'account_balance'  },
   { id: 'shopping',   label: 'Shopping',   icon: 'shopping_cart'    },
   { id: 'service',    label: 'Service',    icon: 'build'            },
+  { id: 'checklists', label: 'Checklists', icon: 'fact_check'       },
 ];
 
 export default function TrackersView({
@@ -833,6 +1014,7 @@ export default function TrackersView({
   maintenanceLogs, onSaveMaintenanceLogs,
   savedSetups, activeCarId,
   initialSubTab,
+  checklistTemplates, onSaveChecklistTemplates,
 }: TrackersViewProps) {
   const [subTab, setSubTab] = useState<SubTab>(initialSubTab ?? 'tasks');
 
@@ -888,6 +1070,12 @@ export default function TrackersView({
             activeCarId={activeCarId}
             accounting={accounting}
             onSaveAccounting={onSaveAccounting}
+          />
+        )}
+        {subTab === 'checklists' && (
+          <ChecklistsTab
+            templates={checklistTemplates}
+            onSaveTemplates={onSaveChecklistTemplates}
           />
         )}
       </div>

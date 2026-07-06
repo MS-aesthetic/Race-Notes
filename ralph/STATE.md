@@ -20,7 +20,7 @@
 | WS-O | Maintenance engine | complete | 1 | 95 | 17ad130 | Car-scoping fix: getComponentStatus now takes savedSetups, resolves weekend.setupId->Setup.carId, excludes unresolvable weekends for scope:'car'. scope:'rig' unaffected (counts all). lint 3-baseline only, build clean. |
 | WS-P | Maintenance UI (Trackers "Service", todo-template style) | complete | 1 | 93 | 47da05b | Service sub-tab in Trackers: Car/Rig grouped rows, status chips (ok/due/overdue), usage bars, Log modal (date/type/notes/cost→accounting), Add Component form, Add Defaults seed. Dashboard Service Due collapsible panel (only due/overdue items). App.tsx state+handlers+cloud-pull wired. lint 3-baseline only, build clean. |
 | WS-Q | Checklist engine | complete | 1 | 94 | f482938 | Added materializeStarterTemplate() to bridge STARTER_TEMPLATES (plain strings) into real, ID-bearing, user-owned ChecklistTemplate objects. instantiateTemplate/checklistProgress/STARTER_TEMPLATES untouched. lint 3-baseline only, build clean.
-| WS-R | Checklist UI | pending | 0 | — | — | |
+| WS-R | Checklist UI | in_progress | 1 | — | — | Building weekend checklist section in RaceWeekendView + template manager in TrackersView. |
 | WS-S | Push infrastructure | pending | 0 | — | — | Blocked by human gates 1–2 |
 | WS-T | Location sharing (foreground) | pending | 0 | — | — | |
 | WS-U | Ping / come-here notifications | pending | 0 | — | — | Needs WS-S |
