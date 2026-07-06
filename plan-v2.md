@@ -31,12 +31,12 @@
 - Priority order: **ERP → Checklists → Location/Push → Directions.**
 - Deliverable now: this plan + scaffold (types, draft migrations, lib/component skeletons) on `preview-v2`.
 
-**Open decisions for Maxx (answer before the flagged WS starts):**
-1. *(WS-O)* Trailer/truck maintenance items aren't car-scoped. Proposal: `scope: 'car' | 'rig'` on each component — `car` items filter by `byActiveCar`, `rig` items always show. OK?
-2. *(WS-P)* Maintenance UI home: proposal = new **"Service" sub-tab in Trackers** (alongside Todos/Accounting/Shopping) + a "Service Due" dashboard panel. Alternative: sub-tab under Setups.
-3. *(WS-T)* v1 location sharing is **foreground-only** (app open, "share while heading to track"). True background tracking needs an Android foreground service + `ACCESS_BACKGROUND_LOCATION` review — deferred to v3. OK?
-4. *(WS-W)* Map tiles: proposal = **Leaflet + free OSM raster tiles** (no key, tiny lib, WebView-safe) with the HERE route polyline drawn on top; HERE quota spent only on routing/geocoding/POI. Alternative: HERE vector tiles (better look, more quota).
-5. *(WS-V)* Default truck profile numbers needed: rig gross weight, height, length, width, axle count (editable per team; used for routing restrictions).
+**Resolved decisions (Maxx, 2026-07-06):**
+1. *(WS-O)* **Rig is its own team-wide entity.** The hauler transports any of the team's cars, so `scope: 'rig'` components are **team-global** — never car-filtered, visible to the whole team, usage counted in weekends/days across all cars. `scope: 'car'` components filter by `byActiveCar` as usual.
+2. *(WS-P)* **Service lives in the Trackers tab, modeled as to-do templates.** Recurring maintenance (weekly car maintenance etc.) is presented like the existing Todo template UX — a "Service" sub-tab in Trackers whose items are template-driven and auto-tracked by the maintenance engine (WS-O derivation still applies; the template look/feel comes from Todos).
+3. *(WS-T)* **Foreground-only location sharing** for v1 (app open). Background tracking deferred.
+4. *(WS-W)* **Leaflet + free OSM raster tiles** (the cheaper option) — no tile key; HERE quota spent only on routing/geocoding/POI.
+5. *(WS-V)* **Default truck profile:** 20,000 lb gross weight · 10 ft height · 48 ft length · 7 ft width (editable per team; `DEFAULT_TRUCK_PROFILE` in `types.ts`).
 
 ---
 
@@ -76,23 +76,71 @@ WS-Y  QA hardening + release (last; gates the batch)
 | WS-X | — (integration) | `TripPlannerView.tsx`, `TeamMapView.tsx` |
 | WS-Y | test scripts, `docs/QA_V2.md` | everything (read-only + fixes) |
 
-### Agent roles (how to run this with subagents/sessions)
-| Role | Owns | Notes |
-|---|---|---|
-| **Coordinator** (main session) | plan-v2.md, merge order, `App.tsx` wiring conflicts, owner approvals | Only role that merges WS branches into `preview-v2`/`preview` |
-| **Data-Model agent** | WS-N | One shot, reviewed carefully — everything depends on it |
-| **Maintenance agent** | WS-O, WS-P | Mirrors `tireHistory.ts` patterns |
-| **Checklist agent** | WS-Q, WS-R | Mirrors Todo patterns |
-| **Platform agent** | WS-S | Needs Firebase console + Supabase secrets access (human-assisted steps flagged below) |
-| **Geo agent** | WS-T, WS-U | Realtime + privacy review |
-| **Routing agent** | WS-V, WS-W, WS-X | Needs HERE API key (human step) |
-| **QA agent** | WS-Y + per-WS verification | Runs lint/build via Windows PowerShell, deploys Netlify previews, drives the test matrix |
+### Execution model — the Ralph Loop (VS Code + GitHub Copilot)
 
-**Tooling per agent:** host-side file tools only (never write through the Linux mount);
-`npm run lint` + `npm run build` via Windows PowerShell; Supabase MCP for reading
-schema/advisors and *drafting* migrations — **migrations are applied to the live
-project only by the Coordinator with Maxx's approval**; Netlify CLI for preview
-deploys only.
+Every workstream is delivered through a repeating **plan → build → test** loop run
+inside VS Code with GitHub Copilot custom agents (`.github/agents/*.agent.md`).
+Loop state lives in `ralph/STATE.md`; the active work order lives in
+`ralph/CURRENT_TASK.md`. Agents communicate **only** through these two files +
+git commits — no side channels, so any session can resume the loop cold.
+
+```
+┌─► 1. PLAN   ws-planner  (Claude Fable 5)
+│      Reads plan-v2.md + ralph/STATE.md → picks the next unblocked WS →
+│      writes ralph/CURRENT_TASK.md (scope, files, steps, acceptance criteria).
+│
+│   2. BUILD  ws-builder  (DeepSeek V4 Pro Max, reasoning — BYOK API key)
+│      Implements EXACTLY ralph/CURRENT_TASK.md. Runs `npm run lint` +
+│      `npm run build` before finishing. Commits WIP to `preview-v2`
+│      ("WS-x attempt N: ..."). Never edits plan-v2.md or STATE.md.
+│
+│   3. TEST/QA  ws-qa  (Claude Fable 5)
+│      Grades the diff against the rubric below. Writes grade + findings into
+│      ralph/STATE.md and updates ralph/CURRENT_TASK.md with concrete fixes.
+│      ├─ PASS (all gates + score ≥ 90) → mark WS complete in STATE.md,
+│      │    squash-worthy note for Coordinator, attempts = 0 ──────────────┐
+│      ├─ FAIL, attempts ≤ 2 → back to 2. BUILD (same builder, fix list)   │
+│      └─ FAIL, attempts > 2 → 4. FIX                                      │
+│                                                                          │
+│   4. FIX   ws-fixer  (Claude Opus 4.8, medium reasoning)                 │
+│      Takes over the branch, fixes the failures directly, re-runs         │
+│      lint/build, hands back to 3. TEST/QA. Resets attempts.              │
+│                                                                          │
+└──────────────────────────── next WS ◄────────────────────────────────────┘
+```
+
+**Model routing (configured per agent file; DeepSeek via VS Code BYOK key):**
+| Agent | File | Model | Role |
+|---|---|---|---|
+| `ws-planner` | `.github/agents/ws-planner.agent.md` | Claude Fable 5 | Picks next WS, writes the work order |
+| `ws-builder` | `.github/agents/ws-builder.agent.md` | DeepSeek V4 Pro Max (reasoning) | All development work |
+| `ws-qa` | `.github/agents/ws-qa.agent.md` | Claude Fable 5 | Grades output, updates plan/task, gates the loop |
+| `ws-fixer` | `.github/agents/ws-fixer.agent.md` | Claude Opus 4.8 (medium reasoning) | Escalation after 2 failed attempts |
+
+**QA grading rubric (ws-qa; every gate is hard — any miss = FAIL):**
+1. `npm run lint` — zero errors beyond the 3-error baseline.
+2. `npm run build` succeeds (Windows).
+3. Scope: diff touches only the WS's Primary/Shared files (ownership matrix).
+4. Architecture: local-first dual-write; no router; car/rig/global scoping
+   correct; types only in `types.ts`; sync only in `sync.ts`;
+   `delete*FromCloud` on every delete path; theme tokens (no hardcoded hex).
+5. Acceptance criteria from `ralph/CURRENT_TASK.md` all demonstrably met.
+Score the remainder 0–100 (code quality, edge cases, offline behavior,
+light/dark, font scale). **Pass = all gates + score ≥ 90.**
+
+**Copilot/VS Code ground rules:**
+- Agents run in the `.worktrees/v2` folder opened as the VS Code workspace
+  (branch `preview-v2`); terminal = Windows PowerShell (lint/build/git all work
+  natively there).
+- One WS in flight at a time (the loop is serial by design — merge-conflict-free
+  by construction; parallel lanes in the dependency graph tell the planner what's
+  *eligible*, not what to run concurrently).
+- **Human-only gates (Maxx / Coordinator, never any agent):** applying Supabase
+  migrations, `supabase secrets set`, Firebase/HERE console setup, Netlify
+  deploys beyond preview, merging `preview-v2` → `preview` → `master`,
+  Google Play / APK signing.
+- Commit style: `WS-x attempt N: <summary>` while looping; ws-qa notes the final
+  passing commit hash in STATE.md.
 
 ---
 
@@ -162,8 +210,9 @@ service, trans fluid, shock rebuilds/laps, trailer maintenance, etc.
    - `laps` = Σ `SESSION_TYPE_LAPS[session.type]` for the component's car
    - `sessions` = count of sessions; `races` = count of Feature sessions
    - `days` = days since `lastServicedAt`
-   - `scope:'rig'` components count **weekends** (trailer goes to every race) or
-     days — not car sessions.
+   - `scope:'rig'` components count **weekends** (the hauler goes to every race,
+     regardless of which car) or days — never car sessions, never car-filtered
+     (decision #1: rig is a single team-wide entity).
 2. `getComponentStatus(c, weekends, activeCarId) → { used, limit, pct, state }`
    where `state: 'ok' | 'due' | 'overdue'` (`due` at ≥ 80%, constant).
 3. `logService(c, log)` → appends `MaintenanceLog`, sets `lastServicedAt`,
@@ -177,13 +226,18 @@ console assertions; counters reset on service log; car scoping correct; offline.
 
 ---
 
-## WS-P — Maintenance UI ("Service")
+## WS-P — Maintenance UI ("Service" in Trackers, to-do-template style)
 
-- **Trackers → new "Service" sub-tab** (pending open decision #2): component list
-  grouped Car / Rig, each row = name · usage vs interval (`font-mono`) · status
-  chip (ok/due/overdue) · "Log service" button (modal: date, notes, cost →
-  optional accounting entry). Add/edit/delete components; seed catalog offered on
-  first open.
+- **Trackers → new "Service" sub-tab** (decision #2): reuse the **Todo template
+  UX** as the visual/interaction model — service items look and behave like a
+  template-driven to-do list, but each row is backed by a `MaintenanceComponent`
+  and auto-tracked by the WS-O engine: name · usage vs interval (`font-mono`) ·
+  status chip (ok/due/overdue) · "Log service" action (modal: date, notes, cost →
+  optional accounting entry) instead of a plain checkbox.
+- Grouped **Car / Rig** (decision #1: Rig section is team-wide — the hauler
+  serves every car, so rig items are never car-filtered and are visible/editable
+  by the whole team). Add/edit/delete components; DEFAULT_COMPONENTS seed catalog
+  offered as a starter template on first open.
 - **Dashboard "Service Due" panel** (collapsible, like Tires): only `due`/`overdue`
   items, tap → Service sub-tab (mirror WS-M deep-link pattern: `trackersSubTab`).
 - Car-scoped items respect `byActiveCar`; rig items always visible.
@@ -294,17 +348,19 @@ the pin correctly; unread badge accurate; no cross-team leakage.
 
 1. `.env`: `VITE_HERE_API_KEY` (domain/app-restricted key; note: client-side by
    design — restrict in HERE console; usage alerting at 80% of 30k/mo).
-2. Wrappers: `geocode(query)`, `truckRoute(origin, dest, profile: TruckProfile)` —
+2. Defaults (decision #5, `DEFAULT_TRUCK_PROFILE` in `types.ts`): **20,000 lb
+   gross · 10 ft height · 48 ft length · 7 ft width** — editable per team.
+3. Wrappers: `geocode(query)`, `truckRoute(origin, dest, profile: TruckProfile)` —
    Routing v8 `transportMode=truck` with `truck[grossWeight|height|length|width|
    axleCount]`, `avoid[features]=ferry,uTurns` + `tollTransponders` options as
    needed; request `return=polyline,summary,actions,tolls`; decode **flexible
    polyline** (`src/lib/geo/flexpolyline.ts` — vendor HERE's MIT reference
    implementation).
-3. `findTruckStops(polyline)` / `findRestAreas(polyline)` — HERE Discover/Browse
+4. `findTruckStops(polyline)` / `findRestAreas(polyline)` — HERE Discover/Browse
    along route corridor (categories: truck stop `700-7900-0131`-family, rest area)
    with distance-along-route sorting. *(Verify exact category IDs against current
    HERE docs during implementation.)*
-4. Cache route + POI results into the `SavedTrip` (avoid re-spending quota);
+5. Cache route + POI results into the `SavedTrip` (avoid re-spending quota);
    offline: show cached trip, disable re-route.
 
 ## WS-W — Trip Planner UI (`TripPlannerView.tsx`)
@@ -312,7 +368,8 @@ the pin correctly; unread badge accurate; no cross-team leakage.
 - Entry points: **"Directions" button on a weekend** (destination pre-filled from
   `weekend.location`/track name) + a Trips list (per-weekend or ad-hoc).
 - Origin: current GPS or saved "Shop" home base (stored in `TruckProfile`).
-- Map: Leaflet + OSM tiles, route polyline, truck-stop/rest-area markers with
+- Map: **Leaflet + free OSM raster tiles** (decision #4 — no tile key/cost),
+  route polyline, truck-stop/rest-area markers with
   toggle chips; elevation/steep-grade warnings from HERE `notices` if present.
 - Turn list: collapsible `actions` list (readable, `font-mono` distances).
 - **Handoff:** "Start navigation" → opens Google Maps (`google.navigation:` intent

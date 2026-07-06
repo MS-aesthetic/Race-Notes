@@ -579,6 +579,17 @@ export interface TruckProfile {
   homeBase?: { lat: number; lng: number; label: string };
 }
 
+/** Default rig profile (decision #5, 2026-07-06) — editable per team.
+ *  20,000 lb gross · 10 ft height · 48 ft length · 7 ft width. */
+export const DEFAULT_TRUCK_PROFILE: TruckProfile = {
+  grossWeightLb: 20000,
+  heightIn: 120,
+  lengthIn: 576,
+  widthIn: 84,
+  axleCount: 2,
+  trailerCount: 1,
+};
+
 export interface TripStop {
   id: string;
   kind: 'truck_stop' | 'rest_area' | 'custom';
