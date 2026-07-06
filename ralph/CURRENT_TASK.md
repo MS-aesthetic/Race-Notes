@@ -1,4 +1,6 @@
-# Current Task — WS-P: Maintenance UI ("Service" sub-tab in Trackers + Dashboard panel)
+# Current Task — WS-P: Maintenance UI — COMPLETE, see STATE.md
+
+**Status:** PASS 93 · commit 47da05b
 
 **Workstream:** WS-P — Maintenance UI
 **Attempt:** 1
