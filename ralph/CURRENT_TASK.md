@@ -1,4 +1,6 @@
-# Current Task — WS-R: Checklist UI (weekend checklists + template manager)
+# Current Task — WS-R: Checklist UI — COMPLETE, see STATE.md
+
+**Status:** PASS 92 · commit f220947
 
 **Workstream:** WS-R — Checklist UI
 **Attempt:** 1

@@ -20,7 +20,7 @@
 | WS-O | Maintenance engine | complete | 1 | 95 | 17ad130 | Car-scoping fix: getComponentStatus now takes savedSetups, resolves weekend.setupId->Setup.carId, excludes unresolvable weekends for scope:'car'. scope:'rig' unaffected (counts all). lint 3-baseline only, build clean. |
 | WS-P | Maintenance UI (Trackers "Service", todo-template style) | complete | 1 | 93 | 47da05b | Service sub-tab in Trackers: Car/Rig grouped rows, status chips (ok/due/overdue), usage bars, Log modal (date/type/notes/cost→accounting), Add Component form, Add Defaults seed. Dashboard Service Due collapsible panel (only due/overdue items). App.tsx state+handlers+cloud-pull wired. lint 3-baseline only, build clean. |
 | WS-Q | Checklist engine | complete | 1 | 94 | f482938 | Added materializeStarterTemplate() to bridge STARTER_TEMPLATES (plain strings) into real, ID-bearing, user-owned ChecklistTemplate objects. instantiateTemplate/checklistProgress/STARTER_TEMPLATES untouched. lint 3-baseline only, build clean.
-| WS-R | Checklist UI | in_progress | 1 | — | — | Building weekend checklist section in RaceWeekendView + template manager in TrackersView. |
+| WS-R | Checklist UI | complete | 1 | 92 | f220947 | ChecklistsSection in RaceWeekendView weekend banner (attach templates, check-off with doneAt/doneBy, delete). ChecklistsTab template manager in Trackers (CRUD items, starter templates, expand-to-edit). App.tsx state+pull+delete-weekend-null wired. lint 3-baseline only, build clean. |
 | WS-S | Push infrastructure | pending | 0 | — | — | Blocked by human gates 1–2 |
 | WS-T | Location sharing (foreground) | pending | 0 | — | — | |
 | WS-U | Ping / come-here notifications | pending | 0 | — | — | Needs WS-S |
@@ -45,6 +45,7 @@ _(ws-qa appends one line per verdict: date · WS · attempt · PASS/FAIL · scor
 - 2026-07 · WS-O · attempt 1 · PASS · 95 · Fixed car-scoping gap in getComponentStatus (added savedSetups param, resolves weekend->car via setupId indirection, rig scope unaffected). Diff scoped to maintenance.ts only. lint 3-baseline only, build clean. No callers yet (App.tsx wiring deferred to WS-P, by design).
 - 2026-07 · WS-Q · attempt 1 · PASS · 94 · Added materializeStarterTemplate() — starter templates were plain string[] items but instantiateTemplate() needs full ChecklistTemplateItem[] w/ ids; new fn bridges the gap. Diff scoped to checklists.ts only. lint 3-baseline only, build clean. No callers yet (App.tsx/UI wiring deferred to WS-R, by design).
 - 2026-07 · WS-P · attempt 1 · PASS · 93 · Full maintenance UI: Service sub-tab (Car/Rig sections, usage bars, status chips, Log modal, Add form, Add Defaults), Dashboard Service Due panel. App.tsx state+pull wiring. Accounting auto-entry on cost log. lint 3-baseline only, build clean.
+- 2026-07 · WS-R · attempt 1 · PASS · 92 · Weekend checklists in RaceWeekendView (attach from template, check-off w/doneAt stamp, delete, blank option). ChecklistsTab template manager in Trackers (CRUD, starter seeds, item add/delete). App.tsx state+cloud-pull+delete-weekend nulling. lint 3-baseline only, build clean.
 
 ## Backlog
 
