@@ -26,6 +26,20 @@ export const STARTER_TEMPLATES: Array<Pick<ChecklistTemplate, 'name' | 'category
 
 const uid = (p: string) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+/** Turn a starter-template definition into a real, user-owned ChecklistTemplate
+ *  (unique id + item ids) so it can be offered, saved, and later edited/instantiated. */
+export function materializeStarterTemplate(
+  starter: (typeof STARTER_TEMPLATES)[number],
+): ChecklistTemplate {
+  return {
+    id: uid('tmpl'),
+    name: starter.name,
+    category: starter.category,
+    items: starter.items.map(text => ({ id: uid('tmpli'), text })),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 /** Snapshot-copy a template into a per-weekend instance.
  *  Later template edits must NOT mutate past weekends. */
 export function instantiateTemplate(

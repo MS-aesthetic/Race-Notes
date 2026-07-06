@@ -1,47 +1,39 @@
-# Current Task — WS-O: Maintenance engine (car-scoping fix + finalize) — COMPLETE, see STATE.md
+# Current Task — WS-Q: Checklist engine (starter-template materialization) — COMPLETE, see STATE.md
 
-**Workstream:** WS-O — Maintenance Engine
+**Workstream:** WS-Q — Checklist Engine
 **Attempt:** 1
-**Files (Primary):** `src/lib/maintenance.ts`
+**Files (Primary):** `src/lib/checklists.ts`
 
 ## Scope
 
-`src/lib/maintenance.ts` already has a working scaffold (`DEFAULT_COMPONENTS`,
-`getComponentStatus`, `applyServiceLog`) but its own comment flags an unresolved
-gap: **car scoping is not implemented** — `sessionsSince` sums sessions from
-*every* weekend regardless of which car ran them, so a `scope:'car'` component
-(e.g. "Engine oil" on Car A) would incorrectly count Car B's laps too.
+`src/lib/checklists.ts` already has a near-complete scaffold: `STARTER_TEMPLATES`
+(4 templates), `instantiateTemplate(template, weekendId?, weekendName?)`, and
+`checklistProgress(list)`. The gap: `STARTER_TEMPLATES` entries have
+`items: string[]` (plain labels), but `instantiateTemplate()` requires a real
+`ChecklistTemplate` with `items: ChecklistTemplateItem[]` (`{id, text}`). There
+is currently no function that turns a starter-template definition into a real,
+ID-bearing, user-owned `ChecklistTemplate` — meaning WS-R (UI) would have
+nothing to call to actually offer the starter templates to a user.
 
-1. Fix car scoping per plan-v2.md decision #1:
-   - `scope: 'rig'` components → count across **all** weekends/cars (unchanged,
-     already correct — the hauler goes to every race).
-   - `scope: 'car'` components → only count weekends whose bound `Setup`
-     (`weekend.setupId` → `savedSetups.find(s => s.id === weekend.setupId)`)
-     has a matching `carId`. Weekends with no bound setup, or a bound setup
-     with no `carId`, are excluded from car-scoped counting (ambiguous —
-     don't guess).
-2. Update `getComponentStatus` signature to accept a new `savedSetups: Setup[]`
-   parameter (needed to resolve weekend → car). Update the JSDoc comment above
-   it to remove the stale "scaffold counts all sessions" caveat once fixed.
-3. Import `Setup` type from `../types`.
-4. Do NOT touch `applyServiceLog`, `DEFAULT_COMPONENTS`, or add any new exports
-   beyond what's needed for the fix above — keep the diff surgical.
-5. Do NOT wire this into `App.tsx`, `sync.ts`, or any component — that's WS-P.
+1. Add `materializeStarterTemplate(starter: typeof STARTER_TEMPLATES[number]): ChecklistTemplate`
+   that converts a starter entry into a full `ChecklistTemplate`: generates an
+   `id` (reuse the existing `uid()` helper, prefix `'tmpl'`), maps each string
+   item to `{ id: uid('tmpli'), text }`, sets `updatedAt` to now.
+2. Export it alongside the existing exports.
+3. Do not change `STARTER_TEMPLATES` data, `instantiateTemplate`, or
+   `checklistProgress`.
+4. Do NOT wire into `App.tsx`/UI — that's WS-R.
 
 ## Out of scope
-- No UI changes.
-- No sync.ts changes (already has maintenance_components/logs push/pull from WS-N).
-- No App.tsx state changes.
-- No changes to DEFAULT_COMPONENTS catalog values.
+- No UI changes, no App.tsx state, no sync.ts changes.
+- No changes to the 4 starter template contents/order.
 
 ## Acceptance criteria
-- [ ] `getComponentStatus(component, weekends, savedSetups)` correctly excludes
-      other cars' sessions for `scope:'car'` components.
-- [ ] `scope:'rig'` components still count all weekends (no regression).
+- [ ] `materializeStarterTemplate()` exists, returns a valid `ChecklistTemplate`
+      with unique `id`s for the template and every item.
 - [ ] `npm run lint` — baseline 3 errors only, no new errors.
 - [ ] `npm run build` — succeeds.
-- [ ] Diff confined to `src/lib/maintenance.ts`.
-- [ ] Stale "scaffold" TODO comment about car-scoping removed/updated to reflect the fix.
+- [ ] Diff confined to `src/lib/checklists.ts`.
 
 ## Human prerequisites
 None.

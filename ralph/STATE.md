@@ -19,7 +19,7 @@
 | WS-N | Data model & migrations foundation | complete | 1 | 96 | e0ecbbf | Types + migrations 011-013 + sync.ts mappers (push/pull/delete) + data.ts defaults for maintenance/checklists/trips. Migrations still need owner approval before apply (human gate 4). |
 | WS-O | Maintenance engine | complete | 1 | 95 | 17ad130 | Car-scoping fix: getComponentStatus now takes savedSetups, resolves weekend.setupId->Setup.carId, excludes unresolvable weekends for scope:'car'. scope:'rig' unaffected (counts all). lint 3-baseline only, build clean. |
 | WS-P | Maintenance UI (Trackers "Service", todo-template style) | pending | 0 | — | — | |
-| WS-Q | Checklist engine | pending | 0 | — | — | |
+| WS-Q | Checklist engine | in_progress | 1 | — | — | Adding materializeStarterTemplate to bridge STARTER_TEMPLATES -> real ChecklistTemplate. |
 | WS-R | Checklist UI | pending | 0 | — | — | |
 | WS-S | Push infrastructure | pending | 0 | — | — | Blocked by human gates 1–2 |
 | WS-T | Location sharing (foreground) | pending | 0 | — | — | |
