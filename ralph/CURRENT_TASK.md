@@ -1,4 +1,4 @@
-# Current Task — WS-O: Maintenance engine (car-scoping fix + finalize)
+# Current Task — WS-O: Maintenance engine (car-scoping fix + finalize) — COMPLETE, see STATE.md
 
 **Workstream:** WS-O — Maintenance Engine
 **Attempt:** 1
