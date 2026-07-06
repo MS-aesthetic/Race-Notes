@@ -16,7 +16,7 @@
 
 | WS | Title | Status | Attempts | Score | Commit | Notes |
 |----|-------|--------|----------|-------|--------|-------|
-| WS-N | Data model & migrations foundation | scaffolded | 0 | — | 7ac5bbc | Types + draft migrations landed; sync mappers + data.ts defaults still to build |
+| WS-N | Data model & migrations foundation | in_progress | 0 | — | 7ac5bbc | Types + draft migrations landed; building sync mappers + data.ts defaults |
 | WS-O | Maintenance engine | pending | 0 | — | — | |
 | WS-P | Maintenance UI (Trackers "Service", todo-template style) | pending | 0 | — | — | |
 | WS-Q | Checklist engine | pending | 0 | — | — | |

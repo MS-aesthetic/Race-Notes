@@ -145,3 +145,13 @@ export const INITIAL_TODO_ITEM: import('./types').TodoItem = {
   done: false,
 };
 
+export const INITIAL_MAINTENANCE_COMPONENTS: import('./types').MaintenanceComponent[] = [];
+
+export const INITIAL_MAINTENANCE_LOGS: import('./types').MaintenanceLog[] = [];
+
+export const INITIAL_CHECKLIST_TEMPLATES: import('./types').ChecklistTemplate[] = [];
+
+export const INITIAL_WEEKEND_CHECKLISTS: import('./types').WeekendChecklist[] = [];
+
+export const INITIAL_TRIPS: import('./types').SavedTrip[] = [];
+
