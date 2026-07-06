@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Setup, SessionRecord, RaceWeekend, Team, TireInventoryItem, Todo } from '../types';
+import { Setup, SessionRecord, RaceWeekend, Team, TireInventoryItem, Todo, MaintenanceComponent } from '../types';
 import { byActiveCar } from '../lib/scope';
+import { getComponentStatus } from '../lib/maintenance';
 
 // Maps legacy full session type names to the short codes used in v2
 const SESSION_NAME_MAP: [string, string][] = [
@@ -42,6 +43,8 @@ interface DashboardViewProps {
   onGoToTires?: () => void;
   onDeleteWeekend: (weekendId: string) => void;
   activeCarId?: string | null;
+  maintenance?: MaintenanceComponent[];
+  onGoToService?: () => void;
 }
 
 export default function DashboardView({
@@ -59,6 +62,8 @@ export default function DashboardView({
   onGoToTires,
   onDeleteWeekend,
   activeCarId = null,
+  maintenance = [],
+  onGoToService,
 }: DashboardViewProps) {
   const [expandedWeekendId, setExpandedWeekendId] = useState<string | null>(
     weekends.length > 0 ? weekends[0].id : null
@@ -67,6 +72,7 @@ export default function DashboardView({
   const [setupsOpen, setSetupsOpen] = useState(false);
   const [tiresOpen, setTiresOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
+  const [serviceOpen, setServiceOpen] = useState(true);
 
   // Filter at display time — never mutate the master arrays
   const displayedSetups = byActiveCar(savedSetups, activeCarId);
@@ -327,6 +333,76 @@ export default function DashboardView({
           </div>
         )}
       </section>
+
+      {/* SERVICE DUE */}
+      {(() => {
+        const dueItems = maintenance.filter(c => {
+          const st = getComponentStatus(c, weekends, savedSetups);
+          return st.state !== 'ok';
+        });
+        if (dueItems.length === 0) return null;
+        return (
+          <section>
+            <button
+              onClick={() => setServiceOpen(v => !v)}
+              className="w-full flex items-center justify-between p-3 bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-400 text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>build_circle</span>
+                <span className="font-mono text-xs font-bold uppercase text-on-surface tracking-wider">
+                  Service Due ({dueItems.length})
+                </span>
+                {dueItems.some(c => getComponentStatus(c, weekends, savedSetups).state === 'overdue') && (
+                  <span className="bg-red-500/20 text-red-400 text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded">Overdue</span>
+                )}
+              </div>
+              <span
+                className="material-symbols-outlined text-on-surface-variant transition-transform duration-200"
+                style={{ transform: serviceOpen ? 'rotate(180deg)' : 'none' }}
+              >expand_more</span>
+            </button>
+            {serviceOpen && (
+              <div className="mt-1 border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
+                {dueItems.map(c => {
+                  const st = getComponentStatus(c, weekends, savedSetups);
+                  const chipCls = st.state === 'overdue'
+                    ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                    : 'bg-amber-500/15 text-amber-400 border-amber-500/30';
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={onGoToService}
+                      className="w-full px-4 py-3 bg-surface-container hover:bg-surface-container-high transition-colors text-left flex items-center gap-3 group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs font-bold text-on-surface group-hover:text-primary transition-colors">{c.name}</span>
+                          <span className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${chipCls}`}>
+                            {st.state === 'overdue' ? 'Overdue' : 'Due'}
+                          </span>
+                          <span className="font-mono text-[10px] text-on-surface-variant/50">{c.category}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex-1 h-1 bg-surface-variant rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${st.state === 'overdue' ? 'bg-red-500' : 'bg-amber-400'}`}
+                              style={{ width: `${Math.min(st.pct * 100, 100)}%` }}
+                            />
+                          </div>
+                          <span className="font-mono text-[10px] text-on-surface-variant shrink-0">
+                            {st.used}/{st.limit}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary text-[16px] transition-colors">chevron_right</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        );
+      })()}
 
       {/* OPEN TASKS */}
       <section>

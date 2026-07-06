@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
-import { Todo, AccountingEntry, ShoppingItem, RaceWeekend } from '../types';
+import { Todo, AccountingEntry, ShoppingItem, RaceWeekend, MaintenanceComponent, MaintenanceLog, Setup, MaintenanceCategory, MAINTENANCE_CATEGORIES, MaintenanceIntervalType } from '../types';
 import { AppUser } from '../lib/supabase';
+import { getComponentStatus, applyServiceLog, DEFAULT_COMPONENTS } from '../lib/maintenance';
 import ToDoView from './ToDoView';
+
+// ── Sub-tab type (declared early; used in Props and component) ───────────────
+
+type SubTab = 'tasks' | 'accounting' | 'shopping' | 'service';
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -15,6 +20,13 @@ interface TrackersViewProps {
   onSaveAccounting: (a: AccountingEntry[]) => void;
   shopping: ShoppingItem[];
   onSaveShopping: (s: ShoppingItem[]) => void;
+  maintenance: MaintenanceComponent[];
+  onSaveMaintenance: (c: MaintenanceComponent[]) => void;
+  maintenanceLogs: MaintenanceLog[];
+  onSaveMaintenanceLogs: (l: MaintenanceLog[]) => void;
+  savedSetups: Setup[];
+  activeCarId: string | null;
+  initialSubTab?: SubTab;
 }
 
 // ── Image compression ─────────────────────────────────────────────────────────
@@ -495,14 +507,321 @@ function ShoppingTab({ items, onSave, weekends }: { items: ShoppingItem[]; onSav
   );
 }
 
-// ── TrackersView ──────────────────────────────────────────────────────────────
+// ── Service Tab ──────────────────────────────────────────────────────────────
 
-type SubTab = 'tasks' | 'accounting' | 'shopping';
+function ServiceTab({
+  components, logs, onSaveComponents, onSaveLogs,
+  weekends, savedSetups, activeCarId,
+  accounting, onSaveAccounting,
+}: {
+  components: MaintenanceComponent[];
+  logs: MaintenanceLog[];
+  onSaveComponents: (c: MaintenanceComponent[]) => void;
+  onSaveLogs: (l: MaintenanceLog[]) => void;
+  weekends: RaceWeekend[];
+  savedSetups: Setup[];
+  activeCarId: string | null;
+  accounting: AccountingEntry[];
+  onSaveAccounting: (a: AccountingEntry[]) => void;
+}) {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [logModalComp, setLogModalComp] = useState<MaintenanceComponent | null>(null);
+
+  // Add form state
+  const [addName, setAddName] = useState('');
+  const [addCategory, setAddCategory] = useState<MaintenanceCategory>('Other');
+  const [addScope, setAddScope] = useState<'car' | 'rig'>('car');
+  const [addIntervalType, setAddIntervalType] = useState<MaintenanceIntervalType>('races');
+  const [addIntervalValue, setAddIntervalValue] = useState('');
+
+  // Log modal state
+  const [logDate, setLogDate] = useState('');
+  const [logType, setLogType] = useState<MaintenanceLog['type']>('service');
+  const [logNotes, setLogNotes] = useState('');
+  const [logCost, setLogCost] = useState('');
+
+  const uid = (p: string) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+  const carComps = components.filter(c => c.scope === 'car' && (!activeCarId || c.carId === activeCarId));
+  const rigComps = components.filter(c => c.scope === 'rig');
+
+  const addDefaults = () => {
+    const now = new Date().toISOString();
+    const newComps: MaintenanceComponent[] = DEFAULT_COMPONENTS.map(d => ({
+      id: uid('maint'),
+      scope: d.scope,
+      carId: d.scope === 'car' ? (activeCarId ?? undefined) : undefined,
+      name: d.name,
+      category: d.category,
+      intervalType: d.intervalType,
+      intervalValue: d.intervalValue,
+      lastServicedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    onSaveComponents([...components, ...newComps]);
+  };
+
+  const deleteComp = (id: string) => {
+    if (!window.confirm('Delete this component and all its service logs?')) return;
+    onSaveComponents(components.filter(c => c.id !== id));
+    onSaveLogs(logs.filter(l => l.componentId !== id));
+  };
+
+  const handleAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addName.trim() || !addIntervalValue) return;
+    const now = new Date().toISOString();
+    const comp: MaintenanceComponent = {
+      id: uid('maint'),
+      scope: addScope,
+      carId: addScope === 'car' ? (activeCarId ?? undefined) : undefined,
+      name: addName.trim(),
+      category: addCategory,
+      intervalType: addIntervalType,
+      intervalValue: parseFloat(addIntervalValue),
+      lastServicedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    onSaveComponents([...components, comp]);
+    setAddName(''); setAddCategory('Other'); setAddScope('car');
+    setAddIntervalType('races'); setAddIntervalValue('');
+    setShowAddForm(false);
+  };
+
+  const openLogModal = (c: MaintenanceComponent) => {
+    setLogDate(new Date().toISOString().slice(0, 10));
+    setLogType('service'); setLogNotes(''); setLogCost('');
+    setLogModalComp(c);
+  };
+
+  const handleLogSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!logModalComp) return;
+    const now = new Date().toISOString();
+    const log: MaintenanceLog = {
+      id: uid('mlog'),
+      componentId: logModalComp.id,
+      date: logDate || now.slice(0, 10),
+      type: logType,
+      notes: logNotes.trim() || undefined,
+      cost: logCost ? parseFloat(logCost) : undefined,
+    };
+    const updated = { ...applyServiceLog(logModalComp, log), updatedAt: now };
+    onSaveComponents(components.map(c => c.id === logModalComp.id ? updated : c));
+    onSaveLogs([log, ...logs]);
+    if (log.cost && log.cost > 0) {
+      const entry: AccountingEntry = {
+        id: uid('acct'),
+        name: `Service: ${logModalComp.name}`,
+        description: log.notes,
+        amount: log.cost,
+        type: 'expense',
+        date: now,
+      };
+      onSaveAccounting([entry, ...accounting]);
+    }
+    setLogModalComp(null);
+  };
+
+  const unitLabel = (c: MaintenanceComponent): string =>
+    ({ laps: 'laps', sessions: 'sess', races: 'races', days: 'days' }[c.intervalType]);
+
+  const renderRow = (c: MaintenanceComponent) => {
+    const status = getComponentStatus(c, weekends, savedSetups);
+    const barColor = status.state === 'overdue' ? 'bg-red-500' : status.state === 'due' ? 'bg-amber-400' : 'bg-green-500';
+    const chipCls = {
+      ok:      'bg-green-500/15 text-green-400 border-green-500/30',
+      due:     'bg-amber-500/15 text-amber-400 border-amber-500/30',
+      overdue: 'bg-red-500/15 text-red-400 border-red-500/30',
+    }[status.state];
+    const chipLabel = { ok: 'OK', due: 'DUE', overdue: 'OVERDUE' }[status.state];
+    return (
+      <div key={c.id} className="flex items-center gap-3 p-3 bg-surface-container border border-outline-variant rounded-lg">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-sm text-on-surface font-semibold">{c.name}</span>
+            <span className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${chipCls}`}>{chipLabel}</span>
+            <span className="font-mono text-[10px] text-on-surface-variant/50">{c.category}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex-1 h-1.5 bg-surface-variant rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${barColor}`}
+                style={{ width: `${Math.min(status.pct * 100, 100)}%` }} />
+            </div>
+            <span className="font-mono text-[10px] text-on-surface-variant shrink-0">
+              {status.used}/{status.limit} {unitLabel(c)}
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={() => openLogModal(c)}
+          className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded border border-primary/40 bg-primary/10 text-primary font-mono text-[10px] uppercase font-bold hover:bg-primary/20 transition-colors"
+        >
+          <span className="material-symbols-outlined text-[13px]">build</span>
+          Log
+        </button>
+        <button
+          onClick={() => deleteComp(c.id)}
+          className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-red-400 shrink-0"
+        >close</button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Header actions */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => setShowAddForm(v => !v)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary font-mono text-[11px] uppercase font-bold transition-colors"
+        >
+          <span className="material-symbols-outlined text-[15px]">{showAddForm ? 'close' : 'add'}</span>
+          {showAddForm ? 'Cancel' : 'Add Component'}
+        </button>
+        {components.length === 0 && !showAddForm && (
+          <button
+            onClick={addDefaults}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 border border-primary/40 text-primary font-mono text-[11px] uppercase font-bold hover:bg-primary/20 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[15px]">auto_awesome</span>
+            Add Defaults
+          </button>
+        )}
+      </div>
+
+      {/* Add component form */}
+      {showAddForm && (
+        <form onSubmit={handleAddSubmit} className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+          <input required placeholder="Component name *" value={addName} onChange={e => setAddName(e.target.value)}
+            className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">Category</label>
+              <select value={addCategory} onChange={e => setAddCategory(e.target.value as MaintenanceCategory)}
+                className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-xs outline-none">
+                {(MAINTENANCE_CATEGORIES as readonly string[]).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">Scope</label>
+              <select value={addScope} onChange={e => setAddScope(e.target.value as 'car' | 'rig')}
+                className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-xs outline-none">
+                <option value="car">Car</option>
+                <option value="rig">Rig (truck/trailer)</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">Measure by</label>
+              <select value={addIntervalType} onChange={e => setAddIntervalType(e.target.value as MaintenanceIntervalType)}
+                className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-xs outline-none">
+                <option value="laps">Laps</option>
+                <option value="sessions">Sessions</option>
+                <option value="races">Feature races</option>
+                <option value="days">Days</option>
+              </select>
+            </div>
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">Interval</label>
+              <input required type="number" min="1" step="any" placeholder="e.g. 250" value={addIntervalValue} onChange={e => setAddIntervalValue(e.target.value)}
+                className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="flex-1 py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80">Add Component</button>
+            <button type="button" onClick={() => setShowAddForm(false)} className="px-4 py-2.5 border border-outline-variant rounded-lg font-mono text-xs text-on-surface-variant">Cancel</button>
+          </div>
+        </form>
+      )}
+
+      {/* Empty state */}
+      {components.length === 0 && !showAddForm && (
+        <div className="text-center py-10 space-y-2 text-on-surface-variant/40">
+          <span className="material-symbols-outlined text-4xl block">build_circle</span>
+          <p className="font-mono text-xs">No service components yet.</p>
+          <p className="font-mono text-[10px]">Add defaults or create your own above.</p>
+        </div>
+      )}
+
+      {/* Car section */}
+      {carComps.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 pt-1">
+            <span className="material-symbols-outlined text-primary text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>directions_car</span>
+            <span className="font-mono text-[11px] uppercase text-on-surface-variant tracking-wider font-bold">Car</span>
+          </div>
+          {carComps.map(renderRow)}
+        </div>
+      )}
+
+      {/* Rig section */}
+      {rigComps.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 pt-1">
+            <span className="material-symbols-outlined text-primary text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>local_shipping</span>
+            <span className="font-mono text-[11px] uppercase text-on-surface-variant tracking-wider font-bold">Rig</span>
+          </div>
+          {rigComps.map(renderRow)}
+        </div>
+      )}
+
+      {/* Log service modal */}
+      {logModalComp && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setLogModalComp(null)}>
+          <form onSubmit={handleLogSubmit} onClick={e => e.stopPropagation()}
+            className="w-full max-w-md bg-surface-container-high border border-outline-variant rounded-2xl p-6 space-y-4 shadow-2xl mb-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display font-bold text-base text-on-surface">Log Service</h3>
+              <button type="button" onClick={() => setLogModalComp(null)}
+                className="material-symbols-outlined text-on-surface-variant text-[22px]">close</button>
+            </div>
+            <p className="font-mono text-xs text-on-surface-variant">{logModalComp.name} · {logModalComp.category}</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(['service', 'replace', 'inspect'] as const).map(t => (
+                <button key={t} type="button" onClick={() => setLogType(t)}
+                  className={`py-2 rounded-lg border font-mono text-[10px] uppercase font-bold transition-all capitalize ${logType === t ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant text-on-surface-variant'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">Date</label>
+              <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)}
+                className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+            </div>
+            <textarea placeholder="Notes (optional)" rows={2} value={logNotes} onChange={e => setLogNotes(e.target.value)}
+              className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none resize-none" />
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">Cost (optional — auto-adds to Accounting)</label>
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-on-surface-variant text-sm">$</span>
+                <input type="number" min="0" step="0.01" placeholder="0.00" value={logCost} onChange={e => setLogCost(e.target.value)}
+                  className="w-full pl-6 pr-3 py-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+              </div>
+            </div>
+            <button type="submit" className="w-full py-3 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-xl tracking-wider active:opacity-80">
+              Save &amp; Reset Counter
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── TrackersView ──────────────────────────────────────────────────────────────
 
 const SUB_TABS: { id: SubTab; label: string; icon: string }[] = [
   { id: 'tasks',      label: 'Tasks',      icon: 'checklist'        },
   { id: 'accounting', label: 'Accounting', icon: 'account_balance'  },
   { id: 'shopping',   label: 'Shopping',   icon: 'shopping_cart'    },
+  { id: 'service',    label: 'Service',    icon: 'build'            },
 ];
 
 export default function TrackersView({
@@ -510,8 +829,12 @@ export default function TrackersView({
   weekends = [],
   accounting, onSaveAccounting,
   shopping, onSaveShopping,
+  maintenance, onSaveMaintenance,
+  maintenanceLogs, onSaveMaintenanceLogs,
+  savedSetups, activeCarId,
+  initialSubTab,
 }: TrackersViewProps) {
-  const [subTab, setSubTab] = useState<SubTab>('tasks');
+  const [subTab, setSubTab] = useState<SubTab>(initialSubTab ?? 'tasks');
 
   return (
     <div className="flex flex-col gap-4 h-full">
@@ -522,7 +845,7 @@ export default function TrackersView({
           <button
             key={t.id}
             onClick={() => setSubTab(t.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-md transition-all ${
               subTab === t.id ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60 hover:text-on-surface'
             }`}
           >
@@ -532,7 +855,7 @@ export default function TrackersView({
             >
               {t.icon}
             </span>
-            {t.label}
+            <span className="hidden sm:inline">{t.label}</span>
           </button>
         ))}
       </div>
@@ -553,6 +876,19 @@ export default function TrackersView({
         )}
         {subTab === 'shopping' && (
           <ShoppingTab items={shopping} onSave={onSaveShopping} weekends={weekends} />
+        )}
+        {subTab === 'service' && (
+          <ServiceTab
+            components={maintenance}
+            logs={maintenanceLogs}
+            onSaveComponents={onSaveMaintenance}
+            onSaveLogs={onSaveMaintenanceLogs}
+            weekends={weekends}
+            savedSetups={savedSetups}
+            activeCarId={activeCarId}
+            accounting={accounting}
+            onSaveAccounting={onSaveAccounting}
+          />
         )}
       </div>
     </div>

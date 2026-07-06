@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
-import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem, Car, ShockSession, CAR_TYPES, TRACK_CONDITION_PRESETS, TrackConditionPreset } from './types';
+import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem, Car, ShockSession, CAR_TYPES, TRACK_CONDITION_PRESETS, TrackConditionPreset, MaintenanceComponent, MaintenanceLog } from './types';
 import {
   INITIAL_SETUP,
   INITIAL_SETUPS,
@@ -15,7 +15,7 @@ import {
 
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, AppUser } from './lib/supabase';
 import AuthView from './components/AuthView';
-import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions } from './lib/sync';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, pushMaintenanceLogs, pullMaintenanceLogs } from './lib/sync';
 import { syncTireLifecycle } from './lib/tireHistory';
 
 import DashboardView from './components/DashboardView';
@@ -70,6 +70,15 @@ export default function App() {
     return localStorage.getItem('race_notes_active_car');
   });
 
+  // ── Maintenance / ERP (WS-P) ──────────────────────────────────────────────
+  const [maintenance, setMaintenance] = useState<MaintenanceComponent[]>(() => {
+    try { const s = localStorage.getItem('race_notes_maintenance'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>(() => {
+    try { const s = localStorage.getItem('race_notes_maintenance_logs'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const [trackersSubTab, setTrackersSubTab] = useState<'tasks' | 'accounting' | 'shopping' | 'service'>('tasks');
+
   // Lifted smasher/shock-session state (Decision 1: cloud sync)
   const [shockSessions, setShockSessions] = useState<ShockSession[]>(() => {
     try { const s = localStorage.getItem('race_notes_shock_graphs'); return s ? JSON.parse(s) : INITIAL_SHOCK_SESSIONS; }
@@ -104,6 +113,18 @@ export default function App() {
     if (user) pushShockSessions(updated, user.id, setSyncStatus);
   };
 
+  const handleSaveMaintenance = (updated: MaintenanceComponent[]) => {
+    setMaintenance(updated);
+    localStorage.setItem('race_notes_maintenance', JSON.stringify(updated));
+    if (user) pushMaintenanceComponents(updated, user.id, setSyncStatus);
+  };
+
+  const handleSaveMaintenanceLogs = (updated: MaintenanceLog[]) => {
+    setMaintenanceLogs(updated);
+    localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(updated));
+    if (user) pushMaintenanceLogs(updated, user.id, setSyncStatus);
+  };
+
   // handleDeleteCar implemented in Phase 7 — stub here
   const handleDeleteCar = (carId: string) => {
     const sc = savedSetups.filter(s => s.carId === carId).length;
@@ -130,6 +151,7 @@ export default function App() {
       'race_notes_active_session', 'race_notes_todos', 'race_notes_tires',
       'race_notes_accounting', 'race_notes_shopping', 'race_notes_cars',
       'race_notes_active_car', 'race_notes_shock_graphs',
+      'race_notes_maintenance', 'race_notes_maintenance_logs',
     ];
     LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
 
@@ -158,6 +180,8 @@ export default function App() {
     setTodos([]);
     setAccounting([]);
     setShopping([]);
+    setMaintenance([]);
+    setMaintenanceLogs([]);
     setSyncStatus('All data cleared');
   };
 
@@ -241,7 +265,7 @@ export default function App() {
     if (!flashReadyRef.current || suppressPullRef.current) return;
     flashSaved();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setup, savedSetups, weekends, activeSession, tireInventory, cars, shockSessions, todos, accounting, shopping]);
+  }, [setup, savedSetups, weekends, activeSession, tireInventory, cars, shockSessions, todos, accounting, shopping, maintenance, maintenanceLogs]);
 
   // Auto-dismiss any sync status so a message can never get "stuck" on screen.
   // 'Syncing...' is left alone (it's replaced by 'Synced' when the pull finishes).
@@ -452,6 +476,17 @@ export default function App() {
       if (cloudShock.length > 0) {
         setShockSessions(cloudShock);
         localStorage.setItem('race_notes_shock_graphs', JSON.stringify(cloudShock));
+      }
+
+      const cloudMaint = await pullMaintenanceComponents(setSyncStatus);
+      if (cloudMaint.length > 0) {
+        setMaintenance(cloudMaint);
+        localStorage.setItem('race_notes_maintenance', JSON.stringify(cloudMaint));
+      }
+      const cloudMaintLogs = await pullMaintenanceLogs(setSyncStatus);
+      if (cloudMaintLogs.length > 0) {
+        setMaintenanceLogs(cloudMaintLogs);
+        localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(cloudMaintLogs));
       }
 
       setSyncStatus('Synced');
@@ -1158,6 +1193,8 @@ export default function App() {
                     setActiveTab('setups');
                   }}
                   onDeleteWeekend={handleDeleteWeekend}
+                  maintenance={maintenance}
+                  onGoToService={() => { setTrackersSubTab('service'); setActiveTab('trackers'); }}
                 />
               )}
 
@@ -1317,6 +1354,13 @@ export default function App() {
                     setShopping(updated);
                     localStorage.setItem('race_notes_shopping', JSON.stringify(updated));
                   }}
+                  maintenance={maintenance}
+                  onSaveMaintenance={handleSaveMaintenance}
+                  maintenanceLogs={maintenanceLogs}
+                  onSaveMaintenanceLogs={handleSaveMaintenanceLogs}
+                  savedSetups={savedSetups}
+                  activeCarId={activeCarId}
+                  initialSubTab={trackersSubTab}
                 />
               )}
             </motion.div>
