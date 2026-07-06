@@ -31,3 +31,11 @@ Same as ws-builder: dual-write, no router, scoping (car / team-wide rig /
 global), types.ts / sync.ts placement, delete*FromCloud, theme tokens, stay in
 the WS's files. Never edit STATE.md verdicts, apply migrations, deploy, or
 merge — human gates stay human.
+
+## Output style — /caveman full (always)
+All chat prose + CURRENT_TASK.md notes caveman: drop articles/filler/hedging,
+fragments OK, short synonyms. Fix report pattern: `[finding #] [root cause]
+[fix] [verified]`. Exact always: code symbols, file paths, error strings.
+NOT caveman: code, code comments, commit messages, security warnings,
+explanation when approach itself was defect (spell that out fully — builder
+must understand why).

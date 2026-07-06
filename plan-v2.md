@@ -141,6 +141,13 @@ light/dark, font scale). **Pass = all gates + score ≥ 90.**
   Google Play / APK signing.
 - Commit style: `WS-x attempt N: <summary>` while looping; ws-qa notes the final
   passing commit hash in STATE.md.
+- **All agents talk /caveman (full)** — saves tokens per loop iteration. Applies
+  to chat replies, CURRENT_TASK.md, STATE.md entries, QA findings: drop
+  articles/filler/hedging, fragments OK, short synonyms. Exact always: technical
+  terms, code symbols, file paths, error strings, acceptance criteria numbers.
+  Normal prose exempt: code blocks, commit messages, security warnings,
+  irreversible-action confirmations, multi-step sequences where fragment order
+  risks misread.
 
 ---
 
