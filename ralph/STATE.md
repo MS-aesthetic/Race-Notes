@@ -19,7 +19,7 @@
 | WS-N | Data model & migrations foundation | complete | 1 | 96 | e0ecbbf | Types + migrations 011-013 + sync.ts mappers (push/pull/delete) + data.ts defaults for maintenance/checklists/trips. Migrations still need owner approval before apply (human gate 4). |
 | WS-O | Maintenance engine | complete | 1 | 95 | 17ad130 | Car-scoping fix: getComponentStatus now takes savedSetups, resolves weekend.setupId->Setup.carId, excludes unresolvable weekends for scope:'car'. scope:'rig' unaffected (counts all). lint 3-baseline only, build clean. |
 | WS-P | Maintenance UI (Trackers "Service", todo-template style) | pending | 0 | — | — | |
-| WS-Q | Checklist engine | in_progress | 1 | — | — | Adding materializeStarterTemplate to bridge STARTER_TEMPLATES -> real ChecklistTemplate. |
+| WS-Q | Checklist engine | complete | 1 | 94 | f482938 | Added materializeStarterTemplate() to bridge STARTER_TEMPLATES (plain strings) into real, ID-bearing, user-owned ChecklistTemplate objects. instantiateTemplate/checklistProgress/STARTER_TEMPLATES untouched. lint 3-baseline only, build clean.
 | WS-R | Checklist UI | pending | 0 | — | — | |
 | WS-S | Push infrastructure | pending | 0 | — | — | Blocked by human gates 1–2 |
 | WS-T | Location sharing (foreground) | pending | 0 | — | — | |
@@ -43,6 +43,7 @@ Status values: `pending` · `in_progress` · `complete` · `scaffolded` (partial
 _(ws-qa appends one line per verdict: date · WS · attempt · PASS/FAIL · score · summary)_
 - 2026-07 · WS-N · attempt 1 · PASS · 96 · sync.ts mappers (maintenance_components, maintenance_logs, checklist_templates, weekend_checklists, saved_trips) + data.ts INITIAL_* defaults. lint 3-baseline only, build clean. Diff scoped to sync.ts + data.ts only.
 - 2026-07 · WS-O · attempt 1 · PASS · 95 · Fixed car-scoping gap in getComponentStatus (added savedSetups param, resolves weekend->car via setupId indirection, rig scope unaffected). Diff scoped to maintenance.ts only. lint 3-baseline only, build clean. No callers yet (App.tsx wiring deferred to WS-P, by design).
+- 2026-07 · WS-Q · attempt 1 · PASS · 94 · Added materializeStarterTemplate() — starter templates were plain string[] items but instantiateTemplate() needs full ChecklistTemplateItem[] w/ ids; new fn bridges the gap. Diff scoped to checklists.ts only. lint 3-baseline only, build clean. No callers yet (App.tsx/UI wiring deferred to WS-R, by design).
 
 ## Backlog
 
