@@ -16,7 +16,7 @@
 
 | WS | Title | Status | Attempts | Score | Commit | Notes |
 |----|-------|--------|----------|-------|--------|-------|
-| WS-N | Data model & migrations foundation | in_progress | 0 | — | 7ac5bbc | Types + draft migrations landed; building sync mappers + data.ts defaults |
+| WS-N | Data model & migrations foundation | complete | 1 | 96 | e0ecbbf | Types + migrations 011-013 + sync.ts mappers (push/pull/delete) + data.ts defaults for maintenance/checklists/trips. Migrations still need owner approval before apply (human gate 4). |
 | WS-O | Maintenance engine | pending | 0 | — | — | |
 | WS-P | Maintenance UI (Trackers "Service", todo-template style) | pending | 0 | — | — | |
 | WS-Q | Checklist engine | pending | 0 | — | — | |
@@ -41,6 +41,7 @@ Status values: `pending` · `in_progress` · `complete` · `scaffolded` (partial
 ## Grade log
 
 _(ws-qa appends one line per verdict: date · WS · attempt · PASS/FAIL · score · summary)_
+- 2026-07 · WS-N · attempt 1 · PASS · 96 · sync.ts mappers (maintenance_components, maintenance_logs, checklist_templates, weekend_checklists, saved_trips) + data.ts INITIAL_* defaults. lint 3-baseline only, build clean. Diff scoped to sync.ts + data.ts only.
 
 ## Backlog
 

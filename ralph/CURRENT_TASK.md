@@ -1,4 +1,4 @@
-# Current Task — WS-N: Data model & migrations foundation (finish scaffold)
+# Current Task — WS-N: Data model & migrations foundation (finish scaffold) — COMPLETE, see STATE.md
 
 **Workstream:** WS-N — Data Model & Migrations Foundation v2
 **Attempt:** 1
