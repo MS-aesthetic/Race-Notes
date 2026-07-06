@@ -17,7 +17,7 @@
 | WS | Title | Status | Attempts | Score | Commit | Notes |
 |----|-------|--------|----------|-------|--------|-------|
 | WS-N | Data model & migrations foundation | complete | 1 | 96 | e0ecbbf | Types + migrations 011-013 + sync.ts mappers (push/pull/delete) + data.ts defaults for maintenance/checklists/trips. Migrations still need owner approval before apply (human gate 4). |
-| WS-O | Maintenance engine | pending | 0 | — | — | |
+| WS-O | Maintenance engine | in_progress | 1 | — | — | Fixing car-scoping gap flagged by prior scaffold. |
 | WS-P | Maintenance UI (Trackers "Service", todo-template style) | pending | 0 | — | — | |
 | WS-Q | Checklist engine | pending | 0 | — | — | |
 | WS-R | Checklist UI | pending | 0 | — | — | |

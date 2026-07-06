@@ -13,6 +13,7 @@ import {
   RaceWeekend,
   SESSION_TYPE_LAPS,
   SessionType,
+  Setup,
 } from '../types';
 
 /** Default catalog offered on first open of the Service tab (user-editable). */
@@ -27,11 +28,26 @@ export const DEFAULT_COMPONENTS: Array<
   { name: 'Trailer bearings', category: 'Trailer',     scope: 'rig', intervalType: 'days',  intervalValue: 180 },
 ];
 
-/** Sessions for a car since a given ISO timestamp, across all weekends. */
-function sessionsSince(weekends: RaceWeekend[], sinceIso: string): { type: string; date: string }[] {
+/**
+ * Sessions since a given ISO timestamp.
+ * - carId === null → count every weekend (rig scope: hauler goes to every race).
+ * - carId set → only weekends whose bound Setup (weekend.setupId → savedSetups)
+ *   has a matching carId. Weekends with no bound setup, or a bound setup with
+ *   no carId, are excluded (ambiguous — don't guess which car ran them).
+ */
+function sessionsSince(
+  weekends: RaceWeekend[],
+  sinceIso: string,
+  carId: string | null,
+  savedSetups: Setup[],
+): { type: string; date: string }[] {
   const since = new Date(sinceIso).getTime();
   const out: { type: string; date: string }[] = [];
   for (const w of weekends) {
+    if (carId) {
+      const boundSetup = w.setupId ? savedSetups.find(s => s.id === w.setupId) : undefined;
+      if (!boundSetup?.carId || boundSetup.carId !== carId) continue;
+    }
     for (const s of w.sessions) {
       const d = new Date(s.time || w.date).getTime();
       if (!Number.isNaN(d) && d >= since) out.push({ type: s.name || s.type, date: w.date });
@@ -50,18 +66,19 @@ function lapsForSessionName(name: string): number {
 
 /**
  * Derive current usage vs interval for a component.
- * - scope 'car': counts laps/sessions/races from that car's weekend sessions
- *   since lastServicedAt. NOTE (WS-O): weekends are global — car attribution
- *   goes through the weekend's bound setup (setupId → setup.carId). Implement
- *   and verify in WS-O; scaffold counts all sessions.
- * - scope 'rig': 'days' recommended; laps/races count all activity.
+ * - scope 'car': counts laps/sessions/races only from weekends whose bound
+ *   Setup carries this component's carId (via weekend.setupId → Setup.carId
+ *   in savedSetups). Weekends with no resolvable car are excluded.
+ * - scope 'rig': counts across every weekend regardless of car — the hauler
+ *   goes to every race (decision #1, plan-v2.md).
  * - manualUnits (when set) overrides derivation for non-derivable items.
  */
 export function getComponentStatus(
   component: MaintenanceComponent,
   weekends: RaceWeekend[],
+  savedSetups: Setup[],
 ): MaintenanceStatus {
-  const { intervalType, intervalValue, lastServicedAt, manualUnits } = component;
+  const { intervalType, intervalValue, lastServicedAt, manualUnits, scope, carId } = component;
   let used = 0;
 
   if (typeof manualUnits === 'number') {
@@ -69,7 +86,7 @@ export function getComponentStatus(
   } else if (intervalType === 'days') {
     used = Math.floor((Date.now() - new Date(lastServicedAt).getTime()) / 86_400_000);
   } else {
-    const sessions = sessionsSince(weekends, lastServicedAt);
+    const sessions = sessionsSince(weekends, lastServicedAt, scope === 'car' ? (carId ?? null) : null, savedSetups);
     if (intervalType === 'laps') used = sessions.reduce((n, s) => n + lapsForSessionName(s.type), 0);
     else if (intervalType === 'races') used = sessions.filter(s => s.type.startsWith('Feature')).length;
     else used = sessions.length; // 'sessions'
