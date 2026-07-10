@@ -142,6 +142,15 @@ export async function handleNativeAuthCallback(url: string): Promise<boolean> {
 /** Sign out. This is the only thing that clears the local "registered on
  * this device" flag – losing network access should never sign someone out. */
 export async function signOut() {
+  // WS-S: drop this device's push token while the session (and its owner-only
+  // RLS) is still valid — must run before the token is destroyed. Lazy import
+  // avoids a static supabase<->push module cycle.
+  try {
+    const { unregisterPush } = await import('./push');
+    await unregisterPush();
+  } catch {
+    /* non-fatal */
+  }
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
   rememberLocalAccount(null);

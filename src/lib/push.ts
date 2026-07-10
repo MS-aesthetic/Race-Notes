@@ -1,46 +1,136 @@
-// ============================================================================
-// Push notification client (plan-v2.md WS-S) — SCAFFOLD
-//
-// Native (APK): @capacitor/push-notifications → FCM token.
-// Web (PWA):   Firebase JS SDK messaging + VAPID key + firebase-messaging-sw.js
-//              (coexists with the Workbox SW — spike this FIRST in WS-S).
-// Tokens upsert into `push_tokens`; the `send-push` Edge Function fans out.
-// Human setup required before WS-S: Firebase project, google-services.json,
-// VAPID key, `supabase secrets set FCM_SERVICE_ACCOUNT_JSON=...`.
-// ============================================================================
-
+/**
+ * Push registration — WS-S. Client half of the push pipe.
+ *
+ * Native (Android) uses @capacitor/push-notifications (FCM under the hood via
+ * google-services.json). Web/PWA uses Firebase JS messaging + a VAPID key and
+ * the dedicated firebase-messaging-sw.js service worker.
+ *
+ * Tokens are stored in the `push_tokens` table (owner-only RLS). This is LIVE
+ * data, not part of the local-first sync loop, so it does NOT go through
+ * sync.ts. Notification DELIVERY/fan-out happens server-side in the
+ * `send-push` Edge Function.
+ */
+import { Capacitor } from '@capacitor/core';
 import { supabase } from './supabase';
-import { AppNotificationType } from '../types';
 
-/** Register this device for push and store the token. WS-S TODO:
- *  - Android 13+ runtime POST_NOTIFICATIONS permission
- *  - token refresh listener
- *  - Capacitor vs web branch */
-export async function registerForPush(_userId: string): Promise<boolean> {
-  console.warn('WS-S: registerForPush not implemented (scaffold)');
-  return false;
+const DEVICE_ID_KEY = 'race_notes_device_id';
+
+function getDeviceId(): string {
+  if (typeof localStorage === 'undefined') return 'server';
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id =
+      (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
 }
 
-/** Remove this device's token (call on sign-out). */
-export async function unregisterPush(_userId: string): Promise<void> {
-  console.warn('WS-S: unregisterPush not implemented (scaffold)');
+async function upsertToken(userId: string, token: string, platform: 'android' | 'web'): Promise<void> {
+  const { error } = await supabase.from('push_tokens').upsert(
+    {
+      token,
+      user_id: userId,
+      platform,
+      device_id: getDeviceId(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'token' },
+  );
+  if (error) console.warn('[push] token upsert failed:', error.message);
 }
 
-/** Send a ping / come-here notification via the send-push Edge Function. */
-export async function sendPush(opts: {
-  toUserId?: string;
-  toTeamId?: string;
-  type: AppNotificationType;
-  title: string;
-  body: string;
-  data?: Record<string, unknown>;
-}): Promise<boolean> {
+// ---------------------------------------------------------------------------
+// Native (Capacitor / Android)
+// ---------------------------------------------------------------------------
+
+let nativeListenersBound = false;
+
+async function registerNative(userId: string): Promise<void> {
+  const { PushNotifications } = await import('@capacitor/push-notifications');
+
+  let perm = await PushNotifications.checkPermissions();
+  if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+    perm = await PushNotifications.requestPermissions();
+  }
+  if (perm.receive !== 'granted') return; // user declined — silent no-op
+
+  if (!nativeListenersBound) {
+    nativeListenersBound = true;
+    await PushNotifications.addListener('registration', (t) => {
+      void upsertToken(userId, t.value, 'android');
+    });
+    await PushNotifications.addListener('registrationError', (e) => {
+      console.warn('[push] native registration error:', JSON.stringify(e));
+    });
+  }
+  await PushNotifications.register();
+}
+
+// ---------------------------------------------------------------------------
+// Web (Firebase JS messaging + PWA service worker)
+// ---------------------------------------------------------------------------
+
+async function registerWeb(userId: string): Promise<void> {
+  const env = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
+  const configRaw = env.VITE_FIREBASE_CONFIG_JSON;
+  const vapidKey = env.VITE_FIREBASE_VAPID_KEY;
+  if (!configRaw || !vapidKey) return; // not configured — no-op
+  if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
+    return; // unsupported environment — no-op
+  }
+
+  const { isSupported, getMessaging, getToken } = await import('firebase/messaging');
+  if (!(await isSupported())) return;
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') return; // declined — no-op
+
+  const { initializeApp, getApps } = await import('firebase/app');
+  const config = JSON.parse(configRaw) as Record<string, string>;
+  const app = getApps().length ? getApps()[0] : initializeApp(config);
+
+  // Register at FCM's own scope so it never clobbers the Workbox root SW ('/').
+  const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+    scope: '/firebase-cloud-messaging-push-scope',
+  });
+  const token = await getToken(getMessaging(app), { vapidKey, serviceWorkerRegistration: swReg });
+  if (token) await upsertToken(userId, token, 'web');
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/** Register this device for push and store its token. Safe to call repeatedly;
+ *  all failure paths (unsupported, denied, offline) resolve as silent no-ops. */
+export async function registerForPush(userId: string): Promise<void> {
+  if (!userId) return;
   try {
-    const { error } = await supabase.functions.invoke('send-push', { body: opts });
-    if (error) { console.warn('sendPush error:', error.message); return false; }
-    return true;
+    if (Capacitor.isNativePlatform()) await registerNative(userId);
+    else await registerWeb(userId);
   } catch (e) {
-    console.warn('sendPush failed', e);
-    return false;
+    console.warn('[push] registerForPush failed (non-fatal):', (e as Error).message);
+  }
+}
+
+/** Remove this device's token. MUST run while the session is still valid
+ *  (owner-only RLS), i.e. before supabase.auth.signOut() destroys it. */
+export async function unregisterPush(): Promise<void> {
+  try {
+    const { data } = await supabase.auth.getUser();
+    const userId = data.user?.id;
+    if (userId) {
+      await supabase.from('push_tokens').delete().eq('user_id', userId).eq('device_id', getDeviceId());
+    }
+    if (Capacitor.isNativePlatform()) {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      await PushNotifications.removeAllListeners();
+      nativeListenersBound = false;
+    }
+  } catch (e) {
+    console.warn('[push] unregisterPush failed (non-fatal):', (e as Error).message);
   }
 }

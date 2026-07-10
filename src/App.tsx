@@ -16,6 +16,7 @@ import {
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, AppUser } from './lib/supabase';
 import AuthView from './components/AuthView';
 import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, pushMaintenanceLogs, pullMaintenanceLogs, pushChecklistTemplates, pullChecklistTemplates, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
+import { registerForPush } from './lib/push';
 import { instantiateTemplate, materializeStarterTemplate, checklistProgress } from './lib/checklists';
 import { syncTireLifecycle } from './lib/tireHistory';
 
@@ -376,6 +377,7 @@ export default function App() {
         if (currentUser) {
           rememberLocalAccount(currentUser);
           setHasLocalAcct(true);
+          void registerForPush(currentUser.id);
           const p = await fetchProfile(currentUser.id);
           setProfile(p);
           const t = await getUserTeam(currentUser.id);
@@ -403,6 +405,7 @@ export default function App() {
         // clearing the flag is left to the explicit signOut() call instead.
         rememberLocalAccount(newUser);
         setHasLocalAcct(true);
+        void registerForPush(newUser.id);
         const p = await fetchProfile(newUser.id);
         setProfile(p);
         const t = await getUserTeam(newUser.id);

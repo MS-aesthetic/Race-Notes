@@ -12,6 +12,11 @@ export default defineConfig(() => {
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['pwa-192x192.png', 'pwa-512x512.png', 'maskable-icon.png'],
+        // WS-S: the FCM service worker is a separate, self-registered SW. Keep it
+        // out of the Workbox precache manifest so the two never conflict.
+        workbox: {
+          globIgnores: ['**/firebase-messaging-sw.js'],
+        },
         manifest: {
           name: 'Race Notes',
           short_name: 'RaceNotes',

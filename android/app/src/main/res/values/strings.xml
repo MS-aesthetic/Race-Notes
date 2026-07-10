@@ -4,4 +4,5 @@
     <string name="title_activity_main">Crew Chief</string>
     <string name="package_name">nimbus.engineering.crewchief</string>
     <string name="custom_url_scheme">nimbus.engineering.crewchief</string>
+    <string name="default_notification_channel_id">crewchief_default</string>
 </resources>
