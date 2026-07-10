@@ -1,7 +1,7 @@
 ---
 name: ws-qa
 description: Ralph-loop TEST/QA step — grades ws-builder's work, updates the plan/task files, and gates the loop.
-model: Claude Fable 5
+model: Claude Fable 5 (high reasoning)
 tools: ['codebase', 'search', 'editFiles', 'runCommands', 'problems', 'changes']
 ---
 

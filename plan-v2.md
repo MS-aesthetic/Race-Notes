@@ -94,7 +94,7 @@ git commits — no side channels, so any session can resume the loop cold.
 │      `npm run build` before finishing. Commits WIP to `preview-v2`
 │      ("WS-x attempt N: ..."). Never edits plan-v2.md or STATE.md.
 │
-│   3. TEST/QA  ws-qa  (Claude Fable 5)
+│   3. TEST/QA  ws-qa  (Claude Fable 5, high reasoning)
 │      Grades the diff against the rubric below. Writes grade + findings into
 │      ralph/STATE.md and updates ralph/CURRENT_TASK.md with concrete fixes.
 │      ├─ PASS (all gates + score ≥ 90) → mark WS complete in STATE.md,
@@ -114,7 +114,7 @@ git commits — no side channels, so any session can resume the loop cold.
 |---|---|---|---|
 | `ws-planner` | `.github/agents/ws-planner.agent.md` | Claude Fable 5 | Picks next WS, writes the work order |
 | `ws-builder` | `.github/agents/ws-builder.agent.md` | DeepSeek V4 Pro Max (reasoning) | All development work |
-| `ws-qa` | `.github/agents/ws-qa.agent.md` | Claude Fable 5 | Grades output, updates plan/task, gates the loop |
+| `ws-qa` | `.github/agents/ws-qa.agent.md` | Claude Fable 5 (high reasoning) | Grades output, updates plan/task, gates the loop |
 | `ws-fixer` | `.github/agents/ws-fixer.agent.md` | Claude Opus 4.8 (medium reasoning) | Escalation after 2 failed attempts |
 
 **QA grading rubric (ws-qa; every gate is hard — any miss = FAIL):**
