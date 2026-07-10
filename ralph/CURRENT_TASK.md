@@ -1,181 +1,46 @@
-# Current Task — WS-R: Checklist UI — COMPLETE, see STATE.md
+# Current Task — WS-V: HERE Truck-Routing Library
 
-**Status:** PASS 92 · commit f220947
-
-**Workstream:** WS-R — Checklist UI
+**Workstream:** WS-V — HERE Truck-Routing Library
 **Attempt:** 1
-**Files (Primary):** `src/components/RaceWeekendView.tsx`, `src/components/TrackersView.tsx`
-**Files (Secondary):** `src/App.tsx`
+**Status:** COMPLETE — PASS 93/100, see STATE.md
 
 ## Scope
-
-Wire the WS-Q `checklists.ts` engine into UI.
-
-### App.tsx
-1. Add `ChecklistTemplate, WeekendChecklist` to type imports.
-2. Import sync fns: `pushChecklistTemplates, pullChecklistTemplates, pushWeekendChecklists, pullWeekendChecklists`.
-3. Import engine fns: `instantiateTemplate, materializeStarterTemplate, checklistProgress` from `./lib/checklists`.
-4. Add state: `checklistTemplates: ChecklistTemplate[]`, `weekendChecklists: WeekendChecklist[]`.
-5. Add handlers: `handleSaveChecklistTemplates`, `handleSaveWeekendChecklists`.
-6. Pull in cloud sync.
-7. Pass `checklistTemplates, weekendChecklists, onSaveWeekendChecklists` to `<RaceWeekendView>`.
-8. Pass `checklistTemplates, onSaveChecklistTemplates` to `<TrackersView>`.
-9. Add `checklistTemplates, weekendChecklists` to Saved-toast watch list.
-10. In `handleDeleteWeekend`: null out `weekendId` on checklists belonging to that weekend (set weekendId to undefined, preserve the list).
-
-### RaceWeekendView.tsx (primary)
-1. Add props: `checklistTemplates?: ChecklistTemplate[]`, `weekendChecklists?: WeekendChecklist[]`, `onSaveWeekendChecklists?: (c: WeekendChecklist[]) => void`.
-2. Import `ChecklistTemplate, WeekendChecklist` from `../types`; `instantiateTemplate, checklistProgress` from `../lib/checklists`.
-3. Inside the Weekend Info Banner section (after the weekend-notes textarea, before `</section>`): add a **Checklists** collapsible sub-section.
-   - Shows each attached checklist as a row: name + `done/total` progress ring + tap to expand items.
-   - Expanded: shows each `ChecklistItemState` row with checkbox; checking stamps `doneAt + doneBy = user?.id`.
-   - "+ Add checklist" button → small sheet modal: lists available templates + "Blank" option.
-   - Blank option creates a new WeekendChecklist with empty items array that can be extended.
-   - Delete icon per checklist (removes from weekendChecklists by id).
-
-### TrackersView.tsx (primary)
-1. Add `'checklists'` to `SubTab` type.
-2. Add props: `checklistTemplates: ChecklistTemplate[]`, `onSaveChecklistTemplates: (t: ChecklistTemplate[]) => void`.
-3. Add "Checklists" tab to `SUB_TABS`.
-4. Implement inline `<ChecklistsTab>` component:
-   - Lists templates with name, item count, edit/delete.
-   - Edit: toggle expanded to show item list + add/remove/reorder items.
-   - "Add template" form (name, category).
-   - "Use starter templates" button if no templates yet — calls `materializeStarterTemplate` on each STARTER_TEMPLATE.
-
-## Out of scope
-- New-weekend flow template picker (modal post-create) — skip for now.
-- Offline team-sync reordering — items just persisted as-is.
-
-## Acceptance criteria
-- [ ] Checklists section appears in RaceWeekendView weekend banner; shows progress per checklist.
-- [ ] Can attach a template to a weekend, check off items (doneAt stamped).
-- [ ] Template manager in Trackers → Checklists: CRUD works, starter templates offered.
-- [ ] Weekend delete nulls weekendId on associated checklists (list preserved).
-- [ ] `npm run lint` — baseline 3 errors only.
-- [ ] `npm run build` — succeeds.
-
-## Human prerequisites
-None.
-
-**Workstream:** WS-P — Maintenance UI
-**Attempt:** 1
-**Files (Primary):** `src/components/TrackersView.tsx`
-**Files (Secondary):** `src/App.tsx`, `src/components/DashboardView.tsx`
-
-## Scope
-
-Wire the WS-O `maintenance.ts` engine into actual UI.
-
-### App.tsx (minimal wiring only)
-1. Import `MaintenanceComponent, MaintenanceLog` from `./types`.
-2. Import `pushMaintenanceComponents, pullMaintenanceComponents, pushMaintenanceLogs, pullMaintenanceLogs, deleteMaintenanceComponentFromCloud, deleteMaintenanceLogFromCloud` from `./lib/sync`.
-3. Add state: `maintenance: MaintenanceComponent[]` (init from `race_notes_maintenance`), `maintenanceLogs: MaintenanceLog[]` (init from `race_notes_maintenance_logs`), `trackersSubTab: 'tasks'|'accounting'|'shopping'|'service'` (default `'tasks'`).
-4. Handlers: `handleSaveMaintenance`, `handleSaveMaintenanceLogs`.
-5. Pull maintenance & logs in the `doPull` cloud-sync effect.
-6. Add `maintenance, maintenanceLogs` to Saved-toast watch list.
-7. Pass new props to `<TrackersView>` and `<DashboardView>`.
-8. Add `race_notes_maintenance` + `race_notes_maintenance_logs` to `handleClearAllData`.
-
-### TrackersView.tsx (primary)
-1. Extend `SubTab` to include `'service'`.
-2. Add props: `maintenance`, `onSaveMaintenance`, `maintenanceLogs`, `onSaveMaintenanceLogs`, `savedSetups`, `activeCarId`, `initialSubTab?` (replaces local default).
-3. Sync `initialSubTab` on mount: `useState(initialSubTab ?? 'tasks')`.
-4. Add "Service" tab button.
-5. Implement inline `<ServiceTab>` component:
-   - Section grouping: **Car** (scope:'car' filtered by activeCarId) + **Rig** (scope:'rig', all).
-   - Each row: name · `used/limit unit` (font-mono) · status chip (ok=green/due=yellow/overdue=red) · "Log" button.
-   - Empty state: offer `DEFAULT_COMPONENTS` as a starter — "Add defaults" button materializes all into real `MaintenanceComponent` records with generated ids/timestamps.
-   - "Add component" button → small form (name, category, scope, intervalType, intervalValue).
-   - "Log service" modal: date (default today), type ('service'|'replace'|'inspect'), notes, cost (optional → creates AccountingEntry).
-   - Long-press/swipe or delete icon on each row → remove component + its logs.
-   - `getComponentStatus(comp, weekends, savedSetups)` drives all status/usage display.
-   - `applyServiceLog(comp, log)` used after logging to reset the component's counter.
-   - `weekends` prop passed from TrackersView (already in existing props).
-
-### DashboardView.tsx
-1. Add props: `maintenance?: MaintenanceComponent[]`, `onGoToService?: () => void`.
-2. Import `getComponentStatus` from `../lib/maintenance`.
-3. Add `serviceOpen` local state (default `true`).
-4. Compute due/overdue items: `maintenance.filter(c => getComponentStatus(c, weekends, savedSetups).state !== 'ok')`.
-5. If no due items AND `serviceOpen` false → hide panel entirely. If items exist, show collapsible "Service Due" panel above or below the Open Tasks panel.
-6. Each row: name · status chip · tap → calls `onGoToService?.()`.
-
-## Out of scope
-- No sync.ts changes (already done by WS-N).
-- No new files — ServiceTab stays inline in TrackersView.tsx.
-- No WS-R (checklist) changes.
-
-## Acceptance criteria
-- [ ] "Service" tab appears in Trackers; shows Car/Rig grouped rows with status chips.
-- [ ] "Add defaults" seeds DEFAULT_COMPONENTS on empty state.
-- [ ] "Log service" updates the component's `lastServicedAt` and appends a log; counter resets.
-- [ ] Dashboard "Service Due" panel shows only due/overdue; tap navigates to Service sub-tab.
-- [ ] Car-scoped components respect active car; rig items always visible.
-- [ ] `npm run lint` — baseline 3 errors only.
-- [ ] `npm run build` — succeeds.
-
-## Human prerequisites
-None.
-**Files (Primary):** `src/lib/checklists.ts`
-
-## Scope
-
-`src/lib/checklists.ts` already has a near-complete scaffold: `STARTER_TEMPLATES`
-(4 templates), `instantiateTemplate(template, weekendId?, weekendName?)`, and
-`checklistProgress(list)`. The gap: `STARTER_TEMPLATES` entries have
-`items: string[]` (plain labels), but `instantiateTemplate()` requires a real
-`ChecklistTemplate` with `items: ChecklistTemplateItem[]` (`{id, text}`). There
-is currently no function that turns a starter-template definition into a real,
-ID-bearing, user-owned `ChecklistTemplate` — meaning WS-R (UI) would have
-nothing to call to actually offer the starter templates to a user.
-
-1. Add `materializeStarterTemplate(starter: typeof STARTER_TEMPLATES[number]): ChecklistTemplate`
-   that converts a starter entry into a full `ChecklistTemplate`: generates an
-   `id` (reuse the existing `uid()` helper, prefix `'tmpl'`), maps each string
-   item to `{ id: uid('tmpli'), text }`, sets `updatedAt` to now.
-2. Export it alongside the existing exports.
-3. Do not change `STARTER_TEMPLATES` data, `instantiateTemplate`, or
-   `checklistProgress`.
-4. Do NOT wire into `App.tsx`/UI — that's WS-R.
-
-## Out of scope
-- No UI changes, no App.tsx state, no sync.ts changes.
-- No changes to the 4 starter template contents/order.
-
-## Acceptance criteria
-- [ ] `materializeStarterTemplate()` exists, returns a valid `ChecklistTemplate`
-      with unique `id`s for the template and every item.
-- [ ] `npm run lint` — baseline 3 errors only, no new errors.
-- [ ] `npm run build` — succeeds.
-- [ ] Diff confined to `src/lib/checklists.ts`.
-
-## Human prerequisites
-None.
-
-<!-- Template (ws-planner fills this in):
-
-# Current Task — WS-x: <title>
-
-**Workstream:** WS-x — <title>
-**Attempt:** 1
-
-## Scope
-1. ...numbered, concrete implementation steps...
+Build a pure TypeScript library for truck-aware routing on the HERE platform: geocoding, truck routing with rig dimensions/weight, flexible-polyline decoding, and truck-stop / rest-area discovery along a route corridor. Returns a `SavedTrip`-shaped object suitable for caching (HERE free tier = 30k tx/mo — never re-spend quota on a trip already fetched). **No UI. No map rendering. No App.tsx wiring. No sync.ts changes.** Persistence is WS-W's job.
 
 ## Files
-- Primary: ...
-- Shared (touch minimally): ...
+**Primary (create):**
+- `src/lib/geo/flexpolyline.ts` — vendored HERE flexible-polyline codec (MIT reference), pure, zero deps.
+- `src/lib/geo/here.ts` — HERE API client: `geocode`, `truckRoute`, `findTruckStops`, `findRestAreas`, `planTrip`, typed `HereError`.
 
-## Out of scope
-- ...
+**Shared (touch only as described):**
+- `.env.example` — add `VITE_HERE_API_KEY=` with a one-line comment.
+- `src/types.ts` — READ FIRST. `TruckProfile`, `SavedTrip`, `TripStop` already exist (WS-N) — do NOT redefine; match field names/units. Add `DEFAULT_TRUCK_PROFILE` (20,000 lb · 10 ft · 48 ft · 7 ft) only if missing, in the established constants location.
+
+**Do NOT touch:** `src/lib/sync.ts`, `src/App.tsx`, any View, Android/Capacitor files.
+
+## Steps
+1. Read existing types (TruckProfile/SavedTrip/TripStop field names + units — imperial lb/ft). Add DEFAULT_TRUCK_PROFILE only if absent.
+2. `flexpolyline.ts`: port HERE MIT reference decoder → `decode(encoded): {lat,lng}[]`, consuming header (precision, 3rd-dim flag) correctly. Keep MIT header. Pure, no deps.
+3. `here.ts`: key helper works in Vite AND Node (`import.meta.env?.VITE_HERE_API_KEY ?? globalThis.process?.env?.VITE_HERE_API_KEY`). Typed `HereError` with `code: 'missing_key'|'offline'|'quota_exceeded'|'bad_request'|'no_results'|'api_error'`. Every export throws only HereError.
+4. `geocode(query)` → GET geocode.search.hereapi.com/v1/geocode?q&limit=1&apiKey → `{lat,lng,label}`; empty → no_results.
+5. `truckRoute(origin,dest,profile)` → router.hereapi.com/v8/routes, transportMode=truck, origin/destination, return=polyline,summary,actions,tolls, avoid[features]=ferry, truck[grossWeight] kg=ceil(lb*0.453592), truck[height|length|width] cm=ceil(ft*30.48), truck[axleCount] if field exists. Return {distanceMeters,durationSeconds,polyline[],notices[],tolls?}; sum multi-section, concat decoded polylines.
+6. `findTruckStops`/`findRestAreas` → browse.search.hereapi.com/v1/browse sampled ~every 50km (≤~12 pts), in=circle r=8000, verified category IDs (truck stop 700-7900-0131, fuel 700-7600-0116, rest area 400-4300-0000 family — verify vs HERE docs, cite in comment). Dedupe by id, annotate distance-along-route, sort asc, map to TripStop shape. One shared browseAlongRoute internal.
+7. `planTrip(originQuery,destQuery,profile,opts?)` — geocode both, truckRoute, both POI searches → SavedTrip-shaped object (weekendId undefined). No storage writes. `opts.skipPois` for route-only.
+8. `.env.example`: add VITE_HERE_API_KEY with comment.
+9. `npm run lint` + `npm run build`; fix new issues.
 
 ## Acceptance criteria
-- [ ] ...testable bullets ws-qa grades against...
+- [ ] flexpolyline.ts zero-dep, MIT attribution, decode() reproduces HERE test vector `BFoz5xJ67i1B1B7PzIhaxL7Y` → 4 pts ≈(50.10228,8.69821)…(50.09878,8.68752) within 1e-5.
+- [ ] here.ts exports geocode, truckRoute, findTruckStops, findRestAreas, planTrip, HereError; no `any` in exported signatures.
+- [ ] Truck params metric (kg/cm), rounded up; avoid ferry + return=polyline,summary,actions,tolls present.
+- [ ] planTrip returns SavedTrip shape; POIs TripStop-shaped, sorted by distance-along-route; no localStorage/Supabase writes; sync.ts untouched.
+- [ ] Missing key / offline / 429 / empty each throw HereError with correct code; no raw fetch rejection escapes.
+- [ ] POI sampling capped; skipPois works; category IDs commented with source.
+- [ ] No new npm deps; no UI/JSX; TruckProfile/SavedTrip/TripStop not redefined; DEFAULT_TRUCK_PROFILE added only if missing.
+- [ ] lint clean except 3 baseline errors; build succeeds (Windows).
 
-## Human prerequisites
-- ...or "none"
+## Out of scope
+WS-W trip UI/map/Leaflet/tab wiring; WS-T/WS-S (parked); WS-X; SavedTrip persistence/sync; offline tiles; turn-by-turn; native.
 
-## QA findings
-_(ws-qa appends numbered findings per failed attempt)_
--->
+## Verification
+Temporary `scripts/smoke-here.ts` (delete after, or mark temporary): (1) decode test vector no-network, assert 4 pts within 1e-5; (2) live geocode("Charlotte Motor Speedway, Concord NC") finite lat/lng + label; (3) live short truck route to nearby point with DEFAULT_TRUCK_PROFILE → distance>0, duration>0, polyline.length>0; (4) key unset → throws HereError code missing_key; (5) optional findTruckStops → array sorted. Print PASS/FAIL, exit non-zero on fail. Then `npm run lint` (3 baseline), `npm run build`. Delete smoke script before done.

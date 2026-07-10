@@ -21,10 +21,10 @@
 | WS-P | Maintenance UI (Trackers "Service", todo-template style) | complete | 1 | 93 | 47da05b | Service sub-tab in Trackers: Car/Rig grouped rows, status chips (ok/due/overdue), usage bars, Log modal (date/type/notes/cost→accounting), Add Component form, Add Defaults seed. Dashboard Service Due collapsible panel (only due/overdue items). App.tsx state+handlers+cloud-pull wired. lint 3-baseline only, build clean. |
 | WS-Q | Checklist engine | complete | 1 | 94 | f482938 | Added materializeStarterTemplate() to bridge STARTER_TEMPLATES (plain strings) into real, ID-bearing, user-owned ChecklistTemplate objects. instantiateTemplate/checklistProgress/STARTER_TEMPLATES untouched. lint 3-baseline only, build clean.
 | WS-R | Checklist UI | complete | 1 | 92 | f220947 | ChecklistsSection in RaceWeekendView weekend banner (attach templates, check-off with doneAt/doneBy, delete). ChecklistsTab template manager in Trackers (CRUD items, starter templates, expand-to-edit). App.tsx state+pull+delete-weekend-null wired. lint 3-baseline only, build clean. |
-| WS-S | Push infrastructure | pending | 0 | — | — | Blocked by human gates 1–2 |
+| WS-S | Push infrastructure | pending | 0 | — | — | Human gates cleared, but PAUSED 2026-07-10: needs package-name rename to `nimbus.engineering.crewchief` committed on preview-v2 first (owner-decided; branches still say com.racenotes.app, Firebase+google-services already nimbus). Web push lib + send-push edge fn + firebase-messaging-sw.js are package-agnostic and can build independently; native manifest/FCM config deferred until rename lands. |
 | WS-T | Location sharing (foreground) | pending | 0 | — | — | |
 | WS-U | Ping / come-here notifications | pending | 0 | — | — | Needs WS-S |
-| WS-V | HERE truck-routing lib | pending | 0 | — | — | Blocked by human gate 3 |
+| WS-V | HERE truck-routing lib | complete | 1 | 93 | 3694aed | flexpolyline decoder + here.ts (geocode/truckRoute/POI discover/planTrip, full HereError taxonomy); live-API verified, lint/build green |
 | WS-W | Trip planner UI | pending | 0 | — | — | Needs WS-V |
 | WS-X | Teammates on route | pending | 0 | — | — | Needs WS-T + WS-W |
 | WS-Y | QA hardening & release | pending | 0 | — | — | Last; gates the batch |
@@ -33,10 +33,12 @@ Status values: `pending` · `in_progress` · `complete` · `scaffolded` (partial
 
 ## Human gates (Maxx) — required before the flagged WS can start
 
-- [ ] 1. Firebase project + `google-services.json` in `android/app/` (→ WS-S)
-- [ ] 2. `supabase secrets set FCM_SERVICE_ACCOUNT_JSON=...` + web VAPID key in `.env.local` (→ WS-S)
-- [ ] 3. HERE account + `VITE_HERE_API_KEY` in `.env.local` (→ WS-V)
-- [ ] 4. Apply migrations 011–013 to live Supabase (→ before WS-O/Q/S/T cloud sync testing)
+- [x] 1. Firebase project + `google-services.json` in `android/app/` (→ WS-S) — done 2026-07-10; pkg nimbus.engineering.crewchief, gitignored
+- [x] 2. `FCM_SERVICE_ACCOUNT_JSON` secret set in Supabase + web VAPID key in `.env.local` (→ WS-S) — done 2026-07-10
+- [x] 3. HERE account + `VITE_HERE_API_KEY` in `.env.local` (→ WS-V) — done 2026-07-10
+- [x] 4. Apply migrations 011–013 to live Supabase (→ before WS-O/Q/S/T cloud sync testing) — applied 2026-07-10
+
+**All human gates cleared 2026-07-10 → WS-S and WS-V are now unblocked.**
 
 ## Grade log
 
@@ -46,7 +48,11 @@ _(ws-qa appends one line per verdict: date · WS · attempt · PASS/FAIL · scor
 - 2026-07 · WS-Q · attempt 1 · PASS · 94 · Added materializeStarterTemplate() — starter templates were plain string[] items but instantiateTemplate() needs full ChecklistTemplateItem[] w/ ids; new fn bridges the gap. Diff scoped to checklists.ts only. lint 3-baseline only, build clean. No callers yet (App.tsx/UI wiring deferred to WS-R, by design).
 - 2026-07 · WS-P · attempt 1 · PASS · 93 · Full maintenance UI: Service sub-tab (Car/Rig sections, usage bars, status chips, Log modal, Add form, Add Defaults), Dashboard Service Due panel. App.tsx state+pull wiring. Accounting auto-entry on cost log. lint 3-baseline only, build clean.
 - 2026-07 · WS-R · attempt 1 · PASS · 92 · Weekend checklists in RaceWeekendView (attach from template, check-off w/doneAt stamp, delete, blank option). ChecklistsTab template manager in Trackers (CRUD, starter seeds, item add/delete). App.tsx state+cloud-pull+delete-weekend nulling. lint 3-baseline only, build clean.
+- 2026-07 · WS-V · attempt 1 · PASS · 93 · All gates + live HERE API verification (decode test vector, geocode, 5.5mi truck route, 10 sorted truck stops, full error taxonomy) passed; Discover text-search POI trade-off accepted; package.json WS-S deps to re-attribute. Commit 3694aed.
 
 ## Backlog
 
 _(follow-up items discovered during QA — do not expand an in-flight WS)_
+- WS-V: re-attribute `firebase` + `@capacitor/push-notifications` package.json additions to WS-S's commit (installed but unused by WS-V; currently left uncommitted in the worktree).
+- WS-V: consider HERE category-ID filtering as a fallback to Discover text search for non-English locales / noisy results.
+- WS-S: PAUSED — commit the package-name rename to `nimbus.engineering.crewchief` on preview-v2 before any native/FCM work (owner-decided 2026-07-10; Firebase + google-services.json already nimbus).
