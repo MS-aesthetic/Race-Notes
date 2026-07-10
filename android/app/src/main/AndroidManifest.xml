@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.racenotes.app">
+    package="nimbus.engineering.crewchief">
 
     <application
         android:allowBackup="true"
@@ -13,7 +13,7 @@
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
-            android:name="com.racenotes.app.MainActivity"
+            android:name="nimbus.engineering.crewchief.MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
@@ -31,6 +31,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="nimbus.engineering.crewchief" android:host="auth-callback" />
                 <data android:scheme="com.racenotes.app" android:host="auth-callback" />
             </intent-filter>
         </activity>

@@ -23,7 +23,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 // Custom URL scheme (registered in AndroidManifest.xml) used to bounce back
 // into the native Android app after the system browser finishes Google sign-in.
-export const NATIVE_AUTH_CALLBACK_URL = 'com.racenotes.app://auth-callback';
+export const NATIVE_AUTH_CALLBACK_URL = 'nimbus.engineering.crewchief://auth-callback';
 
 // ---------------------------------------------------------------------------
 // Local "has this device ever registered/signed in" flag.

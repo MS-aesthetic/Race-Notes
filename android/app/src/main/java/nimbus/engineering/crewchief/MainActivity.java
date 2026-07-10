@@ -1,4 +1,4 @@
-package com.racenotes.app;
+package nimbus.engineering.crewchief;
 
 import android.os.Bundle;
 import androidx.core.view.WindowCompat;
