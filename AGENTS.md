@@ -2,27 +2,55 @@
 
 AI coding agent guide for the **Race Notes** PWA — a professional motorsport logbook and pit-side crew-chief tool for dirt-track racing.
 
-> **📋 Active feature roadmap:** [`plan.md`](./plan.md) — read this FIRST before starting any feature work. It defines 13 workstreams (WS-A through WS-M), their execution order, dependencies, and the shared data-model foundation that must land first.
+> **📋 Active feature roadmap:** [`plan-v2.md`](./plan-v2.md) and
+> [`ralph/STATE.md`](./ralph/STATE.md). Read these before feature work.
 >
 > **📚 Full reference:** [`CODEBASE_KNOWLEDGE.md`](./CODEBASE_KNOWLEDGE.md) — comprehensive technical reference (types, tables, localStorage keys, component details, gotchas, session history).
 >
 > **🧭 NEW AGENT? START WITH [`HANDOFF.md`](./HANDOFF.md)** — consolidated onboarding: current status, session history, worktree/branch gotchas, build/deploy procedures, and the Ralph-loop workflow.
 >
-> ⚠️ **This file (`AGENTS.md`) describes v1** (`plan.md`, WS-A–M, old package `com.racenotes.app`). Architecture/conventions still apply, but for **v2 status and workflow trust [`plan-v2.md`](./plan-v2.md), [`ralph/STATE.md`](./ralph/STATE.md), and [`HANDOFF.md`](./HANDOFF.md)**. Current package is `nimbus.engineering.crewchief`.
+> This file is current workflow authority. For v2 status trust
+> [`plan-v2.md`](./plan-v2.md), [`ralph/STATE.md`](./ralph/STATE.md), and
+> [`HANDOFF.md`](./HANDOFF.md). Current package: `nimbus.engineering.crewchief`.
+
+---
+
+## Mandatory Agent Workflow & Communication (2026-07-11 owner directive)
+
+These rules apply to every future planning, investigation, implementation, QA,
+review, and user-facing status message in this repository.
+
+1. **Use `/caveman full` for all communication.** Keep technical substance exact;
+   remove filler. Code, code comments, commit messages, security warnings, and
+   irreversible-action confirmations remain normal prose. Stop only when Maxx says
+   `stop caveman` or `normal mode`.
+2. **Use `cavecrew` for delegated work.** Read both skills before acting:
+   - `.agents/skills/cavecrew/SKILL.md`
+   - `.agents/skills/caveman/SKILL.md`
+3. Delegation routing:
+   - code/location tracing: `cavecrew-investigator`
+   - known surgical edit touching at most two files: `cavecrew-builder`
+   - diff/branch/file verification: `cavecrew-reviewer`
+   - cross-cutting work touching three or more files: primary agent owns build;
+     cavecrew investigators/reviewers support it
+4. **Model routing:** GPT 5.6 SOL High owns analysis, specification, planning,
+   and QA. GPT 5.6 Terra High owns feature implementation. QA failures 1–2 return
+   to Terra. Failure 3 (more than two failed QA reviews) transfers implementation
+   to GPT 5.6 SOL High, then SOL performs final QA.
+5. If named models are unavailable, state limitation. Never claim unavailable
+   model ran. Preserve role split with best available models only after disclosure.
 
 ---
 
 ## Branch & Deploy Workflow (READ FIRST)
 
-> **BRANCH RULE — all feature work on `preview`.** Never commit feature work directly to `master`. Create `preview` from `master` if it doesn't exist:
+> **BRANCH RULE — all current feature work on `preview-v2`.** Use worktree
+> `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v2`. Never commit feature work
+> directly to `preview` or `master`:
 > ```bash
-> git checkout -b preview master   # only if preview doesn't exist yet
-> ```
->
-> ```bash
-> git checkout preview
+> git checkout preview-v2
 > # ...make changes...
-> git push origin preview
+> git push origin preview-v2
 > ```
 >
 > **DEPLOY RULE — default to PREVIEW.** Always deploy to a Netlify **preview/draft**
@@ -37,14 +65,14 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 >   only when asked; otherwise a GitHub push does not change the live site.
 > - Production publishes require account credits (paid plan). Preview/draft deploys
 >   are the normal iteration loop.
-> - **NEVER merge `preview` → `master`** unless Maxx **explicitly** says "merge to
->   master" / "push to production".
+> - **NEVER merge `preview-v2` → `preview` → `master`** unless Maxx
+>   explicitly authorizes each merge/release step.
 
 ---
 
 ## Architecture
 
-**No router.** Navigation is entirely tab-based: `activeTab` state in `src/App.tsx` conditionally renders one of six view components — `'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'trackers'` (verified 2026-07-01). There is **no `'todos'` tab and no `'team'` tab** — todos live inside `TrackersView`'s Todos sub-tab (alongside Accounting/Shopping), and `TeamView.tsx`/`ToDoView.tsx` exist as files but are unwired/orphaned (not imported by `App.tsx`). To add a new tab: add the tab key to the `activeTab` union type, add a `<button>` in the bottom `<nav>`, and add a conditional render in `<main>`.
+**No router.** Navigation is entirely tab-based: `activeTab` state in `src/App.tsx` conditionally renders one of six view components — `'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'trackers'`. There is **no `'todos'` tab and no `'team'` tab**. Trackers sub-tabs: Checklist, Service, Templates, Accounting. `ToDoView` renders one Main Checklist; `TeamView.tsx` remains unwired. To add a new tab: add the tab key to the `activeTab` union type, add a `<button>` in bottom `<nav>`, and add conditional render in `<main>`.
 
 **Mandatory login gate (added 2026-07).** The app requires sign-in before any tab renders. `isUnlocked = !!user || hasLocalAcct` in `App.tsx` gates the entire UI behind `<AuthView />`. `hasLocalAccount()`/`rememberLocalAccount()` in `src/lib/supabase.ts` maintain a `race_notes_registered_user` localStorage flag independent of live Supabase session validity, so the app stays usable **offline** on a device that has logged in before — only explicit sign-out clears the flag. Google OAuth (web + native, via `signInWithGoogle()`) is available alongside email/password.
 
@@ -76,30 +104,12 @@ Before marking any workstream complete, verify ALL of the following:
 
 ---
 
-## Workstream Coordination (from `plan.md`)
+## Workstream Coordination
 
-`src/App.tsx` and `src/types.ts` are **hot shared files** that most workstreams touch. To avoid conflicts:
-
-- **Do WS-A (Data Model & Migrations Foundation) FIRST** — it adds all new fields/types and empty Supabase columns so downstream agents don't fight over `types.ts`.
-- When two agents must edit `App.tsx`, edit **different regions** and keep diffs small.
-- Prefer extracting new logic into new files (`src/lib/*`, `src/components/*`) and wiring with minimal lines in `App.tsx`.
-
-### Suggested execution order
-```
-WS-A  Data model + migrations  ──►  WS-C Tire lifecycle
-                               ├──►  WS-B Setup diff
-                               ├──►  WS-F Task↔weekend
-                               └──►  WS-G Exports (depends on C, E, F data)
-WS-D  Carry-over setup            (parallel; light App.tsx touch)
-WS-E  Weather history/forecast    (parallel; App.tsx weekend-create region)
-WS-H  Settings default+bigger menu(parallel; SettingsView only)
-WS-I  Font default 1.15           (parallel; tiny)
-WS-J  Reference overhaul          (parallel; QuickReferenceView only)
-WS-K  Light mode fixes            (parallel; index.css only)
-WS-L  Session track-condition     (parallel; App.tsx session-form region)
-WS-M  Dashboard nav fixes         (parallel; DashboardView + small App.tsx)
-```
-Low-conflict quick wins (H, I, J, K, M) can start immediately — see [`plan.md`](./plan.md) for full details on each.
+`plan-v2.md` dependency graph and `ralph/STATE.md` status control execution.
+One workstream stays active. Parallel cavecrew investigation may be read-only;
+feature builds stay serial. `src/App.tsx` and `src/types.ts` are hot shared files:
+keep diffs small and extract logic into `src/lib/*` or `src/components/*`.
 
 ---
 
@@ -107,7 +117,8 @@ Low-conflict quick wins (H, I, J, K, M) can start immediately — see [`plan.md`
 
 | File | Purpose |
 |---|---|
-| `plan.md` | **Active feature roadmap** — 13 workstreams, execution order, dependencies, definition of done. Read FIRST. |
+| `plan-v2.md` | **Active roadmap** — v2 workstreams, dependencies, ownership, Ralph loop. |
+| `ralph/STATE.md` | Durable workstream status, attempts, QA scores, gates. |
 | `CODEBASE_KNOWLEDGE.md` | Comprehensive technical reference — types, tables, localStorage keys, component details, gotchas, all session history. |
 | `src/types.ts` | All TypeScript interfaces — start here to understand domain models |
 | `src/data.ts` | `INITIAL_SETUP`, `INITIAL_SETUPS`, `INITIAL_WEEKENDS`, `INITIAL_ACTIVE_SESSION` defaults |
@@ -140,13 +151,14 @@ Low-conflict quick wins (H, I, J, K, M) can start immediately — see [`plan.md`
 | `race_notes_saved_setups` | `Setup[]` array |
 | `race_notes_weekends` | `RaceWeekend[]` array |
 | `race_notes_active_session` | `ActiveSession` object |
+| `race_notes_active_weekend` | active weekend ID — device-local, never synced |
 | `race_notes_todos` | `Todo[]` array |
 | `race_notes_tires` | `TireInventoryItem[]` array |
 | `race_notes_shock_graphs` | `ShockSession[]` array |
 | `race_notes_cars` | `Car[]` array |
 | `race_notes_active_car` | active car ID string — **device-local, never synced to Supabase** |
 | `race_notes_accounting` | `AccountingEntry[]` array |
-| `race_notes_shopping` | `ShoppingItem[]` array |
+| `race_notes_shopping` | retired Shopping data retained for rollback; no visible UI |
 | `race_notes_theme` | `AppTheme` object (`fontSize: 'standard' \| 'large' \| 'xlarge' \| 'xxlarge'`, drives CSS `--ui-zoom`) |
 | `race_notes_registered_user` | durable "device has logged in before" flag powering offline-resilient auth gate (see Architecture above) |
 

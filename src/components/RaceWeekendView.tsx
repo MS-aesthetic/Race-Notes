@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
-import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, ChecklistTemplate, WeekendChecklist } from '../types';
-import { User } from '@supabase/supabase-js';
+import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup } from '../types';
 import { sortBySize } from '../lib/tireSize';
-import { instantiateTemplate, checklistProgress } from '../lib/checklists';
 
 interface RaceWeekendViewProps {
-  user: User | null;
   session: ActiveSession;
   weekends: RaceWeekend[];
   tireInventory?: TireInventoryItem[];
@@ -14,11 +11,10 @@ interface RaceWeekendViewProps {
   onUpdateWeekend: (updated: RaceWeekend) => void;
   onDeleteSession: (weekendId: string, sessionId: string) => void;
   onSelectSession: (session: SessionRecord, weekendId?: string) => void;
+  activeWeekendId: string | null;
+  onActivateWeekend: (weekendId: string) => void;
   onNewSession?: () => void;
-  onNewWeekend?: () => void;
-  checklistTemplates?: ChecklistTemplate[];
-  weekendChecklists?: WeekendChecklist[];
-  onSaveWeekendChecklists?: (c: WeekendChecklist[]) => void;
+  onCreateWeekend: () => void;
 }
 
 // ── Weather condition code → label ────────────────────────────────────────────
@@ -62,187 +58,11 @@ function compressImage(file: File, maxPx = 1024, quality = 0.82): Promise<string
   });
 }
 
-// ── Checklists section (inline component) ─────────────────────────────────────
-
-function ChecklistsSection({
-  weekendId, weekendName, allChecklists, templates, userId, onSave,
-}: {
-  weekendId: string;
-  weekendName: string;
-  allChecklists: WeekendChecklist[];
-  templates: ChecklistTemplate[];
-  userId?: string;
-  onSave: (c: WeekendChecklist[]) => void;
-}) {
-  const uid = (p: string) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-
-  const mine = allChecklists.filter(c => c.weekendId === weekendId);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [showPicker, setShowPicker] = useState(false);
-
-  const toggleItem = (checklistId: string, itemId: string) => {
-    const updated = allChecklists.map(c => {
-      if (c.id !== checklistId) return c;
-      return {
-        ...c,
-        updatedAt: new Date().toISOString(),
-        items: c.items.map(it =>
-          it.id !== itemId ? it :
-          it.done
-            ? { ...it, done: false, doneAt: undefined, doneBy: undefined, doneByName: undefined }
-            : { ...it, done: true, doneAt: new Date().toISOString(), doneBy: userId }
-        ),
-      };
-    });
-    onSave(updated);
-  };
-
-  const attachTemplate = (template: ChecklistTemplate) => {
-    const cl = instantiateTemplate(template, weekendId, weekendName);
-    onSave([...allChecklists, cl]);
-    setShowPicker(false);
-    setExpandedId(cl.id);
-  };
-
-  const addBlank = () => {
-    const cl: WeekendChecklist = {
-      id: uid('chk'),
-      weekendId,
-      weekendName,
-      name: 'New Checklist',
-      category: 'Custom',
-      items: [],
-      updatedAt: new Date().toISOString(),
-    };
-    onSave([...allChecklists, cl]);
-    setShowPicker(false);
-    setExpandedId(cl.id);
-  };
-
-  const deleteChecklist = (id: string) => {
-    if (!window.confirm('Remove this checklist?')) return;
-    onSave(allChecklists.filter(c => c.id !== id));
-  };
-
-  return (
-    <div className="p-4 border-t border-outline-variant/40">
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-mono text-[10px] uppercase font-bold text-on-surface-variant tracking-wider">Checklists</span>
-        <button
-          onClick={() => setShowPicker(v => !v)}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary font-mono text-[10px] uppercase font-bold transition-colors"
-        >
-          <span className="material-symbols-outlined text-[13px]">{showPicker ? 'close' : 'add'}</span>
-          Add
-        </button>
-      </div>
-
-      {/* Template picker */}
-      {showPicker && (
-        <div className="mb-3 bg-surface-container-high border border-outline-variant rounded-lg overflow-hidden">
-          {templates.length > 0 ? (
-            <>
-              {templates.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => attachTemplate(t)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-primary/10 transition-colors border-b border-outline-variant/30 last:border-0 text-left"
-                >
-                  <span className="font-mono text-xs text-on-surface">{t.name}</span>
-                  <span className="font-mono text-[10px] text-on-surface-variant">{t.items.length} items</span>
-                </button>
-              ))}
-            </>
-          ) : (
-            <p className="px-3 py-3 font-mono text-[10px] text-on-surface-variant/50 italic">
-              No templates yet — create them in Trackers → Checklists.
-            </p>
-          )}
-          <button
-            onClick={addBlank}
-            className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-surface-container transition-colors border-t border-outline-variant/30 text-on-surface-variant"
-          >
-            <span className="material-symbols-outlined text-[14px]">add_circle</span>
-            <span className="font-mono text-xs">Blank checklist</span>
-          </button>
-        </div>
-      )}
-
-      {/* Checklist rows */}
-      {mine.length === 0 && !showPicker ? (
-        <p className="font-mono text-[10px] text-on-surface-variant/40 italic">No checklists for this weekend yet.</p>
-      ) : (
-        <div className="space-y-2">
-          {mine.map(cl => {
-            const prog = checklistProgress(cl);
-            const pct = Math.round(prog.pct * 100);
-            const isExpanded = expandedId === cl.id;
-            return (
-              <div key={cl.id} className="bg-surface rounded-lg border border-outline-variant overflow-hidden">
-                <button
-                  onClick={() => setExpandedId(isExpanded ? null : cl.id)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-surface-container-high transition-colors text-left"
-                >
-                  {/* Progress ring (simple text ring) */}
-                  <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center shrink-0 font-mono text-[10px] font-bold ${pct >= 100 ? 'border-green-500 text-green-400' : pct > 0 ? 'border-primary text-primary' : 'border-outline-variant text-on-surface-variant'}`}>
-                    {prog.done}/{prog.total}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="font-mono text-xs font-semibold text-on-surface block truncate">{cl.name}</span>
-                    <span className={`font-mono text-[10px] ${pct >= 100 ? 'text-green-400' : 'text-on-surface-variant/50'}`}>
-                      {pct >= 100 ? '✓ Complete' : `${pct}%`}
-                    </span>
-                  </div>
-                  <span className="material-symbols-outlined text-on-surface-variant/50 text-[16px] transition-transform duration-200"
-                    style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>expand_more</span>
-                  <button
-                    onClick={e => { e.stopPropagation(); deleteChecklist(cl.id); }}
-                    className="material-symbols-outlined text-[15px] text-on-surface-variant/30 hover:text-red-400 shrink-0"
-                  >close</button>
-                </button>
-                {isExpanded && (
-                  <div className="border-t border-outline-variant/40 divide-y divide-outline-variant/20">
-                    {cl.items.length === 0 ? (
-                      <p className="px-4 py-3 font-mono text-[10px] text-on-surface-variant/40 italic">No items in this checklist.</p>
-                    ) : (
-                      cl.items.map(item => (
-                        <button
-                          key={item.id}
-                          onClick={() => toggleItem(cl.id, item.id)}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container transition-colors text-left"
-                        >
-                          <span className={`material-symbols-outlined text-[18px] ${item.done ? 'text-green-500' : 'text-outline-variant'}`}
-                            style={{ fontVariationSettings: item.done ? "'FILL' 1" : "'FILL' 0" }}>
-                            {item.done ? 'check_circle' : 'radio_button_unchecked'}
-                          </span>
-                          <span className={`font-mono text-xs flex-1 ${item.done ? 'line-through text-on-surface-variant/40' : 'text-on-surface'}`}>
-                            {item.text}
-                          </span>
-                          {item.doneAt && (
-                            <span className="font-mono text-[9px] text-on-surface-variant/30 shrink-0">
-                              {new Date(item.doneAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Main RaceWeekendView ──────────────────────────────────────────────────────
 
 export default function RaceWeekendView({
-  session, weekends, tireInventory = [], savedSetups = [], onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession, onNewSession, onNewWeekend,
-  user,
-  checklistTemplates = [], weekendChecklists = [], onSaveWeekendChecklists,
+  session, weekends, tireInventory = [], savedSetups = [], onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession,
+  activeWeekendId, onActivateWeekend, onNewSession, onCreateWeekend,
 }: RaceWeekendViewProps) {
   const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
@@ -255,11 +75,8 @@ export default function RaceWeekendView({
     () => new Set([weekends.find(w => w.id === session.weekendId)?.id ?? weekends[0]?.id ?? ''].filter(Boolean))
   );
 
-  // ── Weekend lookup: prefer weekendId, fall back to track match ───────────────
-  const currentWeekend =
-    weekends.find(w => w.id === session.weekendId) ||
-    weekends.find(w => w.track === session.track) ||
-    weekends[0];
+  const currentWeekend = weekends.find(w => w.id === activeWeekendId);
+  const hasActiveSession = !!session.id && session.weekendId === activeWeekendId;
 
   const displaySessions = currentWeekend?.sessions || [];
 
@@ -448,6 +265,35 @@ export default function RaceWeekendView({
     onUpdateWeekend({ ...currentWeekend, notes });
   };
 
+  if (weekends.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <button
+          onClick={onCreateWeekend}
+          className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl border-2 border-dashed border-primary/60 bg-primary/10 text-primary font-display font-bold uppercase tracking-wider"
+        >
+          <span className="material-symbols-outlined">add_circle</span>
+          Create Weekend
+        </button>
+      </div>
+    );
+  }
+
+  if (!currentWeekend) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+        <p className="font-mono text-sm text-on-surface-variant">Select an active weekend.</p>
+        <div className="flex flex-wrap justify-center gap-2">
+          {weekends.map(weekend => (
+            <button key={weekend.id} onClick={() => onActivateWeekend(weekend.id)} className="px-3 py-2 border border-primary/50 rounded text-primary font-mono text-xs font-bold uppercase">
+              {weekend.name}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -559,45 +405,21 @@ export default function RaceWeekendView({
             />
           </div>
 
-          {/* Checklists */}
-          {onSaveWeekendChecklists && (
-            <ChecklistsSection
-              weekendId={currentWeekend.id}
-              weekendName={currentWeekend.name}
-              allChecklists={weekendChecklists}
-              templates={checklistTemplates}
-              userId={user?.id}
-              onSave={onSaveWeekendChecklists}
-            />
-          )}
         </section>
       )}
 
-      {/* ── CTAs: New Weekend + New Session ──────────────────────────────── */}
-      {(onNewWeekend || onNewSession) && (
-        <div className="flex gap-3">
-          {onNewWeekend && (
-            <button
-              onClick={onNewWeekend}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-outline-variant hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-on-surface-variant hover:text-primary font-display font-bold uppercase tracking-wider text-sm"
-            >
-              <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
-              New Weekend
-            </button>
-          )}
-          {onNewSession && (
-            <button
-              onClick={onNewSession}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-primary font-display font-bold uppercase tracking-wider text-sm"
-            >
-              <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
-              New Session
-            </button>
-          )}
-        </div>
+      {onNewSession && (
+        <button
+          onClick={onNewSession}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-primary font-display font-bold uppercase tracking-wider text-sm"
+        >
+          <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
+          New Session
+        </button>
       )}
 
       {/* ── Active Session Editor ─────────────────────────────────────────── */}
+      {hasActiveSession && (
       <section className="bg-surface-container rounded-lg border border-outline-variant">
         {/* Collapsible header */}
         <button
@@ -798,6 +620,7 @@ export default function RaceWeekendView({
         </div>
         )}
       </section>
+      )}
 
       {/* ── All Weekends (each collapsible, all sessions inside) ─────────── */}
       {weekends.length > 0 && (
@@ -808,7 +631,7 @@ export default function RaceWeekendView({
 
           <div className="flex flex-col gap-3">
             {[...weekends].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(wk => {
-              const isActiveWk = wk.id === currentWeekend?.id;
+              const isActiveWk = wk.id === activeWeekendId;
               const isWkExpanded = expandedWeekendIds.has(wk.id);
               const wkSessions = wk.sessions || [];
               return (
@@ -831,9 +654,20 @@ export default function RaceWeekendView({
                         {wk.track}{wk.date ? ` · ${wk.date}` : ''} · {wkSessions.length} session{wkSessions.length !== 1 ? 's' : ''}
                       </span>
                     </div>
-                    <span className="material-symbols-outlined text-on-surface-variant">
-                      {isWkExpanded ? 'expand_less' : 'expand_more'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {!isActiveWk && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={event => { event.stopPropagation(); onActivateWeekend(wk.id); }}
+                          onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onActivateWeekend(wk.id); } }}
+                          className="px-2 py-1 rounded border border-primary/40 text-primary font-mono text-[9px] font-bold uppercase"
+                        >Set Active</span>
+                      )}
+                      <span className="material-symbols-outlined text-on-surface-variant">
+                        {isWkExpanded ? 'expand_less' : 'expand_more'}
+                      </span>
+                    </div>
                   </button>
 
                   {/* Sessions inside this weekend */}

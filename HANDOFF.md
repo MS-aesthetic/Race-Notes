@@ -1,14 +1,15 @@
 # CREW CHIEF — Agent Handoff & Onboarding
 
 > **Purpose:** single entry point for any new LLM/agent picking up this project.
-> Read this first, then the linked docs. Last updated **2026-07-10**.
+> Read this first, then the linked docs. Last updated **2026-07-11**.
 
 CREW CHIEF (brand: all caps) is a React + TypeScript PWA + Android app that helps
 dirt-track racing teams track car setups, race sessions, tire inventory, weather,
 pit-crew tasks, maintenance/ERP, pre-race checklists, and (in progress) push
 notifications, live team location, and truck routing. Owner/decision-maker: **Maxx**.
 
-Deployed web preview: https://crew-chief-race-notes.netlify.app
+Production site (unchanged): https://crew-chief-race-notes.netlify.app
+Latest WS-Z draft: https://6a525a23a0b54ce49ff7498c--crew-chief-race-notes.netlify.app
 Repo (Windows host): `C:\Users\maxx\antigravity\Race-Notes`
 
 ---
@@ -20,10 +21,12 @@ Repo (Windows host): `C:\Users\maxx\antigravity\Race-Notes`
 3. **`ralph/STATE.md`** — machine-readable loop state: what's done, scores, human gates, backlog.
 4. **`ralph/CURRENT_TASK.md`** — the work order for the WS currently in flight.
 5. **`CODEBASE_KNOWLEDGE.md`** — 1000-line deep technical reference (types, tables, components, gotchas, session history).
-6. **`AGENTS.md`** — architecture + conventions. ⚠️ Written for **v1** (`plan.md`, WS-A–M, old package name). Still accurate for architecture/conventions, but for v2 status trust `plan-v2.md` + `STATE.md`.
+6. **`AGENTS.md`** — current architecture, workflow, cavecrew/caveman, model,
+   branch, and deploy authority.
 7. **`.github/agents/*.agent.md`** — the four Ralph-loop agent role definitions.
 
-> ⚠️ **Doc-currency note:** `AGENTS.md` and `CODEBASE_KNOWLEDGE.md` predate the v2 batch and the package rename. Where they conflict with this file, `plan-v2.md`, or `STATE.md`, the latter win.
+> **Doc-currency note:** `CODEBASE_KNOWLEDGE.md` predates parts of v2. Current
+> workflow authority: `AGENTS.md`, this file, `plan-v2.md`, then `STATE.md`.
 
 ---
 
@@ -34,7 +37,7 @@ Git worktrees in play:
 | Path | Branch | Role |
 |---|---|---|
 | `C:\Users\maxx\antigravity\Race-Notes` | `preview` | **Main tree.** Has the COMPLETE Android platform (Gradle files, `google-services.json`, keystore, SDK `local.properties`). Has uncommitted v1→nimbus edits. Used to actually build APKs. |
-| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v2` | `preview-v2` | **v2 dev worktree.** Where ALL current feature work (WS-N…Y) happens. Web build works here. Its `android/` platform is INCOMPLETE. |
+| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v2` | `preview-v2` | **v2 dev worktree.** Where ALL current feature work (WS-N…WS-Z) happens. Web build works here. Its `android/` platform is INCOMPLETE. |
 
 **Critical gotchas about the split:**
 
@@ -55,11 +58,12 @@ Package/app identity: **`nimbus.engineering.crewchief`** (renamed from `com.race
 - **Local-first:** `localStorage` is the primary write target; Supabase is the secondary/optional sync layer (only when signed in). Live features (push, location) are the exception — they are server/Realtime data, NOT in the local-first loop.
 
 ### Architecture one-pager
-- **No React Router.** Navigation = single `activeTab` string in `src/App.tsx`. Tabs: `dashboard | setups | raceweekend | trackers | quickref | settings`. (`trackers` = tasks/accounting/shopping/service/checklists. No `todos` or `team` tab.)
+- **No React Router.** Navigation = single `activeTab` string in `src/App.tsx`. Tabs: `dashboard | setups | raceweekend | trackers | quickref | settings`. Trackers = Checklist/Service/Templates/Accounting. No `todos` or `team` tab.
 - **All domain state lives in `App.tsx`** and is passed down as props; views are prop-driven.
 - **Dual-write pattern:** every mutation updates React state AND `localStorage`, then `if (user) push*()` to Supabase. Every delete path must also call `delete*FromCloud(id)`.
 - **Car scoping:** setups, tires, shock sessions are scoped to the active car via `byActiveCar()` (`src/lib/scope.ts`); weekends, todos, accounting, shopping, checklists are global; maintenance components are `scope: 'car' | 'rig'` (rig = team-wide).
-- Active car is device-local (`race_notes_active_car`, never synced).
+- Active car and active weekend are device-local (`race_notes_active_car`,
+  `race_notes_active_weekend`; never synced).
 - New TS interfaces → **only** in `src/types.ts`. Sync push/pull/delete helpers → **only** in `src/lib/sync.ts`.
 - Styling: theme tokens only (`bg-surface`, `bg-surface-container`, `text-on-surface`, `text-on-surface-variant`, `text-primary`, `border-outline-variant`, `font-mono`, `font-display`). No hardcoded hex. Labels are `font-mono uppercase`.
 - Lint = `tsc --noEmit` with a known **3-error baseline** (RaceWeekendView.tsx:368, SetupView.tsx:669, SmasherLoadsView.tsx:507). Never add errors on top. Vite build does NOT type-check.
@@ -68,9 +72,10 @@ Package/app identity: **`nimbus.engineering.crewchief`** (renamed from `com.race
 
 ## 3. Development approach — the "Ralph loop"
 
-Development is run as an autonomous multi-agent loop. Agents communicate ONLY through
-two files + git commits (so any session can resume cold): `ralph/STATE.md` (loop state,
-verdicts, human gates, backlog) and `ralph/CURRENT_TASK.md` (the active work order).
+Development uses autonomous multi-agent loop. `ralph/STATE.md` (loop state,
+verdicts, gates, backlog) and `ralph/CURRENT_TASK.md` (active work order) remain
+durable authority so any session can resume cold. Cavecrew messages/tool results
+may carry transient coordination; durable decisions must land in those files.
 
 ```
 ┌─► 1. PLAN   ws-planner   — picks next unblocked WS, writes CURRENT_TASK.md
@@ -78,22 +83,25 @@ verdicts, human gates, backlog) and `ralph/CURRENT_TASK.md` (the active work ord
 │                            commits "WS-x attempt N: ..." to preview-v2
 │   3. TEST/QA ws-qa       — grades diff vs rubric, writes verdict+fixes to STATE/CURRENT_TASK
 │        ├ PASS (all gates + score ≥ 90) → mark complete, attempts=0 ─────────┐
-│        ├ FAIL, attempts ≤ 2 → back to BUILD (same builder, fix list)        │
-│        └ FAIL, attempts > 2 → FIX                                           │
+│        ├ FAIL reviewing attempt 1–2 → Terra BUILD, next attempt             │
+│        └ FAIL reviewing attempt 3 → SOL FIX takeover                        │
 │   4. FIX    ws-fixer     — escalation; fixes directly, re-runs lint/build   │
 └──────────────────────────── next WS ◄──────────────────────────────────────┘
 ```
 
-### Agents & model routing (defined in `.github/agents/*.agent.md` frontmatter)
+### Agents & model routing (owner directive 2026-07-11)
 
 | Agent | File | Model | Role |
 |---|---|---|---|
-| `ws-planner` | `.github/agents/ws-planner.agent.md` | **Claude Fable 5** | Picks next WS, writes the work order |
-| `ws-builder` | `.github/agents/ws-builder.agent.md` | **DeepSeek V4 Pro Max** (reasoning, BYOK) | All development/coding |
-| `ws-qa` | `.github/agents/ws-qa.agent.md` | **Claude Fable 5 (high reasoning)** | Grades output, updates plan/task, gates the loop |
-| `ws-fixer` | `.github/agents/ws-fixer.agent.md` | **Claude Opus 4.8 (medium reasoning)** | Escalation after 2 failed attempts |
+| `ws-planner` | `.github/agents/ws-planner.agent.md` | **GPT 5.6 SOL High** | Analysis, spec, work order |
+| `ws-builder` | `.github/agents/ws-builder.agent.md` | **GPT 5.6 Terra High** | Feature implementation |
+| `ws-qa` | `.github/agents/ws-qa.agent.md` | **GPT 5.6 SOL High** | Independent QA, plan/task updates, loop gate |
+| `ws-fixer` | `.github/agents/ws-fixer.agent.md` | **GPT 5.6 SOL High** | Implementation takeover after third failed QA review |
 
-> Owner instruction (2026-07-10): **use Fable for planning AND QA (and the plan updates that QA writes).** `ws-qa` was moved to Fable-5-high this session; `ws-planner` was already Fable 5. Keep other agents' models as-is unless told otherwise.
+> Owner instruction (2026-07-11) supersedes prior Fable/DeepSeek/Opus routing.
+> QA failures 1–2 return to Terra. Failure 3 transfers implementation to SOL;
+> SOL then performs final QA. If exact models are unavailable, disclose that fact
+> and never claim they ran.
 
 ### QA rubric (every gate is hard — any miss = FAIL)
 1. `npm run lint` clean beyond the 3-error baseline.
@@ -104,11 +112,18 @@ verdicts, human gates, backlog) and `ralph/CURRENT_TASK.md` (the active work ord
 Then score the remainder 0–100 (code quality, edge cases, offline behavior, regression risk). PASS = all gates + ≥ 90.
 
 ### How this maps when a single coordinating agent runs the loop
-When one agent (e.g. Claude in Cowork) drives everything, the pattern used this session was:
-spawn a **Fable subagent as ws-planner** (returns the work order text), the coordinator **persists it and builds** (coordinator has reliable Windows filesystem access via Desktop Commander; subagents may not), spawn a **Fable subagent as ws-qa** (returns verdict + STATE/CURRENT_TASK text), coordinator **persists + commits**. Two commits per WS: `WS-x attempt N: …` (build) and `ws-qa: WS-x PASS (score) …` (state).
+When one coordinating agent drives everything: SOL plans, Terra builds, SOL QA
+reviews. Coordinator persists `STATE.md`/`CURRENT_TASK.md` and commits. Two commits
+per WS: `WS-x attempt N: …` (build) and `ws-qa: WS-x PASS (score) …` (state).
 
-### Agent skills
-- `.agents/skills/` in the v2 worktree is currently empty. The main tree carries a family of **caveman** skills (`caveman`, `caveman-commit`, `caveman-compress`, `caveman-review`, `caveman-stats`, `cavecrew`, etc.) — a token-compression / terse-output mode. `ws-qa` outputs in `/caveman full` style by convention (terse but exact: file/line/symbol precise; NOT terse for security/data-loss warnings).
+### Mandatory agent skills
+- Read `.agents/skills/caveman/SKILL.md`.
+  Use `/caveman full` for every development/status/user message. Code, commits,
+  security warnings, and irreversible confirmations remain normal.
+- Read `.agents/skills/cavecrew/SKILL.md`.
+  Use investigator for tracing, builder for known edits of at most two files,
+  reviewer for diffs. Primary agent owns cross-cutting builds of three or more files.
+- These rules persist across future sessions until Maxx explicitly changes them.
 
 ---
 
@@ -116,7 +131,7 @@ spawn a **Fable subagent as ws-planner** (returns the work order text), the coor
 
 **v1 (plan.md, WS-A…WS-M):** COMPLETE — data model, tire lifecycle, setup diff, task↔weekend, weather history, carry-over setups, exports, UI/theme/reference passes.
 
-**v2 (plan-v2.md, WS-N…WS-Y):**
+**v2 (plan-v2.md, WS-N…WS-Z):**
 
 | WS | Title | Status |
 |---|---|---|
@@ -132,10 +147,18 @@ spawn a **Fable subagent as ws-planner** (returns the work order text), the coor
 | WS-W | Trip planner UI (needs WS-V ✅) | ⏸ **PARKED by owner** — location/map/directions deferred |
 | WS-X | Teammates-on-route + ETA (needs WS-T + WS-W) | ⬜ blocked by WS-W |
 | WS-Y | QA hardening + release (last; gates the batch) | ⬜ pending |
+| WS-Z | July 11 product simplification | 🟡 code complete; rollout QA pending |
 
-**Human gates (all CLEARED 2026-07-10):** Firebase project + `google-services.json` (nimbus); `FCM_SERVICE_ACCOUNT_JSON` secret in Supabase; `VITE_HERE_API_KEY` + Firebase web config + VAPID in `.env.local`; migrations 011–013 applied to live Supabase; nimbus redirect URL added to Supabase Auth.
+**Earlier human gates cleared 2026-07-10:** Firebase project +
+`google-services.json` (nimbus); `FCM_SERVICE_ACCOUNT_JSON` secret in Supabase;
+`VITE_HERE_API_KEY` + Firebase web config + VAPID in `.env.local`; migrations
+011–013 applied to live Supabase; nimbus redirect URL added to Supabase Auth.
 
-**Next logical work:** WS-T then WS-U (WS-W parked, so WS-X/WS-Y wait on it).
+**Open WS-Z gate:** apply `supabase/migrations/014_team_delete_policies.sql`,
+then run authenticated team-delete, offline reload, light/dark, zoom, and
+mobile/incognito visual QA against latest draft. Production remains unchanged.
+
+**After WS-Z:** WS-T then WS-U (WS-W parked, so WS-X/WS-Y wait on it).
 
 ---
 

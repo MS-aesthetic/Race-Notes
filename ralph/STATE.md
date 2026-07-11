@@ -7,10 +7,17 @@
 ## How to run the loop (VS Code + Copilot)
 
 1. Open `.worktrees/v2` as the workspace (branch `preview-v2`).
-2. `@ws-planner` → writes `ralph/CURRENT_TASK.md` for the next WS.
-3. `@ws-builder` → implements it, commits `WS-x attempt N: ...`.
-4. `@ws-qa` → grades. PASS → back to step 2. FAIL ≤2 attempts → step 3.
-   FAIL >2 attempts → `@ws-fixer`, then back to step 4.
+2. Read repo-local `caveman` + `cavecrew` skills. Use `/caveman full` always;
+   route bounded delegated work through cavecrew.
+3. `@ws-planner` using GPT 5.6 SOL High writes `ralph/CURRENT_TASK.md`.
+4. `@ws-builder` using GPT 5.6 Terra High implements and commits.
+5. `@ws-qa` using GPT 5.6 SOL High grades independently. FAIL 1–2 returns to
+   Terra. FAIL 3 transfers implementation to `@ws-fixer` using GPT 5.6 SOL High,
+   then returns to SOL QA.
+
+If exact models are unavailable, disclose limitation. Never claim unavailable
+model ran. `STATE.md` and `CURRENT_TASK.md` remain durable loop state; cavecrew
+messages/tool results may carry transient coordination.
 
 ## Workstream status
 
@@ -28,6 +35,7 @@
 | WS-W | Trip planner UI | pending | 0 | — | — | Needs WS-V |
 | WS-X | Teammates on route | pending | 0 | — | — | Needs WS-T + WS-W |
 | WS-Y | QA hardening & release | pending | 0 | — | — | Last; gates the batch |
+| WS-Z | July 11 product simplification | in_progress | 1 | — | — | Code complete; reviewer/build/draft-deploy pass. Await migration 014 + authenticated/offline/theme/zoom/mobile visual QA. |
 
 Status values: `pending` · `in_progress` · `complete` · `scaffolded` (partial pre-work exists)
 
@@ -50,6 +58,7 @@ _(ws-qa appends one line per verdict: date · WS · attempt · PASS/FAIL · scor
 - 2026-07 · WS-R · attempt 1 · PASS · 92 · Weekend checklists in RaceWeekendView (attach from template, check-off w/doneAt stamp, delete, blank option). ChecklistsTab template manager in Trackers (CRUD, starter seeds, item add/delete). App.tsx state+cloud-pull+delete-weekend nulling. lint 3-baseline only, build clean.
 - 2026-07 · WS-V · attempt 1 · PASS · 93 · All gates + live HERE API verification (decode test vector, geocode, 5.5mi truck route, 10 sorted truck stops, full error taxonomy) passed; Discover text-search POI trade-off accepted; package.json WS-S deps to re-attribute. Commit 3694aed.
 - 2026-07 · WS-S · attempt 1 · PASS · 93 · All hard gates met; push register/unregister + dual-SW build verified live; send-push deployed (verify_jwt) with 401/405/no-user-401 live smoke; 400/403/200/prune + device rendering inspection-verified, deferred to WS-Y. Commit 93d870d.
+- 2026-07-11 · WS-Z · attempt 1 · PROVISIONAL PASS · — · Cavecrew diff review and deterministic data checks pass; lint has baseline 3 errors only; build and Netlify draft HTTP smoke pass. Final score/status held for migration 014 plus authenticated/offline/theme/zoom/mobile visual QA.
 
 ## Backlog
 
@@ -59,3 +68,4 @@ _(follow-up items discovered during QA — do not expand an in-flight WS)_
 - WS-S: `com.racenotes.app` deep-link scheme still kept alongside the nimbus scheme (back-compat) — confirm intentional or remove in a later pass.
 - WS-V: consider HERE category-ID filtering as a fallback to Discover text search for non-English locales / noisy results.
 - WS-S: PAUSED — commit the package-name rename to `nimbus.engineering.crewchief` on preview-v2 before any native/FCM work (owner-decided 2026-07-10; Firebase + google-services.json already nimbus).
+- WS-Z: apply migration 014, then verify team-member template/service deletion plus offline reload and theme/zoom/mobile presentation on draft deploy.

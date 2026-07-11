@@ -57,6 +57,7 @@ const LBL = 'text-[10px] uppercase font-mono font-semibold text-on-surface-varia
 // ─── Corner Form Sub-component ────────────────────────────────────────────────
 
 interface CornerFormProps {
+  corner: 'lf' | 'rf' | 'lr' | 'rr';
   cornerLabel: string;
   data: CornerSetup;
   isRear: boolean;
@@ -66,7 +67,9 @@ interface CornerFormProps {
   onBatchChange: (updates: Partial<CornerSetup>) => void;
 }
 
-function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = [], onFieldChange, onBatchChange }: CornerFormProps) {
+function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTireIds = [], onFieldChange, onBatchChange }: CornerFormProps) {
+  const rearAngleContext = corner === 'rr' ? 'Ride Height' : 'Full Droop';
+  const topBarAngleField: keyof CornerSetup = corner === 'rr' ? 'topBarAngRH' : 'topBarAngFD';
   return (
     <div className="bg-surface-container border border-outline-variant flex flex-col rounded overflow-hidden">
       <div className="border-b border-outline-variant px-4 py-2 flex items-center gap-2 bg-surface-container-low">
@@ -156,8 +159,8 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = []
         {isRear && (
           <>
             <div>
-              <label className={LBL}>Load Scale (lb)</label>
-              <input type="text" placeholder="e.g. 600" value={data.load || ''} onChange={e => onFieldChange('load', e.target.value)} className={INP} />
+              <label className={LBL}>Scale Weight (lb)</label>
+              <input type="text" placeholder="e.g. 600" value={data.loadWeight ?? data.load ?? ''} onChange={e => onFieldChange('loadWeight', e.target.value)} className={INP} />
             </div>
             <div>
               <label className={LBL}>C-to-C (in)</label>
@@ -168,19 +171,31 @@ function CornerForm({ cornerLabel, data, isRear, tireInventory, usedTireIds = []
               <input type="text" placeholder='e.g. 12.0"' value={data.topBarLength || ''} onChange={e => onFieldChange('topBarLength', e.target.value)} className={INP} />
             </div>
             <div>
+              <label className={LBL}>Top Bar Hole Frame</label>
+              <input type="text" placeholder="e.g. Hole 3" value={data.topBarHFrame || ''} onChange={e => onFieldChange('topBarHFrame', e.target.value)} className={INP} />
+            </div>
+            <div>
+              <label className={LBL}>Top Bar Hole Birdcage</label>
+              <input type="text" placeholder="e.g. Hole 2" value={data.topBarHBird || ''} onChange={e => onFieldChange('topBarHBird', e.target.value)} className={INP} />
+            </div>
+            <div>
+              <label className={LBL}>Top Bar Angle ({rearAngleContext})</label>
+              <input type="text" placeholder="e.g. 12°" value={(data[topBarAngleField] as string | undefined) || ''} onChange={e => onFieldChange(topBarAngleField, e.target.value)} className={INP} />
+            </div>
+            <div>
               <label className={LBL}>Bottom Bar Length</label>
               <input type="text" placeholder='e.g. 9.5"' value={data.bottomBarLength || ''} onChange={e => onFieldChange('bottomBarLength', e.target.value)} className={INP} />
             </div>
             <div>
-              <label className={LBL}>Birdcage Hole (Frame)</label>
+              <label className={LBL}>Bottom Bar Hole Frame</label>
               <input type="text" placeholder="e.g. Frame Hole" value={data.botBarHFrame || ''} onChange={e => onFieldChange('botBarHFrame', e.target.value)} className={INP} />
             </div>
             <div>
-              <label className={LBL}>Birdcage Hole (Birdcage)</label>
+              <label className={LBL}>Bottom Bar Hole Birdcage</label>
               <input type="text" placeholder="e.g. Birdcage Hole" value={data.botBarHBird || ''} onChange={e => onFieldChange('botBarHBird', e.target.value)} className={INP} />
             </div>
             <div>
-              <label className={LBL}>Bottom Bar Angle</label>
+              <label className={LBL}>Bottom Bar Angle ({rearAngleContext})</label>
               <input type="text" placeholder="e.g. 10°" value={data.bottomBarAngle || ''} onChange={e => onFieldChange('bottomBarAngle', e.target.value)} className={INP} />
             </div>
             <div>
@@ -616,8 +631,8 @@ export default function SetupView({
                         {(() => {
                           const lfW = parseWeight(setupItem.lf.loadWeight);
                           const rfW = parseWeight(setupItem.rf.loadWeight);
-                          const lrW = parseWeight(setupItem.lr.loadWeight);
-                          const rrW = parseWeight(setupItem.rr.loadWeight);
+                          const lrW = parseWeight(setupItem.lr.loadWeight ?? setupItem.lr.load);
+                          const rrW = parseWeight(setupItem.rr.loadWeight ?? setupItem.rr.load);
                           const total = (lfW ?? 0) + (rfW ?? 0) + (lrW ?? 0) + (rrW ?? 0);
                           const hasAll = lfW !== null && rfW !== null && lrW !== null && rrW !== null;
                           const noseP  = hasAll ? computeWeightPct((lfW!) + (rfW!), total) : '—';
@@ -667,6 +682,7 @@ export default function SetupView({
                           return (
                             <CornerForm
                               key={corner}
+                              corner={corner}
                               cornerLabel={labels[corner]}
                               data={setupItem[corner]}
                               isRear={corner === 'lr' || corner === 'rr'}

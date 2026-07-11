@@ -4,6 +4,24 @@
 > Branch at time of writing: `master` (all features merged — car-profiles, session-v2, weekend-v2, session-8 features below)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 
+## 2026-07-11 WS-Z behavior override
+
+Newer than older sections below; this block wins conflicts:
+
+- Rear scale weight canonical key: `CornerSetup.loadWeight`; legacy `load` remains
+  readable/preserved through `src/lib/setupCompat.ts`.
+- LR/RR four-bar UI exposes top/bottom length, frame hole, birdcage hole, and
+  angle. RR angles measured at Ride Height; LR at Full Droop.
+- Weekend creation exists on Dashboard, activates weekend, and does not open a
+  session. Session creation requires device-local `race_notes_active_weekend`.
+- Sessions with zero weekends show only Create Weekend content action. Sessions
+  contains no New Weekend or weekend-checklist UI.
+- Trackers visible tabs: Checklist, Service, Templates, Accounting. Checklist is
+  one global Main Checklist; templates import fresh unchecked copies. No weekend
+  association.
+- Shopping UI/export retired. `race_notes_shopping` remains untouched for rollback.
+  Legacy weekend-checklist rows remain hidden, synced, and recoverable.
+
 ## 0. Session 8 Summary (read this first)
 
 Everything below this point that isn't already reflected elsewhere in this doc was added/changed in session 8:

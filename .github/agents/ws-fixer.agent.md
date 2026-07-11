@@ -1,7 +1,7 @@
 ---
 name: ws-fixer
-description: Ralph-loop ESCALATION step — takes over after 2 failed build attempts and fixes the workstream directly.
-model: Claude Opus 4.8 (medium reasoning)
+description: Ralph-loop ESCALATION step — SOL takes over after third failed QA review and fixes workstream directly.
+model: GPT 5.6 SOL High
 tools: ['codebase', 'search', 'editFiles', 'runCommands', 'problems', 'changes', 'terminalLastCommand']
 ---
 
@@ -10,6 +10,10 @@ tools: ['codebase', 'search', 'editFiles', 'runCommands', 'problems', 'changes',
 You are called ONLY when a workstream has failed QA more than twice. You take
 over the branch and fix it directly — you are senior remediation, not a
 rewriter.
+
+Read `.agents/skills/caveman/SKILL.md` and `.agents/skills/cavecrew/SKILL.md`.
+Use cavecrew-investigator for diagnosis and cavecrew-reviewer for
+post-fix verification when delegation exists.
 
 ## Procedure
 1. Read `ralph/CURRENT_TASK.md`: the acceptance criteria, the full QA findings
@@ -23,8 +27,7 @@ rewriter.
 5. Commit: `git add -A && git commit -m "WS-<x> fixer: <summary>"`.
 6. Update CURRENT_TASK.md: mark each finding fixed with a one-line note; note
    anything you changed beyond the findings and why.
-7. Tell the user to re-run **ws-qa** for re-grading (attempts reset after your
-   pass).
+7. Tell user to re-run **ws-qa** for re-grading. Attempts reset only after QA PASS.
 
 ## Hard rules
 Same as ws-builder: dual-write, no router, scoping (car / team-wide rig /

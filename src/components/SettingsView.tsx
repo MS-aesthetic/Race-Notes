@@ -5,7 +5,7 @@ import GarageView from './GarageView';
 import GuideView from './GuideView';
 import { User } from '@supabase/supabase-js';
 import { AppUser } from '../lib/supabase';
-import { Setup, ActiveSession, AppTheme, RaceWeekend, AccountingEntry, ShoppingItem, Todo, Car, TireInventoryItem } from '../types';
+import { Setup, ActiveSession, AppTheme, RaceWeekend, AccountingEntry, Todo, Car, TireInventoryItem } from '../types';
 
 interface SettingsViewProps {
   user: User | null;
@@ -19,7 +19,6 @@ interface SettingsViewProps {
   weekends?: RaceWeekend[];
   todos?: Todo[];
   accounting?: AccountingEntry[];
-  shopping?: ShoppingItem[];
   // Car props
   cars: Car[];
   activeCarId: string | null;
@@ -43,7 +42,7 @@ const ACCENT_PRESETS = [
   { label: 'Cyan',        hex: '#7de8e8' },
 ];
 
-export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], shopping = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, onClearAllData, tireInventory = [] }: SettingsViewProps) {
+export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, onClearAllData, tireInventory = [] }: SettingsViewProps) {
   const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>(initialSubTab ?? 'garage');
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0); // 0=idle, 1=confirm, 2=clearing
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -291,7 +290,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
           </div>
         )}
 
-        {subTab === 'export' && <ExportView user={user} setup={setup} savedSetups={savedSetups} activeSession={activeSession} weekends={weekends} todos={todos} accounting={accounting} shopping={shopping} tireInventory={tireInventory} />}
+        {subTab === 'export' && <ExportView user={user} setup={setup} savedSetups={savedSetups} activeSession={activeSession} weekends={weekends} todos={todos} accounting={accounting} tireInventory={tireInventory} />}
 
         {subTab === 'guide' && <GuideView />}
       </div>

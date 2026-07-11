@@ -45,14 +45,15 @@ Every setup, tire, and shock graph is scoped to the **active car**.
 ## Creating a weekend
 A weekend is the event container holding sessions.
 
-- **Sessions** tab → New Weekend (name, track, date).
+- **Dashboard** → **+ Race Weekend** (name, track, date).
 - Optionally bind a saved setup.
 - Weather widget: GPS or zip-code fallback.
-- After creating, the New Session form opens automatically.
+- Creating makes the weekend active but does not open or create a session.
+- Active-weekend choice is device-local. Use Dashboard or Sessions weekend list to switch it.
 
 ## Logging a session
-- Sessions tab → New Session (or auto-opened after making a weekend).
-- Choose weekend + type (Test / Hot Laps / Qualifying / Heat Race / Feature). Repeats auto-number.
+- Create and activate a weekend first, then Sessions → New Session.
+- Sessions always belong to the active weekend. Choose type (Test / Hot Laps / Qualifying / Heat Race / Feature); repeats auto-number.
 - Handling: Tight / Neutral / Loose at entry, center, exit, with notes.
 - Pick the tire on each corner from inventory; **Import from Setup** fills all four at once.
 - Log lap times, adjustments, photos.
@@ -72,10 +73,12 @@ A weekend is the event container holding sessions.
 - Attach a dyno graph photo (auto-compressed).
 - Overlay multiple graphs to compare. Bind a graph to a setup corner.
 
-## Adding tasks
-- **Trackers** tab → Tasks (to-do) area.
-- Add a task, optional note, optional link to a weekend.
-- Check off when done. Open tasks also surface on the Dashboard.
+## Using Main Checklist
+- **Trackers** → **Checklist** always opens one Main Checklist.
+- Add an item manually, with optional note and assignee.
+- Or select a template and tap **Import**; imported items are fresh unchecked copies.
+- Main Checklist is global, not linked to a weekend.
+- Open items also surface on Dashboard.
 
 ## Assigning tasks
 - Requires a team.
@@ -83,7 +86,14 @@ A weekend is the event container holding sessions.
 - Assigned tasks are highlighted for the assignee ("assigned to me" on Dashboard).
 - Without a team, tasks still work but are not assigned to a person.
 
-## Adding shopping
-- **Trackers** tab → Shopping sub-tab.
-- Add item with name, optional description, estimated cost, optional weekend link.
-- Check off when bought (purchase date recorded).
+## Creating templates
+- **Trackers** → **Templates**.
+- Create a template and add reusable preparation items.
+- Import it from Trackers → Checklist whenever needed.
+- Template edits never change items already imported into Main Checklist.
+
+## Logging service
+- **Trackers** → **Service**.
+- Add car or rig components with lap/session/race/day intervals.
+- Log service, replacement, or inspection work.
+- Optional service cost creates an Accounting expense.

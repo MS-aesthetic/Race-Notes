@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Todo, TodoItem, RaceWeekend } from '../types';
+import { ChecklistTemplate, Todo, TodoItem } from '../types';
 import { AppUser } from '../lib/supabase';
+import { getMainChecklist, MAIN_CHECKLIST_TITLE } from '../lib/mainChecklist';
 
 // ── Completion confirmation modal ─────────────────────────────────────────
 
@@ -86,7 +87,7 @@ interface ToDoViewProps {
   onSaveTodos: (t: Todo[]) => void;
   teamMembers?: AppUser[];
   currentUserId?: string | null;
-  weekends?: RaceWeekend[];
+  templates?: ChecklistTemplate[];
 }
 
 export default function ToDoView({
@@ -94,13 +95,9 @@ export default function ToDoView({
   onSaveTodos,
   teamMembers = [],
   currentUserId = null,
-  weekends = [],
+  templates = [],
 }: ToDoViewProps) {
-  const normalTodos = todos.filter(t => !t.is_template);
-  const templates   = todos.filter(t => t.is_template);
-
-  const [selectedId, setSelectedId]             = useState<string | null>(normalTodos[0]?.id || null);
-  const [newTitle, setNewTitle]                 = useState('');
+  const activeTodo = getMainChecklist(todos);
   const [newItemText, setNewItemText]           = useState('');
   const [newItemDesc, setNewItemDesc]           = useState('');
   const [showDescInput, setShowDescInput]       = useState(false);
@@ -110,67 +107,42 @@ export default function ToDoView({
   const [pendingComplete, setPendingComplete]   = useState<{ todoId: string; item: TodoItem } | null>(null);
   const [showMyTasks, setShowMyTasks]           = useState(false);
 
-  // ── List management ────────────────────────────────────────────────────
-
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim()) return;
-    let items: TodoItem[] = [];
-    if (selectedTemplateId) {
-      const tpl = templates.find(t => t.id === selectedTemplateId);
-      if (tpl) {
-        items = tpl.items.map(i => ({
-          ...i,
-          id: `item-${Date.now()}-${Math.random()}`,
-          done: false,
-          completionNote: undefined,
-          completedAt: undefined,
-        }));
-      }
+  const saveMainItems = (items: TodoItem[]) => {
+    const now = new Date().toISOString();
+    if (activeTodo) {
+      onSaveTodos(todos.map(todo => todo.id === activeTodo.id
+        ? { ...todo, title: MAIN_CHECKLIST_TITLE, weekendId: undefined, weekendName: undefined, items, updated_at: now }
+        : todo));
+      return;
     }
-    const newTodo: Todo = {
-      id: `todo-${Date.now()}`,
+    onSaveTodos([{
+      id: `todo-main-${Date.now()}`,
       user_id: '',
-      title: newTitle,
+      title: MAIN_CHECKLIST_TITLE,
       items,
-      updated_at: new Date().toISOString(),
-    };
-    onSaveTodos([newTodo, ...todos]);
-    setSelectedId(newTodo.id);
-    setNewTitle('');
+      updated_at: now,
+    }, ...todos]);
+  };
+
+  const importTemplate = () => {
+    const template = templates.find(item => item.id === selectedTemplateId);
+    if (!template) return;
+    if (activeTodo?.items.length && !window.confirm(`Add ${template.items.length} items from ${template.name} to Main Checklist?`)) return;
+    const stamp = Date.now();
+    const imported: TodoItem[] = template.items.map((item, index) => ({
+      id: `item-${stamp}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+      text: item.text,
+      done: false,
+    }));
+    saveMainItems([...(activeTodo?.items ?? []), ...imported]);
     setSelectedTemplateId('');
-  };
-
-  const saveAsTemplate = () => {
-    const active = todos.find(t => t.id === selectedId);
-    if (!active) return;
-    const name = window.prompt('Enter template name:', `${active.title} Template`);
-    if (!name) return;
-    const newTemplate: Todo = {
-      ...active,
-      id: `todo-tpl-${Date.now()}`,
-      title: name,
-      is_template: true,
-      items: active.items.map(i => ({ ...i, done: false, completionNote: undefined, completedAt: undefined })),
-      updated_at: new Date().toISOString(),
-    };
-    onSaveTodos([newTemplate, ...todos]);
-    alert('Saved as template!');
-  };
-
-  const deleteList = (todoId: string) => {
-    if (!window.confirm('Delete this list entirely?')) return;
-    const remaining = todos.filter(t => t.id !== todoId);
-    onSaveTodos(remaining);
-    const newNormals = remaining.filter(t => !t.is_template);
-    if (selectedId === todoId) setSelectedId(newNormals[0]?.id || null);
   };
 
   // ── Item management ────────────────────────────────────────────────────
 
   const addItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItemText.trim() || !selectedId) return;
+    if (!newItemText.trim()) return;
     const assignee = teamMembers.find(m => m.id === newItemAssignee);
     const newItem: TodoItem = {
       id: `item-${Date.now()}`,
@@ -182,10 +154,7 @@ export default function ToDoView({
         ? (assignee.displayName || assignee.email || 'Team Member')
         : undefined,
     };
-    const updatedItems = [...(todos.find(t => t.id === selectedId)?.items || []), newItem];
-    onSaveTodos(todos.map(t =>
-      t.id === selectedId ? { ...t, items: updatedItems, updated_at: new Date().toISOString() } : t
-    ));
+    saveMainItems([...(activeTodo?.items ?? []), newItem]);
     setNewItemText('');
     setNewItemDesc('');
     setNewItemAssignee('');
@@ -195,14 +164,8 @@ export default function ToDoView({
 
   const handleCheckboxClick = (todoId: string, item: TodoItem) => {
     if (item.done) {
-      onSaveTodos(todos.map(t =>
-        t.id === todoId ? {
-          ...t,
-          updated_at: new Date().toISOString(),
-          items: t.items.map(i =>
-            i.id === item.id ? { ...i, done: false, completionNote: undefined, completedAt: undefined } : i
-          ),
-        } : t
+      saveMainItems((activeTodo?.items ?? []).map(i =>
+        i.id === item.id ? { ...i, done: false, completionNote: undefined, completedAt: undefined } : i
       ));
     } else {
       setPendingComplete({ todoId, item });
@@ -211,36 +174,24 @@ export default function ToDoView({
 
   const handleConfirmComplete = (note: string) => {
     if (!pendingComplete) return;
-    const { todoId, item } = pendingComplete;
-    onSaveTodos(todos.map(t =>
-      t.id === todoId ? {
-        ...t,
-        updated_at: new Date().toISOString(),
-        items: t.items.map(i =>
-          i.id === item.id
-            ? { ...i, done: true, completionNote: note || undefined, completedAt: new Date().toISOString() }
-            : i
-        ),
-      } : t
+    const { item } = pendingComplete;
+    saveMainItems((activeTodo?.items ?? []).map(i =>
+      i.id === item.id
+        ? { ...i, done: true, completionNote: note || undefined, completedAt: new Date().toISOString() }
+        : i
     ));
     setPendingComplete(null);
   };
 
-  const deleteItem = (todoId: string, itemId: string) => {
-    onSaveTodos(todos.map(t =>
-      t.id === todoId ? {
-        ...t,
-        items: t.items.filter(i => i.id !== itemId),
-        updated_at: new Date().toISOString(),
-      } : t
-    ));
+  const deleteItem = (_todoId: string, itemId: string) => {
+    saveMainItems((activeTodo?.items ?? []).filter(i => i.id !== itemId));
   };
 
   // ── Derived ────────────────────────────────────────────────────────────
 
-  const activeTodo = todos.find(t => t.id === selectedId);
   const allOpen    = activeTodo?.items.filter(i => !i.done) || [];
   const allDone    = activeTodo?.items.filter(i => i.done)  || [];
+  const activeTodoId = activeTodo?.id ?? '';
 
   const myTaskCount  = allOpen.filter(i => i.assignedTo === currentUserId).length;
   const displayOpen  = showMyTasks && currentUserId ? allOpen.filter(i => i.assignedTo === currentUserId) : allOpen;
@@ -276,75 +227,40 @@ export default function ToDoView({
         />
       )}
 
-      {/* ── List selector + creator ─────────────────────────────────── */}
-      <div className="flex flex-col gap-2 bg-surface p-3 rounded-lg border border-outline-variant/50">
-        <label className="text-[10px] uppercase font-mono text-on-surface-variant font-bold">Select Active List</label>
-        <select
-          className="bg-surface-container border border-outline-variant p-2 rounded text-sm font-mono w-full"
-          value={selectedId || ''}
-          onChange={e => setSelectedId(e.target.value)}
-        >
-          {normalTodos.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
-        </select>
-
-        {/* Weekend association */}
-        {weekends.length > 0 && (
-          <div className="flex items-center gap-2">
-            <label className="text-[10px] uppercase font-mono text-on-surface-variant font-bold shrink-0">Weekend</label>
+      {/* ── One global Main Checklist ─────────────────────────────── */}
+      <div className="flex flex-col gap-3 bg-surface p-3 rounded-lg border border-outline-variant/50">
+        <div>
+          <h3 className="font-display font-bold uppercase text-primary text-sm tracking-wide">Main Checklist</h3>
+          <p className="font-mono text-[10px] text-on-surface-variant/60 mt-1">One active team list. Add items manually or import a template.</p>
+        </div>
+        {templates.length > 0 && (
+          <div className="flex gap-2">
             <select
-              className="flex-1 bg-surface-container border border-outline-variant p-1.5 rounded text-xs font-mono"
-              value={activeTodo?.weekendId || ''}
-              onChange={e => {
-                const wid = e.target.value;
-                const w = weekends.find(wk => wk.id === wid);
-                onSaveTodos(todos.map(t =>
-                  t.id === selectedId ? { ...t, weekendId: wid || undefined, weekendName: w?.name || undefined, updated_at: new Date().toISOString() } : t
-                ));
-              }}
+              className="flex-1 min-w-0 p-2 bg-surface-container border border-outline-variant rounded text-xs font-mono"
+              value={selectedTemplateId}
+              onChange={e => setSelectedTemplateId(e.target.value)}
             >
-              <option value="">General / none</option>
-              {weekends.map(w => (
-                <option key={w.id} value={w.id}>{w.name} — {w.track} {w.date}</option>
-              ))}
+              <option value="">Select template…</option>
+              {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
             </select>
+            <button
+              type="button"
+              disabled={!selectedTemplateId}
+              onClick={importTemplate}
+              className="px-3 py-2 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded disabled:opacity-40"
+            >
+              Import
+            </button>
           </div>
         )}
-
-        <div className="border-t border-outline-variant/30 pt-3 mt-1 flex flex-col gap-2">
-          <label className="text-[10px] uppercase font-mono text-on-surface-variant font-bold">Create New List</label>
-          <form onSubmit={handleCreate} className="flex gap-2 items-center flex-wrap">
-            <input
-              type="text"
-              placeholder="Title"
-              required
-              className="flex-1 min-w-[120px] p-2 text-sm bg-surface-container border border-outline-variant rounded font-mono"
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-            />
-            {templates.length > 0 && (
-              <select
-                className="p-2 text-sm bg-surface-container border border-outline-variant rounded font-mono max-w-[140px]"
-                value={selectedTemplateId}
-                onChange={e => setSelectedTemplateId(e.target.value)}
-              >
-                <option value="">No Template</option>
-                {templates.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
-              </select>
-            )}
-            <button className="bg-primary text-[#0e0e0e] px-4 py-2 font-bold rounded uppercase text-xs font-mono tracking-wider whitespace-nowrap">
-              Create
-            </button>
-          </form>
-        </div>
       </div>
 
       {/* ── Active list ──────────────────────────────────────────────── */}
-      {activeTodo && (
-        <div className="bg-surface-container border border-outline-variant rounded-lg p-4 flex-1 flex flex-col overflow-hidden">
+      <div className="bg-surface-container border border-outline-variant rounded-lg p-4 flex-1 flex flex-col overflow-hidden">
 
           {/* List header */}
           <div className="flex justify-between items-center mb-3 gap-2 flex-wrap">
-            <h3 className="font-display font-bold uppercase text-primary text-sm tracking-wide">{activeTodo.title}</h3>
+            <span className="font-mono text-[10px] uppercase text-on-surface-variant font-bold">{allOpen.length} open · {allDone.length} completed</span>
             <div className="flex gap-2 items-center">
               {/* My tasks toggle — only when signed in with a team */}
               {currentUserId && teamMembers.length > 0 && (
@@ -366,8 +282,6 @@ export default function ToDoView({
                   )}
                 </button>
               )}
-              <button title="Save as Template" onClick={saveAsTemplate} className="material-symbols-outlined text-on-surface-variant hover:text-primary text-[18px]">post_add</button>
-              <button title="Delete List" onClick={() => deleteList(activeTodo.id)} className="material-symbols-outlined text-on-surface-variant hover:text-red-400 text-[18px]">delete</button>
             </div>
           </div>
 
@@ -471,7 +385,7 @@ export default function ToDoView({
                       <input
                         type="checkbox"
                         checked={false}
-                        onChange={() => handleCheckboxClick(activeTodo.id, item)}
+                        onChange={() => handleCheckboxClick(activeTodoId, item)}
                         className="w-5 h-5 accent-primary cursor-pointer shrink-0 mt-0.5"
                       />
                       <div className="flex-1 min-w-0 space-y-1">
@@ -486,7 +400,7 @@ export default function ToDoView({
                         )}
                       </div>
                       <button
-                        onClick={() => deleteItem(activeTodo.id, item.id)}
+                        onClick={() => deleteItem(activeTodoId, item.id)}
                         className="shrink-0 material-symbols-outlined text-[16px] text-on-surface-variant/40 hover:text-red-400 mt-0.5"
                       >
                         close
@@ -527,7 +441,7 @@ export default function ToDoView({
                     <input
                       type="checkbox"
                       checked={true}
-                      onChange={() => handleCheckboxClick(activeTodo.id, item)}
+                      onChange={() => handleCheckboxClick(activeTodoId, item)}
                       className="w-5 h-5 accent-primary cursor-pointer shrink-0 mt-0.5"
                     />
                     <div className="flex-1 min-w-0 space-y-1">
@@ -569,7 +483,7 @@ export default function ToDoView({
                       )}
                     </div>
                     <button
-                      onClick={() => deleteItem(activeTodo.id, item.id)}
+                      onClick={() => deleteItem(activeTodoId, item.id)}
                       className="shrink-0 material-symbols-outlined text-[16px] text-on-surface-variant/25 hover:text-red-400 mt-0.5"
                     >
                       close
@@ -579,14 +493,13 @@ export default function ToDoView({
               </div>
             )}
 
-            {activeTodo.items.length === 0 && (
+            {(activeTodo?.items.length ?? 0) === 0 && (
               <p className="text-center text-on-surface-variant/50 font-mono text-xs mt-6">
                 List is empty. Add your first task above.
               </p>
             )}
           </div>
         </div>
-      )}
     </div>
   );
 }

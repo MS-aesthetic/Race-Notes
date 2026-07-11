@@ -24,6 +24,7 @@ export interface CornerSetup {
   // Rear specific
   springHeight?: string;
   springHeightUnit?: string;
+  /** @deprecated Legacy rear scale-weight key. Read for compatibility; write `loadWeight`. */
   load?: string;
   loadUnit?: string;
   topBarLength?: string; // Top bar length

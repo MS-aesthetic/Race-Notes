@@ -4,11 +4,11 @@
 > AI coding agents can work in parallel with minimal collisions, in the same format as
 > `plan.md` (WS-A…WS-M, all complete). This batch continues at **WS-N**.
 >
-> **Branch:** all v2 work happens on **`preview-v2`** (worktree: `.worktrees/v2`),
-> merged into `preview` per-workstream after review. `preview` → `master` remains
-> owner-gated (Maxx explicit approval only).
+> **Branch:** all v2 work happens on **`preview-v2`** (worktree: `.worktrees/v2`).
+> Every merge from `preview-v2` to `preview`, and from `preview` to `master`,
+> requires explicit Maxx approval.
 >
-> Inherit **§0 Working Agreement** and **§1 Coordination** from `plan.md` verbatim —
+> Keep these architecture rules from v1; do not inherit v1 branch/deploy steps:
 > local-first dual-write, no router, car scoping via `byActiveCar()`, all types in
 > `src/types.ts`, all sync in `src/lib/sync.ts`, additive `IF NOT EXISTS` migrations
 > with `in_same_team()` RLS, deletion requires `delete*FromCloud()`, tsc baseline =
@@ -81,41 +81,46 @@ WS-Y  QA hardening + release (last; gates the batch)
 Every workstream is delivered through a repeating **plan → build → test** loop run
 inside VS Code with GitHub Copilot custom agents (`.github/agents/*.agent.md`).
 Loop state lives in `ralph/STATE.md`; the active work order lives in
-`ralph/CURRENT_TASK.md`. Agents communicate **only** through these two files +
-git commits — no side channels, so any session can resume the loop cold.
+`ralph/CURRENT_TASK.md`. These files + git commits hold durable state so any
+session can resume cold. Cavecrew messages/tool results may carry transient
+coordination; decisions affecting scope/status must be persisted.
 
 ```
-┌─► 1. PLAN   ws-planner  (Claude Fable 5)
+┌─► 1. PLAN   ws-planner  (GPT 5.6 SOL High)
 │      Reads plan-v2.md + ralph/STATE.md → picks the next unblocked WS →
 │      writes ralph/CURRENT_TASK.md (scope, files, steps, acceptance criteria).
 │
-│   2. BUILD  ws-builder  (DeepSeek V4 Pro Max, reasoning — BYOK API key)
+│   2. BUILD  ws-builder  (GPT 5.6 Terra High)
 │      Implements EXACTLY ralph/CURRENT_TASK.md. Runs `npm run lint` +
 │      `npm run build` before finishing. Commits WIP to `preview-v2`
 │      ("WS-x attempt N: ..."). Never edits plan-v2.md or STATE.md.
 │
-│   3. TEST/QA  ws-qa  (Claude Fable 5, high reasoning)
+│   3. TEST/QA  ws-qa  (GPT 5.6 SOL High)
 │      Grades the diff against the rubric below. Writes grade + findings into
 │      ralph/STATE.md and updates ralph/CURRENT_TASK.md with concrete fixes.
 │      ├─ PASS (all gates + score ≥ 90) → mark WS complete in STATE.md,
 │      │    squash-worthy note for Coordinator, attempts = 0 ──────────────┐
-│      ├─ FAIL, attempts ≤ 2 → back to 2. BUILD (same builder, fix list)   │
-│      └─ FAIL, attempts > 2 → 4. FIX                                      │
+│      ├─ FAIL reviewing attempt 1–2 → Terra BUILD, next attempt           │
+│      └─ FAIL reviewing attempt 3 → SOL FIX takeover                      │
 │                                                                          │
-│   4. FIX   ws-fixer  (Claude Opus 4.8, medium reasoning)                 │
+│   4. FIX   ws-fixer  (GPT 5.6 SOL High)                                 │
 │      Takes over the branch, fixes the failures directly, re-runs         │
-│      lint/build, hands back to 3. TEST/QA. Resets attempts.              │
+│      lint/build, hands back to 3. TEST/QA. Reset only after QA PASS.     │
 │                                                                          │
 └──────────────────────────── next WS ◄────────────────────────────────────┘
 ```
 
-**Model routing (configured per agent file; DeepSeek via VS Code BYOK key):**
+**Model routing (owner directive 2026-07-11):**
 | Agent | File | Model | Role |
 |---|---|---|---|
-| `ws-planner` | `.github/agents/ws-planner.agent.md` | Claude Fable 5 | Picks next WS, writes the work order |
-| `ws-builder` | `.github/agents/ws-builder.agent.md` | DeepSeek V4 Pro Max (reasoning) | All development work |
-| `ws-qa` | `.github/agents/ws-qa.agent.md` | Claude Fable 5 (high reasoning) | Grades output, updates plan/task, gates the loop |
-| `ws-fixer` | `.github/agents/ws-fixer.agent.md` | Claude Opus 4.8 (medium reasoning) | Escalation after 2 failed attempts |
+| `ws-planner` | `.github/agents/ws-planner.agent.md` | GPT 5.6 SOL High | Analysis, spec, work order |
+| `ws-builder` | `.github/agents/ws-builder.agent.md` | GPT 5.6 Terra High | Feature implementation |
+| `ws-qa` | `.github/agents/ws-qa.agent.md` | GPT 5.6 SOL High | Independent QA, plan/task updates, loop gate |
+| `ws-fixer` | `.github/agents/ws-fixer.agent.md` | GPT 5.6 SOL High | Implementation takeover after third failed QA review |
+
+QA failures 1–2 return to Terra. Failure 3 (more than two failed QA reviews)
+transfers implementation to SOL; SOL performs final QA afterward. If exact models
+are unavailable, disclose limitation and never claim they ran.
 
 **QA grading rubric (ws-qa; every gate is hard — any miss = FAIL):**
 1. `npm run lint` — zero errors beyond the 3-error baseline.
@@ -148,6 +153,10 @@ light/dark, font scale). **Pass = all gates + score ≥ 90.**
   Normal prose exempt: code blocks, commit messages, security warnings,
   irreversible-action confirmations, multi-step sequences where fragment order
   risks misread.
+- **All delegated work uses cavecrew.** Read
+  `.agents/skills/cavecrew/SKILL.md` and `.agents/skills/caveman/SKILL.md` first.
+  Investigator locates code; builder handles known edits of at most two files;
+  reviewer checks diffs. Primary agent owns cross-cutting builds.
 
 ---
 
@@ -444,3 +453,15 @@ planned trip ≤ ~5 requests.
 - **Uncommitted work on `preview`** (package rename to `nimbus`, privacy.html) —
   belongs to Maxx; v2 worktree branched from committed HEAD; rebase `preview-v2`
   after that lands.
+
+---
+
+## WS-Z — July 11 Product Simplification *(in progress)*
+
+Authoritative work order: `ralph/CURRENT_TASK.md`.
+
+- Setup scale compatibility + exact LR/RR four-bar inputs.
+- Device-local active weekend; session gating; dashboard-only weekend creation;
+  no forced session; Sessions checklist retirement.
+- One global Main Checklist; template import; retain Service/Templates/Accounting;
+  retire Shopping surfaces while preserving legacy data.

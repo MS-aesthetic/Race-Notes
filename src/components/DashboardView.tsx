@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Setup, SessionRecord, RaceWeekend, Team, TireInventoryItem, Todo, MaintenanceComponent } from '../types';
 import { byActiveCar } from '../lib/scope';
 import { getComponentStatus } from '../lib/maintenance';
+import { getMainChecklist } from '../lib/mainChecklist';
 
 // Maps legacy full session type names to the short codes used in v2
 const SESSION_NAME_MAP: [string, string][] = [
@@ -43,6 +44,8 @@ interface DashboardViewProps {
   onGoToTires?: () => void;
   onDeleteWeekend: (weekendId: string) => void;
   activeCarId?: string | null;
+  activeWeekendId?: string | null;
+  onActivateWeekend: (weekendId: string) => void;
   maintenance?: MaintenanceComponent[];
   onGoToService?: () => void;
 }
@@ -62,6 +65,8 @@ export default function DashboardView({
   onGoToTires,
   onDeleteWeekend,
   activeCarId = null,
+  activeWeekendId = null,
+  onActivateWeekend,
   maintenance = [],
   onGoToService,
 }: DashboardViewProps) {
@@ -81,15 +86,12 @@ export default function DashboardView({
   const uniqueTracks = Array.from(new Set(weekends.map(w => w.track).filter(Boolean))).sort();
   const filteredWeekends = trackFilter ? weekends.filter(w => w.track === trackFilter) : weekends;
 
-  // Open tasks across all real (non-template) todo lists
-  const openTaskLists = todos
-    .filter(list => !list.is_template)
-    .map(list => ({
-      list,
-      openItems: (list.items ?? []).filter(i => !i.done),
-      assignedToMe: (list.items ?? []).filter(i => !i.done && userId && i.assignedTo === userId),
-    }))
-    .filter(entry => entry.openItems.length > 0);
+  const mainChecklist = getMainChecklist(todos);
+  const openTaskLists = mainChecklist ? [{
+    list: mainChecklist,
+    openItems: (mainChecklist.items ?? []).filter(i => !i.done),
+    assignedToMe: (mainChecklist.items ?? []).filter(i => !i.done && userId && i.assignedTo === userId),
+  }].filter(entry => entry.openItems.length > 0) : [];
 
   return (
     <div className="space-y-5" id="dashboard-view-root">
@@ -138,7 +140,9 @@ export default function DashboardView({
         </button>
         <button
           onClick={onStartNewSession}
-          className="bg-primary text-on-primary hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer font-bold tracking-wider rounded h-12 uppercase font-mono text-[11px] flex items-center justify-center gap-1.5 shadow"
+          disabled={!activeWeekendId}
+          title={activeWeekendId ? 'Start session for active weekend' : 'Activate a weekend first'}
+          className="bg-primary text-on-primary hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer font-bold tracking-wider rounded h-12 uppercase font-mono text-[11px] flex items-center justify-center gap-1.5 shadow disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
         >
           <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>timer</span>
           + Session Entry
@@ -187,8 +191,9 @@ export default function DashboardView({
           <div className="space-y-3">
             {filteredWeekends.map((weekend) => {
               const isExpanded = expandedWeekendId === weekend.id;
+              const isActiveWeekend = activeWeekendId === weekend.id;
               return (
-                <div key={weekend.id} className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
+                <div key={weekend.id} className={`bg-surface-container border rounded-lg overflow-hidden ${isActiveWeekend ? 'border-primary/60' : 'border-outline-variant'}`}>
                   <div
                     onClick={() => setExpandedWeekendId(isExpanded ? null : weekend.id)}
                     className="p-4 flex justify-between items-center bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer select-none"
@@ -197,6 +202,7 @@ export default function DashboardView({
                       <span className="material-symbols-outlined text-primary text-[22px]">calendar_today</span>
                       <div>
                         <h3 className="font-display text-base font-bold text-on-surface uppercase tracking-wide">{weekend.name}</h3>
+                        {isActiveWeekend && <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-primary/15 text-primary font-mono text-[9px] font-bold uppercase">Active</span>}
                         <div className="text-xs text-on-surface-variant font-mono mt-0.5">{weekend.track} • {weekend.date}</div>
                         {weekend.setupName && (
                           <div className="text-[10px] text-on-surface-variant/60 font-mono mt-0.5 flex items-center gap-1">
@@ -207,6 +213,13 @@ export default function DashboardView({
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onActivateWeekend(weekend.id); }}
+                        disabled={isActiveWeekend}
+                        className="px-2 py-1 rounded border border-primary/40 text-primary font-mono text-[9px] font-bold uppercase disabled:bg-primary/15 disabled:cursor-default"
+                      >
+                        {isActiveWeekend ? 'Active' : 'Set Active'}
+                      </button>
                       <span className="px-2 py-0.5 bg-surface-bright border border-outline-variant text-[10px] uppercase font-bold text-on-surface-variant rounded font-mono">
                         {weekend.sessions.length} {weekend.sessions.length === 1 ? 'Sess.' : 'Sess.'}
                       </span>
@@ -413,7 +426,7 @@ export default function DashboardView({
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[20px]">checklist</span>
             <span className="font-mono text-xs font-bold uppercase text-on-surface tracking-wider">
-              Open Tasks ({openTaskLists.reduce((n, e) => n + e.openItems.length, 0)})
+              Main Checklist ({openTaskLists.reduce((n, e) => n + e.openItems.length, 0)})
             </span>
             {openTaskLists.some(e => e.assignedToMe.length > 0) && (
               <span className="bg-primary/20 text-primary text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded">
@@ -430,7 +443,7 @@ export default function DashboardView({
         {tasksOpen && (
           <div className="mt-1 border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
             {openTaskLists.length === 0 ? (
-              <div className="p-4 text-center text-xs font-mono text-on-surface-variant/50">No open tasks.</div>
+              <div className="p-4 text-center text-xs font-mono text-on-surface-variant/50">Main Checklist clear.</div>
             ) : (
               openTaskLists.map(({ list, openItems, assignedToMe }) => (
                 <button

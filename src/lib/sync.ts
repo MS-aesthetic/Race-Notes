@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { Setup, RaceWeekend, ActiveSession, SessionRecord, Todo, TireInventoryItem, Car, ShockSession, WeatherHistoryDay, WeatherSnapshot, MaintenanceComponent, MaintenanceLog, ChecklistTemplate, WeekendChecklist, SavedTrip } from '../types';
+import { normalizeSetup } from './setupCompat';
 
 // ---------------------------------------------------------------------------
 // Local-First Sync Engine
@@ -25,7 +26,9 @@ export function pushSetups(setups: Setup[], userId: string, onStatus?: SyncCallb
   if (pushDebounceTimers.has(key)) clearTimeout(pushDebounceTimers.get(key)!);
   pushDebounceTimers.set(key, setTimeout(async () => {
     try {
-      const rows = setups.map(s => ({
+      const rows = setups.map(raw => {
+        const s = normalizeSetup(raw);
+        return ({
         id: s.id,
         user_id: userId,
         chassis: s.chassis,
@@ -46,7 +49,8 @@ export function pushSetups(setups: Setup[], userId: string, onStatus?: SyncCallb
         lr: s.lr,
         rr: s.rr,
         updated_at: new Date().toISOString(),
-      }));
+        });
+      });
       const { error } = await supabase.from('setups').upsert(rows, { onConflict: 'id' });
       if (error) console.warn('Sync: pushSetups error:', error.message);
       else onStatus?.('Setups synced to cloud');
@@ -126,7 +130,7 @@ export async function pullAllData(
       .select('*')
       .order('updated_at', { ascending: false });
     if (cloudSetups) {
-      results.setups = cloudSetups.map((r: Record<string, unknown>) => ({
+      results.setups = cloudSetups.map((r: Record<string, unknown>) => normalizeSetup({
         id: r.id as string,
         chassis: (r.chassis as string) || '',
         track: (r.track as string) || '',
@@ -216,7 +220,7 @@ export async function pullSharedData(userId: string): Promise<{
         .in('id', setupIds);
 
       if (cloudSetups) {
-        results.sharedSetups = cloudSetups.map((r: Record<string, unknown>) => ({
+        results.sharedSetups = cloudSetups.map((r: Record<string, unknown>) => normalizeSetup({
           id: r.id as string,
           chassis: (r.chassis as string) || '',
           track: (r.track as string) || '',
@@ -606,11 +610,12 @@ export async function pullMaintenanceComponents(onStatus?: SyncCallback): Promis
   }
 }
 
-export async function deleteMaintenanceComponentFromCloud(componentId: string): Promise<void> {
+export async function deleteMaintenanceComponentFromCloud(componentId: string): Promise<boolean> {
   try {
     const { error } = await supabase.from('maintenance_components').delete().eq('id', componentId);
-    if (error) console.warn('Sync: deleteMaintenanceComponentFromCloud error:', error.message);
-  } catch (e) { console.warn('Sync: deleteMaintenanceComponentFromCloud failed', e); }
+    if (error) { console.warn('Sync: deleteMaintenanceComponentFromCloud error:', error.message); return false; }
+    return true;
+  } catch (e) { console.warn('Sync: deleteMaintenanceComponentFromCloud failed', e); return false; }
 }
 
 // ---------------------------------------------------------------------------
@@ -670,11 +675,12 @@ export async function pullMaintenanceLogs(onStatus?: SyncCallback): Promise<Main
   }
 }
 
-export async function deleteMaintenanceLogFromCloud(logId: string): Promise<void> {
+export async function deleteMaintenanceLogFromCloud(logId: string): Promise<boolean> {
   try {
     const { error } = await supabase.from('maintenance_logs').delete().eq('id', logId);
-    if (error) console.warn('Sync: deleteMaintenanceLogFromCloud error:', error.message);
-  } catch (e) { console.warn('Sync: deleteMaintenanceLogFromCloud failed', e); }
+    if (error) { console.warn('Sync: deleteMaintenanceLogFromCloud error:', error.message); return false; }
+    return true;
+  } catch (e) { console.warn('Sync: deleteMaintenanceLogFromCloud failed', e); return false; }
 }
 
 // ---------------------------------------------------------------------------
@@ -723,11 +729,12 @@ export async function pullChecklistTemplates(onStatus?: SyncCallback): Promise<C
   }
 }
 
-export async function deleteChecklistTemplateFromCloud(templateId: string): Promise<void> {
+export async function deleteChecklistTemplateFromCloud(templateId: string): Promise<boolean> {
   try {
     const { error } = await supabase.from('checklist_templates').delete().eq('id', templateId);
-    if (error) console.warn('Sync: deleteChecklistTemplateFromCloud error:', error.message);
-  } catch (e) { console.warn('Sync: deleteChecklistTemplateFromCloud failed', e); }
+    if (error) { console.warn('Sync: deleteChecklistTemplateFromCloud error:', error.message); return false; }
+    return true;
+  } catch (e) { console.warn('Sync: deleteChecklistTemplateFromCloud failed', e); return false; }
 }
 
 // ---------------------------------------------------------------------------

@@ -15,10 +15,11 @@ import {
 
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, AppUser } from './lib/supabase';
 import AuthView from './components/AuthView';
-import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, pushMaintenanceLogs, pullMaintenanceLogs, pushChecklistTemplates, pullChecklistTemplates, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, deleteMaintenanceComponentFromCloud, pushMaintenanceLogs, pullMaintenanceLogs, deleteMaintenanceLogFromCloud, pushChecklistTemplates, pullChecklistTemplates, deleteChecklistTemplateFromCloud, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
 import { registerForPush } from './lib/push';
-import { instantiateTemplate, materializeStarterTemplate, checklistProgress } from './lib/checklists';
 import { syncTireLifecycle } from './lib/tireHistory';
+import { normalizeSetup, normalizeSetups } from './lib/setupCompat';
+import { materializeMainChecklist } from './lib/mainChecklist';
 
 import DashboardView from './components/DashboardView';
 import SetupView from './components/SetupView';
@@ -28,15 +29,23 @@ import QuickReferenceView from './components/QuickReferenceView';
 import TrackersView from './components/TrackersView';
 import { Todo } from './types';
 
+const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'trackers'>('dashboard');
   const [setup, setSetup] = useState<Setup>(INITIAL_SETUP);
   const [savedSetups, setSavedSetups] = useState<Setup[]>(INITIAL_SETUPS);
   const [weekends, setWeekends] = useState<RaceWeekend[]>(INITIAL_WEEKENDS);
+  const [activeWeekendId, setActiveWeekendId] = useState<string | null>(() =>
+    localStorage.getItem(ACTIVE_WEEKEND_KEY)
+  );
   const [activeSession, setActiveSession] = useState<ActiveSession>(INITIAL_ACTIVE_SESSION);
   const [todos, setTodos] = useState<Todo[]>(() => {
     const saved = localStorage.getItem('race_notes_todos');
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    const materialized = materializeMainChecklist(JSON.parse(saved));
+    localStorage.setItem('race_notes_todos', JSON.stringify(materialized));
+    return materialized;
   });
 
   const [accounting, setAccounting] = useState<AccountingEntry[]>(() => {
@@ -87,7 +96,7 @@ export default function App() {
   const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>(() => {
     try { const s = localStorage.getItem('race_notes_maintenance_logs'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
-  const [trackersSubTab, setTrackersSubTab] = useState<'tasks' | 'accounting' | 'shopping' | 'service'>('tasks');
+  const [trackersSubTab, setTrackersSubTab] = useState<'checklist' | 'service' | 'templates' | 'accounting'>('checklist');
 
   // Lifted smasher/shock-session state (Decision 1: cloud sync)
   const [shockSessions, setShockSessions] = useState<ShockSession[]>(() => {
@@ -175,6 +184,7 @@ export default function App() {
       'race_notes_active_car', 'race_notes_shock_graphs',
       'race_notes_maintenance', 'race_notes_maintenance_logs',
       'race_notes_checklist_templates', 'race_notes_weekend_checklists',
+      ACTIVE_WEEKEND_KEY,
     ];
     LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
 
@@ -195,6 +205,7 @@ export default function App() {
     // Reset all in-memory state
     setSavedSetups([]);
     setWeekends([]);
+    setActiveWeekendId(null);
     setTireInventory([]);
     setCars([]);
     setShockSessions([]);
@@ -317,6 +328,22 @@ export default function App() {
   const [newSessionTrackCondition, setNewSessionTrackCondition] = useState<TrackConditionPreset | ''>('');
   const [newSessionConditionNotes, setNewSessionConditionNotes] = useState('');
   const [newSessionTimeOfDay, setNewSessionTimeOfDay] = useState<'current' | 'Afternoon' | 'Evening' | 'Night'>('current');
+  const activeWeekend = weekends.find(w => w.id === activeWeekendId) ?? null;
+
+  // Active weekend is device-local. Recover stale IDs and migrate legacy session selection.
+  useEffect(() => {
+    if (weekends.length === 0) {
+      if (activeWeekendId) setActiveWeekendId(null);
+      localStorage.removeItem(ACTIVE_WEEKEND_KEY);
+      return;
+    }
+    if (activeWeekendId && weekends.some(w => w.id === activeWeekendId)) return;
+    const nextId = activeSession.weekendId && weekends.some(w => w.id === activeSession.weekendId)
+      ? activeSession.weekendId
+      : weekends[0].id;
+    setActiveWeekendId(nextId);
+    localStorage.setItem(ACTIVE_WEEKEND_KEY, nextId);
+  }, [weekends, activeWeekendId, activeSession.weekendId]);
   // Session weather fetch state
   const [sessionWeatherStr, setSessionWeatherStr] = useState('');
   const [sessionWeatherLoading, setSessionWeatherLoading] = useState(false);
@@ -335,10 +362,18 @@ export default function App() {
     const savedActive = localStorage.getItem('race_notes_active_session');
 
     if (savedSetup) {
-      try { setSetup(JSON.parse(savedSetup)); } catch { /* ignore */ }
+      try {
+        const normalized = normalizeSetup(JSON.parse(savedSetup));
+        setSetup(normalized);
+        localStorage.setItem('race_notes_setup', JSON.stringify(normalized));
+      } catch { /* ignore */ }
     }
     if (savedSetupsData) {
-      try { setSavedSetups(JSON.parse(savedSetupsData)); } catch { /* ignore */ }
+      try {
+        const normalized = normalizeSetups(JSON.parse(savedSetupsData));
+        setSavedSetups(normalized);
+        localStorage.setItem('race_notes_saved_setups', JSON.stringify(normalized));
+      } catch { /* ignore */ }
     }
     if (savedWeekends) {
       try {
@@ -478,8 +513,27 @@ export default function App() {
 
       const cloudTodos = await pullTodos(setSyncStatus);
       if (cloudTodos.length > 0) {
-        setTodos(cloudTodos);
-        localStorage.setItem('race_notes_todos', JSON.stringify(cloudTodos));
+        setTodos(prev => {
+          const cloudById = new Map(cloudTodos.map(todo => [todo.id, todo]));
+          const hasNewerLocal = prev.some(local => {
+            const cloud = cloudById.get(local.id);
+            return !cloud || (local.updated_at || '') > (cloud.updated_at || '');
+          });
+          const merged = [...prev];
+          for (const cloud of cloudTodos) {
+            const index = merged.findIndex(local => local.id === cloud.id);
+            if (index < 0) merged.push(cloud);
+            else if ((cloud.updated_at || '') >= (merged[index].updated_at || '')) merged[index] = cloud;
+          }
+          const materialized = materializeMainChecklist(merged);
+          localStorage.setItem('race_notes_todos', JSON.stringify(materialized));
+          if (hasNewerLocal || JSON.stringify(materialized) !== JSON.stringify(merged)) {
+            pushTodos(materialized, user.id, setSyncStatus);
+          }
+          return materialized;
+        });
+      } else if (todos.length > 0) {
+        pushTodos(materializeMainChecklist(todos), user.id, setSyncStatus);
       }
 
       const cloudTires = await pullTires(user.id, setSyncStatus);
@@ -754,12 +808,41 @@ export default function App() {
 
   // ── Open session creation form ────────────────────────────────────────────────
 
-  const handleOpenNewSessionForm = (preferWeekendId?: string) => {
-    // Validate the preferred ID exists; fall back to most recent weekend
-    const validIds = new Set(weekends.map(w => w.id));
-    const candidate = preferWeekendId || activeSession.weekendId || newSessionWeekendId;
-    const targetId = (candidate && validIds.has(candidate)) ? candidate : (weekends[weekends.length - 1]?.id ?? '');
-    if (targetId) setNewSessionWeekendId(targetId);
+  const handleActivateWeekend = (weekendId: string) => {
+    const target = weekends.find(w => w.id === weekendId);
+    if (!target) return;
+    setActiveWeekendId(target.id);
+    localStorage.setItem(ACTIVE_WEEKEND_KEY, target.id);
+    setNewSessionWeekendId(target.id);
+    setNewSessionTrack(target.track);
+  };
+
+  const handleDeleteMaintenanceComponent = (componentId: string) => {
+    const deletedLogIds = maintenanceLogs.filter(log => log.componentId === componentId).map(log => log.id);
+    handleSaveMaintenance(maintenance.filter(component => component.id !== componentId));
+    handleSaveMaintenanceLogs(maintenanceLogs.filter(log => log.componentId !== componentId));
+    if (user) {
+      void Promise.all([
+        deleteMaintenanceComponentFromCloud(componentId),
+        ...deletedLogIds.map(deleteMaintenanceLogFromCloud),
+      ]).then(results => {
+        if (results.some(ok => !ok)) setSyncStatus('Cloud delete failed — retry online');
+      });
+    }
+  };
+
+  const handleDeleteChecklistTemplate = (templateId: string) => {
+    const updated = checklistTemplates.filter(template => template.id !== templateId);
+    handleSaveChecklistTemplates(updated);
+    if (user) void deleteChecklistTemplateFromCloud(templateId).then(ok => {
+      if (!ok) setSyncStatus('Cloud delete failed — retry online');
+    });
+  };
+
+  const handleOpenNewSessionForm = () => {
+    if (!activeWeekend) return;
+    setNewSessionWeekendId(activeWeekend.id);
+    setNewSessionTrack(activeWeekend.track);
     setNewSessionType('Test');
     setNewSessionCond('');
     setNewSessionTrackCondition('');
@@ -818,16 +901,16 @@ export default function App() {
 
     setNewSessionWeekendId(newWknd.id);
     setNewSessionTrack(newWknd.track);
+    setActiveWeekendId(newWknd.id);
+    localStorage.setItem(ACTIVE_WEEKEND_KEY, newWknd.id);
     setShowNewWeekendForm(false);
-    // Open session form directly for convenience after weekend is made
-    setShowNewSessionForm(true);
   };
 
   const handleCreateNewSession = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSessionWeekendId) return;
+    if (!activeWeekendId || newSessionWeekendId !== activeWeekendId) return;
 
-    const targetWeekend = weekends.find(w => w.id === newSessionWeekendId);
+    const targetWeekend = weekends.find(w => w.id === activeWeekendId);
     if (!targetWeekend) return;
 
     // Load setup baseline pressures as initial psi values for convenience
@@ -977,6 +1060,18 @@ export default function App() {
     // Hard-delete from cloud so it doesn't come back on next sync pull
     deleteWeekendFromCloud(weekendId);
     if (user) pushWeekends(updated, user.id);
+    if (activeWeekendId === weekendId) {
+      setShowNewSessionForm(false);
+      const nextId = updated[0]?.id ?? null;
+      setActiveWeekendId(nextId);
+      if (nextId) localStorage.setItem(ACTIVE_WEEKEND_KEY, nextId);
+      else localStorage.removeItem(ACTIVE_WEEKEND_KEY);
+    }
+    if (activeSession.weekendId === weekendId) {
+      const cleared: ActiveSession = { ...INITIAL_ACTIVE_SESSION, weekendId: undefined };
+      setActiveSession(cleared);
+      localStorage.setItem('race_notes_active_session', JSON.stringify(cleared));
+    }
     // Null out weekendId on any checklists that belonged to this weekend (preserve the lists)
     const updatedChecklists = weekendChecklists.map(c =>
       c.weekendId === weekendId ? { ...c, weekendId: undefined, weekendName: undefined } : c
@@ -1018,6 +1113,7 @@ export default function App() {
   };
 
   const handleSelectRecentSession = (rec: SessionRecord, weekendId: string) => {
+    handleActivateWeekend(weekendId);
     // Dynamically spawn details in modal or swap session
     const restoredSession: ActiveSession = {
       id: rec.id,
@@ -1061,6 +1157,7 @@ export default function App() {
       dynoPhotos: rec.dynoPhotos || [],
     };
     setActiveSession(restoredSession);
+    localStorage.setItem('race_notes_active_session', JSON.stringify(restoredSession));
   };
 
   // ---- Auth gate: registration/sign-in is required to use the app. -------
@@ -1214,13 +1311,15 @@ export default function App() {
                   userId={user?.id}
                   team={team}
                   activeCarId={activeCarId}
+                  activeWeekendId={activeWeekendId}
+                  onActivateWeekend={handleActivateWeekend}
                   onStartNewWeekend={() => {
                     setNewWeekendName('');
                     setNewWeekendTrack('');
                     setNewWeekendDate(new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
                     setShowNewWeekendForm(true);
                   }}
-                  onStartNewSession={() => handleOpenNewSessionForm()}
+                  onStartNewSession={handleOpenNewSessionForm}
                   onSelectSession={(rec, weekendId) => {
                     handleSelectRecentSession(rec, weekendId || '');
                     setActiveTab('raceweekend');
@@ -1230,7 +1329,7 @@ export default function App() {
                     if (found) setSetup(found);
                     setActiveTab('setups');
                   }}
-                  onGoToTodos={() => setActiveTab('trackers')}
+                  onGoToTodos={() => { setTrackersSubTab('checklist'); setActiveTab('trackers'); }}
                   onGoToTires={() => {
                     setSetupSubTab('tires');
                     setActiveTab('setups');
@@ -1325,7 +1424,6 @@ export default function App() {
 
               {activeTab === 'raceweekend' && (
                 <RaceWeekendView
-                  user={user}
                   session={activeSession}
                   weekends={weekends}
                   tireInventory={tireInventory}
@@ -1334,16 +1432,16 @@ export default function App() {
                   onUpdateWeekend={handleUpdateWeekend}
                   onDeleteSession={handleDeleteSession}
                   onSelectSession={(rec, weekendId) => handleSelectRecentSession(rec, weekendId)}
-                  onNewSession={() => handleOpenNewSessionForm(activeSession.weekendId)}
-                  onNewWeekend={() => {
+                  activeWeekendId={activeWeekendId}
+                  onActivateWeekend={handleActivateWeekend}
+                  onNewSession={handleOpenNewSessionForm}
+                  onCreateWeekend={() => {
+                    setActiveTab('dashboard');
                     setNewWeekendName('');
                     setNewWeekendTrack('');
                     setNewWeekendDate(new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
                     setShowNewWeekendForm(true);
                   }}
-                  checklistTemplates={checklistTemplates}
-                  weekendChecklists={weekendChecklists}
-                  onSaveWeekendChecklists={handleSaveWeekendChecklists}
                 />
               )}
 
@@ -1360,7 +1458,6 @@ export default function App() {
                   weekends={weekends}
                   todos={todos}
                   accounting={accounting}
-                  shopping={shopping}
                   cars={cars}
                   activeCarId={activeCarId}
                   onSelectCar={handleSelectCar}
@@ -1396,13 +1493,9 @@ export default function App() {
                     setAccounting(updated);
                     localStorage.setItem('race_notes_accounting', JSON.stringify(updated));
                   }}
-                  shopping={shopping}
-                  onSaveShopping={(updated) => {
-                    setShopping(updated);
-                    localStorage.setItem('race_notes_shopping', JSON.stringify(updated));
-                  }}
                   maintenance={maintenance}
                   onSaveMaintenance={handleSaveMaintenance}
+                  onDeleteMaintenance={handleDeleteMaintenanceComponent}
                   maintenanceLogs={maintenanceLogs}
                   onSaveMaintenanceLogs={handleSaveMaintenanceLogs}
                   savedSetups={savedSetups}
@@ -1410,6 +1503,7 @@ export default function App() {
                   initialSubTab={trackersSubTab}
                   checklistTemplates={checklistTemplates}
                   onSaveChecklistTemplates={handleSaveChecklistTemplates}
+                  onDeleteChecklistTemplate={handleDeleteChecklistTemplate}
                 />
               )}
             </motion.div>
@@ -1661,6 +1755,7 @@ export default function App() {
                 <button
                   onClick={() => {
                     setShowNewSessionForm(false);
+                    setActiveTab('dashboard');
                     setShowNewWeekendForm(true);
                   }}
                   className="px-4 py-2 bg-primary text-on-primary font-bold text-xs uppercase cursor-pointer rounded block w-full"
@@ -1670,24 +1765,11 @@ export default function App() {
               </div>
             ) : (
               <form onSubmit={handleCreateNewSession} className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
-                {/* Weekend selector */}
+                {/* Session always belongs to device-active weekend. */}
                 <div>
-                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Race Weekend</label>
-                  <div className="relative">
-                    <select
-                      value={newSessionWeekendId}
-                      onChange={(e) => {
-                        setNewSessionWeekendId(e.target.value);
-                        const selected = weekends.find(w => w.id === e.target.value);
-                        if (selected) setNewSessionTrack(selected.track);
-                      }}
-                      className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
-                    >
-                      {weekends.map((w) => (
-                        <option key={w.id} value={w.id}>{w.name} ({w.track})</option>
-                      ))}
-                    </select>
-                    <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[14px]">expand_more</span>
+                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Active Weekend</label>
+                  <div className="w-full bg-surface-container text-xs text-on-surface p-2.5 border border-outline-variant rounded font-mono">
+                    {activeWeekend?.name} ({activeWeekend?.track})
                   </div>
                 </div>
 

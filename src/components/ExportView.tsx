@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Setup, ActiveSession, RaceWeekend, AccountingEntry, ShoppingItem, Todo, TireInventoryItem } from '../types';
+import { Setup, ActiveSession, RaceWeekend, AccountingEntry, Todo, TireInventoryItem } from '../types';
 import { User } from '@supabase/supabase-js';
 import { pullSharedData } from '../lib/sync';
+import { getMainChecklist } from '../lib/mainChecklist';
 
 interface ExportViewProps {
   user?: User | null;
@@ -13,11 +14,10 @@ interface ExportViewProps {
   weekends?: RaceWeekend[];
   todos?: Todo[];
   accounting?: AccountingEntry[];
-  shopping?: ShoppingItem[];
   tireInventory?: TireInventoryItem[];
 }
 
-type TrackerKind = 'all' | 'tasks' | 'accounting' | 'shopping';
+type TrackerKind = 'all' | 'checklist' | 'accounting';
 
 const REPORT_CSS = `
   body{font-family:'Inter',sans-serif;color:#111;padding:32px;max-width:900px;margin:0 auto;line-height:1.5}
@@ -51,7 +51,6 @@ export default function ExportView({
   weekends = [],
   todos = [],
   accounting = [],
-  shopping = [],
   tireInventory = [],
 }: ExportViewProps) {
   const [cloudSync, setCloudSync] = useState(true);
@@ -128,9 +127,7 @@ export default function ExportView({
   };
 
   const weekendSection = (w: RaceWeekend): string => {
-    const linkedTasks = todos.flatMap((t) => t.items.filter((i) => i.weekendId === w.id));
     const linkedAcct = accounting.filter((e) => e.weekendId === w.id);
-    const linkedShop = shopping.filter((s) => s.weekendId === w.id);
     const totalIncome = linkedAcct.filter((e) => e.type === 'income').reduce((s, e) => s + e.amount, 0);
     const totalExpense = linkedAcct.filter((e) => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
 
@@ -152,36 +149,24 @@ export default function ExportView({
         </tbody></table>`
       : '<p class="empty">No accounting linked.</p>';
 
-    const shopHtml = linkedShop.length
-      ? `<table><thead><tr><th>Item</th><th>Cost</th><th>Status</th></tr></thead><tbody>
-          ${linkedShop.map((i) => `<tr><td>${i.name}</td><td>${i.cost != null ? fmt(i.cost) : '—'}</td><td>${i.purchased ? '✓ Purchased' : 'Needed'}</td></tr>`).join('')}
-        </tbody></table>`
-      : '<p class="empty">No shopping linked.</p>';
-
-    const tasksHtml = linkedTasks.length
-      ? `<ul>${linkedTasks.map((t) => `<li class="${t.done ? 'done' : ''}">${t.done ? '✓' : '○'} ${t.text}</li>`).join('')}</ul>`
-      : '<p class="empty">No tasks linked.</p>';
-
     return `
       <h1>${w.name}</h1>
       <p style="color:#555;font-size:14px">${w.track} · ${w.date}</p>
       ${w.notes ? `<div style="background:#f9f9f9;border-left:3px solid #ba1a20;padding:10px 14px;margin:12px 0;font-size:13px">${w.notes}</div>` : ''}
       <h2>Sessions (${w.sessions.length})</h2>
       ${w.sessions.length ? sessions : '<p class="empty">No sessions recorded.</p>'}
-      <h2>Tasks</h2>${tasksHtml}
       <h2>Accounting</h2>${acctHtml}
-      <h2>Shopping</h2>${shopHtml}
     `;
   };
 
   const trackersSection = (kind: TrackerKind): string => {
-    const allTasks = todos.flatMap((t) => t.items);
+    const allTasks = getMainChecklist(todos)?.items ?? [];
     const tasksHtml =
-      kind === 'all' || kind === 'tasks'
-        ? `<h2>Tasks (${allTasks.length})</h2>${
+      kind === 'all' || kind === 'checklist'
+        ? `<h2>Main Checklist (${allTasks.length})</h2>${
             allTasks.length
-              ? `<ul>${allTasks.map((t) => `<li class="${t.done ? 'done' : ''}">${t.done ? '✓' : '○'} ${t.text}${t.weekendName ? ` <small>(${t.weekendName})</small>` : ''}</li>`).join('')}</ul>`
-              : '<p class="empty">No tasks.</p>'
+              ? `<ul>${allTasks.map((t) => `<li class="${t.done ? 'done' : ''}">${t.done ? '✓' : '○'} ${t.text}</li>`).join('')}</ul>`
+              : '<p class="empty">Main Checklist empty.</p>'
           }`
         : '';
     const income = accounting.filter((e) => e.type === 'income').reduce((s, e) => s + e.amount, 0);
@@ -197,19 +182,7 @@ export default function ExportView({
               : '<p class="empty">No accounting entries.</p>'
           }`
         : '';
-    const shopTotal = shopping.reduce((s, i) => s + (i.cost ?? 0), 0);
-    const shopHtml =
-      kind === 'all' || kind === 'shopping'
-        ? `<h2>Shopping (${shopping.length})</h2>${
-            shopping.length
-              ? `<table><thead><tr><th>Item</th><th>Cost</th><th>Status</th></tr></thead><tbody>
-                  ${shopping.map((i) => `<tr><td>${i.name}</td><td>${i.cost != null ? fmt(i.cost) : '—'}</td><td>${i.purchased ? '✓ Purchased' : 'Needed'}</td></tr>`).join('')}
-                  <tr class="total-row"><td><strong>Estimated Total</strong></td><td><strong>${fmt(shopTotal)}</strong></td><td></td></tr>
-                </tbody></table>`
-              : '<p class="empty">No shopping items.</p>'
-          }`
-        : '';
-    return tasksHtml + acctHtml + shopHtml || '<p class="empty">Nothing to export.</p>';
+    return tasksHtml + acctHtml || '<p class="empty">Nothing to export.</p>';
   };
 
   // ── Export actions ───────────────────────────────────────────────────────
@@ -229,9 +202,8 @@ export default function ExportView({
 
   const trackerLabel: Record<TrackerKind, string> = {
     all: 'All Trackers',
-    tasks: 'Tasks',
+    checklist: 'Main Checklist',
     accounting: 'Accounting',
-    shopping: 'Shopping',
   };
   const exportTrackers = () => printReport('Trackers Report', trackerLabel[selectedTracker], trackersSection(selectedTracker));
 
@@ -355,9 +327,8 @@ export default function ExportView({
           <div className="relative">
             <select value={selectedTracker} onChange={(e) => setSelectedTracker(e.target.value as TrackerKind)} className={selectClass}>
               <option value="all">All Trackers</option>
-              <option value="tasks">Tasks</option>
+              <option value="checklist">Main Checklist</option>
               <option value="accounting">Accounting</option>
-              <option value="shopping">Shopping</option>
             </select>
             <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
           </div>

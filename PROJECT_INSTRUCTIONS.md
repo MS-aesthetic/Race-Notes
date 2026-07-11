@@ -1,14 +1,17 @@
 # CREW CHIEF — Project Instructions
 
-> **⚠️ This file is a legacy entry point.** For the authoritative, up-to-date agent guide, see:
+> Entry point. Authoritative current guides:
 > - **[`AGENTS.md`](./AGENTS.md)** — architecture, conventions, branch/deploy workflow, definition of done
-> - **[`plan.md`](./plan.md)** — active feature roadmap (13 workstreams, execution order)
+> - **[`HANDOFF.md`](./HANDOFF.md)** — branch/worktree status and operating context
+> - **[`plan-v2.md`](./plan-v2.md)** — active roadmap and agent loop
+> - **[`ralph/STATE.md`](./ralph/STATE.md)** — current workstream state
 > - **[`CODEBASE_KNOWLEDGE.md`](./CODEBASE_KNOWLEDGE.md)** — full technical reference (types, tables, localStorage keys, component details, gotchas)
 
 ### Quick start (for new agents)
 
-1. Read [`plan.md`](./plan.md) first — understand what workstreams are active
-2. Read [`AGENTS.md`](./AGENTS.md) for conventions, branch rules, and architecture
-3. Reference [`CODEBASE_KNOWLEDGE.md`](./CODEBASE_KNOWLEDGE.md) for types, sync patterns, and gotchas
+1. Open `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v2` on `preview-v2`.
+2. Read [`HANDOFF.md`](./HANDOFF.md), [`plan-v2.md`](./plan-v2.md), and [`ralph/STATE.md`](./ralph/STATE.md).
+3. Read [`AGENTS.md`](./AGENTS.md), including mandatory cavecrew/caveman and SOL/Terra routing.
+4. Reference [`CODEBASE_KNOWLEDGE.md`](./CODEBASE_KNOWLEDGE.md) for older technical detail; newer v2 sources win conflicts.
 
-**One-line summary:** React 19 + TS + Vite 6 PWA, Capacitor 8 Android wrapper, Supabase backend. Dirt-track racing logbook for crews. Local-first dual-write, tab-based navigation (no router). All feature work on `preview` branch, deploy previews to Netlify.
+**One-line summary:** React 19 + TS + Vite 6 PWA, Capacitor 8 Android wrapper, Supabase backend. Local-first dual-write, no router. All feature work on `preview-v2`; preview deploys only unless Maxx explicitly authorizes production.

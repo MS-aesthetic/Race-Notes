@@ -1,5 +1,6 @@
 import { Setup } from '../types';
 import { parseTireSize } from './tireSize';
+import { normalizeSetup } from './setupCompat';
 
 export interface SetupDiffRow {
   label: string;
@@ -51,6 +52,8 @@ const CORNERS = ['LF', 'RF', 'LR', 'RR'] as const;
 
 /** Compare two setups and return a flat list of diff rows. */
 export function diffSetups(a: Setup, b: Setup): SetupDiffRow[] {
+  a = normalizeSetup(a);
+  b = normalizeSetup(b);
   const rows: SetupDiffRow[] = [];
 
   // Top-level metadata
@@ -84,9 +87,15 @@ export function diffSetups(a: Setup, b: Setup): SetupDiffRow[] {
     ['Caster', 'caster'],
     ['Camber', 'camber'],
     ['Spring Height', 'springHeight'],
-    ['Load', 'load'],
     ['Top Bar Len', 'topBarLength'],
+    ['Top Bar Hole Frame', 'topBarHFrame'],
+    ['Top Bar Hole Birdcage', 'topBarHBird'],
+    ['Top Bar Angle (Ride Height)', 'topBarAngRH'],
+    ['Top Bar Angle (Full Droop)', 'topBarAngFD'],
     ['Bottom Bar Len', 'bottomBarLength'],
+    ['Bottom Bar Hole Frame', 'botBarHFrame'],
+    ['Bottom Bar Hole Birdcage', 'botBarHBird'],
+    ['Bottom Bar Angle', 'bottomBarAngle'],
     ['Droop', 'droop'],
     ['Preload', 'preload'],
   ];
