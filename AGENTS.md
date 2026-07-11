@@ -5,6 +5,10 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 > **📋 Active feature roadmap:** [`plan.md`](./plan.md) — read this FIRST before starting any feature work. It defines 13 workstreams (WS-A through WS-M), their execution order, dependencies, and the shared data-model foundation that must land first.
 >
 > **📚 Full reference:** [`CODEBASE_KNOWLEDGE.md`](./CODEBASE_KNOWLEDGE.md) — comprehensive technical reference (types, tables, localStorage keys, component details, gotchas, session history).
+>
+> **🧭 NEW AGENT? START WITH [`HANDOFF.md`](./HANDOFF.md)** — consolidated onboarding: current status, session history, worktree/branch gotchas, build/deploy procedures, and the Ralph-loop workflow.
+>
+> ⚠️ **This file (`AGENTS.md`) describes v1** (`plan.md`, WS-A–M, old package `com.racenotes.app`). Architecture/conventions still apply, but for **v2 status and workflow trust [`plan-v2.md`](./plan-v2.md), [`ralph/STATE.md`](./ralph/STATE.md), and [`HANDOFF.md`](./HANDOFF.md)**. Current package is `nimbus.engineering.crewchief`.
 
 ---
 
