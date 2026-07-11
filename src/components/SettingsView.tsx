@@ -12,6 +12,7 @@ interface SettingsViewProps {
   profile: AppUser | null;
   onAuthChange: (user: User | null) => void;
   setup: Setup;
+  savedSetups?: Setup[];
   activeSession: ActiveSession;
   theme: AppTheme;
   onThemeChange: (t: AppTheme) => void;
@@ -42,7 +43,7 @@ const ACCENT_PRESETS = [
   { label: 'Cyan',        hex: '#7de8e8' },
 ];
 
-export default function SettingsView({ user, profile, onAuthChange, setup, activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], shopping = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, onClearAllData, tireInventory = [] }: SettingsViewProps) {
+export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], shopping = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, onClearAllData, tireInventory = [] }: SettingsViewProps) {
   const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>(initialSubTab ?? 'garage');
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0); // 0=idle, 1=confirm, 2=clearing
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -50,7 +51,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Sub-tab bar */}      
-      <div className="flex bg-surface rounded-lg p-0.5 border border-outline-variant/30 text-sm font-sans overflow-x-auto">
+      <div className="flex bg-surface rounded-lg p-0.5 border border-outline-variant/30 text-xs font-mono uppercase tracking-wide overflow-x-auto">
         <button
           onClick={() => setSubTab('garage')}
           className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'garage' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
@@ -290,7 +291,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, activ
           </div>
         )}
 
-        {subTab === 'export' && <ExportView setup={setup} activeSession={activeSession} weekends={weekends} todos={todos} accounting={accounting} shopping={shopping} tireInventory={tireInventory} />}
+        {subTab === 'export' && <ExportView user={user} setup={setup} savedSetups={savedSetups} activeSession={activeSession} weekends={weekends} todos={todos} accounting={accounting} shopping={shopping} tireInventory={tireInventory} />}
 
         {subTab === 'guide' && <GuideView />}
       </div>

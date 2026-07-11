@@ -1353,6 +1353,7 @@ export default function App() {
                   profile={profile}
                   onAuthChange={(u) => setUser(u)}
                   setup={setup}
+                  savedSetups={savedSetups}
                   activeSession={activeSession}
                   theme={theme}
                   onThemeChange={handleThemeChange}
