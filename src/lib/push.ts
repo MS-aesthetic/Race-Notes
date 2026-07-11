@@ -93,7 +93,10 @@ async function registerWeb(userId: string): Promise<void> {
   const app = getApps().length ? getApps()[0] : initializeApp(config);
 
   // Register at FCM's own scope so it never clobbers the Workbox root SW ('/').
-  const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+  // Pass the Firebase web config in the URL so no keys are hardcoded in the SW
+  // source file (the browser persists this registration URL for later wakeups).
+  const swUrl = `/firebase-messaging-sw.js?config=${encodeURIComponent(configRaw)}`;
+  const swReg = await navigator.serviceWorker.register(swUrl, {
     scope: '/firebase-cloud-messaging-push-scope',
   });
   const token = await getToken(getMessaging(app), { vapidKey, serviceWorkerRegistration: swReg });
