@@ -1,15 +1,22 @@
 # CREW CHIEF — Agent Handoff & Onboarding
 
 > **Purpose:** single entry point for any new LLM/agent picking up this project.
-> Read this first, then the linked docs. Last updated **2026-07-11**.
+> Read this first, then the linked docs. Last updated **2026-07-12**.
+
+> ### ⚡ Update 2026-07-12 (supersedes stale details below)
+> - **Single worktree now.** The `.worktrees/v2` worktree was removed and the repo consolidated to ONE working tree at `C:\Users\maxx\antigravity\Race-Notes`, checked out on **`master`** (no longer detached HEAD). It holds both the app code AND the complete Android platform, so APKs build **directly here** — the old "build-from-main bridge" and the "incomplete v2 android platform" caveats are **retired**. Future parallel dev should use a fresh worktree named **`v3 preview`**.
+> - **`master` == `origin/master` == `98bb2e0`+cleanup.** The `preview` (v1) and `preview-v2` branches were retired/removed after consolidation; `master` is the single source of truth. Deploys still default to Netlify preview; production only on Maxx's explicit say-so.
+> - **Migration 014 IS applied to live Supabase** (`20260711151905`, applied 2026-07-11). Ignore older "014 not applied" notes.
+> - **Current APK provenance established.** `android/app/build/outputs/apk/debug/app-debug.apk` (~9.1 MB) was built from secured commit `98bb2e0` on the complete Android platform, includes the native `@capacitor/push-notifications` plugin, and reflects the SW security fix. The old ~5 MB `CrewChief.apk` / `race_notes.apk` root copies were stale (pre-fix) and were **deleted** during cleanup.
+> - **Repo hygiene pass done:** removed dead PWABuilder/TWA leftovers (root gradle files, `pwabuilder-adv-sw.js`, `metadata.json`, `build_apk.bat`, `PWA_INSTRUCTIONS.md`), retired v1 `plan.md`, untracked `.idea/` + root `local.properties`, and added `android/app/google-services.json` to `.gitignore`.
 
 CREW CHIEF (brand: all caps) is a React + TypeScript PWA + Android app that helps
 dirt-track racing teams track car setups, race sessions, tire inventory, weather,
 pit-crew tasks, maintenance/ERP, pre-race checklists, and (in progress) push
 notifications, live team location, and truck routing. Owner/decision-maker: **Maxx**.
 
-Production site (unchanged): https://crew-chief-race-notes.netlify.app
-Latest WS-Z draft: https://6a525a23a0b54ce49ff7498c--crew-chief-race-notes.netlify.app
+Production URL (current deploy history not audited here): https://crew-chief-race-notes.netlify.app
+WS-Z draft recorded at deployment time: https://6a525a23a0b54ce49ff7498c--crew-chief-race-notes.netlify.app
 Repo (Windows host): `C:\Users\maxx\antigravity\Race-Notes`
 
 ---
@@ -17,7 +24,9 @@ Repo (Windows host): `C:\Users\maxx\antigravity\Race-Notes`
 ## 0. Start-here reading order
 
 1. **This file (`HANDOFF.md`)** — orientation, current status, session history, gotchas.
-2. **`plan-v2.md`** — the ACTIVE roadmap (workstreams WS-N … WS-Y). Supersedes `plan.md`.
+   - **[WS-Z handoff](./docs/HANDOFF_WS_Z_2026-07-11.md)** — exact changes, commits, validation, APK bridge, and remaining rollout gates.
+   - **Security:** Existing copied WS-Z APKs predate secured commit `98bb2e0` and are not approved for redistribution, security QA, or native-push QA. Rebuild from current secured source first.
+2. **`plan-v2.md`** — the ACTIVE roadmap (workstreams WS-N … WS-Z). Supersedes `plan.md`.
 3. **`ralph/STATE.md`** — machine-readable loop state: what's done, scores, human gates, backlog.
 4. **`ralph/CURRENT_TASK.md`** — the work order for the WS currently in flight.
 5. **`CODEBASE_KNOWLEDGE.md`** — 1000-line deep technical reference (types, tables, components, gotchas, session history).
@@ -27,6 +36,9 @@ Repo (Windows host): `C:\Users\maxx\antigravity\Race-Notes`
 
 > **Doc-currency note:** `CODEBASE_KNOWLEDGE.md` predates parts of v2. Current
 > workflow authority: `AGENTS.md`, this file, `plan-v2.md`, then `STATE.md`.
+> Older sections in this file may still mention Shopping exports/state or earlier
+> naming. The dedicated [WS-Z handoff](./docs/HANDOFF_WS_Z_2026-07-11.md) and
+> `ralph/CURRENT_TASK.md` override those stale entries.
 
 ---
 
@@ -36,8 +48,13 @@ Git worktrees in play:
 
 | Path | Branch | Role |
 |---|---|---|
-| `C:\Users\maxx\antigravity\Race-Notes` | `preview` | **Main tree.** Has the COMPLETE Android platform (Gradle files, `google-services.json`, keystore, SDK `local.properties`). Has uncommitted v1→nimbus edits. Used to actually build APKs. |
+| `C:\Users\maxx\antigravity\Race-Notes` | detached HEAD | **Main tree.** Has the COMPLETE Android platform (Gradle files, `google-services.json`, keystore, SDK `local.properties`). Used to build APKs. Preserve its current generated/host-specific dirty files. |
 | `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v2` | `preview-v2` | **v2 dev worktree.** Where ALL current feature work (WS-N…WS-Z) happens. Web build works here. Its `android/` platform is INCOMPLETE. |
+
+Audited refs on 2026-07-12: `preview` = `6407d6e`; `preview-v2` and `master` =
+`98bb2e0`. Git refs do not indicate Netlify deployment state; current Netlify
+deploy history was not audited in this handoff session. Main-tree dirty files to preserve: `android/app/capacitor.build.gradle`,
+`android/capacitor.settings.gradle`, and untracked `android/app/google-services.json`.
 
 **Critical gotchas about the split:**
 
