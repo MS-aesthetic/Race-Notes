@@ -8,6 +8,7 @@ import SetupDiffView from './SetupDiffView';
 import { byActiveCar } from '../lib/scope';
 import { getTireUsageHistory, getTireTotalLaps, downloadTireUsageCsv, printTireUsageReport } from '../lib/tireHistory';
 import { compareTireSize, sortBySize } from '../lib/tireSize';
+import EmptyState from './ui/EmptyState';
 
 interface SetupViewProps {
   savedSetups: Setup[];
@@ -468,7 +469,7 @@ export default function SetupView({
             <form onSubmit={handleAddNewSetup} className="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
               <div className="flex-grow">
                 <label className="block text-[10px] uppercase font-bold text-on-surface-variant mb-1 font-mono">Create New Setup</label>
-                <input type="text" placeholder="e.g. Chassis #42 - Slick Track Soft" value={newSetupName}
+                <input id="new-setup-name" type="text" placeholder="e.g. Chassis #42 - Slick Track Soft" value={newSetupName}
                   onChange={(e) => setNewSetupName(e.target.value)}
                   className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm px-3 py-2 outline-none rounded" />
               </div>
@@ -481,6 +482,14 @@ export default function SetupView({
 
           {/* Accordion list — filtered to active car */}
           <div className="space-y-4" id="setups-accordion">
+            {!noCar && displayedSetups.length === 0 && (
+              <EmptyState
+                icon="tune"
+                title="No setups for this car"
+                body="Start with a baseline, then tune from what the track tells you."
+                cta={{ label: 'Start baseline setup', onClick: () => document.getElementById('new-setup-name')?.focus() }}
+              />
+            )}
             {displayedSetups.map((setupItem) => {
               const isExpanded = expandedId === setupItem.id;
               const isActive = activeId === setupItem.id;

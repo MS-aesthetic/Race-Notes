@@ -32,7 +32,8 @@ import TrackersView from './components/TrackersView';
 import ContextStrip from './components/ContextStrip';
 import HelpSheet from './components/ui/HelpSheet';
 import { InfoToast } from './components/ui/UndoToast';
-import { pickAutoWeekend } from './lib/scope';
+import { pickAutoWeekend, sortWeekends } from './lib/scope';
+import { buildQuickServiceRecords, type QuickServiceOutcome, type QuickServiceRequest } from './lib/serviceLog';
 import { useOnlineStatus } from './lib/saveStatus';
 import { hasOpenSheets, isPopSuppressed } from './lib/backStack';
 import { Todo } from './types';
@@ -342,9 +343,15 @@ export default function App() {
   // [15] Weekend/session creation modals now live in RaceWeekendView.
   // This one-shot action tells the Sessions tab to open a modal on arrival.
   const [rwInitialAction, setRwInitialAction] = useState<'new-session' | 'new-weekend' | null>(null);
+  const continueToRunAfterWeekendRef = useRef(false);
   const openRaceWeekendAction = (action: 'new-session' | 'new-weekend') => {
     setRwInitialAction(action);
     setActiveTab('raceweekend');
+  };
+
+  const openWeekendForRun = () => {
+    continueToRunAfterWeekendRef.current = true;
+    openRaceWeekendAction('new-weekend');
   };
 
   // ── [29] Tab scroll preservation ───────────────────────────────────────────
@@ -892,6 +899,11 @@ export default function App() {
     setActiveWeekendId(newWknd.id);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, newWknd.id);
     setInfoToast(`Active: ${newWknd.name}`);
+    if (continueToRunAfterWeekendRef.current) {
+      continueToRunAfterWeekendRef.current = false;
+      setRwInitialAction('new-session');
+      setActiveTab('raceweekend');
+    }
   };
 
   const handleCreateNewSession = (data: NewSessionData) => {
@@ -1036,8 +1048,8 @@ export default function App() {
     setActiveTab('raceweekend');
   };
 
-  // Immediate delete — no confirm. RaceWeekendView wraps this in the undo
-  // toast pattern; Dashboard keeps the window.confirm wrapper below.
+  // Immediate delete — no confirm. Both RaceWeekendView and Dashboard wrap
+  // this in the undo-toast pattern ([8]/[16]) — it fires only on commit.
   const deleteWeekendNow = (weekendId: string) => {
     const updated = weekends.filter(w => w.id !== weekendId);
     setWeekends(updated);
@@ -1063,29 +1075,73 @@ export default function App() {
     handleSaveWeekendChecklists(updatedChecklists);
   };
 
-  const handleDeleteWeekend = (weekendId: string) => {
-    if (!window.confirm('Delete this race weekend and all its sessions? This cannot be undone.')) return;
-    deleteWeekendNow(weekendId);
+  // [7] Dashboard hero quick-start: create a weekend at the most recent track
+  // dated today (handleCreateNewWeekend auto-activates it), then deep-link
+  // straight into the new-session flow on the Sessions tab.
+  const handleQuickStartWeekend = () => {
+    const track = sortWeekends(weekends, activeWeekendId).find(w => w.track)?.track || 'Home Track';
+    const today = new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    handleCreateNewWeekend({ name: `${track} — ${today}`, track, date: today });
+    openRaceWeekendAction('new-session');
+  };
+
+  // [25] Quick service log from the Dashboard chip. Record building lives in
+  // lib/serviceLog.ts; this just applies the state writes (local-first + push).
+  const handleQuickService = (req: QuickServiceRequest): QuickServiceOutcome | null => {
+    const component = maintenance.find(c => c.id === req.componentId);
+    if (!component) return null;
+    const activeWeekend = weekends.find(w => w.id === activeWeekendId) ?? null;
+    const result = buildQuickServiceRecords(component, req, weekends, savedSetups, activeWeekend);
+    handleSaveMaintenance(maintenance.map(c => (c.id === component.id ? result.updatedComponent : c)));
+    handleSaveMaintenanceLogs([result.log, ...maintenanceLogs]);
+    if (result.accountingEntry) {
+      const updated = [result.accountingEntry, ...accounting];
+      setAccounting(updated);
+      localStorage.setItem('race_notes_accounting', JSON.stringify(updated));
+    }
+    return { result, prevComponent: component };
+  };
+
+  // Undo removes BOTH records and restores the component's service counter.
+  const handleUndoQuickService = ({ result, prevComponent }: QuickServiceOutcome) => {
+    handleSaveMaintenance(maintenance.map(c => (c.id === prevComponent.id ? prevComponent : c)));
+    handleSaveMaintenanceLogs(maintenanceLogs.filter(l => l.id !== result.log.id));
+    if (user) void deleteMaintenanceLogFromCloud(result.log.id).then(ok => {
+      if (!ok) setSyncStatus('Cloud undo failed — retry online');
+    });
+    if (result.accountingEntry) {
+      const entryId = result.accountingEntry.id;
+      const updated = accounting.filter(e => e.id !== entryId);
+      setAccounting(updated);
+      localStorage.setItem('race_notes_accounting', JSON.stringify(updated));
+    }
   };
 
   const handleDeleteSession = (weekendId: string, sessionId: string) => {
-    if (!window.confirm('Delete this session? This cannot be undone.')) return;
-    const updated = weekends.map(w =>
-      w.id === weekendId ? { ...w, sessions: w.sessions.filter(s => s.id !== sessionId) } : w
-    );
-    setWeekends(updated);
-    localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
-    if (user) pushWeekends(updated, user.id);
-    // If we just deleted the active session, clear weekendId so view resets
+    // RaceWeekendView owns the undo window. This commit runs only after expiry.
+    setWeekends(prev => {
+      const updated = prev.map(w =>
+        w.id === weekendId ? { ...w, sessions: w.sessions.filter(s => s.id !== sessionId) } : w
+      );
+      localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
+      if (user) pushWeekends(updated, user.id);
+
+      setTireInventory(prevTires => {
+        const lifecycled = syncTireLifecycle(prevTires, updated);
+        localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
+        if (user) pushTires(lifecycled, user.id);
+        return lifecycled;
+      });
+      return updated;
+    });
+
     if (activeSession.id === sessionId) {
-      setActiveSession(prev => ({ ...prev, id: undefined, weekendId: undefined }));
+      setActiveSession(prev => {
+        const cleared = { ...prev, id: undefined, weekendId: undefined };
+        localStorage.setItem('race_notes_active_session', JSON.stringify(cleared));
+        return cleared;
+      });
     }
-    
-    // Sync tire lifecycle after session deletion
-    const lifecycled = syncTireLifecycle(tireInventory, updated);
-    setTireInventory(lifecycled);
-    localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
-    if (user) pushTires(lifecycled, user.id);
   };
 
   const handleUpdateWeekend = (updated: RaceWeekend) => {
@@ -1313,26 +1369,28 @@ export default function App() {
                   team={team}
                   activeCarId={activeCarId}
                   activeWeekendId={activeWeekendId}
-                  onActivateWeekend={handleActivateWeekend}
+                  carCount={cars.length}
                   onStartNewWeekend={() => openRaceWeekendAction('new-weekend')}
+                  onStartNewWeekendForRun={openWeekendForRun}
                   onStartNewSession={() => openRaceWeekendAction('new-session')}
+                  onQuickStartWeekend={handleQuickStartWeekend}
                   onSelectSession={(rec, weekendId) => {
                     handleSelectRecentSession(rec, weekendId || '');
                     setActiveTab('raceweekend');
                   }}
-                  onSelectSetup={(setupId) => {
-                    const found = savedSetups.find(s => s.id === setupId);
-                    if (found) setSetup(found);
-                    setActiveTab('setups');
-                  }}
+                  onGoToSetups={() => setActiveTab('setups')}
+                  onGoToSessions={() => setActiveTab('raceweekend')}
+                  onGoToGarage={() => setActiveTab('settings')}
                   onGoToTodos={() => { setTrackersSubTab('checklist'); setActiveTab('trackers'); }}
                   onGoToTires={() => {
                     setSetupSubTab('tires');
                     setActiveTab('setups');
                   }}
-                  onDeleteWeekend={handleDeleteWeekend}
+                  onDeleteWeekend={deleteWeekendNow}
                   maintenance={maintenance}
                   onGoToService={() => { setTrackersSubTab('service'); setActiveTab('trackers'); }}
+                  onQuickService={handleQuickService}
+                  onUndoQuickService={handleUndoQuickService}
                 />
               )}
 
@@ -1460,6 +1518,7 @@ export default function App() {
                   setupCount={carSetupCount}
                   tireCount={carTireCount}
                   shockCount={carShockCount}
+                  onStartWeekend={() => openRaceWeekendAction('new-weekend')}
                   initialSubTab={settingsSubTab}
                   onClearAllData={handleClearAllData}
                   tireInventory={tireInventory}

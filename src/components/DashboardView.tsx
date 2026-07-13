@@ -1,33 +1,20 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Setup, SessionRecord, RaceWeekend, Team, TireInventoryItem, Todo, MaintenanceComponent } from '../types';
-import { byActiveCar } from '../lib/scope';
+import { byActiveCar, sortWeekends } from '../lib/scope';
 import { getComponentStatus } from '../lib/maintenance';
 import { getMainChecklist } from '../lib/mainChecklist';
-
-// Maps legacy full session type names to the short codes used in v2
-const SESSION_NAME_MAP: [string, string][] = [
-  ['HOT LAPS', 'HL'],
-  ['Hot Laps', 'HL'],
-  ['QUALIFYING', 'Qual'],
-  ['Qualifying', 'Qual'],
-  ['HEAT RACE', 'Heat'],
-  ['Heat Race', 'Heat'],
-  ['HEAT', 'Heat'],
-  ['FEATURE', 'Feat.'],
-  ['Feature', 'Feat.'],
-  ['TEST', 'Test'],
-];
-
-function normalizeSessionName(name: string): string {
-  for (const [full, code] of SESSION_NAME_MAP) {
-    if (name.toUpperCase() === full.toUpperCase()) return code;
-    if (name.toUpperCase().startsWith(full.toUpperCase() + ' ')) {
-      const suffix = name.slice(full.length).trim();
-      return `${code} ${suffix}`;
-    }
-  }
-  return name;
-}
+import {
+  describeServiceStatus,
+  pickWorstComponent,
+  type QuickServiceOutcome,
+  type QuickServiceRequest,
+} from '../lib/serviceLog';
+import { useUndoableDelete } from '../lib/undo';
+import BottomSheet from './ui/BottomSheet';
+import CollapsibleSection from './ui/CollapsibleSection';
+import EmptyState from './ui/EmptyState';
+import UndoToast, { InfoToast } from './ui/UndoToast';
+import GetRaceReadyCard from './GetRaceReadyCard';
 
 interface DashboardViewProps {
   weekends: RaceWeekend[];
@@ -36,18 +23,29 @@ interface DashboardViewProps {
   todos: Todo[];
   userId?: string;
   team: Team | null;
+  /** [1] Get-race-ready: cars live in App/Settings — only the count is needed. */
+  carCount: number;
   onStartNewWeekend: () => void;
+  /** Opens weekend form and continues into quick-log after creation. */
+  onStartNewWeekendForRun: () => void;
   onStartNewSession: () => void;
+  /** [7] Create weekend @ most-recent track dated today, activate, deep-link new-session. */
+  onQuickStartWeekend: () => void;
   onSelectSession: (session: SessionRecord, weekendId?: string) => void;
-  onSelectSetup: (setupId: string) => void;
   onGoToTodos: () => void;
   onGoToTires?: () => void;
+  onGoToSetups: () => void;
+  onGoToSessions: () => void;
+  onGoToGarage: () => void;
+  /** Immediate delete (no confirm) — the undo toast here is the safety net. */
   onDeleteWeekend: (weekendId: string) => void;
   activeCarId?: string | null;
   activeWeekendId?: string | null;
-  onActivateWeekend: (weekendId: string) => void;
   maintenance?: MaintenanceComponent[];
   onGoToService?: () => void;
+  /** [25] Quick service log; returns records for the UNDO toast (null if component vanished). */
+  onQuickService: (req: QuickServiceRequest) => QuickServiceOutcome | null;
+  onUndoQuickService: (outcome: QuickServiceOutcome) => void;
 }
 
 export default function DashboardView({
@@ -57,34 +55,53 @@ export default function DashboardView({
   todos,
   userId,
   team,
+  carCount,
   onStartNewWeekend,
+  onStartNewWeekendForRun,
   onStartNewSession,
+  onQuickStartWeekend,
   onSelectSession,
-  onSelectSetup,
   onGoToTodos,
   onGoToTires,
+  onGoToSetups,
+  onGoToSessions,
+  onGoToGarage,
   onDeleteWeekend,
   activeCarId = null,
   activeWeekendId = null,
-  onActivateWeekend,
   maintenance = [],
   onGoToService,
+  onQuickService,
+  onUndoQuickService,
 }: DashboardViewProps) {
-  const [expandedWeekendId, setExpandedWeekendId] = useState<string | null>(
-    weekends.length > 0 ? weekends[0].id : null
-  );
-  const [trackFilter, setTrackFilter] = useState<string>('');
-  const [setupsOpen, setSetupsOpen] = useState(false);
-  const [tiresOpen, setTiresOpen] = useState(false);
-  const [tasksOpen, setTasksOpen] = useState(false);
-  const [serviceOpen, setServiceOpen] = useState(true);
+  // [8] Weekend delete lives behind the ⋯ sheet with an undo window.
+  const weekendUndo = useUndoableDelete<RaceWeekend>();
+  const pendingDeleteId = weekendUndo.pending?.id ?? null;
+  const visibleWeekends = weekends.filter(w => w.id !== pendingDeleteId);
+  const sortedWeekends = sortWeekends(visibleWeekends, activeWeekendId);
+  const activeWeekend = visibleWeekends.find(w => w.id === activeWeekendId) ?? null;
+
+  // [7] Hero + no-active-weekend teaching sheet
+  const [noWeekendSheetOpen, setNoWeekendSheetOpen] = useState(false);
+  const [weekendMenuOpen, setWeekendMenuOpen] = useState(false);
+
+  const lastTrack = sortedWeekends.find(w => w.track)?.track ?? '';
+  const lastRun = (() => {
+    for (const w of sortedWeekends) {
+      if (w.sessions.length > 0) return { session: w.sessions[0], weekendId: w.id };
+    }
+    return null;
+  })();
+  const totalSessions = weekends.reduce((n, w) => n + w.sessions.length, 0);
+
+  const handleLogRun = () => {
+    if (activeWeekend) onStartNewSession();
+    else setNoWeekendSheetOpen(true);
+  };
 
   // Filter at display time — never mutate the master arrays
   const displayedSetups = byActiveCar(savedSetups, activeCarId);
   const displayedTires = byActiveCar(tireInventory, activeCarId);
-
-  const uniqueTracks = Array.from(new Set(weekends.map(w => w.track).filter(Boolean))).sort();
-  const filteredWeekends = trackFilter ? weekends.filter(w => w.track === trackFilter) : weekends;
 
   const mainChecklist = getMainChecklist(todos);
   const openTaskLists = mainChecklist ? [{
@@ -92,9 +109,105 @@ export default function DashboardView({
     openItems: (mainChecklist.items ?? []).filter(i => !i.done),
     assignedToMe: (mainChecklist.items ?? []).filter(i => !i.done && userId && i.assignedTo === userId),
   }].filter(entry => entry.openItems.length > 0) : [];
+  const openTaskCount = openTaskLists.reduce((n, e) => n + e.openItems.length, 0);
+
+  // [25] Service chip + quick service sheet
+  // Car parts follow active-car scope; rig parts remain team-global.
+  const visibleMaintenance = maintenance.filter(c => c.scope === 'rig' || !activeCarId || c.carId === activeCarId);
+  const worst = pickWorstComponent(visibleMaintenance, weekends, savedSetups);
+  const dueItems = visibleMaintenance.filter(c => getComponentStatus(c, weekends, savedSetups).state !== 'ok');
+  const [svcOpen, setSvcOpen] = useState(false);
+  const [svcNotes, setSvcNotes] = useState('');
+  const [svcCost, setSvcCost] = useState('');
+  const [svcDate, setSvcDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [svcComponentId, setSvcComponentId] = useState('');
+  const [svcToast, setSvcToast] = useState<QuickServiceOutcome | null>(null);
+  const selectedServiceComponent = visibleMaintenance.find(c => c.id === svcComponentId) ?? worst?.component ?? null;
+  const selectedServiceStatus = selectedServiceComponent
+    ? getComponentStatus(selectedServiceComponent, weekends, savedSetups)
+    : null;
+
+  useEffect(() => {
+    if (!svcToast) return;
+    const t = setTimeout(() => setSvcToast(null), 6000);
+    return () => clearTimeout(t);
+  }, [svcToast]);
+
+  const openQuickService = () => {
+    setSvcComponentId(worst?.component.id ?? visibleMaintenance[0]?.id ?? '');
+    setSvcNotes('');
+    setSvcCost('');
+    setSvcDate(new Date().toISOString().slice(0, 10));
+    setSvcOpen(true);
+  };
+
+  const saveQuickService = () => {
+    if (!selectedServiceComponent) return;
+    const cost = parseFloat(svcCost);
+    const d = new Date(`${svcDate}T12:00`);
+    const outcome = onQuickService({
+      componentId: selectedServiceComponent.id,
+      notes: svcNotes.trim(),
+      cost: Number.isFinite(cost) && cost > 0 ? cost : undefined,
+      dateISO: isNaN(d.getTime()) ? undefined : d.toISOString(),
+    });
+    setSvcOpen(false);
+    if (outcome) setSvcToast(outcome);
+  };
+
+  const requestWeekendDelete = (wk: RaceWeekend) => {
+    setWeekendMenuOpen(false);
+    weekendUndo.requestDelete({
+      id: wk.id,
+      label: wk.name,
+      item: wk,
+      // Local removal/restore is handled by filtering on `pending.id` in render.
+      removeFromState: () => {},
+      restoreToState: () => {},
+      // Commit runs App's deleteWeekendNow (state + localStorage + cloud delete).
+      commit: () => onDeleteWeekend(wk.id),
+    });
+  };
+
+  const awLastLap = activeWeekend?.sessions.find(s => s.bestLap)?.bestLap ?? null;
 
   return (
     <div className="space-y-5" id="dashboard-view-root">
+
+      {/* [1] FIRST-RUN "GET RACE-READY" */}
+      <GetRaceReadyCard
+        carCount={carCount}
+        weekendCount={weekends.length}
+        setupCount={displayedSetups.length}
+        sessionCount={totalSessions}
+        onAddCar={onGoToGarage}
+        onStartWeekend={handleLogRun}
+        onEnterSetup={onGoToSetups}
+        onLogRun={handleLogRun}
+      />
+
+      {/* [7] + LOG RUN HERO */}
+      <section className="space-y-2" id="section-log-run-hero">
+        <button
+          onClick={handleLogRun}
+          className="w-full min-h-16 bg-primary text-on-primary rounded-xl shadow-lg font-display text-2xl font-bold uppercase tracking-wide flex items-center justify-center gap-3 hover:opacity-90 active:scale-[0.99] transition-all"
+        >
+          <span className="material-symbols-outlined text-[30px]" style={{ fontVariationSettings: "'FILL' 1" }}>timer</span>
+          + Log Run
+        </button>
+        {lastRun && (
+          <button
+            onClick={() => onSelectSession(lastRun.session, lastRun.weekendId)}
+            className="w-full min-h-12 px-3 flex items-center justify-between gap-2 rounded-lg border border-outline-variant bg-surface-container text-left hover:bg-surface-container-high transition-colors"
+          >
+            <span className="font-mono text-xs text-on-surface-variant truncate">
+              Last run: <span className="text-on-surface font-bold">{lastRun.session.name}</span>
+              {lastRun.session.bestLap ? <> · <span className="text-primary font-bold">{lastRun.session.bestLap}</span></> : null}
+            </span>
+            <span className="material-symbols-outlined text-on-surface-variant/50 text-[18px] shrink-0">arrow_forward</span>
+          </button>
+        )}
+      </section>
 
       {/* TEAM BANNER */}
       {team && (
@@ -129,359 +242,388 @@ export default function DashboardView({
         </section>
       )}
 
-      {/* CTA BUTTONS */}
-      <section className="grid grid-cols-2 gap-2" id="section-ctas">
-        <button
-          onClick={onStartNewWeekend}
-          className="bg-surface-container-high border border-outline-variant/40 text-on-surface hover:bg-surface-container-highest active:scale-[0.98] transition-all cursor-pointer font-bold tracking-wider rounded h-12 uppercase font-mono text-[11px] flex items-center justify-center gap-1.5 shadow"
-        >
-          <span className="material-symbols-outlined text-base">calendar_today</span>
-          + Race Weekend
-        </button>
-        <button
-          onClick={onStartNewSession}
-          disabled={!activeWeekendId}
-          title={activeWeekendId ? 'Start session for active weekend' : 'Activate a weekend first'}
-          className="bg-primary text-on-primary hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer font-bold tracking-wider rounded h-12 uppercase font-mono text-[11px] flex items-center justify-center gap-1.5 shadow disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
-        >
-          <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>timer</span>
-          + Session Entry
-        </button>
-      </section>
-
-      {/* RACE WEEKENDS */}
-      <section id="section-recent-sessions">
-        <div className="flex flex-col gap-2 mb-3">
-          <h2 className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">Race Weekends & Sessions</h2>
-          {uniqueTracks.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[18px] shrink-0">filter_list</span>
-              <div className="relative flex-1">
-                <select
-                  value={trackFilter}
-                  onChange={e => setTrackFilter(e.target.value)}
-                  className="w-full bg-surface-container border-2 border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-3 rounded-lg outline-none appearance-none cursor-pointer pr-8"
-                >
-                  <option value="">All Tracks</option>
-                  {uniqueTracks.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
-              </div>
-              {trackFilter && (
-                <button
-                  onClick={() => setTrackFilter('')}
-                  className="flex items-center justify-center w-11 h-11 rounded-lg border-2 border-outline-variant bg-surface-container shrink-0 active:opacity-70"
-                >
-                  <span className="material-symbols-outlined text-on-surface-variant text-[18px]">close</span>
-                </button>
-              )}
-            </div>
-          )}
+      {/* [9] ACTIVE WEEKEND SUMMARY — the full list lives in the Sessions tab */}
+      <section id="section-active-weekend">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">Active Weekend</h2>
+          <button
+            onClick={onStartNewWeekend}
+            className="min-h-12 px-2 font-mono text-[11px] font-bold uppercase text-primary hover:opacity-80"
+          >
+            + New Weekend
+          </button>
         </div>
 
-        {weekends.length === 0 ? (
-          <div className="bg-surface-container border border-outline-variant rounded-lg p-6 text-center text-on-surface-variant/80 font-mono text-xs">
-            No race weekends logged yet. Create a weekend to get started.
+        {visibleWeekends.length === 0 ? (
+          <div className="bg-surface-container border border-outline-variant rounded-lg">
+            <EmptyState
+              icon="sports_score"
+              title="No race weekends yet"
+              body="Start a weekend and the dashboard lights up — sessions, laps and service all hang off it."
+              cta={{ label: '+ Race Weekend', icon: 'calendar_today', onClick: onStartNewWeekend }}
+            />
           </div>
-        ) : filteredWeekends.length === 0 ? (
-          <div className="bg-surface-container border border-outline-variant rounded-lg p-6 text-center text-on-surface-variant/80 font-mono text-xs">
-            No weekends found for <span className="text-primary font-bold">{trackFilter}</span>.
-          </div>
+        ) : !activeWeekend ? (
+          <button
+            onClick={onGoToSessions}
+            className="w-full min-h-12 px-4 py-3 flex items-center justify-between gap-2 bg-surface-container border border-outline-variant rounded-lg text-left hover:bg-surface-container-high transition-colors"
+          >
+            <span className="font-mono text-xs text-on-surface-variant">
+              No active weekend — pick one in <span className="text-primary font-bold">Sessions</span>
+            </span>
+            <span className="material-symbols-outlined text-on-surface-variant/50 text-[18px]">arrow_forward</span>
+          </button>
         ) : (
-          <div className="space-y-3">
-            {filteredWeekends.map((weekend) => {
-              const isExpanded = expandedWeekendId === weekend.id;
-              const isActiveWeekend = activeWeekendId === weekend.id;
-              return (
-                <div key={weekend.id} className={`bg-surface-container border rounded-lg overflow-hidden ${isActiveWeekend ? 'border-primary/60' : 'border-outline-variant'}`}>
-                  <div
-                    onClick={() => setExpandedWeekendId(isExpanded ? null : weekend.id)}
-                    className="p-4 flex justify-between items-center bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer select-none"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-primary text-[22px]">calendar_today</span>
-                      <div>
-                        <h3 className="font-display text-base font-bold text-on-surface uppercase tracking-wide">{weekend.name}</h3>
-                        {isActiveWeekend && <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-primary/15 text-primary font-mono text-[9px] font-bold uppercase">Active</span>}
-                        <div className="text-xs text-on-surface-variant font-mono mt-0.5">{weekend.track} • {weekend.date}</div>
-                        {weekend.setupName && (
-                          <div className="text-[10px] text-on-surface-variant/60 font-mono mt-0.5 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[11px]">settings_input_component</span>
-                            {weekend.setupName}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onActivateWeekend(weekend.id); }}
-                        disabled={isActiveWeekend}
-                        className="px-2 py-1 rounded border border-primary/40 text-primary font-mono text-[9px] font-bold uppercase disabled:bg-primary/15 disabled:cursor-default"
-                      >
-                        {isActiveWeekend ? 'Active' : 'Set Active'}
-                      </button>
-                      <span className="px-2 py-0.5 bg-surface-bright border border-outline-variant text-[10px] uppercase font-bold text-on-surface-variant rounded font-mono">
-                        {weekend.sessions.length} {weekend.sessions.length === 1 ? 'Sess.' : 'Sess.'}
-                      </span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onDeleteWeekend(weekend.id); }}
-                        className="material-symbols-outlined text-on-surface-variant/40 hover:text-red-400 text-[18px] transition-colors p-1 rounded"
-                        title="Delete weekend"
-                      >delete</button>
-                      <span
-                        className="material-symbols-outlined text-on-surface-variant transition-transform duration-200"
-                        style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}
-                      >expand_more</span>
-                    </div>
-                  </div>
-
-                  {isExpanded && (
-                    <div className="divide-y divide-outline-variant/30 bg-surface-container/30">
-                      {weekend.sessions.length === 0 ? (
-                        <div className="p-4 text-xs font-mono text-center text-on-surface-variant/50">No sessions logged yet.</div>
-                      ) : (
-                        weekend.sessions.map((s) => (
-                          <div
-                            key={s.id}
-                            onClick={() => onSelectSession(s, weekend.id)}
-                            className="p-3.5 pl-6 flex justify-between items-center hover:bg-surface-container-high/40 transition-all cursor-pointer group"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div>
-                                <div className="font-semibold text-sm text-on-surface uppercase tracking-wide group-hover:text-primary transition-colors">{s.name}</div>
-                                <div className="text-[11px] text-on-surface-variant/80 font-mono">{s.condition}{s.time ? ` • ${s.time}` : ''}</div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className="text-right">
-                                <span className="text-[9px] uppercase text-on-surface-variant block font-mono">Best Lap</span>
-                                <span className="font-mono text-xs font-bold text-primary">{s.bestLap || '--'}</span>
-                              </div>
-                              <span className="material-symbols-outlined text-xs text-on-surface-variant/40 group-hover:text-primary transition-colors">arrow_forward</span>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+          <div className="bg-surface-container border border-primary/60 rounded-lg overflow-hidden">
+            <div className="flex items-stretch">
+              <button onClick={onGoToSessions} className="flex-1 min-h-12 min-w-0 p-4 text-left group">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[20px]">calendar_today</span>
+                  <h3 className="font-display text-base font-bold text-on-surface uppercase tracking-wide truncate group-hover:text-primary transition-colors">
+                    {activeWeekend.name}
+                  </h3>
+                </div>
+                <div className="text-xs text-on-surface-variant font-mono mt-1 truncate">
+                  {activeWeekend.track} • {activeWeekend.date}
+                </div>
+                <div className="text-[11px] font-mono mt-1.5 flex items-center gap-3">
+                  <span className="text-on-surface-variant">
+                    {activeWeekend.sessions.length} session{activeWeekend.sessions.length === 1 ? '' : 's'}
+                  </span>
+                  {awLastLap && (
+                    <span className="text-on-surface-variant">
+                      Last lap <span className="text-primary font-bold">{awLastLap}</span>
+                    </span>
                   )}
                 </div>
+              </button>
+              <button
+                aria-label={`Weekend actions for ${activeWeekend.name}`}
+                onClick={() => setWeekendMenuOpen(true)}
+                className="min-w-12 flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">more_horiz</span>
+              </button>
+            </div>
+            {activeWeekend.sessions.length === 0 && (
+              <div className="border-t border-outline-variant/40">
+                <EmptyState
+                  icon="timer"
+                  title="Nothing logged yet"
+                  body="Hit + LOG RUN after your first laps."
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* [25] SERVICE CHIP — worst-status component, tap → quick service log */}
+      {worst && (
+        <section id="section-service-chip">
+          <button
+            type="button"
+            onClick={openQuickService}
+            aria-label={`Log service for ${worst.component.name}`}
+            className="flex min-h-12 w-full items-center gap-2 rounded-lg px-1 text-left active:opacity-80"
+          >
+            <span className="status-chip min-w-0">
+              <span
+                className={`material-symbols-outlined ${worst.status.state === 'overdue' ? 'text-red-400' : 'text-amber-400'}`}
+                aria-hidden="true"
+              >warning</span>
+              <span className="truncate">
+                {worst.component.name} — {describeServiceStatus(worst.component, worst.status)}
+              </span>
+            </span>
+            <span className="ml-auto shrink-0 font-mono text-[10px] font-bold uppercase text-primary">Log service</span>
+          </button>
+        </section>
+      )}
+
+      {/* SERVICE DUE (collapsible) */}
+      {dueItems.length > 0 && (
+        <CollapsibleSection
+          title={`Service Due (${dueItems.length})`}
+          storageKey="race_notes_dash_service_open"
+          defaultOpen={false}
+          badge={dueItems.some(c => getComponentStatus(c, weekends, savedSetups).state === 'overdue') ? (
+            <span className="bg-red-500/20 text-red-400 text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded shrink-0">Overdue</span>
+          ) : undefined}
+        >
+          <div className="border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
+            {dueItems.map(c => {
+              const st = getComponentStatus(c, weekends, savedSetups);
+              const chipCls = st.state === 'overdue'
+                ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                : 'bg-amber-500/15 text-amber-400 border-amber-500/30';
+              return (
+                <button
+                  key={c.id}
+                  onClick={onGoToService}
+                  className="w-full px-4 py-3 min-h-12 bg-surface-container hover:bg-surface-container-high transition-colors text-left flex items-center gap-3 group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs font-bold text-on-surface group-hover:text-primary transition-colors">{c.name}</span>
+                      <span className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${chipCls}`}>
+                        {st.state === 'overdue' ? 'Overdue' : 'Due'}
+                      </span>
+                      <span className="font-mono text-[10px] text-on-surface-variant/50">{c.category}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-1 bg-surface-variant rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${st.state === 'overdue' ? 'bg-red-500' : 'bg-amber-400'}`}
+                          style={{ width: `${Math.min(st.pct * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="font-mono text-[10px] text-on-surface-variant shrink-0">
+                        {st.used}/{st.limit}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary text-[16px] transition-colors">chevron_right</span>
+                </button>
               );
             })}
           </div>
-        )}
-      </section>
+        </CollapsibleSection>
+      )}
 
-      {/* SETUPS */}
-      <section>
+      {/* MAIN CHECKLIST (collapsible) */}
+      <CollapsibleSection
+        title={`Main Checklist (${openTaskCount})`}
+        storageKey="race_notes_dash_checklist_open"
+        defaultOpen={false}
+        badge={openTaskLists.some(e => e.assignedToMe.length > 0) ? (
+          <span className="bg-primary/20 text-primary text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded shrink-0">
+            Assigned to me
+          </span>
+        ) : undefined}
+      >
+        {openTaskLists.length === 0 ? (
+          <EmptyState
+            icon="checklist"
+            title="Main Checklist clear"
+            body="Nothing outstanding — the rig's ready to roll."
+            cta={{ label: 'Open checklist', onClick: onGoToTodos }}
+          />
+        ) : (
+          <div className="border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
+            {openTaskLists.map(({ list, openItems, assignedToMe }) => (
+              <button
+                key={list.id}
+                onClick={onGoToTodos}
+                className="w-full px-4 py-3 min-h-12 bg-surface-container hover:bg-surface-container-high transition-colors text-left group"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-mono text-xs font-bold text-on-surface group-hover:text-primary transition-colors">{list.title}</span>
+                  <div className="flex items-center gap-1.5">
+                    {assignedToMe.length > 0 && (
+                      <span className="bg-primary/20 text-primary text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded">
+                        {assignedToMe.length} mine
+                      </span>
+                    )}
+                    <span className="text-[10px] font-mono text-on-surface-variant">{openItems.length} open</span>
+                    <span className="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary text-[16px] transition-colors">chevron_right</span>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  {openItems.slice(0, 3).map(item => (
+                    <div key={item.id} className="flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.assignedTo === userId ? 'bg-primary' : 'bg-outline-variant'}`}></span>
+                      <span className={`font-mono text-[10px] truncate ${item.assignedTo === userId ? 'text-primary font-bold' : 'text-on-surface-variant'}`}>
+                        {item.text}
+                      </span>
+                    </div>
+                  ))}
+                  {openItems.length > 3 && (
+                    <span className="font-mono text-[9px] text-on-surface-variant/50 pl-3">+{openItems.length - 3} more</span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </CollapsibleSection>
+
+      {/* [9] SETUPS / TIRES — one-line link-outs (full lists live in the Setups tab) */}
+      <section className="grid grid-cols-2 gap-2" id="section-linkouts">
         <button
-          onClick={() => setSetupsOpen(v => !v)}
-          className="w-full flex items-center justify-between p-3 bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors"
+          onClick={onGoToSetups}
+          className="min-h-12 px-3 flex items-center justify-between gap-2 bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors"
         >
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-[20px]">tune</span>
-            <span className="font-mono text-xs font-bold uppercase text-on-surface tracking-wider">
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="material-symbols-outlined text-primary text-[18px]">tune</span>
+            <span className="font-mono text-xs font-bold uppercase text-on-surface tracking-wider truncate">
               Setups ({displayedSetups.length})
             </span>
-          </div>
-          <span
-            className="material-symbols-outlined text-on-surface-variant transition-transform duration-200"
-            style={{ transform: setupsOpen ? 'rotate(180deg)' : 'none' }}
-          >expand_more</span>
+          </span>
+          <span className="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_right</span>
         </button>
-
-        {setupsOpen && (
-          <div className="mt-1 border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
-            {displayedSetups.length === 0 ? (
-              <div className="p-4 text-center text-xs font-mono text-on-surface-variant/50">No setups saved yet.</div>
-            ) : (
-              displayedSetups.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => onSelectSetup(s.id)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-surface-container hover:bg-surface-container-high transition-colors text-left group"
-                >
-                  <div>
-                    <div className="font-mono text-sm font-bold text-on-surface group-hover:text-primary transition-colors">{s.chassis}</div>
-                    <div className="font-mono text-[10px] text-on-surface-variant">{s.track} · {s.date}</div>
-                  </div>
-                  <span className="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary text-[18px] transition-colors">chevron_right</span>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* TIRES */}
-      <section>
         <button
-          onClick={() => onGoToTires ? onGoToTires() : setTiresOpen(v => !v)}
-          className="w-full flex items-center justify-between p-3 bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors"
+          onClick={() => onGoToTires?.()}
+          className="min-h-12 px-3 flex items-center justify-between gap-2 bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors"
         >
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-[20px]">trip_origin</span>
-            <span className="font-mono text-xs font-bold uppercase text-on-surface tracking-wider">
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="material-symbols-outlined text-primary text-[18px]">trip_origin</span>
+            <span className="font-mono text-xs font-bold uppercase text-on-surface tracking-wider truncate">
               Tires ({displayedTires.length})
             </span>
-          </div>
-          <span
-            className="material-symbols-outlined text-on-surface-variant"
-          >chevron_right</span>
+          </span>
+          <span className="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_right</span>
         </button>
-
-        {!onGoToTires && tiresOpen && (
-          <div className="mt-1 border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
-            {displayedTires.length === 0 ? (
-              <div className="p-4 text-center text-xs font-mono text-on-surface-variant/50">No tires in inventory — add tires under Setups.</div>
-            ) : (
-              displayedTires.map(t => (
-                <div key={t.id} className="px-4 py-2.5 bg-surface-container flex items-baseline gap-4">
-                  <span className="font-mono text-xs font-bold text-primary shrink-0">#{t.tireNumber}</span>
-                  <span className="font-mono text-[11px] text-on-surface">
-                    {t.size}{t.size && !t.size.includes('"') ? '"' : ''} <span className="text-outline-variant mx-1">|</span> BS {t.wheelBackspacing}" <span className="text-outline-variant mx-1">|</span> {t.compound} <span className="text-outline-variant mx-1">|</span> Duro {t.durometer || '—'}{t.airPressure ? <><span className="text-outline-variant mx-1">|</span> {t.airPressure} psi</> : null}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        )}
       </section>
 
-      {/* SERVICE DUE */}
-      {(() => {
-        const dueItems = maintenance.filter(c => {
-          const st = getComponentStatus(c, weekends, savedSetups);
-          return st.state !== 'ok';
-        });
-        if (dueItems.length === 0) return null;
-        return (
-          <section>
+      {/* [7] TEACHING SHEET — no active weekend */}
+      <BottomSheet
+        open={noWeekendSheetOpen}
+        onClose={() => setNoWeekendSheetOpen(false)}
+        title="No active weekend — start one?"
+      >
+        <div className="space-y-3 pb-2">
+          <p className="text-sm text-on-surface-variant">
+            Runs live inside a race weekend. Start one and you’ll go straight into your first session.
+          </p>
+          {visibleWeekends.length > 0 ? (
             <button
-              onClick={() => setServiceOpen(v => !v)}
-              className="w-full flex items-center justify-between p-3 bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors"
+              onClick={() => { setNoWeekendSheetOpen(false); onQuickStartWeekend(); }}
+              className="w-full min-h-14 bg-primary text-on-primary rounded-xl font-display font-bold uppercase tracking-wide flex items-center justify-center gap-2 active:opacity-90"
             >
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-amber-400 text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>build_circle</span>
-                <span className="font-mono text-xs font-bold uppercase text-on-surface tracking-wider">
-                  Service Due ({dueItems.length})
-                </span>
-                {dueItems.some(c => getComponentStatus(c, weekends, savedSetups).state === 'overdue') && (
-                  <span className="bg-red-500/20 text-red-400 text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded">Overdue</span>
-                )}
-              </div>
-              <span
-                className="material-symbols-outlined text-on-surface-variant transition-transform duration-200"
-                style={{ transform: serviceOpen ? 'rotate(180deg)' : 'none' }}
-              >expand_more</span>
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
+              <span className="truncate">Start weekend at {lastTrack || 'last track'} today</span>
             </button>
-            {serviceOpen && (
-              <div className="mt-1 border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
-                {dueItems.map(c => {
-                  const st = getComponentStatus(c, weekends, savedSetups);
-                  const chipCls = st.state === 'overdue'
-                    ? 'bg-red-500/15 text-red-400 border-red-500/30'
-                    : 'bg-amber-500/15 text-amber-400 border-amber-500/30';
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={onGoToService}
-                      className="w-full px-4 py-3 bg-surface-container hover:bg-surface-container-high transition-colors text-left flex items-center gap-3 group"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs font-bold text-on-surface group-hover:text-primary transition-colors">{c.name}</span>
-                          <span className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${chipCls}`}>
-                            {st.state === 'overdue' ? 'Overdue' : 'Due'}
-                          </span>
-                          <span className="font-mono text-[10px] text-on-surface-variant/50">{c.category}</span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="flex-1 h-1 bg-surface-variant rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${st.state === 'overdue' ? 'bg-red-500' : 'bg-amber-400'}`}
-                              style={{ width: `${Math.min(st.pct * 100, 100)}%` }}
-                            />
-                          </div>
-                          <span className="font-mono text-[10px] text-on-surface-variant shrink-0">
-                            {st.used}/{st.limit}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary text-[16px] transition-colors">chevron_right</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        );
-      })()}
+          ) : (
+            <button
+              onClick={() => { setNoWeekendSheetOpen(false); onStartNewWeekendForRun(); }}
+              className="w-full min-h-14 bg-primary text-on-primary rounded-xl font-display font-bold uppercase tracking-wide flex items-center justify-center gap-2 active:opacity-90"
+            >
+              <span className="material-symbols-outlined">calendar_today</span>
+              Set up your first weekend
+            </button>
+          )}
+          <button
+            onClick={() => { setNoWeekendSheetOpen(false); onStartNewWeekendForRun(); }}
+            className="w-full min-h-12 rounded-xl border border-outline-variant text-on-surface font-mono text-xs font-bold uppercase tracking-wider active:opacity-80"
+          >
+            Pick track…
+          </button>
+        </div>
+      </BottomSheet>
 
-      {/* OPEN TASKS */}
-      <section>
-        <button
-          onClick={() => setTasksOpen(v => !v)}
-          className="w-full flex items-center justify-between p-3 bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-[20px]">checklist</span>
-            <span className="font-mono text-xs font-bold uppercase text-on-surface tracking-wider">
-              Main Checklist ({openTaskLists.reduce((n, e) => n + e.openItems.length, 0)})
-            </span>
-            {openTaskLists.some(e => e.assignedToMe.length > 0) && (
-              <span className="bg-primary/20 text-primary text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded">
-                Assigned to me
-              </span>
-            )}
-          </div>
-          <span
-            className="material-symbols-outlined text-on-surface-variant transition-transform duration-200"
-            style={{ transform: tasksOpen ? 'rotate(180deg)' : 'none' }}
-          >expand_more</span>
-        </button>
+      {/* [8] ⋯ WEEKEND MENU */}
+      <BottomSheet
+        open={weekendMenuOpen}
+        onClose={() => setWeekendMenuOpen(false)}
+        title={activeWeekend?.name ?? 'Weekend'}
+      >
+        <div className="space-y-1 pb-2">
+          <button
+            onClick={() => { setWeekendMenuOpen(false); onGoToSessions(); }}
+            className="tap-target-block gap-3 rounded-xl px-3 text-left text-on-surface hover:bg-surface-container-high transition-colors"
+          >
+            <span className="material-symbols-outlined text-on-surface-variant">sports_score</span>
+            Open in Sessions
+          </button>
+          <button
+            onClick={() => activeWeekend && requestWeekendDelete(activeWeekend)}
+            className="tap-target-block gap-3 rounded-xl px-3 text-left text-red-400 hover:bg-surface-container-high transition-colors"
+          >
+            <span className="material-symbols-outlined">delete</span>
+            Delete weekend
+          </button>
+        </div>
+      </BottomSheet>
 
-        {tasksOpen && (
-          <div className="mt-1 border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
-            {openTaskLists.length === 0 ? (
-              <div className="p-4 text-center text-xs font-mono text-on-surface-variant/50">Main Checklist clear.</div>
-            ) : (
-              openTaskLists.map(({ list, openItems, assignedToMe }) => (
-                <button
-                  key={list.id}
-                  onClick={onGoToTodos}
-                  className="w-full px-4 py-3 bg-surface-container hover:bg-surface-container-high transition-colors text-left group"
+      {/* [25] QUICK SERVICE LOG SHEET */}
+      <BottomSheet
+        open={svcOpen}
+        onClose={() => setSvcOpen(false)}
+        title={selectedServiceComponent ? `Log service — ${selectedServiceComponent.name}` : 'Log service'}
+      >
+        {selectedServiceComponent && selectedServiceStatus && (
+          <div className="space-y-3 pb-2">
+            {visibleMaintenance.length > 1 && (
+              <label className="block">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">Component</span>
+                <select
+                  value={selectedServiceComponent.id}
+                  onChange={e => setSvcComponentId(e.target.value)}
+                  className="mt-1 w-full min-h-12 bg-surface border border-outline-variant focus:border-primary rounded-lg px-3 text-sm text-on-surface outline-none"
                 >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-mono text-xs font-bold text-on-surface group-hover:text-primary transition-colors">{list.title}</span>
-                    <div className="flex items-center gap-1.5">
-                      {assignedToMe.length > 0 && (
-                        <span className="bg-primary/20 text-primary text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded">
-                          {assignedToMe.length} mine
-                        </span>
-                      )}
-                      <span className="text-[10px] font-mono text-on-surface-variant">{openItems.length} open</span>
-                      <span className="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary text-[16px] transition-colors">chevron_right</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    {openItems.slice(0, 3).map(item => (
-                      <div key={item.id} className="flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.assignedTo === userId ? 'bg-primary' : 'bg-outline-variant'}`}></span>
-                        <span className={`font-mono text-[10px] truncate ${item.assignedTo === userId ? 'text-primary font-bold' : 'text-on-surface-variant'}`}>
-                          {item.text}
-                        </span>
-                      </div>
-                    ))}
-                    {openItems.length > 3 && (
-                      <span className="font-mono text-[9px] text-on-surface-variant/50 pl-3">+{openItems.length - 3} more</span>
-                    )}
-                  </div>
-                </button>
-              ))
+                  {visibleMaintenance.map(component => (
+                    <option key={component.id} value={component.id}>{component.name}</option>
+                  ))}
+                </select>
+              </label>
             )}
+            <span className="status-chip">
+              <span
+                className={`material-symbols-outlined ${selectedServiceStatus.state === 'overdue' ? 'text-red-400' : 'text-amber-400'}`}
+                aria-hidden="true"
+              >warning</span>
+              <span>{describeServiceStatus(selectedServiceComponent, selectedServiceStatus)}</span>
+            </span>
+            <label className="block">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">What was done</span>
+              <textarea
+                value={svcNotes}
+                onChange={e => setSvcNotes(e.target.value)}
+                rows={2}
+                placeholder="e.g. Fresh oil + filter"
+                className="mt-1 w-full bg-surface border border-outline-variant focus:border-primary rounded-lg px-3 py-3 text-sm text-on-surface outline-none"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">Cost (optional)</span>
+                <input
+                  inputMode="decimal"
+                  value={svcCost}
+                  onChange={e => setSvcCost(e.target.value)}
+                  placeholder="0.00"
+                  className="mt-1 w-full min-h-12 bg-surface border border-outline-variant focus:border-primary rounded-lg px-3 text-sm text-on-surface outline-none font-mono"
+                />
+              </label>
+              <label className="block">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">Date</span>
+                <input
+                  type="date"
+                  value={svcDate}
+                  onChange={e => setSvcDate(e.target.value)}
+                  className="mt-1 w-full min-h-12 bg-surface border border-outline-variant focus:border-primary rounded-lg px-3 text-sm text-on-surface outline-none font-mono"
+                />
+              </label>
+            </div>
+            <button
+              onClick={saveQuickService}
+              className="w-full min-h-14 bg-primary text-on-primary rounded-xl font-display font-bold uppercase tracking-wide active:opacity-90"
+            >
+              Save service log
+            </button>
+            <button
+              onClick={() => { setSvcOpen(false); onGoToService?.(); }}
+              className="w-full min-h-12 text-primary font-mono text-xs font-bold uppercase tracking-wider"
+            >
+              Full service tracker →
+            </button>
           </div>
         )}
-      </section>
+      </BottomSheet>
+
+      {/* Undo toasts */}
+      <UndoToast pending={weekendUndo.pending} onUndo={weekendUndo.undo} onDismiss={weekendUndo.dismiss} />
+      <InfoToast
+        open={!!svcToast}
+        title={svcToast?.result.accountingEntry ? 'Logged + added to accounting' : 'Service logged'}
+        icon="build_circle"
+        action={svcToast ? {
+          label: 'UNDO',
+          onClick: () => { onUndoQuickService(svcToast); setSvcToast(null); },
+        } : undefined}
+        onClose={() => setSvcToast(null)}
+      />
 
     </div>
   );

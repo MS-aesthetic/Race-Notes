@@ -3,6 +3,8 @@ import { Setup, ActiveSession, RaceWeekend, AccountingEntry, Todo, TireInventory
 import { User } from '@supabase/supabase-js';
 import { pullSharedData } from '../lib/sync';
 import { getMainChecklist } from '../lib/mainChecklist';
+import { sortWeekends } from '../lib/scope';
+import EmptyState from './ui/EmptyState';
 
 interface ExportViewProps {
   user?: User | null;
@@ -15,6 +17,7 @@ interface ExportViewProps {
   todos?: Todo[];
   accounting?: AccountingEntry[];
   tireInventory?: TireInventoryItem[];
+  onStartWeekend?: () => void;
 }
 
 type TrackerKind = 'all' | 'checklist' | 'accounting';
@@ -51,7 +54,7 @@ export default function ExportView({
   weekends = [],
   todos = [],
   accounting = [],
-  tireInventory = [],
+  tireInventory = [], onStartWeekend,
 }: ExportViewProps) {
   const [cloudSync, setCloudSync] = useState(true);
   const [sharedSetups, setSharedSetups] = useState<Setup[]>([]);
@@ -61,8 +64,21 @@ export default function ExportView({
   // The active setup is always selectable, plus any saved setups (deduped).
   const setupOptions: Setup[] = [setup, ...savedSetups.filter((s) => s.id !== setup.id)];
   const [selectedSetupId, setSelectedSetupId] = useState<string>(setup.id);
-  const [selectedWeekendId, setSelectedWeekendId] = useState<string>(weekends[0]?.id || '');
+  // [10] Canonical weekend ordering (date descending; no active concept here).
+  const sortedWeekendOptions = sortWeekends(weekends, null);
+  const [selectedWeekendId, setSelectedWeekendId] = useState<string>(sortWeekends(weekends, null)[0]?.id || '');
   const [selectedTracker, setSelectedTracker] = useState<TrackerKind>('all');
+
+  // Cloud/local hydration can populate weekends after first render.
+  useEffect(() => {
+    if (sortedWeekendOptions.length === 0) {
+      if (selectedWeekendId) setSelectedWeekendId('');
+      return;
+    }
+    if (!sortedWeekendOptions.some(w => w.id === selectedWeekendId)) {
+      setSelectedWeekendId(sortedWeekendOptions[0].id);
+    }
+  }, [sortedWeekendOptions, selectedWeekendId]);
 
   useEffect(() => {
     if (user) {
@@ -300,7 +316,7 @@ export default function ExportView({
             <>
               <div className="relative">
                 <select value={selectedWeekendId} onChange={(e) => setSelectedWeekendId(e.target.value)} className={selectClass}>
-                  {weekends.map((w) => (
+                  {sortedWeekendOptions.map((w) => (
                     <option key={w.id} value={w.id}>
                       {w.name} — {w.track} ({w.date})
                     </option>
@@ -314,7 +330,12 @@ export default function ExportView({
               </button>
             </>
           ) : (
-            <p className="font-mono text-xs text-on-surface-variant italic">No race weekends yet.</p>
+            <EmptyState
+              icon="calendar_today"
+              title="No weekends to export"
+              body="Log a race weekend and it'll be ready to print here."
+              cta={onStartWeekend ? { label: 'Start race weekend', onClick: onStartWeekend } : undefined}
+            />
           )}
         </div>
 

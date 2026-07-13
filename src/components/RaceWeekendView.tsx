@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS } from '../types';
 import { sortBySize } from '../lib/tireSize';
-import { parseWeekendDate } from '../lib/scope';
+import { sortWeekends } from '../lib/scope';
 import { useBackClosable } from '../lib/backStack';
 import { useUndoableDelete } from '../lib/undo';
 import { suggestNextSession, buildSessionNameFrom, SessionPrefill } from '../lib/sessionSequence';
@@ -10,6 +10,7 @@ import NumberStepper from './ui/NumberStepper';
 import EmptyState from './ui/EmptyState';
 import LapTimeKeypad from './ui/LapTimeKeypad';
 import UndoToast from './ui/UndoToast';
+import BottomSheet from './ui/BottomSheet';
 
 // ── Data passed up to App's create handlers ([15]) ───────────────────────────
 
@@ -152,6 +153,8 @@ export default function RaceWeekendView({
   // Per-weekend ⋯ menu + undoable delete
   const [menuWeekendId, setMenuWeekendId] = useState<string | null>(null);
   const weekendUndo = useUndoableDelete<RaceWeekend>();
+  const [menuSession, setMenuSession] = useState<{ weekendId: string; session: SessionRecord } | null>(null);
+  const sessionUndo = useUndoableDelete<SessionRecord>();
 
   // [13] Lap-time keypad
   const [lapPadOpen, setLapPadOpen] = useState(false);
@@ -162,19 +165,15 @@ export default function RaceWeekendView({
 
   // Weekend pending delete stays hidden everywhere until undo/commit resolves.
   const pendingDeleteId = weekendUndo.pending?.id ?? null;
+  const pendingSessionDeleteId = sessionUndo.pending?.id ?? null;
   const visibleWeekends = weekends.filter(w => w.id !== pendingDeleteId);
 
   const currentWeekend = visibleWeekends.find(w => w.id === activeWeekendId);
+  const menuWeekend = visibleWeekends.find(w => w.id === menuWeekendId) ?? null;
   const hasActiveSession = !!session.id && session.weekendId === activeWeekendId;
 
-  // Active first, then date descending (same ordering as ContextStrip).
-  const sortedWeekends = [...visibleWeekends].sort((a, b) => {
-    if (a.id === activeWeekendId) return -1;
-    if (b.id === activeWeekendId) return 1;
-    const ta = parseWeekendDate(a.date)?.getTime() ?? -Infinity;
-    const tb = parseWeekendDate(b.date)?.getTime() ?? -Infinity;
-    return tb - ta;
-  });
+  // [10] Canonical ordering shared with ContextStrip/Dashboard.
+  const sortedWeekends = sortWeekends(visibleWeekends, activeWeekendId);
 
   // ── Session helpers ──────────────────────────────────────────────────────────
 
@@ -491,6 +490,19 @@ export default function RaceWeekendView({
     });
   };
 
+  const requestDeleteSession = (weekendId: string, sessionRecord: SessionRecord) => {
+    setMenuSession(null);
+    sessionUndo.requestDelete({
+      id: sessionRecord.id,
+      label: sessionRecord.name,
+      item: sessionRecord,
+      // Local hiding is render-only until commit; undo therefore needs no write.
+      removeFromState: () => {},
+      restoreToState: () => {},
+      commit: () => onDeleteSession(weekendId, sessionRecord.id),
+    });
+  };
+
   // ── [15] Consume initialAction (from App header / dashboard shortcuts) ─────
 
   useEffect(() => {
@@ -799,7 +811,10 @@ export default function RaceWeekendView({
   );
 
   const undoToastEl = (
-    <UndoToast pending={weekendUndo.pending} onUndo={weekendUndo.undo} onDismiss={weekendUndo.dismiss} />
+    <>
+      <UndoToast pending={weekendUndo.pending} onUndo={weekendUndo.undo} onDismiss={weekendUndo.dismiss} />
+      <UndoToast pending={sessionUndo.pending} onUndo={sessionUndo.undo} onDismiss={sessionUndo.dismiss} />
+    </>
   );
 
   // ── Empty / no-selection states ─────────────────────────────────────────────
@@ -1266,7 +1281,7 @@ export default function RaceWeekendView({
             {sortedWeekends.map(wk => {
               const isActiveWk = wk.id === activeWeekendId;
               const isWkExpanded = expandedWeekendIds.has(wk.id);
-              const wkSessions = wk.sessions || [];
+              const wkSessions = (wk.sessions || []).filter(s => s.id !== pendingSessionDeleteId);
               return (
                 <div key={wk.id} className={`bg-surface-container border rounded-lg overflow-hidden ${isActiveWk ? 'border-primary/50' : 'border-outline-variant'}`}>
                   {/* Weekend header */}
@@ -1314,33 +1329,16 @@ export default function RaceWeekendView({
                     </div>
                   </button>
 
-                  {/* ⋯ action row */}
-                  {menuWeekendId === wk.id && (
-                    <div className="flex gap-2 border-t border-outline-variant/30 p-2">
-                      <button
-                        type="button"
-                        onClick={() => { setMenuWeekendId(null); openWeekendForm(wk); }}
-                        className="flex-1 flex min-h-12 items-center justify-center gap-1.5 rounded border border-outline-variant font-mono text-[10px] font-bold uppercase text-on-surface hover:border-primary hover:text-primary transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">edit</span>
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => requestDeleteWeekend(wk)}
-                        className="flex-1 flex min-h-12 items-center justify-center gap-1.5 rounded border border-outline-variant font-mono text-[10px] font-bold uppercase text-on-surface-variant hover:border-red-500/50 hover:text-red-400 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">delete</span>
-                        Delete
-                      </button>
-                    </div>
-                  )}
-
                   {/* Sessions inside this weekend */}
                   {isWkExpanded && (
                     <div className="border-t border-outline-variant/30">
                       {wkSessions.length === 0 && (
-                        <p className="font-mono text-xs text-on-surface-variant/40 text-center py-3">No sessions yet.</p>
+                        <EmptyState
+                          icon="timer"
+                          title="No runs logged yet"
+                          body="Log a run after your first laps."
+                          cta={isActiveWk ? { label: '+ Log run', onClick: openNewSession } : { label: 'Make weekend active', onClick: () => onActivateWeekend(wk.id) }}
+                        />
                       )}
                       {wkSessions.map(sx => {
                         const isActiveSx = sx.id === session.id;
@@ -1375,11 +1373,11 @@ export default function RaceWeekendView({
                                       Load
                                     </button>
                                     <button
-                                      onClick={(e) => { e.stopPropagation(); onDeleteSession(wk.id, sx.id); }}
-                                      className="flex items-center gap-1.5 px-3 py-1 border border-outline-variant hover:border-red-500/50 hover:bg-red-900/20 rounded transition-colors text-[10px] font-bold uppercase font-mono text-on-surface-variant hover:text-red-400 cursor-pointer"
+                                      aria-label={`Actions for ${sx.name}`}
+                                      onClick={(e) => { e.stopPropagation(); setMenuSession({ weekendId: wk.id, session: sx }); }}
+                                      className="flex min-h-12 min-w-12 items-center justify-center rounded border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary transition-colors"
                                     >
-                                      <span className="material-symbols-outlined text-[14px]">delete</span>
-                                      Delete
+                                      <span className="material-symbols-outlined text-[18px]">more_horiz</span>
                                     </button>
                                   </div>
                                 </div>
@@ -1416,6 +1414,63 @@ export default function RaceWeekendView({
         onClose={() => setLapPadOpen(false)}
         onCommit={(v) => onUpdateSession({ ...session, bestLap: v })}
       />
+
+      <BottomSheet
+        open={!!menuSession}
+        onClose={() => setMenuSession(null)}
+        title={menuSession?.session.name ?? 'Run'}
+      >
+        {menuSession && (
+          <div className="space-y-1 pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                onSelectSession(menuSession.session, menuSession.weekendId);
+                setMenuSession(null);
+              }}
+              className="tap-target-block w-full gap-3 rounded-xl px-3 text-left text-on-surface hover:bg-surface-container-high"
+            >
+              <span className="material-symbols-outlined text-primary">edit</span>
+              Load run
+            </button>
+            <button
+              type="button"
+              onClick={() => requestDeleteSession(menuSession.weekendId, menuSession.session)}
+              className="tap-target-block w-full gap-3 rounded-xl px-3 text-left text-red-400 hover:bg-surface-container-high"
+            >
+              <span className="material-symbols-outlined">delete</span>
+              Delete run
+            </button>
+          </div>
+        )}
+      </BottomSheet>
+
+      <BottomSheet
+        open={!!menuWeekend}
+        onClose={() => setMenuWeekendId(null)}
+        title={menuWeekend?.name ?? 'Weekend'}
+      >
+        {menuWeekend && (
+          <div className="space-y-1 pb-2">
+            <button
+              type="button"
+              onClick={() => { setMenuWeekendId(null); openWeekendForm(menuWeekend); }}
+              className="tap-target-block w-full gap-3 rounded-xl px-3 text-left text-on-surface hover:bg-surface-container-high"
+            >
+              <span className="material-symbols-outlined text-primary">edit</span>
+              Edit weekend
+            </button>
+            <button
+              type="button"
+              onClick={() => requestDeleteWeekend(menuWeekend)}
+              className="tap-target-block w-full gap-3 rounded-xl px-3 text-left text-red-400 hover:bg-surface-container-high"
+            >
+              <span className="material-symbols-outlined">delete</span>
+              Delete weekend
+            </button>
+          </div>
+        )}
+      </BottomSheet>
 
       {weekendFormModal}
       {sessionFormModal}

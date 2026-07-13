@@ -4,6 +4,7 @@ import { AppUser } from '../lib/supabase';
 import { getComponentStatus, applyServiceLog, DEFAULT_COMPONENTS } from '../lib/maintenance';
 import { STARTER_TEMPLATES, materializeStarterTemplate } from '../lib/checklists';
 import ToDoView from './ToDoView';
+import EmptyState from './ui/EmptyState';
 
 // ── Sub-tab type (declared early; used in Props and component) ───────────────
 
@@ -262,9 +263,12 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
 
       {/* Entries list */}
       {sorted.length === 0 ? (
-        <div className="text-center py-10 text-on-surface-variant/40 font-mono text-xs">
-          No entries yet. Add your first income or expense above.
-        </div>
+        <EmptyState
+          icon="account_balance"
+          title="No money logged yet"
+          body="Track race-night income and expenses from one ledger."
+          cta={{ label: 'Add first entry', onClick: () => setShowForm(true) }}
+        />
       ) : (
         <div className="space-y-2">
           {sorted.map(e => (
@@ -558,11 +562,13 @@ function ServiceTab({
 
       {/* Empty state */}
       {components.length === 0 && !showAddForm && (
-        <div className="text-center py-10 space-y-2 text-on-surface-variant/40">
-          <span className="material-symbols-outlined text-4xl block">build_circle</span>
-          <p className="font-mono text-xs">No service components yet.</p>
-          <p className="font-mono text-[10px]">Add defaults or create your own above.</p>
-        </div>
+        <EmptyState
+          icon="build_circle"
+          title="No service items yet"
+          body="Add common race-car service intervals or build your own."
+          cta={{ label: 'Add common items', onClick: addDefaults }}
+          secondaryCta={{ label: 'Create service item', onClick: () => setShowAddForm(true) }}
+        />
       )}
 
       {/* Car section */}
@@ -739,11 +745,13 @@ function TemplatesTab({
 
       {/* Empty state */}
       {templates.length === 0 && !showAddForm && (
-        <div className="text-center py-10 space-y-2 text-on-surface-variant/40">
-          <span className="material-symbols-outlined text-4xl block">fact_check</span>
-          <p className="font-mono text-xs">No templates yet.</p>
-          <p className="font-mono text-[10px]">Use starter templates or create your own.</p>
-        </div>
+        <EmptyState
+          icon="fact_check"
+          title="No checklist templates yet"
+          body="Load race-ready starters or build your own checklist."
+          cta={{ label: 'Add starter templates', onClick: addStarterTemplates }}
+          secondaryCta={{ label: 'Create template', onClick: () => setShowAddForm(true) }}
+        />
       )}
 
       {/* Template list */}

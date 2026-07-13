@@ -22,6 +22,22 @@ export const parseWeekendDate = (raw: string | undefined | null): Date | null =>
 };
 
 /**
+ * [10] Canonical weekend ordering: active weekend first, then date descending
+ * (unparseable dates sink to the end). Returns a new array — never mutates.
+ */
+export const sortWeekends = (
+  weekends: RaceWeekend[],
+  activeWeekendId: string | null,
+): RaceWeekend[] =>
+  [...weekends].sort((a, b) => {
+    if (a.id === activeWeekendId) return -1;
+    if (b.id === activeWeekendId) return 1;
+    const ta = parseWeekendDate(a.date)?.getTime() ?? -Infinity;
+    const tb = parseWeekendDate(b.date)?.getTime() ?? -Infinity;
+    return tb - ta;
+  });
+
+/**
  * [5] Auto-activate: pick the weekend whose date is within ±3 days of today.
  * Prefers today/upcoming (closest first), else the most recent past.
  * Returns null when nothing is close or no dates parse.

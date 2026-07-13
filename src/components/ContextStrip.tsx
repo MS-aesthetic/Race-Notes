@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Car, RaceWeekend } from '../types';
 import BottomSheet from './ui/BottomSheet';
-import { parseWeekendDate } from '../lib/scope';
+import { sortWeekends } from '../lib/scope';
 
 export interface ContextStripProps {
   cars: Car[];
@@ -34,14 +34,8 @@ export default function ContextStrip({
   const activeCar = cars.find(c => c.id === activeCarId) ?? null;
   const activeWeekend = weekends.find(w => w.id === activeWeekendId) ?? null;
 
-  // Active first, then date descending (unparseable dates sink to the end).
-  const sortedWeekends = [...weekends].sort((a, b) => {
-    if (a.id === activeWeekendId) return -1;
-    if (b.id === activeWeekendId) return 1;
-    const ta = parseWeekendDate(a.date)?.getTime() ?? -Infinity;
-    const tb = parseWeekendDate(b.date)?.getTime() ?? -Infinity;
-    return tb - ta;
-  });
+  // [10] Canonical ordering shared with RaceWeekendView/Dashboard.
+  const sortedWeekends = sortWeekends(weekends, activeWeekendId);
 
   return (
     <div className="w-full border-b border-outline-variant bg-surface-container/60 px-4 md:px-6">
