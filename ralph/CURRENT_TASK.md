@@ -1,83 +1,66 @@
-# Current Task — WS-Z: July 11 Product Simplification
+# Current Task — UX Chunk 5: Setups + Fast Four-Bar
 
-**Status:** CODE COMPLETE — attempt 1; rollout QA pending
+**Status:** READY TO PLAN/BUILD after UX-C4 commit `21405e9`
 
-## Scope
+## Routing
 
-1. Fix setup scale percentages. Canonical key: `loadWeight` on LF/RF/LR/RR;
-   legacy rear `load` remains readable without data loss.
-2. Add exact eight four-bar inputs to LR and RR. RR angle context: Ride Height;
-   LR angle context: Full Droop.
-3. Add device-local active weekend. Session creation requires valid active
-   weekend. Weekend creation activates weekend but never opens session form.
-4. Sessions with zero weekends show only Create Weekend content action. Action
-   routes through Dashboard weekend creation. Remove normal New Weekend action
-   and weekend checklist UI from Sessions.
-5. Trackers: one Main Checklist, Service, Templates, Accounting. Remove Shopping
-   surfaces. Main Checklist supports manual items and template import; no list
-   selector, new-list flow, delete-list action, or weekend association.
-6. Preserve hidden legacy Shopping and weekend-checklist data. Never erase data
-   during UI retirement.
-7. Update `docs/USER_GUIDE.md`, `GuideView.tsx`, and current knowledge/handoff docs.
+- GPT 5.6 SOL High: analysis, specification, QA.
+- GPT 5.6 Terra High: implementation; QA failures 1–2 return to Terra.
+- Third failed QA review transfers implementation and final QA to SOL.
+- If exact models are unavailable, disclose before work and never claim they ran.
+- `/caveman full`; cavecrew investigator/reviewer only for bounded delegated work.
 
-## Files
+## Goal
 
-Primary: `src/components/SetupView.tsx`, `src/components/RaceWeekendView.tsx`,
-`src/components/ToDoView.tsx`, `src/components/TrackersView.tsx`,
-`src/components/DashboardView.tsx`, `src/App.tsx`, `src/lib/sync.ts`,
-`src/lib/setupDiff.ts`, `src/data.ts`, `src/types.ts`.
+Make Setups fast trackside: physical corner cards, glove-sized steppers, visible
+four-bar quick adjustment, copy-last defaults, pressure provenance, one-tap diff,
+and Tires sub-view. Four-bar must stay prominent because owner changes it often.
 
-Integration/docs: `src/components/ExportView.tsx`, `src/components/SettingsView.tsx`,
-`src/components/GuideView.tsx`, `docs/USER_GUIDE.md`, `HANDOFF.md`,
-`CODEBASE_KNOWLEDGE.md`, `plan-v2.md`, `ralph/STATE.md`.
+## Primary scope
 
-## Out of scope
+- New: `src/components/FourBarQuickAdjust.tsx`,
+  `src/components/TiresSubView.tsx`, `src/lib/setupSteps.ts`.
+- Modify: `src/components/SetupView.tsx`, `src/components/RaceWeekendView.tsx`,
+  `src/components/SetupDiffView.tsx`, `src/lib/setupCompat.ts`, `src/types.ts`.
+- `src/App.tsx`: wiring only if existing props cannot carry setup mutations.
+- Do not start Chunk 6/7 work.
 
-- Production deploy or merge to `preview`/`master`.
-- Deleting legacy Shopping or weekend-checklist rows/storage.
-- WS-T/U/W/X/Y work.
-- New router/store architecture.
+## Acceptance
 
-## Acceptance criteria
+1. LF/RF/LR/RR numeric fields use physical 2×2 corner cards and shared
+   `NumberStepper`; steps live only in `setupSteps.ts`.
+2. Four-bar quick adjust is visible in Setups and reachable from quick-log in at
+   most two taps; both mounts edit the same active setup state.
+3. New setup defaults to active car's latest compatible setup, with explicit
+   Start Blank option and no legacy-field loss.
+4. Auto-carried pressure/four-bar values show source/provenance.
+5. Setup card ⋯ Compare opens existing diff with correct default pair.
+6. Tires sub-view shows active-car stagger/history and useful EmptyState.
+7. Rare no-car Add Tire/Smasher disabled prerequisites become teaching actions.
+8. Local-first dual-write, cloud sync, active-car scoping, old-data defaults,
+   themes, and all zoom levels remain intact.
+9. `npm run lint`: exact three-error baseline only. `npm run build`: pass.
+10. Netlify draft + Android emulator walkthrough; production untouched.
 
-- LF=500, RF=600, LR=700, RR=800: total 2600, Nose 42.3%, Left
-  46.2%, Cross 50.0%, LR split -100.0 lb. Legacy LR/RR `load` works.
-- LR/RR each show exactly requested eight four-bar inputs with correct labels.
-- New weekend persists, becomes active, session modal stays closed.
-- Session modal cannot open or submit without active weekend; no weekend picker.
-- Zero-weekend Sessions content shows only Create Weekend; existing-weekend view
-  contains no New Weekend or Checklists section.
-- Trackers contains Checklist, Service, Templates, Accounting; no Shopping.
-- Checklist always shows one Main Checklist. Manual add/toggle/delete/assignment
-  persists offline/cloud. Template import appends fresh unchecked item IDs.
-- No weekend selector/link in Main Checklist.
-- Dashboard task count uses Main Checklist only. Service panel still works.
-- Shopping absent from Trackers/export/Guide; legacy key/data preserved.
-- Cloud-backed deletions call matching `delete*FromCloud` helper.
-- `npm run lint`: no new errors beyond three-error baseline. `npm run build`: pass.
-- Dark/light, all zoom levels, offline reload, preview/incognito QA recorded.
+## Required context
 
-## Model and skill routing
+Read `HANDOFF.md` UX block, `docs/IMPLEMENTATION_PLAN_2026-07-12.md` Chunk 5,
+`ralph/STATE.md`, and `CODEBASE_KNOWLEDGE.md` Chunk 4 override before editing.
 
-- Requested GPT 5.6 models unavailable in current runtime; disclosed to owner.
-- Current model performs all roles under owner fallback instruction.
-- `.agents/skills/caveman/SKILL.md`: `/caveman full` always.
-- `.agents/skills/cavecrew/SKILL.md`: investigators map code; primary owns
-  cross-file build; cavecrew reviewer gates diffs.
+## Build/Android gotchas
 
-## Human prerequisite
+- v3 must contain gitignored `.env` and `.env.local` before build.
+- Gate order: lint, v3 build, copy v3 `dist` to main, raw
+  `npx cap sync android`, Gradle `assembleDebug`.
+- Never run main-tree `npm run android:sync` during bridge; it rebuilds master.
+- Bump live main-tree Android versionCode/versionName for each installable APK.
+- Clear emulator app data after install to defeat stale Workbox cache.
 
-- Apply `supabase/migrations/014_team_delete_policies.sql` to live Supabase before
-  team-member deletion QA. Migration only adds team DELETE policies; no row changes.
+## UX-C4 handoff evidence
 
-## Verification record
-
-- Cavecrew diff review: PASS; no unresolved WS-Z blockers.
-- `npm run lint`: three known baseline errors only; zero new errors.
-- `npm run build`: PASS (520 modules; PWA assets generated).
-- Deterministic setup example: PASS (2600 / 42.3 / 46.2 / 50.0 / -100.0).
-- Main Checklist legacy migration/idempotence checks: PASS.
-- Netlify draft deploy: HTTP 200, title `Race Notes`, manifest present.
-- Draft URL: https://6a525a23a0b54ce49ff7498c--crew-chief-race-notes.netlify.app
-- Remaining before WS-Z complete: apply migration 014; authenticated team-delete,
-  offline reload, light/dark, zoom, and mobile/incognito visual checks.
+- Commit: `21405e9`.
+- Draft: `https://6a5458d75d0c165c44d0ef9f--crew-chief-race-notes.netlify.app`.
+- APK: main standard debug output, versionCode 14/versionName 3.9.
+- Verified: fresh auto-car/onboarding/hero/weekend/new-session flow;
+  service cost creates linked Accounting expense and Undo removes both;
+  session ⋯ delete/Undo; no runtime exceptions.

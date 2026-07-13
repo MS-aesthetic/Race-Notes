@@ -1,5 +1,11 @@
 # CREW CHIEF — Build Plan v2 (Multi-Agent): ERP · Checklists · Location/Push · Truck Directions
 
+> **2026-07-12 active-track override:** this document remains authority for the
+> WS-N…Z batch, but current UX feature work is on `preview-v3`. Chunks 1–4 are
+> complete; Chunk 5 is next. Use `docs/IMPLEMENTATION_PLAN_2026-07-12.md`,
+> `ralph/CURRENT_TASK.md`, `ralph/STATE.md`, and `HANDOFF.md` for that track.
+> Do not follow the stale `preview-v2` branch directions below for UX work.
+
 > **Purpose.** Single source of truth for the **v2 feature batch**. Written so multiple
 > AI coding agents can work in parallel with minimal collisions, in the same format as
 > `plan.md` (WS-A…WS-M, all complete). This batch continues at **WS-N**.

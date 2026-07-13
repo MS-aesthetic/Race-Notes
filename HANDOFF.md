@@ -4,23 +4,24 @@
 > Read this first, then the linked docs. Last updated **2026-07-12**.
 
 > ### ⚡ Update 2026-07-12 (supersedes stale details below)
-> - **Single worktree now.** The `.worktrees/v2` worktree was removed and the repo consolidated to ONE working tree at `C:\Users\maxx\antigravity\Race-Notes`, checked out on **`master`** (no longer detached HEAD). It holds both the app code AND the complete Android platform, so APKs build **directly here** — the old "build-from-main bridge" and the "incomplete v2 android platform" caveats are **retired**. Future parallel dev should use a fresh worktree named **`v3 preview`**.
+> - **Two active trees.** Main tree `C:\Users\maxx\antigravity\Race-Notes` stays on `master` and owns the complete gitignored Android platform. UX work lives in `.worktrees\v3` on `preview-v3`. Web builds run in v3; APKs use the documented dist-to-main bridge. `.worktrees/v2` is retired.
 > - **`master` == `origin/master` == `98bb2e0`+cleanup.** The `preview` (v1) and `preview-v2` branches were retired/removed after consolidation; `master` is the single source of truth. Deploys still default to Netlify preview; production only on Maxx's explicit say-so.
 > - **Migration 014 IS applied to live Supabase** (`20260711151905`, applied 2026-07-11). Ignore older "014 not applied" notes.
-> - **Current APK provenance established.** `android/app/build/outputs/apk/debug/app-debug.apk` (~9.1 MB) was built from secured commit `98bb2e0` on the complete Android platform, includes the native `@capacitor/push-notifications` plugin, and reflects the SW security fix. The old ~5 MB `CrewChief.apk` / `race_notes.apk` root copies were stale (pre-fix) and were **deleted** during cleanup.
+> - **Current APK provenance:** `android/app/build/outputs/apk/debug/app-debug.apk` is the Chunk 4 v3 QA build from commit `21405e9`, versionCode 14/versionName 3.9, with six Capacitor plugins including native push. Production remains unchanged.
 > - **Repo hygiene pass done:** removed dead PWABuilder/TWA leftovers (root gradle files, `pwabuilder-adv-sw.js`, `metadata.json`, `build_apk.bat`, `PWA_INSTRUCTIONS.md`), retired v1 `plan.md`, untracked `.idea/` + root `local.properties`, and added `android/app/google-services.json` to `.gitignore`.
 
 > ### 🎨 UX OVERHAUL track — `preview-v3` (active dev line as of 2026-07-12)
 > A dedicated UX/UI overhaul is in progress on a NEW worktree **`.worktrees/v3` (branch `preview-v3`, created from `master` `3ea6648`)**. `master` is untouched; the overhaul lands on `preview-v3` and merges to `master` only on owner approval.
 > - **Source of the work:** [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md) (Fable expert UX audit — 37 recs, cost/benefit) → [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md) (spec-driven, 7 build chunks).
-> - **Workflow (owner directive):** **Fable 5 (high) does EVERYTHING** — plan, build, QA. The coordinator (Opus) lints/builds/commits and runs harnesses; Fable build/QA agents read+write the worktree directly via Desktop Commander. **`/caveman full`** is on for status/chat (code/commits/security stay normal). One consolidated QA pass per chunk + standing `tsc --noEmit` (3-error baseline) and `vite build` gates.
-> - **Chunk status:** ✅ **1** (shared UI primitives + glove/glare/zoom hardening, `e04b15c`) · ✅ **2** (app-shell: 5-tab nav, ContextStrip, sunlight toggle, auto-car/auto-weekend, Android back, offline badge, `306445d`) · ✅ **3** (Sessions owns weekends + quick-log flow, keypad, 3×3 diagnostics, session sequencing; App.tsx −451 lines, `c68f27d`). ⬜ **4** Dashboard launchpad/+LOG RUN hero/first-run · ⬜ **5** Setups corner-cards/steppers/**four-bar quick-adjust**/tires/diff · ⬜ **6** Trackers hybrid checklist/templates-merge/service-from-dashboard · ⬜ **7** Export share/contextual help/copy audit/font-zoom sweep.
-> - **New reusable code (chunks 1-3):** `src/components/ui/` (`NumberStepper`, `UndoToast`+`InfoToast`, `EmptyState`, `CollapsibleSection`, `SegmentedGrid`, `BottomSheet`, `HelpSheet`, `LapTimeKeypad`); `src/lib/undo.ts` (`useUndoableDelete` — optimistic delete, `commit`/cloud-delete only after undo window/unmount/pagehide), `src/lib/backStack.ts` (`useBackClosable` — Android back closes sheets), `src/lib/saveStatus.ts` (offline badge; `reportSave(synced)` wiring is a TODO), `src/lib/sessionSequence.ts` (`suggestNextSession`, `buildSessionNameFrom`), `src/lib/scope.ts` (+`pickAutoWeekend`, `parseWeekendDate`), `src/components/ContextStrip.tsx`. CSS: `.tap-target`, `.sticky-action-bar`, `.status-chip` + light-theme contrast bump (in `src/index.css`).
+> - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High owns implementation; QA failures 1–2 return to Terra and failure 3 transfers build+final QA to SOL. Exact models were unavailable in the Chunk 4 Codex runtime and were disclosed; current Codex model plus cavecrew review preserved role separation. **`/caveman full`** stays on. One consolidated QA pass per chunk + standing `tsc --noEmit` (3-error baseline) and `vite build` gates.
+> - **Chunk status:** ✅ **1** (shared UI primitives + glove/glare/zoom hardening, `e04b15c`) · ✅ **2** (app-shell: 5-tab nav, ContextStrip, sunlight toggle, auto-car/auto-weekend, Android back, offline badge, `306445d`) · ✅ **3** (Sessions owns weekends + quick-log flow, keypad, 3×3 diagnostics, session sequencing; App.tsx −451 lines, `c68f27d`) · ✅ **4** (Dashboard launchpad, Get Race-Ready, +LOG RUN teaching/continuation, canonical weekend sorting, ⋯+Undo deletes, scoped quick-service+Accounting Undo, `21405e9`). ⬜ **5** Setups corner-cards/steppers/**four-bar quick-adjust**/tires/diff · ⬜ **6** Trackers hybrid checklist/templates-merge · ⬜ **7** Export share/contextual help/copy audit/font-zoom sweep.
+> - **New reusable code (chunks 1-4):** `src/components/ui/` (`NumberStepper`, `UndoToast`+`InfoToast`, `EmptyState`, `CollapsibleSection`, `SegmentedGrid`, `BottomSheet`, `HelpSheet`, `LapTimeKeypad`); `src/lib/undo.ts`; `src/lib/backStack.ts`; `src/lib/saveStatus.ts`; `src/lib/sessionSequence.ts`; `src/lib/serviceLog.ts`; `src/lib/scope.ts` (`pickAutoWeekend`, `parseWeekendDate`, `sortWeekends`); `src/components/ContextStrip.tsx`; `src/components/GetRaceReadyCard.tsx`. CSS: `.tap-target`, `.sticky-action-bar`, `.status-chip` + light-theme contrast bump.
 > - **Owner UX answers baked into the plan:** (1) app used during the week + at the track after each run; (2) 95% single-user → assignment/concurrency deferred; (3) most teams 1 car (some 2-3) → car UI hidden at ≤1 car; (4) **four-bar changed VERY often trackside → make it FAST, not hidden** (reverses the "fold behind expander" rec — chunk 5); (5) dusk→night racing → sunlight/light-theme tuned; (6) Main Checklist = hybrid core-reset + ad-hoc (chunk 6).
-> - **Testing:** v3 APKs are built via the build-from-main bridge (build web in v3 → mirror `dist` to main tree → `cap sync` + `assembleDebug`; main tree holds the Android platform). Current v3 test APK (chunks 1-3) is the standard debug output.
+> - **Testing:** v3 APKs use the build-from-main bridge: run lint then build in v3; mirror v3 `dist` to main; run raw `npx cap sync android` (not main `npm run android:sync`, which rebuilds master); run `assembleDebug`. Current Chunk 4 APK is versionCode 14/versionName 3.9 at the standard debug output. Android emulator QA passed fresh-profile hero→weekend→new-session, quick-service cost→Accounting→Undo, and session ⋯ delete→Undo. Emulator native `screencap` showed white because WebView tile-memory/compositor warnings; direct WebView capture and DOM verified rendered UI.
+> - **Chunk 4 draft:** https://6a5458d75d0c165c44d0ef9f--crew-chief-race-notes.netlify.app (auth gate renders; zero browser console errors). Production unchanged.
 > - **⚠️ BUILD GOTCHA (cost us a blank screen):** a new git worktree does NOT get the gitignored `.env`/`.env.local`. Building the v3 web bundle without them bakes an EMPTY `VITE_SUPABASE_URL` → runtime `Error: supabaseUrl is required` → **blank screen**. Fix applied: copied `.env` + `.env.local` from the main tree into `.worktrees/v3`. Always ensure the worktree has both env files before `vite build`.
 > - **⚠️ PWA-cache gotcha:** the Workbox service worker caches the built bundle, so `adb install -r` alone can keep serving the OLD assets after a rebuild. To see a new build, **clear app data** (`adb shell pm clear nimbus.engineering.crewchief`, or Android Studio "Clear Storage") then relaunch. Debug: `adb logcat -d | findstr Capacitor/Console` surfaces WebView JS errors.
-> - **Chunk backlog (non-blocking, from Fable QA):** dashboard needs 2 back-presses to exit; auto-create-first-car could duplicate if a signed-in cloud pull silently errors (returns `[]`); a deleting weekend still shows in ContextStrip/Dashboard during its 5s undo window; wire `reportSave('synced')` into `sync.ts`; prune the dead `'quickref'` `activeTab` union member; add a focus-trap to `BottomSheet`.
+> - **Chunk backlog (non-blocking):** dashboard needs 2 back-presses to exit; auto-create-first-car could duplicate if a signed-in cloud pull silently errors (returns `[]`); pending weekend delete remains visible in global ContextStrip during its 5s window; wire `reportSave('synced')` into `sync.ts`; prune dead `'quickref'` union; add BottomSheet focus trap; convert rare no-car Add Tire/Smasher prerequisites to teaching sheets during Chunk 5; App.tsx Chunk 4 orchestration exceeded the plan's aspirational ~10-line wiring budget but kept domain state centralized.
 
 CREW CHIEF (brand: all caps) is a React + TypeScript PWA + Android app that helps
 dirt-track racing teams track car setups, race sessions, tire inventory, weather,
@@ -60,19 +61,23 @@ Git worktrees in play:
 
 | Path | Branch | Role |
 |---|---|---|
-| `C:\Users\maxx\antigravity\Race-Notes` | detached HEAD | **Main tree.** Has the COMPLETE Android platform (Gradle files, `google-services.json`, keystore, SDK `local.properties`). Used to build APKs. Preserve its current generated/host-specific dirty files. |
-| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v2` | `preview-v2` | **v2 dev worktree.** Where ALL current feature work (WS-N…WS-Z) happens. Web build works here. Its `android/` platform is INCOMPLETE. |
+| `C:\Users\maxx\antigravity\Race-Notes` | `master` | **Main/release tree.** Owns complete Android platform and gitignored Gradle/SDK/Firebase files. Preserve existing dirty host/generated files. |
+| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–4 complete; Chunk 5 next. Web build works here; Android platform lacks gitignored main-tree files. |
 
-Audited refs on 2026-07-12: `preview` = `6407d6e`; `preview-v2` and `master` =
-`98bb2e0`. Git refs do not indicate Netlify deployment state; current Netlify
-deploy history was not audited in this handoff session. Main-tree dirty files to preserve: `android/app/capacitor.build.gradle`,
-`android/capacitor.settings.gradle`, and untracked `android/app/google-services.json`.
+Audited 2026-07-12: `preview-v3` includes UX-C4 `21405e9`; `master` remains
+release/stable. Git refs do not indicate Netlify deployment state. Main-tree
+dirty/generated Android files must be preserved.
 
 **Critical gotchas about the split:**
 
-- `android/app/build.gradle`, `android/build.gradle`, `android/app/google-services.json`, `android/local.properties`, `gradle.properties`, `settings.gradle` are **gitignored** → they exist only in the main tree, NOT in the v2 worktree. So **you cannot `assembleDebug` from the v2 worktree as-is.**
-- **How APKs are currently built** (see §7): build the web in `preview-v2`, mirror `dist/` into the main tree, `cap sync` + `assembleDebug` there. Native Capacitor plugins added only in v2 (e.g. `@capacitor/push-notifications`) are therefore NOT in that APK — fine for UI testing, not for native-push testing.
-- Branch rule: **all feature work on `preview-v2`**; the v1 line was `preview`. **NEVER merge to `master` or deploy to production without Maxx's explicit say-so.**
+- Gitignored Android Gradle, SDK, keystore, and Firebase files exist only in main,
+  so `assembleDebug` cannot run directly from v3.
+- APK bridge: lint + build in v3; copy v3 `dist` to main; from main run raw
+  `npx cap sync android`; then `android\gradlew.bat -p android assembleDebug`.
+  Do not run main `npm run android:sync` because its build step overwrites v3
+  assets with master.
+- Branch rule: all current UX feature work on `preview-v3`. Never merge to
+  `master` or deploy production without explicit Maxx authorization.
 
 Package/app identity: **`nimbus.engineering.crewchief`** (renamed from `com.racenotes.app` this session — see §5). App name "Crew Chief". Native OAuth deep link kept for BOTH schemes during transition.
 
@@ -87,7 +92,7 @@ Package/app identity: **`nimbus.engineering.crewchief`** (renamed from `com.race
 - **Local-first:** `localStorage` is the primary write target; Supabase is the secondary/optional sync layer (only when signed in). Live features (push, location) are the exception — they are server/Realtime data, NOT in the local-first loop.
 
 ### Architecture one-pager
-- **No React Router.** Navigation = single `activeTab` string in `src/App.tsx`. Tabs: `dashboard | setups | raceweekend | trackers | quickref | settings`. Trackers = Checklist/Service/Templates/Accounting. No `todos` or `team` tab.
+- **No React Router.** Navigation = single `activeTab` string in `src/App.tsx`. Visible tabs: Dashboard, Setups, Sessions (`raceweekend`), Trackers, Settings. QuickRef lives in HelpSheet; stale internal `'quickref'` union member is backlog. Trackers = Checklist/Service/Templates/Accounting.
 - **All domain state lives in `App.tsx`** and is passed down as props; views are prop-driven.
 - **Dual-write pattern:** every mutation updates React state AND `localStorage`, then `if (user) push*()` to Supabase. Every delete path must also call `delete*FromCloud(id)`.
 - **Car scoping:** setups, tires, shock sessions are scoped to the active car via `byActiveCar()` (`src/lib/scope.ts`); weekends, todos, accounting, shopping, checklists are global; maintenance components are `scope: 'car' | 'rig'` (rig = team-wide).

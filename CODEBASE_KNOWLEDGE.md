@@ -4,7 +4,31 @@
 > Branch at time of writing: `master` (all features merged — car-profiles, session-v2, weekend-v2, session-8 features below)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
-> ⚠️ **2026-07-12:** A UX overhaul is in progress on branch **`preview-v3`** (7 chunks; 1-3 done). It adds `src/components/ui/*` primitives, `src/lib/{undo,backStack,saveStatus,sessionSequence}.ts`, `ContextStrip`, a 5-tab nav, and moves weekend/session modals into `RaceWeekendView`. This file predates it — for current UX state see `HANDOFF.md` (UX section), `docs/IMPLEMENTATION_PLAN_2026-07-12.md`, and `ralph/STATE.md`.
+> ⚠️ **2026-07-12:** A UX overhaul is in progress on branch **`preview-v3`** (7 chunks; 1-4 done). It adds `src/components/ui/*` primitives, `src/lib/{undo,backStack,saveStatus,sessionSequence,serviceLog}.ts`, `ContextStrip`, a 5-tab nav, moves weekend/session modals into `RaceWeekendView`, and turns Dashboard into a race-day launchpad. For current UX state see `HANDOFF.md` (UX section), `docs/IMPLEMENTATION_PLAN_2026-07-12.md`, and `ralph/STATE.md`.
+
+## 2026-07-12 UX Chunk 4 override
+
+- Commit `21405e9`: Dashboard launchpad is current behavior.
+- Dashboard top order: device-local Get Race-Ready card, ≥64px `+ LOG RUN`
+  hero, active-weekend summary, scoped service chip, collapsed checklist/service
+  summaries, Setup/Tire link-outs. Full weekend CRUD remains in Sessions.
+- Fresh `+ LOG RUN` with no weekend opens a teaching sheet. Creating a weekend
+  from that flow auto-activates it and continues directly into new-session.
+- `GetRaceReadyCard.tsx` checks real active-car/setup/weekend/session data and
+  persists dismissal at `race_notes_onboarding_dismissed`.
+- `src/lib/serviceLog.ts` builds quick-service records. Cost greater than zero
+  also creates linked Accounting expense; Dashboard Undo removes both and
+  restores previous maintenance counter.
+- Dashboard maintenance visibility: active-car components plus global rig
+  components only. Never show/reset another car's component.
+- Weekend/session destructive actions use ⋯ sheets and delayed Undo commit.
+- `sortWeekends()` in `src/lib/scope.ts` is canonical: active first, then date
+  descending; ContextStrip, Sessions, Dashboard, and Export use it.
+- Android QA APK: main-tree `android/app/build/outputs/apk/debug/app-debug.apk`,
+  versionCode 14/versionName 3.9. Build v3 `dist` first, copy it to main, run
+  raw `npx cap sync android`, then Gradle. Never run main-tree
+  `npm run android:sync` for this bridge because it rebuilds master over v3.
+- Chunk 4 draft: `https://6a5458d75d0c165c44d0ef9f--crew-chief-race-notes.netlify.app`.
 
 ## 2026-07-11 WS-Z behavior override
 

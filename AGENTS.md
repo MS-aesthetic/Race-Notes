@@ -9,7 +9,7 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 >
 > **🧭 NEW AGENT? START WITH [`HANDOFF.md`](./HANDOFF.md)** — consolidated onboarding: current status, session history, worktree/branch gotchas, build/deploy procedures, and the Ralph-loop workflow.
 >
-> **🎨 UX OVERHAUL in progress on branch `preview-v3`** (3 of 7 chunks done). Owner directive: **Fable 5 (high) plans/builds/QAs everything; `/caveman full`** for status. Plan: [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md); audit: [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md); status/backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
+> **🎨 UX OVERHAUL in progress on branch `preview-v3`** (4 of 7 chunks done). Current routing: **GPT 5.6 SOL High plans and QAs; GPT 5.6 Terra High builds; `/caveman full`** for status. Plan: [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md); audit: [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md); status/backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
 >
 > This file is current workflow authority. For v2 status trust
 > [`plan-v2.md`](./plan-v2.md), [`ralph/STATE.md`](./ralph/STATE.md), and
@@ -38,7 +38,9 @@ review, and user-facing status message in this repository.
 4. **Model routing:** GPT 5.6 SOL High owns analysis, specification, planning,
    and QA. GPT 5.6 Terra High owns feature implementation. QA failures 1–2 return
    to Terra. Failure 3 (more than two failed QA reviews) transfers implementation
-   to GPT 5.6 SOL High, then SOL performs final QA.
+   to GPT 5.6 SOL High, then SOL performs final QA. Bounded read-only
+   `cavecrew-investigator` scans may use Terra Medium for fast evidence gathering;
+   SOL retains interpretation and decisions.
 5. If named models are unavailable, state limitation. Never claim unavailable
    model ran. Preserve role split with best available models only after disclosure.
 
@@ -46,13 +48,13 @@ review, and user-facing status message in this repository.
 
 ## Branch & Deploy Workflow (READ FIRST)
 
-> **BRANCH RULE — all current feature work on `preview-v2`.** Use worktree
-> `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v2`. Never commit feature work
-> directly to `preview` or `master`:
+> **BRANCH RULE — current UX feature work runs on `preview-v3`.** Use worktree
+> `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`. Never commit feature work
+> directly to `master`:
 > ```bash
-> git checkout preview-v2
+> git checkout preview-v3
 > # ...make changes...
-> git push origin preview-v2
+> git push origin preview-v3
 > ```
 >
 > **DEPLOY RULE — default to PREVIEW.** Always deploy to a Netlify **preview/draft**
@@ -67,8 +69,8 @@ review, and user-facing status message in this repository.
 >   only when asked; otherwise a GitHub push does not change the live site.
 > - Production publishes require account credits (paid plan). Preview/draft deploys
 >   are the normal iteration loop.
-> - **NEVER merge `preview-v2` → `preview` → `master`** unless Maxx
->   explicitly authorizes each merge/release step.
+> - **NEVER merge `preview-v3` → `master`** unless Maxx explicitly authorizes
+>   that release step.
 
 ---
 
