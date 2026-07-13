@@ -69,3 +69,28 @@ _(follow-up items discovered during QA — do not expand an in-flight WS)_
 - WS-V: consider HERE category-ID filtering as a fallback to Discover text search for non-English locales / noisy results.
 - WS-S: PAUSED — commit the package-name rename to `nimbus.engineering.crewchief` on preview-v2 before any native/FCM work (owner-decided 2026-07-10; Firebase + google-services.json already nimbus).
 - WS-Z: apply migration 014, then verify team-member template/service deletion plus offline reload and theme/zoom/mobile presentation on draft deploy.
+
+
+## UX Overhaul (branch `preview-v3`, started 2026-07-12)
+
+Separate track from WS-N…Z. Source: `docs/UX_ANALYSIS_2026-07-12.md` (Fable audit, 37 recs) → `docs/IMPLEMENTATION_PLAN_2026-07-12.md` (7 chunks). Workflow: **Fable does plan/build/QA**, coordinator lints/builds/commits, `/caveman full`. Consolidated QA per chunk + `tsc` (3-baseline) / `vite build` gates. Runtime QA (emulator) accumulates per chunk — validate on the v3 debug APK.
+
+| Chunk | Scope | Status | Commit |
+|---|---|---|---|
+| 1 | Shared UI primitives (`components/ui/*`, `lib/undo.ts`) + glove/glare/zoom hardening CSS | ✅ complete (Fable QA PASS-w-notes) | e04b15c |
+| 2 | App shell: 6→5 tabs (QuickRef→HelpSheet), race-day order, ContextStrip (car+weekend, car hidden ≤1), sunlight toggle, auto-create-first-car, auto-activate-weekend, scroll preservation + Android back (`backStack.ts`), offline badge (`saveStatus.ts`) | ✅ complete (PASS, no blockers) | 306445d |
+| 3 | Sessions owns weekends (modals moved out of App.tsx, −451 lines), quick-log top-to-bottom + SAVE RUN, `LapTimeKeypad`, 3×3 diagnostics `SegmentedGrid`, `sessionSequence.ts` auto-name/prefill | ✅ complete (PASS, no blockers; pure fns harness-PASS) | c68f27d |
+| 4 | Dashboard: launchpad + "+LOG RUN" hero + first-run "get race-ready" card + panel collapse/dedupe | ⬜ pending | — |
+| 5 | Setups: corner cards + steppers, **four-bar quick-adjust (fast, not hidden)**, tires sub-view, copy-last-setup, diff entry, propagation toast | ⬜ pending | — |
+| 6 | Trackers: hybrid Main Checklist (core-reset + ad-hoc), merge Templates, service-from-dashboard + auto-accounting, accounting defaults | ⬜ pending | — |
+| 7 | Export share (Web Share), contextual help "?", racing-language copy audit, font-zoom sweep | ⬜ pending | — |
+
+### UX chunk grade log
+- 2026-07-12 · UX-C1 · Fable QA · PASS-WITH-NOTES · primitives safe (undo state-machine no early-fire/leak; applied pagehide-commit + stepper keyboard). lint 3-baseline, build green, isolated (App.tsx untouched).
+- 2026-07-12 · UX-C2 · Fable QA · PASS (no blockers) · back-handling no trap/double-handle; one-shot guards (auto-car/weekend) correct; `byActiveCar` byte-identical; dual-writes intact. Backlog: dashboard 2-press exit; auto-car dup if signed-in pull errors→[]; reportSave(synced) TODO; prune `'quickref'` union.
+- 2026-07-12 · UX-C3 · Fable QA · PASS (no blockers) · move-out faithful (weather/image/guards/tire-lifecycle/dual-writes preserved via line-diff); undo delete lazy; diagnostics round-trip; keypad string. Pure fns harness PASS. Backlog: deleting weekend still shows in ContextStrip/Dashboard during undo window.
+
+### UX backlog (non-blocking)
+- C2: dashboard needs 2 back-presses to exit; auto-create-first-car dup-risk if signed-in `pullCars` returns `[]` on error; wrap `doPull` in try/finally so `pullDone` always sets (offline fresh-install car); wire `reportSave('synced')` into `sync.ts` push helpers; prune dead `'quickref'` in the `activeTab` union.
+- C3: pending-delete weekend visible in ContextStrip/Dashboard during 5s undo window (cosmetic); `initialAction='new-session'` with no active weekend opens weekend-create; empty bestLap persists as `"s"` (pre-existing).
+- C1: add focus-trap to `BottomSheet` (a11y).

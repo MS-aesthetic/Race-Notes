@@ -9,6 +9,8 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 >
 > **🧭 NEW AGENT? START WITH [`HANDOFF.md`](./HANDOFF.md)** — consolidated onboarding: current status, session history, worktree/branch gotchas, build/deploy procedures, and the Ralph-loop workflow.
 >
+> **🎨 UX OVERHAUL in progress on branch `preview-v3`** (3 of 7 chunks done). Owner directive: **Fable 5 (high) plans/builds/QAs everything; `/caveman full`** for status. Plan: [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md); audit: [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md); status/backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
+>
 > This file is current workflow authority. For v2 status trust
 > [`plan-v2.md`](./plan-v2.md), [`ralph/STATE.md`](./ralph/STATE.md), and
 > [`HANDOFF.md`](./HANDOFF.md). Current package: `nimbus.engineering.crewchief`.

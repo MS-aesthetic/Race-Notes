@@ -3,6 +3,8 @@
 > Last updated: 2026-07-01 (session 8 — Google OAuth, mandatory auth gate, tire usage history, shock-compare, 3-tier zoom sizing, Android API 36)
 > Branch at time of writing: `master` (all features merged — car-profiles, session-v2, weekend-v2, session-8 features below)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
+>
+> ⚠️ **2026-07-12:** A UX overhaul is in progress on branch **`preview-v3`** (7 chunks; 1-3 done). It adds `src/components/ui/*` primitives, `src/lib/{undo,backStack,saveStatus,sessionSequence}.ts`, `ContextStrip`, a 5-tab nav, and moves weekend/session modals into `RaceWeekendView`. This file predates it — for current UX state see `HANDOFF.md` (UX section), `docs/IMPLEMENTATION_PLAN_2026-07-12.md`, and `ralph/STATE.md`.
 
 ## 2026-07-11 WS-Z behavior override
 
