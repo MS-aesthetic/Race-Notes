@@ -67,9 +67,9 @@ html[data-theme="light"] {
   --color-surface-container-high: #e7e4e3;
   --color-surface-container-highest: #e1dedc;
   --color-on-surface: #1c1b1b;
-  --color-on-surface-variant: #4d3837;
+  --color-on-surface-variant: #3d2b2a; /* darkened for dusk/outdoor contrast (>=4.5:1 on #f4f1f0) */
   --color-outline: #857370;
-  --color-outline-variant: #d8c2be;
+  --color-outline-variant: #a08278; /* darkened so borders stay visible in sunlight (>=3:1) */
   --color-background: #f4f1f0;
   --color-on-background: #1c1b1b;
   --color-surface-variant: #f5dbd8;
@@ -202,4 +202,75 @@ header.bg-surface {
 .status-glow-red {
   box-shadow: 0 0 10px #ba1a20;
   background-color: #ba1a20;
+}
+
+
+/* ============================================================
+   [31] GLOBAL HARDENING LAYER (Chunk 1)
+   Plain CSS utilities shared by UI primitives. Token-based only.
+   All sizes in rem so they scale under zoom: var(--ui-zoom).
+   ============================================================ */
+
+/* Minimum 48px hit area for any tappable control (3rem = 48px @ 16px root) */
+.tap-target {
+  min-height: 3rem;
+  min-width: 3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Full-width variant for list rows / section headers */
+.tap-target-block {
+  min-height: 3rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/* Bottom-pinned action container (form save bars, wizard footers) */
+.sticky-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: var(--color-surface-container-high);
+  border-top: 1px solid var(--color-outline-variant);
+  padding: 0.75rem 1rem;
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+}
+
+/* Compact status chip: icon + text. Readable but intentionally
+   smaller than a tap target (chips are informational, not primary taps). */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 1.75rem; /* 28px */
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container);
+  color: var(--color-on-surface-variant);
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.status-chip .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+/* Modal scrim for BottomSheet (a scrim must darken both themes) */
+.sheet-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.5);
+}
+
+/* BottomSheet entrance */
+.sheet-enter {
+  animation: sheet-up 200ms ease-out;
+}
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
 }
