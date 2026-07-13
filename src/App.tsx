@@ -27,6 +27,12 @@ import RaceWeekendView from './components/RaceWeekendView';
 import SettingsView from './components/SettingsView';
 import QuickReferenceView from './components/QuickReferenceView';
 import TrackersView from './components/TrackersView';
+import ContextStrip from './components/ContextStrip';
+import HelpSheet from './components/ui/HelpSheet';
+import { InfoToast } from './components/ui/UndoToast';
+import { pickAutoWeekend } from './lib/scope';
+import { useOnlineStatus } from './lib/saveStatus';
+import { hasOpenSheets, isPopSuppressed } from './lib/backStack';
 import { Todo } from './types';
 
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
@@ -106,6 +112,16 @@ export default function App() {
 
   const activeCar = cars.find(c => c.id === activeCarId) ?? null;
 
+  // ── [27] Help sheet, [37]/[5] info toast, [33] online status ──────────────
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [infoToast, setInfoToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!infoToast) return;
+    const t = setTimeout(() => setInfoToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [infoToast]);
+  const isOnline = useOnlineStatus();
+
   // Auto-select first car if activeCarId is missing or dangling
   useEffect(() => {
     if (cars.length > 0 && (!activeCarId || !cars.find(c => c.id === activeCarId))) {
@@ -121,6 +137,14 @@ export default function App() {
   };
 
   const handleSelectCar = (carId: string) => {
+    // [37] Confirm the scope switch when the user actually changes car
+    if (activeCarId && carId !== activeCarId && cars.length > 1) {
+      const nextCar = cars.find(c => c.id === carId);
+      if (nextCar) {
+        const label = nextCar.name || `${nextCar.chassis} · ${nextCar.carType}`;
+        setInfoToast(`Now viewing ${label} — setups, sessions & trackers switched.`);
+      }
+    }
     setActiveCarId(carId);
     localStorage.setItem('race_notes_active_car', carId);
     // No data reload — views re-filter on activeCarId
@@ -226,8 +250,9 @@ export default function App() {
   const carTireCount = (carId: string) => tireInventory.filter(t => t.carId === carId).length;
   const carShockCount = (carId: string) => shockSessions.filter(s => s.carId === carId).length;
 
-  // Navigate to Settings → Garage from the active-car chip
-  const [settingsSubTab, setSettingsSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>('garage');
+  // Initial Settings sub-tab (former header chip deep-links now live in the
+  // ContextStrip / HelpSheet, so nothing sets this at runtime anymore)
+  const [settingsSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>('garage');
   // Deep-link into SetupView sub-tabs from Dashboard
   const [setupSubTab, setSetupSubTab] = useState<'setups' | 'smasherloads' | 'tires'>('setups');
 
@@ -276,6 +301,7 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [hasLocalAcct, setHasLocalAcct] = useState<boolean>(() => hasLocalAccount());
   const [syncStatus, setSyncStatus] = useState('');
+  const [pullDone, setPullDone] = useState(false); // initial cloud pull resolved — gates [4]
 
   // ── "Saved" flash toast ──────────────────────────────────────────────────
   // Local-first writes are instant; this gives users clear, prominent
@@ -330,6 +356,49 @@ export default function App() {
   const [newSessionTimeOfDay, setNewSessionTimeOfDay] = useState<'current' | 'Afternoon' | 'Evening' | 'Night'>('current');
   const activeWeekend = weekends.find(w => w.id === activeWeekendId) ?? null;
 
+  // ── [29] Tab scroll preservation ───────────────────────────────────────────
+  const mainRef = useRef<HTMLElement | null>(null);
+  const scrollPosRef = useRef<Record<string, number>>({});
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  useEffect(() => {
+    // Read the target before AnimatePresence's exit clamps scrollTop to 0.
+    const target = scrollPosRef.current[activeTab] ?? 0;
+    const restore = () => { if (mainRef.current) mainRef.current.scrollTop = target; };
+    const raf = requestAnimationFrame(restore);
+    const t = setTimeout(restore, 250); // after the 180ms tab exit animation settles
+    return () => { cancelAnimationFrame(raf); clearTimeout(t); };
+  }, [activeTab]);
+
+  // ── [29] Android back: sheets close first (via useBackClosable), then
+  // modals, then non-dashboard tabs fall back to Dashboard, then exit. ───────
+  const showNewWeekendFormRef = useRef(false);
+  const showNewSessionFormRef = useRef(false);
+  showNewWeekendFormRef.current = showNewWeekendForm;
+  showNewSessionFormRef.current = showNewSessionForm;
+  useEffect(() => {
+    window.history.pushState({ __cc_root: true }, '');
+    const onPop = () => {
+      if (isPopSuppressed()) return;       // programmatic history.back() from a sheet
+      if (hasOpenSheets()) return;         // the topmost BottomSheet consumes this pop
+      if (showNewWeekendFormRef.current || showNewSessionFormRef.current) {
+        setShowNewWeekendForm(false);
+        setShowNewSessionForm(false);
+        window.history.pushState({ __cc_root: true }, '');
+        return;
+      }
+      if (activeTabRef.current !== 'dashboard') {
+        setActiveTab('dashboard');
+        window.history.pushState({ __cc_root: true }, '');
+        return;
+      }
+      // Dashboard with nothing open: don't re-push — the next back exits.
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Active weekend is device-local. Recover stale IDs and migrate legacy session selection.
   useEffect(() => {
     if (weekends.length === 0) {
@@ -344,6 +413,22 @@ export default function App() {
     setActiveWeekendId(nextId);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, nextId);
   }, [weekends, activeWeekendId, activeSession.weekendId]);
+
+  // ── [5] Auto-activate a nearby weekend on first load (one-shot). Runs after
+  // the stale-ID effect above so its ±3-day pick wins the initial batch. ─────
+  const didAutoWeekend = useRef(false);
+  useEffect(() => {
+    if (didAutoWeekend.current || weekends.length === 0) return;
+    didAutoWeekend.current = true;
+    if (activeWeekendId) return;
+    const pick = pickAutoWeekend(weekends, new Date().toISOString());
+    if (pick) {
+      setActiveWeekendId(pick.id);
+      localStorage.setItem(ACTIVE_WEEKEND_KEY, pick.id);
+      setInfoToast(`Active: ${pick.name}`);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekends, activeWeekendId]);
   // Session weather fetch state
   const [sessionWeatherStr, setSessionWeatherStr] = useState('');
   const [sessionWeatherLoading, setSessionWeatherLoading] = useState(false);
@@ -582,6 +667,7 @@ export default function App() {
       }
 
       setSyncStatus('Synced');
+      setPullDone(true); // gates [4] auto-create so a 2nd device can't duplicate
       setTimeout(() => setSyncStatus(''), 3000);
       // Re-enable "Saved" flashes after pull-driven state settles.
       setTimeout(() => { suppressPullRef.current = false; }, 800);
@@ -640,6 +726,41 @@ export default function App() {
     handleSelectCar(defaultCar.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedSetups, tireInventory, shockSessions, cars]);
+
+  // ── [4] Auto-create a first car for truly-empty accounts (one-shot) ───────
+  // The backfill effect above owns the "legacy data, no cars" case; this one
+  // handles brand-new/empty accounts so the app never lacks an active car.
+  // Signed-in devices wait for the initial cloud pull so a 2nd device doesn't
+  // create a duplicate before the cloud garage arrives.
+  const didAutoCar = useRef(false);
+  useEffect(() => {
+    if (didAutoCar.current) return;
+    if (!authReady) return;
+    if (user && !pullDone) return;
+    if (cars.length > 0) { didAutoCar.current = true; return; }
+    const hasLegacyData = savedSetups.length > 0 || tireInventory.length > 0 || shockSessions.length > 0;
+    if (hasLegacyData) return; // legacy backfill effect will create the car
+
+    didAutoCar.current = true;
+    const now = new Date().toISOString();
+    const defaultCar: Car = {
+      id: `car-${Date.now()}`,
+      userId: user?.id ?? 'local',
+      teamId: team?.id ?? null,
+      carType: CAR_TYPES[0],
+      chassis: 'My Car',
+      division: '',
+      name: 'My Car',
+      createdAt: now,
+      updatedAt: now,
+    };
+    const updated = [defaultCar];
+    setCars(updated);
+    localStorage.setItem('race_notes_cars', JSON.stringify(updated));
+    if (user) pushCars(updated, user.id, team?.id ?? null, setSyncStatus);
+    handleSelectCar(defaultCar.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady, user, pullDone, cars, savedSetups, tireInventory, shockSessions]);
 
   const saveSetup = (updatedSetup: Setup) => {
     setSetup(updatedSetup);
@@ -903,6 +1024,7 @@ export default function App() {
     setNewSessionTrack(newWknd.track);
     setActiveWeekendId(newWknd.id);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, newWknd.id);
+    setInfoToast(`Active: ${newWknd.name}`);
     setShowNewWeekendForm(false);
   };
 
@@ -1225,39 +1347,49 @@ export default function App() {
               </h1>
             </div>
             
-            <div className="flex items-center gap-2">
-              {/* Help / Guide */}
+            <div className="flex items-center gap-1">
+              {/* Help / Reference sheet ([27]) */}
               <button
-                onClick={() => { setSettingsSubTab('guide'); setActiveTab('settings'); }}
-                aria-label="Open the how-to guide"
-                title="How to use CREW CHIEF"
-                className="flex items-center justify-center w-8 h-8 rounded-full border border-outline-variant/60 text-on-surface-variant hover:text-primary hover:border-primary/50 transition-colors"
+                onClick={() => setHelpOpen(true)}
+                aria-label="Open help & reference"
+                title="Help & quick reference"
+                className="flex items-center justify-center min-w-12 min-h-12 rounded-full text-on-surface-variant hover:text-primary transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px]">help</span>
+                <span className="material-symbols-outlined text-[20px]">help</span>
               </button>
-              {/* Active-car chip */}
-              {activeCar ? (
-                <button
-                  onClick={() => { setSettingsSubTab('garage'); setActiveTab('settings'); }}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary font-mono text-[10px] uppercase tracking-wider font-bold hover:bg-primary/20 transition-colors"
-                  title="Switch car in Garage"
-                >
-                  <span className="material-symbols-outlined text-[12px]">directions_car</span>
-                  <span className="truncate max-w-[80px]">{activeCar.name || `${activeCar.chassis} · ${activeCar.carType}`}</span>
-                </button>
-              ) : cars.length === 0 ? (
-                <button
-                  onClick={() => { setSettingsSubTab('garage'); setActiveTab('settings'); }}
-                  className="flex items-center gap-1 px-2 py-1 rounded-full border border-outline-variant/50 text-on-surface-variant/60 font-mono text-[10px] uppercase tracking-wider hover:border-primary/40 hover:text-primary/70 transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[12px]">add</span>
-                  Add Car
-                </button>
-              ) : null}
-{/* +Session moved into RaceWeekendView as a prominent top-center button */}
+              {/* Sunlight / theme-mode toggle ([32]) */}
+              <button
+                onClick={() => handleThemeChange({ ...theme, mode: theme.mode === 'dark' ? 'light' : 'dark' })}
+                aria-label={theme.mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                title={theme.mode === 'dark' ? 'Switch to light mode (sunlight)' : 'Switch to dark mode'}
+                className="flex items-center justify-center min-w-12 min-h-12 rounded-full text-on-surface-variant hover:text-primary transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">
+                  {theme.mode === 'dark' ? 'dark_mode' : 'light_mode'}
+                </span>
+              </button>
+{/* Active-car chip moved into ContextStrip ([6]); +Session lives in RaceWeekendView */}
             </div>
           </div>
         </header>
+
+        {/* [6] Context strip — which car & weekend everything is scoped to */}
+        {(activeTab === 'dashboard' || activeTab === 'setups' || activeTab === 'raceweekend' || activeTab === 'trackers') && (
+          <ContextStrip
+            cars={cars}
+            activeCarId={activeCarId}
+            weekends={weekends}
+            activeWeekendId={activeWeekendId}
+            onSelectCar={handleSelectCar}
+            onSelectWeekend={handleActivateWeekend}
+            onNewWeekend={() => {
+              setNewWeekendName('');
+              setNewWeekendTrack('');
+              setNewWeekendDate(new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
+              setShowNewWeekendForm(true);
+            }}
+          />
+        )}
 
         {/* Single brief Saved / sync toast — bottom-center, above the nav bar.
             Only three states surface: local "Saved", initial "Syncing…", and
@@ -1268,7 +1400,10 @@ export default function App() {
           const isBusy = !savedFlash && syncStatus === 'Syncing...';
           const isSynced = !savedFlash && syncStatus === 'Synced';
           if (!savedFlash && !isBusy && !isSynced) return null;
-          const msg = savedFlash ? 'Saved' : isBusy ? 'Syncing…' : 'Synced';
+          // [33] Offline-aware: local saves still land, so say exactly that.
+          const msg = savedFlash
+            ? (isOnline ? 'Saved' : 'Offline — saved on device')
+            : isBusy ? 'Syncing…' : 'Synced';
           const isSuccess = savedFlash || isSynced;
           return (
             <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[60] pointer-events-none px-4 w-full max-w-md flex justify-center">
@@ -1283,7 +1418,7 @@ export default function App() {
                 style={{ boxShadow: isSuccess ? '0 8px 30px rgba(34,197,94,0.45)' : undefined }}
               >
                 <span className={`material-symbols-outlined text-xl ${isBusy ? 'animate-spin' : ''}`} style={{ fontVariationSettings: "'FILL' 1" }}>
-                  {isSuccess ? 'check_circle' : isBusy ? 'progress_activity' : 'cloud'}
+                  {savedFlash && !isOnline ? 'cloud_off' : isSuccess ? 'check_circle' : isBusy ? 'progress_activity' : 'cloud'}
                 </span>
                 {msg}
               </div>
@@ -1292,7 +1427,11 @@ export default function App() {
         })()}
 
         {/* Core Main Active Canvas Area */}
-        <main className="flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto pb-6 custom-scrollbar">
+        <main
+          ref={mainRef}
+          onScroll={(e) => { scrollPosRef.current[activeTabRef.current] = e.currentTarget.scrollTop; }}
+          className="flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto pb-6 custom-scrollbar"
+        >
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -1472,10 +1611,7 @@ export default function App() {
                 />
               )}
 
-              {activeTab === 'quickref' && (
-                <QuickReferenceView />
-              )}
-
+              {/* [27] QuickRef tab removed — content now lives in the HelpSheet */}
 
               {activeTab === 'trackers' && (
                 <TrackersView
@@ -1587,24 +1723,7 @@ export default function App() {
             </span>
           </button>
 
-          {/* Reference Button */}
-          <button
-            onClick={() => setActiveTab('quickref')}
-            id="tab-btn-quickref"
-            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
-              activeTab === 'quickref' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
-            }`}
-          >
-            <span
-              className="material-symbols-outlined text-[20px]"
-              style={{ fontVariationSettings: activeTab === 'quickref' ? "'FILL' 1" : "'FILL' 0" }}
-            >
-              menu_book
-            </span>
-            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
-              Reference
-            </span>
-          </button>
+          {/* [27] Reference tab removed — QuickRef opens via the header ? button */}
 
           {/* Settings Button */}
           <button
@@ -1626,6 +1745,18 @@ export default function App() {
           </button>
         </nav>
       </div>
+
+      {/* [27] Help & Reference sheet — replaces the Quick Reference tab */}
+      <HelpSheet open={helpOpen} onClose={() => setHelpOpen(false)}>
+        <QuickReferenceView />
+      </HelpSheet>
+
+      {/* [37]/[5] Car-switch & auto-weekend info toast */}
+      <InfoToast
+        open={!!infoToast}
+        title={infoToast ?? ''}
+        onClose={() => setInfoToast(null)}
+      />
 
       {/* NEW WEEKEND FORM DIALOG */}
       {showNewWeekendForm && (

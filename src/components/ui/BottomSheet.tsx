@@ -5,6 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
+import { useBackClosable } from '../../lib/backStack';
 
 export interface BottomSheetProps {
   open: boolean;
@@ -18,6 +19,9 @@ const DRAG_CLOSE_THRESHOLD_PX = 80;
 export default function BottomSheet({ open, onClose, title, children }: BottomSheetProps) {
   const startYRef = useRef<number | null>(null);
   const [dragY, setDragY] = useState(0);
+
+  // [29] Android hardware back closes the sheet instead of leaving the app
+  useBackClosable(open, onClose);
 
   // Escape closes
   useEffect(() => {
