@@ -20,6 +20,8 @@ import { registerForPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
 import { normalizeSetup, normalizeSetups } from './lib/setupCompat';
 import { materializeMainChecklist } from './lib/mainChecklist';
+import { reconcileStarterTemplates } from './lib/checklists';
+import { deriveReadableLightAccent, readableOnColor } from './lib/colorContrast';
 
 import DashboardView from './components/DashboardView';
 import SetupView from './components/SetupView';
@@ -277,23 +279,22 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute('data-theme', theme.mode);
-    const hex = theme.accent;
-    root.style.setProperty('--color-primary', hex);
-    root.style.setProperty('--color-primary-fixed-dim', hex);
-    root.style.setProperty('--color-surface-tint', hex);
-    // Derive on-primary contrast colour
-    const r = parseInt(hex.slice(1, 3), 16) || 0;
-    const g = parseInt(hex.slice(3, 5), 16) || 0;
-    const b = parseInt(hex.slice(5, 7), 16) || 0;
-    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-    root.style.setProperty('--color-on-primary', luma > 160 ? '#1a0003' : '#ffffff');
+    // Stored accent stays untouched. Light mode gets only a derived rendered value.
+    const renderedAccent = theme.mode === 'light'
+      ? deriveReadableLightAccent(theme.accent, '#e1dedc')
+      : theme.accent;
+    root.style.setProperty('--color-primary', renderedAccent);
+    root.style.setProperty('--color-primary-fixed-dim', renderedAccent);
+    root.style.setProperty('--color-surface-tint', renderedAccent);
+    root.style.setProperty('--color-on-primary', readableOnColor(renderedAccent));
     // UI scale — zoom (not root font-size) so it scales fixed-px utility
     // classes and rem-based ones uniformly, and renders identically on the
     // installed PWA (Chrome) vs the Capacitor APK (Android WebView) — both
     // Chromium, both respect `zoom` the same way.
     root.style.fontSize = '16px';
     const ZOOM: Record<AppTheme['fontSize'], number> = { standard: 1, large: 1.15, xlarge: 1.45, xxlarge: 1.7 };
-    root.style.setProperty('--ui-zoom', String(ZOOM[theme.fontSize] ?? 1));
+    const zoom = ZOOM[theme.fontSize] ?? 1;
+    root.style.setProperty('--ui-zoom', String(zoom));
   }, [theme]);
 
   // ---- Auth & Cloud Sync State ----
@@ -305,6 +306,21 @@ export default function App() {
   const [hasLocalAcct, setHasLocalAcct] = useState<boolean>(() => hasLocalAccount());
   const [syncStatus, setSyncStatus] = useState('');
   const [pullDone, setPullDone] = useState(false); // initial cloud pull resolved — gates [4]
+  const pullGenerationRef = useRef(0);
+
+  // Wait for auth restoration and, when signed in, the settled cloud merge.
+  // This prevents transient local starter seeds from racing team-visible data.
+  useEffect(() => {
+    if (!authReady || (user && !pullDone)) return;
+    const reconciled = reconcileStarterTemplates(checklistTemplates);
+    if (reconciled.seeded.length === 0 && reconciled.discardedIds.length === 0) return;
+    setChecklistTemplates(reconciled.templates);
+    localStorage.setItem('race_notes_checklist_templates', JSON.stringify(reconciled.templates));
+    if (user) {
+      if (reconciled.seeded.length > 0) pushChecklistTemplates(reconciled.seeded, user.id, setSyncStatus);
+      reconciled.discardedIds.forEach(id => { void deleteChecklistTemplateFromCloud(id); });
+    }
+  }, [authReady, checklistTemplates, pullDone, user]);
 
   // ── "Saved" flash toast ──────────────────────────────────────────────────
   // Local-first writes are instant; this gives users clear, prominent
@@ -471,6 +487,7 @@ export default function App() {
       try {
         const { data } = await supabase.auth.getSession();
         const currentUser = data.session?.user ?? null;
+        setPullDone(false);
         setUser(currentUser);
         if (currentUser) {
           rememberLocalAccount(currentUser);
@@ -495,6 +512,7 @@ export default function App() {
     initAuth();
 
     const unsub = onAuthChange(async (newUser) => {
+      setPullDone(false);
       setUser(newUser);
       if (newUser) {
         // Only a *positive* session ever writes the local flag here. A null
@@ -535,13 +553,21 @@ export default function App() {
 
   // ---- Cloud sync: pull on login, push on data changes ----
   useEffect(() => {
-    if (!user) return;
+    const generation = ++pullGenerationRef.current;
+    if (!user) {
+      setPullDone(true);
+      return () => { if (pullGenerationRef.current === generation) pullGenerationRef.current += 1; };
+    }
+    const pullUserId = user.id;
+    const isCurrentPull = () => pullGenerationRef.current === generation;
+    setPullDone(false);
 
     // Pull cloud data and merge into localStorage
     const doPull = async () => {
       suppressPullRef.current = true; // don't show "Saved" for cloud-pull state updates
       setSyncStatus('Syncing...');
-      const data = await pullAllData(user.id, setSyncStatus);
+      const data = await pullAllData(pullUserId, setSyncStatus);
+      if (!isCurrentPull()) return;
 
       if (data.setups.length > 0) {
         mergeIntoLocalStorage('setups', data.setups, 'race_notes_saved_setups');
@@ -575,6 +601,7 @@ export default function App() {
       }
 
       const cloudTodos = await pullTodos(setSyncStatus);
+      if (!isCurrentPull()) return;
       if (cloudTodos.length > 0) {
         setTodos(prev => {
           const cloudById = new Map(cloudTodos.map(todo => [todo.id, todo]));
@@ -591,21 +618,23 @@ export default function App() {
           const materialized = materializeMainChecklist(merged);
           localStorage.setItem('race_notes_todos', JSON.stringify(materialized));
           if (hasNewerLocal || JSON.stringify(materialized) !== JSON.stringify(merged)) {
-            pushTodos(materialized, user.id, setSyncStatus);
+            pushTodos(materialized, pullUserId, setSyncStatus);
           }
           return materialized;
         });
       } else if (todos.length > 0) {
-        pushTodos(materializeMainChecklist(todos), user.id, setSyncStatus);
+        pushTodos(materializeMainChecklist(todos), pullUserId, setSyncStatus);
       }
 
-      const cloudTires = await pullTires(user.id, setSyncStatus);
+      const cloudTires = await pullTires(pullUserId, setSyncStatus);
+      if (!isCurrentPull()) return;
       if (cloudTires.length > 0) {
         setTireInventory(cloudTires);
         localStorage.setItem('race_notes_tires', JSON.stringify(cloudTires));
       }
 
-      const cloudCars = await pullCars(user.id, setSyncStatus);
+      const cloudCars = await pullCars(pullUserId, setSyncStatus);
+      if (!isCurrentPull()) return;
       if (cloudCars.length > 0) {
         setCars(cloudCars);
         localStorage.setItem('race_notes_cars', JSON.stringify(cloudCars));
@@ -616,42 +645,63 @@ export default function App() {
         }
       }
 
-      const cloudShock = await pullShockSessions(user.id, setSyncStatus);
+      const cloudShock = await pullShockSessions(pullUserId, setSyncStatus);
+      if (!isCurrentPull()) return;
       if (cloudShock.length > 0) {
         setShockSessions(cloudShock);
         localStorage.setItem('race_notes_shock_graphs', JSON.stringify(cloudShock));
       }
 
       const cloudMaint = await pullMaintenanceComponents(setSyncStatus);
+      if (!isCurrentPull()) return;
       if (cloudMaint.length > 0) {
         setMaintenance(cloudMaint);
         localStorage.setItem('race_notes_maintenance', JSON.stringify(cloudMaint));
       }
       const cloudMaintLogs = await pullMaintenanceLogs(setSyncStatus);
+      if (!isCurrentPull()) return;
       if (cloudMaintLogs.length > 0) {
         setMaintenanceLogs(cloudMaintLogs);
         localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(cloudMaintLogs));
       }
 
       const cloudClTemplates = await pullChecklistTemplates(setSyncStatus);
+      if (!isCurrentPull()) return;
       if (cloudClTemplates.length > 0) {
-        setChecklistTemplates(cloudClTemplates);
-        localStorage.setItem('race_notes_checklist_templates', JSON.stringify(cloudClTemplates));
+        setChecklistTemplates(prev => {
+          const merged = [...prev];
+          for (const cloud of cloudClTemplates) {
+            const index = merged.findIndex(local => local.id === cloud.id);
+            if (index < 0) merged.push(cloud);
+            else if ((cloud.updatedAt || '') >= (merged[index].updatedAt || '')) merged[index] = cloud;
+          }
+          localStorage.setItem('race_notes_checklist_templates', JSON.stringify(merged));
+          return merged;
+        });
       }
       const cloudWkndChecklists = await pullWeekendChecklists(setSyncStatus);
+      if (!isCurrentPull()) return;
       if (cloudWkndChecklists.length > 0) {
         setWeekendChecklists(cloudWkndChecklists);
         localStorage.setItem('race_notes_weekend_checklists', JSON.stringify(cloudWkndChecklists));
       }
 
       setSyncStatus('Synced');
-      setPullDone(true); // gates [4] auto-create so a 2nd device can't duplicate
       setTimeout(() => setSyncStatus(''), 3000);
       // Re-enable "Saved" flashes after pull-driven state settles.
-      setTimeout(() => { suppressPullRef.current = false; }, 800);
+      setTimeout(() => { if (isCurrentPull()) suppressPullRef.current = false; }, 800);
     };
 
-    doPull();
+    doPull().catch(error => {
+      if (!isCurrentPull()) return;
+      console.warn('Cloud pull failed:', error);
+      setSyncStatus('Offline — local data ready');
+    }).finally(() => {
+      if (!isCurrentPull()) return;
+      setPullDone(true); // checklist reconciliation may now use merged/local data
+      setTimeout(() => { if (isCurrentPull()) suppressPullRef.current = false; }, 800);
+    });
+    return () => { if (pullGenerationRef.current === generation) pullGenerationRef.current += 1; };
   }, [user]);
 
   // ── One-time backfill: assign legacy data to a default car ────────────────
@@ -1262,23 +1312,24 @@ export default function App() {
       >
         {/* TopAppBar component with logo title & dual NEW entries triggers */}
         <header className="bg-surface w-full top-0 sticky border-b border-outline-variant z-40">
-          <div className="flex justify-between items-center px-4 md:px-6 py-3 w-full">
-            <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap justify-between items-center gap-y-1 px-4 md:px-6 py-3 w-full">
+            <div className="flex min-w-0 items-center gap-1.5">
               <span className="material-symbols-outlined text-primary text-xl">headset_mic</span>
               <h1 className="font-display font-bold tracking-tight text-base text-primary uppercase">
                 CREW CHIEF
               </h1>
             </div>
             
-            <div className="flex items-center gap-1">
-              {/* Help / Reference sheet ([27]) */}
+            <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1">
+              {/* Tuning Guide sheet ([27]) */}
               <button
                 onClick={() => setHelpOpen(true)}
-                aria-label="Open help & reference"
-                title="Help & quick reference"
-                className="flex items-center justify-center min-w-12 min-h-12 rounded-full text-on-surface-variant hover:text-primary transition-colors"
+                aria-label="Tuning Guide"
+                title="Tuning Guide"
+                className="flex min-w-0 max-w-full flex-wrap items-center justify-center gap-1 px-2 min-h-12 rounded-full text-on-surface-variant hover:text-primary transition-colors text-center leading-tight"
               >
-                <span className="material-symbols-outlined text-[20px]">help</span>
+                <span className="material-symbols-outlined text-[20px]">menu_book</span>
+                <span className="font-mono text-[11px] font-semibold">Tuning Guide</span>
               </button>
               {/* Sunlight / theme-mode toggle ([32]) */}
               <button
@@ -1552,6 +1603,7 @@ export default function App() {
                   activeCarId={activeCarId}
                   initialSubTab={trackersSubTab}
                   checklistTemplates={checklistTemplates}
+                  starterTemplatesReady={authReady && (!user || pullDone)}
                   onSaveChecklistTemplates={handleSaveChecklistTemplates}
                   onDeleteChecklistTemplate={handleDeleteChecklistTemplate}
                 />
@@ -1569,7 +1621,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('dashboard')}
             id="tab-btn-dashboard"
-            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
+            className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
               activeTab === 'dashboard' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
@@ -1579,7 +1631,7 @@ export default function App() {
             >
               dashboard
             </span>
-            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
+            <span className="w-full min-w-0 text-center font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-tight leading-none break-words whitespace-normal">
               Dashboard
             </span>
           </button>
@@ -1588,7 +1640,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('setups')}
             id="tab-btn-setups"
-            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
+            className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
               activeTab === 'setups' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
@@ -1598,7 +1650,7 @@ export default function App() {
             >
               settings_input_component
             </span>
-            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
+            <span className="w-full min-w-0 text-center font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-tight leading-none break-words whitespace-normal">
               Setups
             </span>
           </button>
@@ -1607,7 +1659,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('raceweekend')}
             id="tab-btn-raceweekend"
-            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
+            className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
               activeTab === 'raceweekend' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
@@ -1617,7 +1669,7 @@ export default function App() {
             >
               timer
             </span>
-            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
+            <span className="w-full min-w-0 text-center font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-tight leading-none break-words whitespace-normal">
               Sessions
             </span>
           </button>
@@ -1625,14 +1677,14 @@ export default function App() {
           {/* Trackers Button */}
           <button onClick={() => setActiveTab('trackers')}
             id="tab-btn-trackers"
-            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
+            className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
               activeTab === 'trackers' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}>
             <span className="material-symbols-outlined text-[20px]"
                   style={{ fontVariationSettings: activeTab === 'trackers' ? "'FILL' 1" : "'FILL' 0" }}>
               monitoring
             </span>
-            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
+            <span className="w-full min-w-0 text-center font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-tight leading-none break-words whitespace-normal">
               Trackers
             </span>
           </button>
@@ -1643,7 +1695,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('settings')}
             id="tab-btn-settings"
-            className={`flex flex-col items-center justify-center w-14 h-full transition-all cursor-pointer ${
+            className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
               activeTab === 'settings' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
@@ -1653,7 +1705,7 @@ export default function App() {
             >
               settings
             </span>
-            <span className="font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-wider">
+            <span className="w-full min-w-0 text-center font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-tight leading-none break-words whitespace-normal">
               Settings
             </span>
           </button>

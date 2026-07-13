@@ -73,7 +73,7 @@ _(follow-up items discovered during QA — do not expand an in-flight WS)_
 
 ## UX Overhaul (branch `preview-v3`, started 2026-07-12)
 
-Separate track from WS-N…Z. Source: `docs/UX_ANALYSIS_2026-07-12.md` (historical Fable audit, 37 recs) → `docs/IMPLEMENTATION_PLAN_2026-07-12.md` (7 chunks). Current owner routing: GPT 5.6 SOL High plans/QAs, GPT 5.6 Terra High builds; disclose when unavailable. `/caveman full`. Consolidated QA per chunk + `tsc` (3-baseline) / `vite build` gates. Runtime QA accumulates on v3 APK and Netlify drafts.
+Separate track from WS-N…Z. Source: `docs/UX_ANALYSIS_2026-07-12.md` (historical Fable audit, 37 recs) → `docs/IMPLEMENTATION_PLAN_2026-07-12.md` (7 chunks). Current owner routing: GPT 5.6 SOL High plans/QAs, GPT 5.6 Terra High builds; runtime metadata is authoritative and unobservable identity is `unverified`. `/caveman full`. Consolidated QA per chunk + `tsc` (3-baseline) / `vite build` gates. Runtime QA accumulates on v3 APK and Netlify drafts.
 
 | Chunk | Scope | Status | Commit |
 |---|---|---|---|
@@ -81,7 +81,8 @@ Separate track from WS-N…Z. Source: `docs/UX_ANALYSIS_2026-07-12.md` (historic
 | 2 | App shell: 6→5 tabs (QuickRef→HelpSheet), race-day order, ContextStrip (car+weekend, car hidden ≤1), sunlight toggle, auto-create-first-car, auto-activate-weekend, scroll preservation + Android back (`backStack.ts`), offline badge (`saveStatus.ts`) | ✅ complete (PASS, no blockers) | 306445d |
 | 3 | Sessions owns weekends (modals moved out of App.tsx, −451 lines), quick-log top-to-bottom + SAVE RUN, `LapTimeKeypad`, 3×3 diagnostics `SegmentedGrid`, `sessionSequence.ts` auto-name/prefill | ✅ complete (PASS, no blockers; pure fns harness-PASS) | c68f27d |
 | 4 | Dashboard: launchpad + "+LOG RUN" hero + first-run card + sorting + ⋯/Undo + scoped quick-service/Accounting | ✅ complete | 21405e9 |
-| 5 | Setups: corner cards + steppers, **four-bar quick-adjust (fast, not hidden)**, tires sub-view, copy-last-setup, diff entry, propagation toast | ⬜ pending | — |
+| R1 | **URGENT pre-Chunk-5 regression repair:** Dashboard-first team banner, WCAG light accent/type floor, named AFCO-scoped Tuning Guide, deterministic exact starter-template convergence | ✅ complete — CODE_PASS + RUNTIME_PASS; Android 4.0 (15); SOL→Terra→SOL metadata verified | this UX-R1 commit |
+| 5 | Setups: corner cards + steppers, **four-bar quick-adjust (fast, not hidden)**, tires sub-view, copy-last-setup, diff entry, propagation toast | ⬜ pending — unblocked; do not start until next work order | — |
 | 6 | Trackers: hybrid Main Checklist (core-reset + ad-hoc), merge Templates, service-from-dashboard + auto-accounting, accounting defaults | ⬜ pending | — |
 | 7 | Export share (Web Share), contextual help "?", racing-language copy audit, font-zoom sweep | ⬜ pending | — |
 
@@ -90,9 +91,10 @@ Separate track from WS-N…Z. Source: `docs/UX_ANALYSIS_2026-07-12.md` (historic
 - 2026-07-12 · UX-C2 · Fable QA · PASS (no blockers) · back-handling no trap/double-handle; one-shot guards (auto-car/weekend) correct; `byActiveCar` byte-identical; dual-writes intact. Backlog: dashboard 2-press exit; auto-car dup if signed-in pull errors→[]; reportSave(synced) TODO; prune `'quickref'` union.
 - 2026-07-12 · UX-C3 · Fable QA · PASS (no blockers) · move-out faithful (weather/image/guards/tire-lifecycle/dual-writes preserved via line-diff); undo delete lazy; diagnostics round-trip; keypad string. Pure fns harness PASS. Backlog: deleting weekend still shows in ContextStrip/Dashboard during undo window.
 - 2026-07-12 · UX-C4 · current Codex + cavecrew review · PASS-WITH-NOTES · exact named GPT 5.6 routes unavailable/disclosed. Initial review found 3 critical issues (cross-car service, immediate session delete, fresh-flow continuation); fixed. lint exact 3 baseline; build/Gradle green; Android fresh flow/service-accounting Undo/session Undo pass; draft auth gate clean. Commit `21405e9`; draft `6a5458d75d0c165c44d0ef9f`.
+- 2026-07-13 · UX-R1 · SOL/Terra/SOL runtime-verified · PASS · five-tab named Tuning Guide; AFCO class/chassis scoping; light accent + 12px floor; deterministic starter convergence; offline local icons/PWA precache; 320×800 theme × four-font matrix; cold offline Android pass. `turn_context.model` is authoritative; earlier generic self-reports of model unavailability were incorrect.
 
 ### UX backlog (non-blocking)
-- C2: dashboard needs 2 back-presses to exit; auto-create-first-car dup-risk if signed-in `pullCars` returns `[]` on error; wrap `doPull` in try/finally so `pullDone` always sets (offline fresh-install car); wire `reportSave('synced')` into `sync.ts` push helpers; prune dead `'quickref'` in the `activeTab` union.
+- C2: dashboard needs 2 back-presses to exit; wire `reportSave('synced')` into `sync.ts` push helpers; prune dead `'quickref'` in the `activeTab` union. UX-R1 added generation/user guards so stale or failed pulls cannot mark readiness for the wrong auth state.
 - C3: pending-delete weekend visible in ContextStrip/Dashboard during 5s undo window (cosmetic); `initialAction='new-session'` with no active weekend opens weekend-create; empty bestLap persists as `"s"` (pre-existing).
 - C1: add focus-trap to `BottomSheet` (a11y).
 - C4: rare no-active-car Add Tire/Smasher buttons still use disabled prerequisite UI; convert while Setups is rebuilt in C5. Global ContextStrip can still show a weekend pending Dashboard undo. App.tsx orchestration grew beyond the ~10-line wiring target; domain-state ownership remains correct.

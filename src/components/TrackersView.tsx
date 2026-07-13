@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Todo, AccountingEntry, RaceWeekend, MaintenanceComponent, MaintenanceLog, Setup, MaintenanceCategory, MAINTENANCE_CATEGORIES, MaintenanceIntervalType, ChecklistTemplate, CHECKLIST_CATEGORIES } from '../types';
 import { AppUser } from '../lib/supabase';
 import { getComponentStatus, applyServiceLog, DEFAULT_COMPONENTS } from '../lib/maintenance';
-import { STARTER_TEMPLATES, materializeStarterTemplate } from '../lib/checklists';
+import { STARTER_TEMPLATES, isUntouchedStarterTemplate, materializeStarterTemplate } from '../lib/checklists';
 import ToDoView from './ToDoView';
 import EmptyState from './ui/EmptyState';
 
@@ -28,6 +28,7 @@ interface TrackersViewProps {
   savedSetups: Setup[];
   activeCarId: string | null;
   checklistTemplates: ChecklistTemplate[];
+  starterTemplatesReady: boolean;
   onSaveChecklistTemplates: (t: ChecklistTemplate[]) => void;
   onDeleteChecklistTemplate: (id: string) => void;
   initialSubTab?: SubTab;
@@ -641,9 +642,10 @@ function ServiceTab({
 // ── Templates Tab ────────────────────────────────────────────────────────────
 
 function TemplatesTab({
-  templates, onSaveTemplates, onDeleteTemplate,
+  templates, starterTemplatesReady, onSaveTemplates, onDeleteTemplate,
 }: {
   templates: ChecklistTemplate[];
+  starterTemplatesReady: boolean;
   onSaveTemplates: (t: ChecklistTemplate[]) => void;
   onDeleteTemplate: (id: string) => void;
 }) {
@@ -656,8 +658,12 @@ function TemplatesTab({
   const [newItemText, setNewItemText] = useState<Record<string, string>>({});
 
   const addStarterTemplates = () => {
-    const materialized = STARTER_TEMPLATES.map(s => materializeStarterTemplate(s));
-    onSaveTemplates([...templates, ...materialized]);
+    if (!starterTemplatesReady) return;
+    const materialized = STARTER_TEMPLATES
+      .filter(starter => !templates.some(template => isUntouchedStarterTemplate(template)
+        && template.name === starter.name && template.category === starter.category))
+      .map(starter => materializeStarterTemplate(starter));
+    if (materialized.length > 0) onSaveTemplates([...templates, ...materialized]);
   };
 
   const handleAddTemplate = (e: React.FormEvent) => {
@@ -712,7 +718,7 @@ function TemplatesTab({
           <span className="material-symbols-outlined text-[15px]">{showAddForm ? 'close' : 'add'}</span>
           {showAddForm ? 'Cancel' : 'New Template'}
         </button>
-        {templates.length === 0 && !showAddForm && (
+        {templates.length === 0 && !showAddForm && starterTemplatesReady && (
           <button
             onClick={addStarterTemplates}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 border border-primary/40 text-primary font-mono text-[11px] uppercase font-bold hover:bg-primary/20 transition-colors"
@@ -748,8 +754,8 @@ function TemplatesTab({
         <EmptyState
           icon="fact_check"
           title="No checklist templates yet"
-          body="Load race-ready starters or build your own checklist."
-          cta={{ label: 'Add starter templates', onClick: addStarterTemplates }}
+          body={starterTemplatesReady ? 'Load race-ready starters or build your own checklist.' : 'Finishing initial template sync before starter lists are available.'}
+          cta={starterTemplatesReady ? { label: 'Add starter templates', onClick: addStarterTemplates } : undefined}
           secondaryCta={{ label: 'Create template', onClick: () => setShowAddForm(true) }}
         />
       )}
@@ -836,7 +842,7 @@ export default function TrackersView({
   maintenanceLogs, onSaveMaintenanceLogs,
   savedSetups, activeCarId,
   initialSubTab,
-  checklistTemplates, onSaveChecklistTemplates, onDeleteChecklistTemplate,
+  checklistTemplates, starterTemplatesReady, onSaveChecklistTemplates, onDeleteChecklistTemplate,
 }: TrackersViewProps) {
   const [subTab, setSubTab] = useState<SubTab>(initialSubTab ?? 'checklist');
 
@@ -895,6 +901,7 @@ export default function TrackersView({
         {subTab === 'templates' && (
           <TemplatesTab
             templates={checklistTemplates}
+            starterTemplatesReady={starterTemplatesReady}
             onSaveTemplates={onSaveChecklistTemplates}
             onDeleteTemplate={onDeleteChecklistTemplate}
           />

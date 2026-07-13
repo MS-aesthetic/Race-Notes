@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-12) — branch `preview-v3`:** Chunk 1 `e04b15c` ✅ · Chunk 2 `306445d` ✅ · Chunk 3 `c68f27d` ✅ · Chunk 4 `21405e9` ✅ · Chunks 5-7 pending. Owner reversed rec #18 — four-bar is a top trackside adjustment, make it FAST (chunk 5), not folded. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; exact named models must be disclosed when unavailable. `/caveman full`. Status + backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
+> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunk 1 `e04b15c` ✅ · Chunk 2 `306445d` ✅ · Chunk 3 `c68f27d` ✅ · Chunk 4 `21405e9` ✅ · urgent UX-R1 regression repair ✅ (pending commit) · Chunks 5-7 pending. Chunk 5 is next and unblocked but not started. Owner reversed rec #18 — four-bar is a top trackside adjustment, make it FAST (chunk 5), not folded. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; rollout runtime metadata verifies SOL → Terra → SOL handoff. `/caveman full`. Status + backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:

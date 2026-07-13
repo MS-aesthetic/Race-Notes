@@ -1053,3 +1053,32 @@ See §2 "UI scaling — 3-tier `zoom` system" for the full mechanism (constant `
 **Fix:** switch to CSS `zoom` on the two possible app-shell roots (`#applet-main-body` for the normal app, `#applet-auth-gate` for the pre-login screen — see §7b), add a 3rd sizing tier (Standard 1x / Large 1.15x / X-Large 1.32x, X-Large being new), and normalize Chrome's text-inflation with `text-size-adjust: 100%`. Because `zoom` is a Chromium-specific property implemented identically by both Android WebView (APK) and mobile Chrome (PWA), this also fixed the cross-platform inconsistency — both now scale through the exact same rendering path.
 
 **`SettingsView.tsx` Style tab:** the font-size picker grid changed from `grid-cols-2` to `grid-cols-3` to fit the new third option.
+
+---
+
+## 23. UX-R1 Regression Repair + Codex Model Handoffs (2026-07-13)
+
+- Dashboard renders the team identity/banner before Get Race-Ready and Log Run.
+- `src/lib/colorContrast.ts` derives a readable light-mode accent against the
+  darkest real light surface without mutating the stored theme accent.
+- Explicit Tailwind `text-[8px]` through `text-[11px]` utilities render at a 12px
+  minimum. Chromium `zoom` remains the app-shell scaling path for all four sizes.
+- The persistent header exposes a named **Tuning Guide** while the bottom shell
+  stays at five tabs. Guide rows use explicit AFCO Modified/Dirt Late Model or
+  chassis-specific applicability and avoid universal fixed-pressure claims.
+- `src/lib/checklists.ts` fingerprints exact untouched starter semantics.
+  Reconciliation waits for signed-in pull settlement, seeds only missing starters,
+  removes only exact duplicates, pushes only seeded rows, and cloud-deletes only
+  discarded duplicate IDs. Customized and same-name templates survive.
+- Material Symbols Outlined is local (`material-symbols@0.45.7`); Workbox includes
+  WOFF2 and permits the 3.96 MiB font with a 5 MiB precache limit. Android cold
+  offline launch therefore keeps icons and layout intact.
+- Runtime QA: 320×800 Android WebView passed dark/light × Standard/Large/X-Large/
+  XX-Large; cold offline launch passed after HTTP/service-worker cache removal.
+  Current APK is versionCode 15/versionName 4.0 at root `race_notes.apk`.
+- Project Codex roles live in `.codex/agents/*.toml`. Model changes happen by
+  continuing one task with an explicit model override: SOL planning/QA → Terra
+  implementation → SOL QA. `handoff_thread` is for checkout/worktree/host state,
+  not model selection. Runtime truth is rollout `turn_context.payload.model`.
+  Verify config plus a smoke-token sequence with
+  `powershell -ExecutionPolicy Bypass -File scripts/verify-agent-handoff.ps1 -Token <token>`.

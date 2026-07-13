@@ -16,6 +16,8 @@ export default defineConfig(() => {
         // out of the Workbox precache manifest so the two never conflict.
         workbox: {
           globIgnores: ['**/firebase-messaging-sw.js'],
+          globPatterns: ['**/*.{js,css,html,woff2}'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
         manifest: {
           name: 'Race Notes',

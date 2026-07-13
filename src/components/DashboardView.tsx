@@ -174,6 +174,34 @@ export default function DashboardView({
   return (
     <div className="space-y-5" id="dashboard-view-root">
 
+      {/* Team identity leads Dashboard. Text uses opaque token surfaces. */}
+      {team && (
+        <section id="section-team-banner">
+          <div className="w-full bg-surface-container rounded-lg border border-outline-variant overflow-hidden shadow">
+            {team.banner_url && (
+              <div className="h-32 md:h-40 w-full relative">
+                <img src={team.banner_url} alt="Team Banner" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-surface/55" aria-hidden="true" />
+              </div>
+            )}
+            <div className="px-5 py-4 bg-surface-container">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded bg-primary text-on-primary flex items-center justify-center font-display font-bold text-xl shadow-lg border border-outline-variant/30 shrink-0">
+                  {team.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-display text-xl font-bold uppercase tracking-tight text-on-surface truncate">{team.name}</h2>
+                  <p className="font-mono text-xs text-on-surface-variant uppercase tracking-widest font-semibold flex items-center gap-1.5 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary" aria-hidden="true" />
+                    Active Team Roster
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* [1] FIRST-RUN "GET RACE-READY" */}
       <GetRaceReadyCard
         carCount={carCount}
@@ -208,39 +236,6 @@ export default function DashboardView({
           </button>
         )}
       </section>
-
-      {/* TEAM BANNER */}
-      {team && (
-        <section id="section-team-banner">
-          <div className="w-full bg-surface-container rounded-lg border border-outline-variant overflow-hidden relative shadow">
-            {team.banner_url ? (
-              <div className="h-32 md:h-40 w-full relative">
-                <img src={team.banner_url} alt="Team Banner" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-[#131313]/60 to-transparent"></div>
-              </div>
-            ) : (
-              <div className="h-24 w-full bg-surface-container-high relative overflow-hidden">
-                <div className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#5b403d_1px,transparent_1px)] [background-size:16px_16px]"></div>
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent"></div>
-              </div>
-            )}
-            <div className={`px-5 pb-4 ${team.banner_url ? 'pt-0 -mt-10 relative z-10' : 'pt-4'}`}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded bg-primary text-on-primary flex items-center justify-center font-display font-bold text-xl shadow-lg border border-outline-variant/30 shrink-0">
-                  {team.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <h2 className="font-display text-xl font-bold uppercase tracking-tight text-on-surface">{team.name}</h2>
-                  <p className="font-mono text-[10px] text-primary uppercase tracking-widest font-semibold flex items-center gap-1.5 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                    Active Team Roster
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* [9] ACTIVE WEEKEND SUMMARY — the full list lives in the Sessions tab */}
       <section id="section-active-weekend">

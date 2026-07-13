@@ -1,27 +1,28 @@
 # CREW CHIEF — Agent Handoff & Onboarding
 
 > **Purpose:** single entry point for any new LLM/agent picking up this project.
-> Read this first, then the linked docs. Last updated **2026-07-12**.
+> Read this first, then the linked docs. Last updated **2026-07-13**.
 
 > ### ⚡ Update 2026-07-12 (supersedes stale details below)
 > - **Two active trees.** Main tree `C:\Users\maxx\antigravity\Race-Notes` stays on `master` and owns the complete gitignored Android platform. UX work lives in `.worktrees\v3` on `preview-v3`. Web builds run in v3; APKs use the documented dist-to-main bridge. `.worktrees/v2` is retired.
 > - **`master` == `origin/master` == `98bb2e0`+cleanup.** The `preview` (v1) and `preview-v2` branches were retired/removed after consolidation; `master` is the single source of truth. Deploys still default to Netlify preview; production only on Maxx's explicit say-so.
 > - **Migration 014 IS applied to live Supabase** (`20260711151905`, applied 2026-07-11). Ignore older "014 not applied" notes.
-> - **Current APK provenance:** `android/app/build/outputs/apk/debug/app-debug.apk` is the Chunk 4 v3 QA build from commit `21405e9`, versionCode 14/versionName 3.9, with six Capacitor plugins including native push. Production remains unchanged.
+> - **Current APK provenance:** `C:\Users\maxx\antigravity\Race-Notes\race_notes.apk` is the UX-R1 v3 QA build, versionCode 15/versionName 4.0. Production remains unchanged.
+> - **Current Netlify draft:** `https://6a54e5f9c0cf5c7bcc9280a4--crew-chief-race-notes.netlify.app`. Production remains untouched.
 > - **Repo hygiene pass done:** removed dead PWABuilder/TWA leftovers (root gradle files, `pwabuilder-adv-sw.js`, `metadata.json`, `build_apk.bat`, `PWA_INSTRUCTIONS.md`), retired v1 `plan.md`, untracked `.idea/` + root `local.properties`, and added `android/app/google-services.json` to `.gitignore`.
 
 > ### 🎨 UX OVERHAUL track — `preview-v3` (active dev line as of 2026-07-12)
 > A dedicated UX/UI overhaul is in progress on a NEW worktree **`.worktrees/v3` (branch `preview-v3`, created from `master` `3ea6648`)**. `master` is untouched; the overhaul lands on `preview-v3` and merges to `master` only on owner approval.
 > - **Source of the work:** [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md) (Fable expert UX audit — 37 recs, cost/benefit) → [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md) (spec-driven, 7 build chunks).
-> - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High owns implementation; QA failures 1–2 return to Terra and failure 3 transfers build+final QA to SOL. Exact models were unavailable in the Chunk 4 Codex runtime and were disclosed; current Codex model plus cavecrew review preserved role separation. **`/caveman full`** stays on. One consolidated QA pass per chunk + standing `tsc --noEmit` (3-error baseline) and `vite build` gates.
-> - **Chunk status:** ✅ **1** (shared UI primitives + glove/glare/zoom hardening, `e04b15c`) · ✅ **2** (app-shell: 5-tab nav, ContextStrip, sunlight toggle, auto-car/auto-weekend, Android back, offline badge, `306445d`) · ✅ **3** (Sessions owns weekends + quick-log flow, keypad, 3×3 diagnostics, session sequencing; App.tsx −451 lines, `c68f27d`) · ✅ **4** (Dashboard launchpad, Get Race-Ready, +LOG RUN teaching/continuation, canonical weekend sorting, ⋯+Undo deletes, scoped quick-service+Accounting Undo, `21405e9`). ⬜ **5** Setups corner-cards/steppers/**four-bar quick-adjust**/tires/diff · ⬜ **6** Trackers hybrid checklist/templates-merge · ⬜ **7** Export share/contextual help/copy audit/font-zoom sweep.
+> - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High owns implementation; QA failures 1–2 return to Terra and failure 3 transfers build+final QA to SOL. Codex model overrides and rollout metadata are now verified: SOL → Terra → SOL works in one persistent task. Generic prose self-identification is not model evidence. **`/caveman full`** stays on. One consolidated QA pass per chunk + standing `tsc --noEmit` (3-error baseline) and `vite build` gates.
+> - **Chunk status:** ✅ **1** (`e04b15c`) · ✅ **2** (`306445d`) · ✅ **3** (`c68f27d`) · ✅ **4** (`21405e9`) · ✅ **UX-R1** urgent regression repair (pending commit). ⬜ **5** Setups corner-cards/steppers/**four-bar quick-adjust**/tires/diff is next and unblocked but not started · ⬜ **6** Trackers hybrid checklist/templates-merge · ⬜ **7** Export share/contextual help/copy audit/font-zoom sweep.
 > - **New reusable code (chunks 1-4):** `src/components/ui/` (`NumberStepper`, `UndoToast`+`InfoToast`, `EmptyState`, `CollapsibleSection`, `SegmentedGrid`, `BottomSheet`, `HelpSheet`, `LapTimeKeypad`); `src/lib/undo.ts`; `src/lib/backStack.ts`; `src/lib/saveStatus.ts`; `src/lib/sessionSequence.ts`; `src/lib/serviceLog.ts`; `src/lib/scope.ts` (`pickAutoWeekend`, `parseWeekendDate`, `sortWeekends`); `src/components/ContextStrip.tsx`; `src/components/GetRaceReadyCard.tsx`. CSS: `.tap-target`, `.sticky-action-bar`, `.status-chip` + light-theme contrast bump.
 > - **Owner UX answers baked into the plan:** (1) app used during the week + at the track after each run; (2) 95% single-user → assignment/concurrency deferred; (3) most teams 1 car (some 2-3) → car UI hidden at ≤1 car; (4) **four-bar changed VERY often trackside → make it FAST, not hidden** (reverses the "fold behind expander" rec — chunk 5); (5) dusk→night racing → sunlight/light-theme tuned; (6) Main Checklist = hybrid core-reset + ad-hoc (chunk 6).
 > - **Testing:** v3 APKs use the build-from-main bridge: run lint then build in v3; mirror v3 `dist` to main; run raw `npx cap sync android` (not main `npm run android:sync`, which rebuilds master); run `assembleDebug`. Current Chunk 4 APK is versionCode 14/versionName 3.9 at the standard debug output. Android emulator QA passed fresh-profile hero→weekend→new-session, quick-service cost→Accounting→Undo, and session ⋯ delete→Undo. Emulator native `screencap` showed white because WebView tile-memory/compositor warnings; direct WebView capture and DOM verified rendered UI.
 > - **Chunk 4 draft:** https://6a5458d75d0c165c44d0ef9f--crew-chief-race-notes.netlify.app (auth gate renders; zero browser console errors). Production unchanged.
 > - **⚠️ BUILD GOTCHA (cost us a blank screen):** a new git worktree does NOT get the gitignored `.env`/`.env.local`. Building the v3 web bundle without them bakes an EMPTY `VITE_SUPABASE_URL` → runtime `Error: supabaseUrl is required` → **blank screen**. Fix applied: copied `.env` + `.env.local` from the main tree into `.worktrees/v3`. Always ensure the worktree has both env files before `vite build`.
 > - **⚠️ PWA-cache gotcha:** the Workbox service worker caches the built bundle, so `adb install -r` alone can keep serving the OLD assets after a rebuild. To see a new build, **clear app data** (`adb shell pm clear nimbus.engineering.crewchief`, or Android Studio "Clear Storage") then relaunch. Debug: `adb logcat -d | findstr Capacitor/Console` surfaces WebView JS errors.
-> - **Chunk backlog (non-blocking):** dashboard needs 2 back-presses to exit; auto-create-first-car could duplicate if a signed-in cloud pull silently errors (returns `[]`); pending weekend delete remains visible in global ContextStrip during its 5s window; wire `reportSave('synced')` into `sync.ts`; prune dead `'quickref'` union; add BottomSheet focus trap; convert rare no-car Add Tire/Smasher prerequisites to teaching sheets during Chunk 5; App.tsx Chunk 4 orchestration exceeded the plan's aspirational ~10-line wiring budget but kept domain state centralized.
+> - **Chunk backlog (non-blocking):** dashboard needs 2 back-presses to exit; pending weekend delete remains visible in global ContextStrip during its 5s window; wire `reportSave('synced')` into `sync.ts`; prune dead `'quickref'` union; add BottomSheet focus trap; convert rare no-car Add Tire/Smasher prerequisites to teaching sheets during Chunk 5; App.tsx Chunk 4 orchestration exceeded the plan's aspirational ~10-line wiring budget but kept domain state centralized. UX-R1 now guards pull generations/auth switches.
 
 CREW CHIEF (brand: all caps) is a React + TypeScript PWA + Android app that helps
 dirt-track racing teams track car setups, race sessions, tire inventory, weather,
@@ -62,7 +63,7 @@ Git worktrees in play:
 | Path | Branch | Role |
 |---|---|---|
 | `C:\Users\maxx\antigravity\Race-Notes` | `master` | **Main/release tree.** Owns complete Android platform and gitignored Gradle/SDK/Firebase files. Preserve existing dirty host/generated files. |
-| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–4 complete; Chunk 5 next. Web build works here; Android platform lacks gitignored main-tree files. |
+| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–4 + UX-R1 complete; Chunk 5 next and unblocked. Web build works here; Android platform lacks gitignored main-tree files. |
 
 Audited 2026-07-12: `preview-v3` includes UX-C4 `21405e9`; `master` remains
 release/stable. Git refs do not indicate Netlify deployment state. Main-tree
@@ -134,8 +135,11 @@ may carry transient coordination; durable decisions must land in those files.
 
 > Owner instruction (2026-07-11) supersedes prior Fable/DeepSeek/Opus routing.
 > QA failures 1–2 return to Terra. Failure 3 transfers implementation to SOL;
-> SOL then performs final QA. If exact models are unavailable, disclose that fact
-> and never claim they ran.
+> SOL then performs final QA. Dispatch model changes with an explicit model
+> override on the same Codex task. `handoff_thread` moves checkout/worktree/host
+> state; it does not choose a model. Verify the executed sequence from rollout
+> `turn_context.payload.model` using `scripts/verify-agent-handoff.ps1`; if that
+> metadata is missing, say **unverified**, not unavailable.
 
 ### QA rubric (every gate is hard — any miss = FAIL)
 1. `npm run lint` clean beyond the 3-error baseline.

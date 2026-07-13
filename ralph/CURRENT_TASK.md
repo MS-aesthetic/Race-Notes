@@ -1,66 +1,204 @@
-# Current Task — UX Chunk 5: Setups + Fast Four-Bar
+# Current Task — UX-R1: Urgent Pre-Chunk-5 Regression Repair
 
-**Status:** READY TO PLAN/BUILD after UX-C4 commit `21405e9`
+**Status:** COMPLETE — CODE_PASS + RUNTIME_PASS (2026-07-13)
+**Priority:** CLOSED — UX Chunk 5 is unblocked but has not started.
 
 ## Routing
 
-- GPT 5.6 SOL High: analysis, specification, QA.
-- GPT 5.6 Terra High: implementation; QA failures 1–2 return to Terra.
+- GPT 5.6 SOL High owns this specification and final QA.
+- GPT 5.6 Terra High owns implementation. QA failures 1–2 return to Terra.
 - Third failed QA review transfers implementation and final QA to SOL.
-- If exact models are unavailable, disclose before work and never claim they ran.
-- `/caveman full`; cavecrew investigator/reviewer only for bounded delegated work.
+- Runtime metadata, not prose self-identification, proves which model ran.
+- Use `/caveman full`. Use cavecrew only for bounded investigation or diff review.
+- Evidence is settled. Do not browse or broaden product scope.
 
 ## Goal
 
-Make Setups fast trackside: physical corner cards, glove-sized steppers, visible
-four-bar quick adjustment, copy-last defaults, pressure provenance, one-tap diff,
-and Tires sub-view. Four-bar must stay prominent because owner changes it often.
+Repair four regressions before Setups work resumes: restore team identity at the
+top of Dashboard, make light-mode accent and metadata readable, restore a safe
+and clearly scoped Tuning Guide without adding a sixth tab, and make starter
+checklist hydration deterministic across offline and signed-in use.
 
-## Primary scope
+## Required behavior
 
-- New: `src/components/FourBarQuickAdjust.tsx`,
-  `src/components/TiresSubView.tsx`, `src/lib/setupSteps.ts`.
-- Modify: `src/components/SetupView.tsx`, `src/components/RaceWeekendView.tsx`,
-  `src/components/SetupDiffView.tsx`, `src/lib/setupCompat.ts`, `src/types.ts`.
-- `src/App.tsx`: wiring only if existing props cannot carry setup mutations.
-- Do not start Chunk 6/7 work.
+### 1. Team banner leads Dashboard
 
-## Acceptance
+- Render the existing team banner as Dashboard's first content block, before
+  Get Race-Ready, `+ LOG RUN`, launchpad cards, service, and accounting content.
+- Keep current team data and edit/navigation behavior. Do not create duplicate
+  team state or a second banner elsewhere.
+- Team name and metadata must remain readable over every supplied/custom image.
+  Use a deterministic scrim, gradient, or opaque text surface; never depend on
+  image brightness. Normal text must meet WCAG AA 4.5:1 and large text 3:1.
+- Missing image/team details must keep a deliberate, compact fallback with no
+  layout jump or empty decorative block.
 
-1. LF/RF/LR/RR numeric fields use physical 2×2 corner cards and shared
-   `NumberStepper`; steps live only in `setupSteps.ts`.
-2. Four-bar quick adjust is visible in Setups and reachable from quick-log in at
-   most two taps; both mounts edit the same active setup state.
-3. New setup defaults to active car's latest compatible setup, with explicit
-   Start Blank option and no legacy-field loss.
-4. Auto-carried pressure/four-bar values show source/provenance.
-5. Setup card ⋯ Compare opens existing diff with correct default pair.
-6. Tires sub-view shows active-car stagger/history and useful EmptyState.
-7. Rare no-car Add Tire/Smasher disabled prerequisites become teaching actions.
-8. Local-first dual-write, cloud sync, active-car scoping, old-data defaults,
-   themes, and all zoom levels remain intact.
-9. `npm run lint`: exact three-error baseline only. `npm run build`: pass.
-10. Netlify draft + Android emulator walkthrough; production untouched.
+### 2. Readable rendered accent and global text floor
 
-## Required context
+- Keep the user's stored accent value byte-for-byte unchanged. Do not migrate,
+  clamp, or overwrite `race_notes_theme` or the Style picker value.
+- Add a pure helper that derives the rendered light-theme accent from the stored
+  accent and the actual light surface. Preserve hue as closely as practical,
+  adjust only presentation, and deterministically choose the nearest color that
+  meets WCAG AA: 4.5:1 where used for normal text and 3:1 for large text,
+  controls, icons, borders, and focus indicators. Dark-theme rendering must not
+  regress.
+- Feed derived color through existing CSS theme variables. Components continue
+  using semantic tokens; no component-local hardcoded color fixes.
+- Raise global tiny-copy floor to 12 CSS px at standard zoom. Remove utilities or
+  transforms that render app labels/metadata below that floor.
+- Strengthen faint light-mode metadata and secondary-text tokens to 4.5:1 on
+  their normal surfaces. Disabled-state and purely decorative exceptions must
+  remain distinguishable and must not carry essential information alone.
+- Verify standard, large, xlarge, and xxlarge zoom. No clipping, overlap, hidden
+  actions, or horizontal page scroll.
 
-Read `HANDOFF.md` UX block, `docs/IMPLEMENTATION_PLAN_2026-07-12.md` Chunk 5,
-`ralph/STATE.md`, and `CODEBASE_KNOWLEDGE.md` Chunk 4 override before editing.
+### 3. Prominent, scoped, safe Tuning Guide
 
-## Build/Android gotchas
+- Retain exactly five bottom tabs. Do not restore `quickref` as a tab.
+- Add a prominent action labeled exactly **Tuning Guide** to the existing help
+  entry surface so it is named and reachable in one tap from the persistent help
+  control. Preserve other HelpSheet content and back behavior.
+- Label guide applicability at both guide and row/section level. Separate
+  **Modified** and **Dirt Late Model** guidance; never present chassis-specific
+  AFCO direction as universal advice. State that these are baseline diagnostic
+  directions and chassis, tire, shock-builder, and track rules prevail.
+- Correct the already-flagged contradictory or unsafe setup rows only from the
+  supplied official AFCO Modified and Dirt Late Model evidence. Keep conflicting
+  application-specific directions in separate labeled rows. Do not invent a
+  blended rule or perform new web research.
+- Remove every universal claim that a pressure change of `5 PSI`, or any fixed
+  pressure change, is a minimum or inherently safe. Pressure guidance must defer
+  to tire manufacturer, chassis builder, measured hot pressure, and track rules.
+- Preserve and surface the warning to change one item at a time, record the
+  result, and revert if behavior worsens.
+- Keep factual source attribution in the guide: official AFCO Modified and Dirt
+  Late Model setup guidance. Do not add unsupported safety or performance claims.
 
-- v3 must contain gitignored `.env` and `.env.local` before build.
-- Gate order: lint, v3 build, copy v3 `dist` to main, raw
-  `npx cap sync android`, Gradle `assembleDebug`.
-- Never run main-tree `npm run android:sync` during bridge; it rebuilds master.
-- Bump live main-tree Android versionCode/versionName for each installable APK.
-- Clear emulator app data after install to defeat stale Workbox cache.
+### 4. Exact starter-template reconciliation
 
-## UX-C4 handoff evidence
+- Add a pure, exported helper for an **untouched starter fingerprint**. Fingerprint
+  only canonical starter semantics: starter name plus ordered item text and any
+  starter-defined behavior fields. Ignore generated IDs, owner/team IDs, cloud
+  timestamps, and bookkeeping fields. Comparison is exact after applying only
+  existing persisted-data defaults; do not lowercase, trim, sort, fuzzy-match,
+  or identify a starter by name alone.
+- A customized starter is not an untouched starter. A user template with the same
+  name is not an untouched starter. Preserve both unchanged.
+- During hydration, reconcile each canonical starter independently:
+  1. Keep one exact untouched copy using an order-independent deterministic
+     keeper rule with ID as final tie-break.
+  2. Seed only canonical starters whose exact fingerprint is absent.
+  3. Remove only additional exact untouched copies.
+- Signed-out/offline-local hydration may reconcile after local hydration. When a
+  user is signed in, do not seed or dedupe until the signed-in cloud pull attempt
+  has settled and local/cloud data has been merged. No transient defaults may be
+  pushed before pull completion.
+- Persist the reconciled survivor set to React state and localStorage. When signed
+  in, push newly seeded survivors and call the existing checklist-template cloud
+  delete helper for every discarded duplicate ID. Never delete by name or
+  fingerprint query.
+- Repeated hydration, array reordering, offline restart, login, logout, pull
+  success, and pull failure must converge without creating another starter or
+  deleting customized/same-name templates.
 
-- Commit: `21405e9`.
-- Draft: `https://6a5458d75d0c165c44d0ef9f--crew-chief-race-notes.netlify.app`.
-- APK: main standard debug output, versionCode 14/versionName 3.9.
-- Verified: fresh auto-car/onboarding/hero/weekend/new-session flow;
-  service cost creates linked Accounting expense and Undo removes both;
-  session ⋯ delete/Undo; no runtime exceptions.
+## Explicit file scope
+
+Implementation may touch only these production areas:
+
+- `src/App.tsx` — minimal hydration/theme/help wiring only.
+- `src/index.css` — semantic theme-token contrast and global type floor.
+- `src/components/DashboardView.tsx` and its existing team-banner component, if
+  already extracted — ordering/fallback/contrast only.
+- `src/components/ui/HelpSheet.tsx` — named Tuning Guide entry and in-sheet
+  navigation only.
+- Existing Tuning/Quick Reference guide component or data module — applicability,
+  AFCO-backed row corrections, pressure disclaimer, and warning only.
+- Existing checklist template manager component — reconciliation wiring only.
+- `src/lib/checklists.ts` — fingerprint, classification, deterministic reconcile.
+- `src/lib/sync.ts` — only existing pull/delete integration needed for convergence.
+- One new pure color helper under `src/lib/`.
+- New focused harness files under `scripts/` for color contrast and starter
+  reconciliation.
+
+Builder may use bounded `rg` to resolve an existing extracted component's exact
+filename. Any other production file requires planner approval before editing.
+No schema, migration, dependency, router, tab-count, or unrelated Chunk 5/6/7
+changes.
+
+## Required harnesses
+
+1. **Accent harness:** representative user accents including very light, very
+   dark, saturated, achromatic, short hex, and invalid legacy input. Assert
+   deterministic fallback, unchanged stored input, and required contrast against
+   actual light surfaces for every semantic use.
+2. **Starter harness:** empty state; one untouched copy; duplicate untouched
+   copies in every order; customized starter; same-name custom template; missing
+   one starter; legacy missing optional fields; offline repeat; merged local/cloud
+   repeat. Assert idempotence, order-independent keeper, exact seed/delete ID sets,
+   and preservation of every non-exact template.
+
+Harnesses must run from documented Windows commands without network access and
+must fail nonzero on any assertion.
+
+## Acceptance and QA gates
+
+1. Dashboard banner is visually first and its text meets stated contrast on
+   bright, dark, and high-detail images plus no-image fallback.
+2. Stored accent remains exact; rendered light accent and metadata meet stated
+   WCAG ratios. Dark theme remains readable.
+3. No app text renders below 12 CSS px at standard zoom. Light/dark at standard,
+   large, xlarge, and xxlarge show no clipping, overlap, lost actions, or page
+   horizontal scroll.
+4. Exactly five bottom tabs remain. **Tuning Guide** is prominent, named, one-tap
+   reachable from help, and back behavior returns to prior view.
+5. Guide clearly separates Modified from Dirt Late Model applicability, matches
+   supplied official AFCO evidence, contains no contradictory blended rows or
+   universal `5 PSI`/fixed-pressure safety claim, and retains one-change-at-a-time
+   warning.
+6. Starter harness proves exact-only, idempotent, order-independent reconciliation.
+   Customized and same-name templates survive byte-for-byte.
+7. Signed-in pull is settled before reconciliation. Offline-first use, then login,
+   and a second device/cloud pull converge to one copy of each untouched starter.
+   Every discarded exact duplicate ID receives cloud delete; no other ID does.
+8. Local-first writes, team sharing/RLS behavior, and existing checklist CRUD stay
+   intact. Pull failure settles safely and does not create repeated defaults.
+9. `npm run lint` reports exactly the three known baseline errors and no new error.
+10. `npm run build` succeeds in the v3 worktree with required environment files.
+11. Both focused harnesses pass. Record exact commands and output summaries.
+12. Deploy a Netlify **draft** only. Hard-refresh/incognito visual QA covers bright
+    and dark banners, light/dark themes, all four zooms, five tabs, Tuning Guide,
+    and checklist reload/login convergence. Production remains untouched.
+13. Build Android through the documented v3-dist-to-main bridge, bump installable
+    versionCode/versionName, install with app data cleared, and repeat critical
+    banner/theme/guide/checklist flows. Record APK path and version.
+14. Terra reports exact files changed, harness evidence, lint baseline, build,
+    draft URL, offline/login convergence evidence, and Android evidence. SOL QA
+    independently verifies diff scope and all gates before unblocking Chunk 5.
+
+## Completion record — 2026-07-13
+
+- Product: banner leads Dashboard; light accent derives against the darkest light
+  surface; explicit 8–11px utilities floor at 12px; five-tab shell exposes a named
+  Tuning Guide; AFCO applicability/pressure language corrected; starter hydration
+  converges without deleting customized or same-name templates.
+- Offline: Material Symbols Outlined bundled locally and included in Workbox's
+  WOFF2 precache. Cold Android launch passed with Wi-Fi/data disabled and WebView
+  HTTP/service-worker caches removed.
+- Responsive runtime: Android WebView at 320×800 passed dark/light × Standard,
+  Large, X-Large, and XX-Large. Root/shell/nav had no horizontal scroll; five tab
+  labels/icons and Tuning Guide remained visible.
+- Gates: both UX-R1 harnesses PASS; build PASS; lint remained exactly the three
+  known baseline errors; independent cavecrew review found no product defect.
+- Android: debug APK versionCode 15/versionName 4.0 at
+  `C:\Users\maxx\antigravity\Race-Notes\race_notes.apk`.
+- Netlify draft: `https://6a54e5f9c0cf5c7bcc9280a4--crew-chief-race-notes.netlify.app`.
+  Draft auth gate rendered without horizontal overflow and loaded the local icon
+  font. Production remained untouched.
+- Model routing: fresh token `handoff-live-7139` passed SOL → Terra → SOL in one
+  task. Rollout `turn_context.payload.model` recorded `gpt-5.6-sol` →
+  `gpt-5.6-terra` → `gpt-5.6-sol`, all high effort. Verify with
+  `scripts/verify-agent-handoff.ps1 -Token handoff-live-7139`.
+- Scope exception: `material-symbols@0.45.7`, `package*.json`, and `vite.config.ts`
+  were added after runtime failure proved externally hosted icons broke offline
+  layout. Workbox now precaches the emitted WOFF2 under a 5 MiB cap.

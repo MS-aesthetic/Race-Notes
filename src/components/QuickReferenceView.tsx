@@ -6,6 +6,7 @@ type TrackCondition = 'all' | 'slick' | 'rubber' | 'wet' | 'tacky';
 type CarBehavior = 'select' | 'loose-entry' | 'loose-center' | 'loose-exit'
                  | 'tight-entry' | 'tight-center' | 'tight-exit' | 'need-drive';
 type AdjPriority = 'high' | 'medium' | 'low';
+type AdjustmentApplication = 'Dirt Late Model' | 'Modified' | 'Class/chassis-specific';
 
 interface Adjustment {
   component: string;
@@ -13,6 +14,13 @@ interface Adjustment {
   action: string;
   effect: string;
   priority: AdjPriority;
+  application?: AdjustmentApplication;
+}
+
+function adjustmentApplicability(adjustment: Adjustment): string {
+  if (adjustment.application === 'Dirt Late Model') return 'Dirt Late Model only — verify the applicable AFCO sheet';
+  if (adjustment.application === 'Modified') return 'Modified only — verify the applicable AFCO sheet';
+  return 'Class/chassis-specific — use the applicable AFCO sheet; change one item';
 }
 
 interface ConditionGroup {
@@ -62,12 +70,12 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
     ],
     conditionAdjustments: {
       slick: [
-        { component: 'Shocks', location: 'Both Fronts', action: 'Stiffen compression even more vs. tacky', priority: 'high',
-          effect: 'On dry-slick, the superior combo is stiffen LF compression AND stiffen LR rebound. This slows violent nose dive and holds the left rear chassis down, keeping rear tires flat and planted to prevent sudden loss of side bite.' },
+        { component: 'Shocks', location: 'Both Fronts', action: 'Stiffen compression; verify LR rebound separately', priority: 'high',
+          effect: 'For a loose-entry condition, do not reverse the LR-rebound direction in the same recommendation. Use the applicable AFCO Modified or Dirt Late Model shock sheet, make one measured change, and record the result.' },
         { component: 'J-Bar', location: 'Both Ends', action: 'Lower both equally (to center of pinion or below)', priority: 'high',
           effect: 'On dry-slick, lower the J-bar on both ends to lower the rear roll center. This makes the chassis roll slowly and progressively rather than abruptly, preventing the rear from snapping loose on a low-grip surface.' },
-        { component: 'Tires', location: 'Left Rear', action: 'Lower Pressure (6–8 PSI)', priority: 'medium',
-          effect: 'Slick tracks demand maximum LR contact patch. Lower LR pressure increases footprint width to extract every bit of available mechanical grip.' },
+        { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'medium',
+          effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules. No universal cold-pressure number is safe for every package.' },
       ],
       rubber: [
         { component: 'Shocks', location: 'Right Front', action: 'More Compression (controlled)', priority: 'medium',
@@ -122,8 +130,8 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       slick: [
         { component: 'Shocks', location: 'Both Fronts', action: 'Decrease compression + Soften LR rebound', priority: 'high',
           effect: 'On dry-slick, lower J-bar both ends AND soften LR rebound. Do NOT over-soften front compression as it can make the front wash out. The J-bar and LR rebound combo keeps the rear compliant without sacrificing front stability.' },
-        { component: 'Tires', location: 'Right Front', action: 'Lower Pressure (10–12 PSI)', priority: 'medium',
-          effect: 'Softer RF carcass increases the steering contact patch on a slick track, giving the front more grip to steer rather than plow.' },
+        { component: 'Tires', location: 'Right Front', action: 'Verify pressure with tire maker and chassis builder', priority: 'medium',
+          effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules; do not copy a universal numeric setting.' },
       ],
       rubber: [
         { component: 'Cross-Weight', location: 'RF or LR Perch', action: 'Reduce slightly', priority: 'medium',
@@ -149,8 +157,8 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
     subtitle: 'Loose-Middle / Oversteer at Apex',
     type: 'tighten',
     baseAdjustments: [
-      { component: 'Shocks', location: 'Right Front', action: 'Less Rebound (Decrease)', priority: 'high',
-        effect: 'Decreasing RF rebound allows the nose to rise faster as the driver picks up throttle. The rising nose transfers weight rearward more quickly, loading the rear tires and planting the rear before it can slide. This is the premier mid-corner shock fix from GRT.' },
+      { component: 'Shocks', location: 'Right Front', action: 'Verify RF rebound direction for class/chassis', priority: 'high',
+        effect: 'RF rebound direction differs by class and chassis package. Use only the applicable AFCO Modified or Dirt Late Model sheet, make one measured change, and record the result.' },
       { component: 'Shocks', location: 'Left Rear', action: 'Less Compression (Decrease)', priority: 'high',
         effect: 'Decreasing LR compression allows the left rear to compress more freely. This lets the chassis settle smoothly onto the rear tires without the abrupt "bounce" that can cause the rear to step out at the apex.' },
       { component: 'Shocks', location: 'Right Rear', action: 'More Compression (Increase)', priority: 'high',
@@ -178,11 +186,11 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       slick: [
         { component: 'Shocks', location: 'Right Rear', action: 'Soften compression + Stiffen LR compression', priority: 'high',
           effect: 'The ultimate dry-slick mid-corner tightening combo: soften RR compression to maximize the RR tire footprint on the outside tire, while stiffening LR compression keeps the LR chassis from collapsing too quickly, maintaining rear steer geometry.' },
-        { component: 'Tires', location: 'Right Rear', action: 'Lower Pressure (10–13 PSI)', priority: 'high',
-          effect: 'A dry-slick track offers minimal grip. Lower RR pressure enlarges the side bite contact patch — the only available mechanical grip at the apex on a slick surface.' },
+        { component: 'Tires', location: 'Right Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'high',
+          effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules; do not copy a universal numeric setting.' },
       ],
       rubber: [
-        { component: 'Shocks', location: 'Right Rear', action: 'Stiffen RF rebound (instead of decrease)', priority: 'high',
+        { component: 'Shocks', location: 'Right Front', action: 'Stiffen RF rebound (instead of decrease)', priority: 'high',
           effect: 'On heavy/tacky tracks, mid-corner looseness usually stems from front tires biting too aggressively. The best move is to stiffen RF rebound. This prevents the nose from lifting under early throttle, keeping front tires steered and cutting a clean arc through the groove.' },
       ],
       wet: [
@@ -191,7 +199,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       ],
       tacky: [
         { component: 'Stagger', location: 'Rear Axle', action: 'Reduce stagger', priority: 'medium',
-          effect: 'On a tacky track the surface provides side bite aggressively. Add stagger to the baseline adjustment reduces the mid-corner rotation, helping the car stay stable rather than swapping ends on the high-grip surface.' },
+          effect: 'On a tacky track the surface provides side bite aggressively. Reducing stagger from the baseline reduces natural mid-corner rotation, helping the car stay stable on the high-grip surface.' },
       ],
     },
   },
@@ -277,8 +285,8 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
         effect: 'More LR rebound slows the LR chassis hike-up speed on throttle. Delayed rear steer onset keeps the car planted longer before rear steer begins — extends the drive window.' },
       { component: 'Shocks', location: 'Right Rear', action: 'More Rebound (increase)', priority: 'medium',
         effect: 'More RR rebound resists the RR shock from extending as the car flattens out. This keeps RR side bite pinned longer through the exit phase.' },
-      { component: 'Tires', location: 'Left Rear', action: 'Lower Pressure (5–9 PSI)', priority: 'high',
-        effect: 'Maximizes LR tire footprint width and length. The LR is the primary source of forward traction — give it the most contact patch possible. If spinning on throttle, this is one of the highest-impact changes.' },
+      { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'high',
+        effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules. Do not treat a copied numeric setting as a universal safety limit.' },
       { component: 'Tire Spacing', location: 'Left Rear', action: 'Add ½" Wheel Spacer', priority: 'medium',
         effect: 'A LR spacer widens the left-side track, keeping the LR tire flatter and more loaded under acceleration — increases forward traction and tightens corner exit.' },
       { component: 'Tire Spacing', location: 'Right Rear', action: 'Move RR inboard ½"', priority: 'medium',
@@ -294,16 +302,16 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
           effect: 'A dry-slick track demands the slowest, most progressive torque delivery possible. Maximum pull bar compliance prevents the slightest tire spin on a surface with virtually no grip.' },
         { component: 'Shocks', location: 'Right Rear', action: 'Double-spring RR combination', priority: 'high',
           effect: 'On dry-slick, run a double spring RR combination (e.g., 10"×100 lb inner + 12"×150 lb barrel outer spring). This provides the same entry roll rate as a single spring but delivers a softer, highly compliant exit rate for ultimate traction.' },
-        { component: 'Shocks', location: 'Left Rear (5th coil)', action: 'Decrease LR rebound + Increase gas pressure in LR front/5th coil shock', priority: 'medium',
-          effect: 'On dry-slick, decrease LR rebound behind the shock to increase LR bite. Also increase nitrogen gas pressure in the LR front or 5th coil shock to help hold the rear up under deceleration and control axle rotation under power.' },
+        { component: 'Shocks', location: '5th Coil', action: 'Verify gas-pressure change on applicable AFCO sheet', priority: 'medium', application: 'Dirt Late Model',
+          effect: 'For a Dirt Late Model with a fifth-coil package, verify the specified gas-pressure direction on the applicable AFCO sheet. Make only that measured change before evaluating drive.' },
       ],
       rubber: [
         { component: 'Pull Bar', location: 'Spring', action: 'Can stiffen slightly vs. slick', priority: 'low',
           effect: 'The rubber groove provides significantly more grip. A moderately stiffer pull bar is acceptable in the groove — the track can handle more torque without spinning.' },
       ],
       wet: [
-        { component: 'Tires', location: 'Left Rear', action: 'Raise to 8–11 PSI (vs. slick)', priority: 'medium',
-          effect: 'On heavy/wet tracks, mud buildup affects handling. Slightly higher pressure than slick settings prevents excessive deformation in soft dirt.' },
+        { component: 'Tires', location: 'Left Rear', action: 'Recheck pressure against tire and track guidance', priority: 'medium',
+          effect: 'Wet-track tire pressure depends on construction, measured hot pressure, chassis guidance, and track rules. Do not use a fixed number as a safety threshold.' },
       ],
       tacky: [
         { component: 'Shocks', location: 'Right Rear', action: 'Soften RR compression', priority: 'high',
@@ -339,8 +347,8 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
         effect: 'Moving the pull bar to the right loosens the corner exit by shifting the torque loading away from the LR tire. This reduces the mechanical clamping force that is causing the push.' },
       { component: 'Shocks', location: 'Right Rear', action: 'Less Rebound (Decrease)', priority: 'medium',
         effect: 'Less RR rebound allows the RR shock to extend easily on exit, releasing side bite quickly so the car can square up and rotate off the corner.' },
-      { component: 'Tires', location: 'Right Rear', action: 'Higher Pressure (14–16 PSI)', priority: 'medium',
-        effect: 'Stiffens the RR tire carcass, preventing it from generating maximum side bite. A stiffer carcass releases the RR earlier in the exit phase, allowing the car to rotate rather than being stuck in the groove.' },
+      { component: 'Tires', location: 'Right Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'medium',
+        effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules. Do not treat a copied numeric setting as a universal safety limit.' },
       { component: 'Springs', location: 'Left Rear', action: 'Softer Rate', priority: 'medium',
         effect: 'A softer LR spring promotes deeper chassis hike and suspension separation on throttle. More hike = more rear steer = more rotation to escape the tight-exit push.' },
       { component: 'Stagger', location: 'Rear Axle', action: 'Add slightly', priority: 'medium',
@@ -356,16 +364,16 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       rubber: [
         { component: 'Pull Bar', location: 'Spring', action: 'Stiffen aggressively', priority: 'high',
           effect: 'The rubber groove hooks the rear very hard. A stiff pull bar delivers an aggressive torque spike to break the rear loose and create rotation — necessary when the groove is holding the car in a push.' },
-        { component: 'Tires', location: 'Right Rear', action: 'Higher Pressure (14–16 PSI)', priority: 'high',
-          effect: 'In rubber, the groove hooks the RR extremely hard. Raise RR pressure to prevent dead-hooking — the stiffer carcass releases side bite earlier and allows rotation.' },
+        { component: 'Tires', location: 'Right Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'high',
+          effect: 'Rubbered-track pressure remains tire- and chassis-specific. Use measured hot pressure and track rules instead of a copied universal number.' },
       ],
       wet: [
         { component: 'Stagger', location: 'Rear Axle', action: 'Add stagger', priority: 'medium',
           effect: 'A wet/heavy track with mud in the cushion often pushes on exit. More stagger provides natural rotation to exit the corner properly in heavy conditions.' },
       ],
       tacky: [
-        { component: 'Shocks', location: 'Right Front', action: 'Decrease RF rebound (GRT approach)', priority: 'high',
-          effect: 'On high-grip tacky/heavy tracks, the most effective exit-loosening move is DECREASE RF rebound. This unloads the front tires immediately under hard acceleration, preventing the aggressive front tires from over-steering into a push, while freeing the rear to rotate.' },
+        { component: 'Shocks', location: 'Right Front', action: 'Verify RF rebound direction for class/chassis', priority: 'high',
+          effect: 'RF rebound direction differs by class and chassis package on high-grip tracks. Use the applicable AFCO sheet and make one measured change before evaluating exit balance.' },
         { component: 'Pull Bar', location: 'Spring', action: 'Stiffer', priority: 'medium',
           effect: 'On tacky track the rear hooks hard. A stiffer pull bar helps rotate the car off the corner by delivering a more aggressive torque spike.' },
       ],
@@ -385,8 +393,8 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
         effect: 'Lowering the pinion side steepens the J-bar angle under power, converting lateral forces into vertical downward pressure on the LR. Maximum mechanical forward traction.' },
       { component: '4-Link', location: 'LR Top Bar (Drive Bar)', action: 'Steepen (Raise chassis / Lower birdcage)', priority: 'high',
         effect: 'Maximum vertical clamping force on the LR tire under acceleration. The LR footprint is compressed firmly into the dirt for maximum forward traction. This is the most direct 4-link tool for forward bite.' },
-      { component: 'Tires', location: 'Left Rear', action: 'Lower Pressure (5–9 PSI)', priority: 'high',
-        effect: 'The LR is the primary forward traction tire. Lower pressure maximizes footprint area — the most contact patch between rubber and dirt for acceleration.' },
+      { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'high',
+        effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules. Do not treat a copied numeric setting as a universal safety limit.' },
       { component: 'Shocks', location: 'Left Rear', action: 'Less Compression (Decrease)', priority: 'high',
         effect: 'Decreasing LR compression allows the left rear to squat smoothly under acceleration. Smooth, progressive squat = smooth weight transfer = tire stays in contact = more drive. Abrupt LR compression resistance causes the tire to bounce off the track.' },
       { component: 'Shocks', location: 'Right Front', action: 'Less Rebound (Decrease)', priority: 'high',
@@ -395,8 +403,8 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
         effect: 'Softening RR compression allows weight to transfer rapidly and smoothly to the outside tire. The soft cushion absorbs the power without causing the RR to bounce or break traction.' },
       { component: 'Shocks', location: 'Left Rear', action: 'More Rebound (Increase)', priority: 'medium',
         effect: 'More LR rebound slows the LR chassis hike-up on throttle. Slower hike means the tire stays loaded and driving longer before rear steer begins — more sustained forward bite.' },
-      { component: 'Shocks', location: 'LR Front / 5th Coil', action: 'Increase gas pressure', priority: 'medium',
-        effect: 'Increasing nitrogen gas pressure in the LR front shock or 5th coil shock helps hold the rear up under deceleration and controls axle housing rotation under power — adds LR bite and forward drive.' },
+      { component: 'Shocks', location: '5th Coil', action: 'Verify gas-pressure change on applicable AFCO sheet', priority: 'medium', application: 'Dirt Late Model',
+        effect: 'For a Dirt Late Model with a fifth-coil package, verify the specified gas-pressure direction on the applicable AFCO sheet. Make only that measured change before evaluating forward drive.' },
       { component: '4-Link', location: 'LR Lower Rod', action: 'Lower on chassis (flatten)', priority: 'medium',
         effect: 'Lowering the LR bottom rod on the chassis holds the spring load longer during chassis hike-up under acceleration, maximizing the duration of LR tire loading and sustained forward bite.' },
       { component: 'Tire Spacing', location: 'Left Rear', action: 'Add ½" spacer on LR', priority: 'medium',
@@ -408,8 +416,8 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
     ],
     conditionAdjustments: {
       slick: [
-        { component: 'Tires', location: 'Left Rear', action: '5–7 PSI (minimum safe)', priority: 'high',
-          effect: 'A dry-slick track has no grip to spare. Run the LR at the lowest possible safe pressure to extract every ounce of mechanical traction.' },
+        { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'high',
+          effect: 'There is no universal minimum-safe pressure. Use measured hot pressure, tire construction, chassis guidance, and track rules.' },
         { component: 'Springs', location: 'Rear', action: 'Soften both rear springs', priority: 'medium',
           effect: 'Softer rear springs (such as 100 lb or 175 lb RR) allow the suspension to work with the slick surface rather than skipping over it, maintaining consistent tire contact for drive.' },
         { component: 'Driver Technique', location: 'Gas Point', action: 'Wait until fully rotated before throttle', priority: 'high',
@@ -424,8 +432,8 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       wet: [
         { component: 'Driver Technique', location: 'Line Choice', action: 'Go wide — use the cushion', priority: 'high',
           effect: 'On wet/heavy, the biggest drive comes from using the cushion. Hit the cushion on exit to slingshot down the straight. This is more valuable than any mechanical change in heavy conditions.' },
-        { component: 'Tires', location: 'Left Rear', action: '8–11 PSI', priority: 'medium',
-          effect: 'Heavy/wet tracks pack the tire with mud — extremely low pressures cause handling issues. Run slightly higher than slick settings.' },
+        { component: 'Tires', location: 'Left Rear', action: 'Recheck pressure against tire and track guidance', priority: 'medium',
+          effect: 'Wet-track pressure is package-specific. Use tire-maker, chassis-builder, measured hot-pressure, and track-rule guidance.' },
       ],
       tacky: [
         { component: 'Pull Bar', location: 'Spring', action: 'Medium-stiff spring', priority: 'medium',
@@ -455,7 +463,7 @@ const TRACK_CONDITION_INFO: Record<Exclude<TrackCondition, 'all'>, { label: stri
   wet: {
     label: 'Wet / Heavy',
     icon: 'water_drop',
-    description: 'Fresh moisture or rained on. Soft, heavy, wide track. High grip initially — can change rapidly. Wide cushion line is fastest. Increase compression overall. Run grooved tires. Use higher tire pressures vs. slick.',
+    description: 'Fresh moisture or rained on. Soft, heavy, wide track. High grip initially — can change rapidly. Wide cushion line is fastest. Increase compression overall. Run grooved tires. Recheck pressure with tire maker, chassis builder, measured hot pressure, and track rules; wet/heavy direction is package-specific.',
     colorClass: 'text-blue-400',
   },
   tacky: {
@@ -554,8 +562,8 @@ export default function QuickReferenceView() {
 
   const isTighten = activeGroup?.type === 'tighten';
   const isDrive   = activeGroup?.type === 'drive';
-  const accentClass = isTighten ? 'text-[#ff5555]' : isDrive ? 'text-tertiary' : 'text-primary';
-  const bgAccent    = isTighten ? 'bg-[#ba1a20]/10 border-red-900/30' : isDrive ? 'bg-tertiary/10 border-tertiary/30' : 'bg-primary/10 border-primary/30';
+  const accentClass = isTighten ? 'text-error' : isDrive ? 'text-tertiary' : 'text-primary';
+  const bgAccent    = isTighten ? 'bg-error/10 border-error/30' : isDrive ? 'bg-tertiary/10 border-tertiary/30' : 'bg-primary/10 border-primary/30';
 
   const condInfo = trackCondition !== 'all' ? TRACK_CONDITION_INFO[trackCondition as Exclude<TrackCondition,'all'>] : null;
 
@@ -571,12 +579,18 @@ export default function QuickReferenceView() {
               Pit-Side Adjustment Finder
             </h2>
             <p className="text-[10px] font-mono text-on-surface-variant">
-              DLM · UMP Modified · IMCA Modified — Oval Dirt Track
+              AFCO baseline reference — Modified and Dirt Late Model
             </p>
           </div>
         </div>
 
         <div className="p-4 space-y-3">
+          <div className="rounded border border-outline-variant bg-surface-container-high p-3 text-xs text-on-surface-variant leading-relaxed">
+            <p className="font-mono font-bold uppercase text-on-surface">Applicability</p>
+            <p><strong className="text-on-surface">Modified:</strong> use only the AFCO Modified direction for your chassis. <strong className="text-on-surface">Dirt Late Model:</strong> use only the AFCO Dirt Late Model direction. Four-link, birdcage, and pull-bar availability is chassis-specific; fifth-coil rows below are Dirt Late Model only.</p>
+            <p className="mt-1">Baseline diagnostic guidance only. Chassis builder, shock builder, tire manufacturer, measured hot pressures, and track rules control.</p>
+            <p className="mt-1 font-mono">Source: official AFCO Modified and Dirt Late Model setup guidance.</p>
+          </div>
           <div>
             <label className="block text-[10px] font-mono uppercase font-bold text-on-surface-variant mb-1.5 tracking-wider">
               Symptom
@@ -657,7 +671,7 @@ export default function QuickReferenceView() {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {highCount > 0 && (
-                <span className="px-2 py-0.5 rounded bg-[#ba1a20]/30 border border-[#ba1a20]/50 text-[#ff5555] font-mono text-[9px] font-bold uppercase">
+                <span className="px-2 py-0.5 rounded bg-error/30 border border-error/50 text-error font-mono text-[9px] font-bold uppercase">
                   {highCount} HIGH
                 </span>
               )}
@@ -711,15 +725,15 @@ export default function QuickReferenceView() {
                   <div
                     key={i}
                     className={`bg-surface-container border rounded-lg overflow-hidden ${
-                      isHigh ? 'border-[#ba1a20]/40' : isMed ? 'border-secondary/25' : 'border-outline-variant/40'
+                      isHigh ? 'border-error/40' : isMed ? 'border-secondary/25' : 'border-outline-variant/40'
                     }`}
                   >
-                    <div className={`h-0.5 w-full ${isHigh ? 'bg-[#ba1a20]' : isMed ? 'bg-secondary' : 'bg-outline-variant'}`} />
+                    <div className={`h-0.5 w-full ${isHigh ? 'bg-error' : isMed ? 'bg-secondary' : 'bg-outline-variant'}`} />
                     <div className="p-3 flex flex-col md:flex-row md:items-start gap-3">
                       <div className="md:w-2/5 flex-shrink-0 space-y-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className={`text-[9px] font-mono font-black uppercase px-1.5 py-0.5 rounded ${
-                            isHigh ? 'bg-[#ba1a20]/30 text-[#ff5555]' : isMed ? 'bg-secondary/20 text-secondary' : 'bg-surface-container-high text-on-surface-variant'
+                            isHigh ? 'bg-error/30 text-error' : isMed ? 'bg-secondary/20 text-secondary' : 'bg-surface-container-high text-on-surface-variant'
                           }`}>
                             {adj.priority}
                           </span>
@@ -727,6 +741,7 @@ export default function QuickReferenceView() {
                             {adj.component}
                           </span>
                           <span className="text-[10px] text-on-surface-variant font-mono">{adj.location}</span>
+                          <span className="text-xs text-on-surface-variant font-mono">{adjustmentApplicability(adj)}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <span className="material-symbols-outlined text-[13px] text-primary">build</span>
@@ -735,7 +750,7 @@ export default function QuickReferenceView() {
                           </span>
                         </div>
                       </div>
-                      <div className="md:w-3/5 text-[11px] text-[#dfdad8] leading-relaxed border-t md:border-t-0 border-outline-variant/30 pt-2 md:pt-0">
+                      <div className="md:w-3/5 text-[11px] text-on-surface leading-relaxed border-t md:border-t-0 border-outline-variant/30 pt-2 md:pt-0">
                         <span className="text-[9px] text-on-surface-variant font-mono uppercase font-semibold block mb-0.5">Why it works</span>
                         {adj.effect}
                       </div>
@@ -752,7 +767,7 @@ export default function QuickReferenceView() {
               <span className="material-symbols-outlined text-[14px] text-primary">info</span>
               Tuning Fundamentals
             </h4>
-            <ul className="text-[11px] text-[#bfb9b7] list-disc pl-4 space-y-1 leading-relaxed">
+            <ul className="text-[11px] text-on-surface-variant list-disc pl-4 space-y-1 leading-relaxed">
               <li><strong>LOOSE</strong> = rear tires sliding (oversteer). Goal: tighten by planting the rear.</li>
               <li><strong>TIGHT / PUSH</strong> = front plowing, won't steer (understeer). Goal: add rotation.</li>
               <li><strong>Shocks control SPEED</strong> of weight transfer. Springs control the AMOUNT.</li>
@@ -761,7 +776,7 @@ export default function QuickReferenceView() {
               <li><strong>Cross-weight (wedge)</strong>: ½ to 1 turn on RF or LR perch = noticeable change. Always start small.</li>
               <li><strong>Pull bar rate</strong>: spinning tires → soften. Not spinning but not driving → stiffen.</li>
               <li><strong>J-bar frame side</strong> → controls corner entry. <strong>Pinion side</strong> → controls corner exit.</li>
-              <li><strong>HIGH priority</strong> first. Make one change, go back on track, evaluate before next change.</li>
+              <li><strong>HIGH priority</strong> first. Make one change, go back on track, evaluate and record result before next change; revert if behavior worsens.</li>
               <li><strong>Tuning order</strong>: 1) Corner Entry → 2) Middle → 3) Exit. Always fix entry before middle.</li>
             </ul>
           </div>
@@ -798,7 +813,7 @@ export default function QuickReferenceView() {
                       <th className="text-left p-1.5 border border-outline-variant/30">#3</th>
                     </tr>
                   </thead>
-                  <tbody className="text-[#dfdad8]">
+                  <tbody className="text-on-surface">
                     {[
                       ['Loose Entry', 'LR Rebound ↓', 'RF Comp ↑', 'Both Fronts Comp ↑'],
                       ['Tight Entry', 'LR Rebound ↑', 'RF Comp ↓', 'Both Fronts Comp ↓'],
@@ -811,7 +826,7 @@ export default function QuickReferenceView() {
                     ].map(([cond, a, b, c]) => (
                       <tr key={cond} className="border-b border-outline-variant/20">
                         <td className="p-1.5 border border-outline-variant/30 text-on-surface-variant font-bold">{cond}</td>
-                        <td className="p-1.5 border border-outline-variant/30 text-[#ff5555]">{a}</td>
+                        <td className="p-1.5 border border-outline-variant/30 text-error">{a}</td>
                         <td className="p-1.5 border border-outline-variant/30">{b}</td>
                         <td className="p-1.5 border border-outline-variant/30">{c}</td>
                       </tr>
@@ -869,12 +884,12 @@ export default function QuickReferenceView() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       <div>
                         <p className="text-[9px] uppercase font-bold text-on-surface-variant tracking-wider mb-0.5">Compression</p>
-                        <p className="text-[#ff5555]">↑ Stiffen: {comp.stiffen}</p>
+                        <p className="text-error">↑ Stiffen: {comp.stiffen}</p>
                         <p className="text-primary mt-0.5">↓ Soften: {comp.soften}</p>
                       </div>
                       <div>
                         <p className="text-[9px] uppercase font-bold text-on-surface-variant tracking-wider mb-0.5">Rebound</p>
-                        <p className="text-[#ff5555]">↑ Stiffen: {reb.stiffen}</p>
+                        <p className="text-error">↑ Stiffen: {reb.stiffen}</p>
                         <p className="text-primary mt-0.5">↓ Soften: {reb.soften}</p>
                       </div>
                     </div>
@@ -891,11 +906,11 @@ export default function QuickReferenceView() {
                     <tr className="text-on-surface-variant">
                       <th className="text-left p-1.5 border border-outline-variant/30">Corner</th>
                       <th className="text-left p-1.5 border border-outline-variant/30">Adj.</th>
-                      <th className="text-left p-1.5 border border-outline-variant/30 text-[#ff5555]">↑ Stiffen →</th>
+                      <th className="text-left p-1.5 border border-outline-variant/30 text-error">↑ Stiffen →</th>
                       <th className="text-left p-1.5 border border-outline-variant/30 text-primary">↓ Soften →</th>
                     </tr>
                   </thead>
-                  <tbody className="text-[#dfdad8]">
+                  <tbody className="text-on-surface">
                     {[
                       ['LF', 'Comp', 'Tighter entry — slows nose dive on turn-in', 'Looser entry — faster nose dive, more rotation'],
                       ['LF', 'Reb', 'Tighter middle — holds LF corner loaded through apex', 'Looser middle/exit — frees LF, shifts weight rearward on throttle'],
@@ -909,7 +924,7 @@ export default function QuickReferenceView() {
                       <tr key={`${corner}-${adj}`} className="border-b border-outline-variant/20">
                         <td className="p-1.5 border border-outline-variant/30 text-on-surface font-black">{corner}</td>
                         <td className="p-1.5 border border-outline-variant/30 text-on-surface-variant font-bold">{adj}</td>
-                        <td className="p-1.5 border border-outline-variant/30 text-[#ff8888]">{stiffen}</td>
+                        <td className="p-1.5 border border-outline-variant/30 text-error">{stiffen}</td>
                         <td className="p-1.5 border border-outline-variant/30 text-primary">{soften}</td>
                       </tr>
                     ))}
@@ -920,13 +935,13 @@ export default function QuickReferenceView() {
 
             {/* ── ADJUSTMENT REFERENCE: Tire Pressure, Springs & Weight ── */}
             <div className="space-y-3">
-              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Quick Adjustment Reference — Dirt Modified &amp; Late Model</p>
-              <p className="text-[9px] text-on-surface-variant/60 font-mono">Starting points. Change <strong className="text-on-surface-variant">one thing at a time</strong>, then re-scale and re-check.</p>
+              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Quick Adjustment Reference — class-specific AFCO baseline</p>
+              <p className="text-[9px] text-on-surface-variant font-mono">Modified and Dirt Late Model directions are not interchangeable. Change <strong className="text-on-surface-variant">one thing at a time</strong>, record result, then re-scale and re-check.</p>
 
               {/* Tire Pressure */}
               <div className="bg-surface-container border border-outline-variant/40 rounded p-3 space-y-2">
                 <p className="text-[10px] uppercase font-bold text-on-surface tracking-wider">Tire Pressure per Corner</p>
-                <p className="text-[9px] text-on-surface-variant">Lower = more grip at that corner. Higher = less grip, more stability. Adjust <strong className="text-on-surface">1–2 psi</strong> at a time.</p>
+                <p className="text-[9px] text-on-surface-variant">Use tire-manufacturer, chassis-builder, measured hot-pressure, and track-rule guidance. No fixed pressure is a universal minimum or safe setting.</p>
                 <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
                   <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">RF ↑</span><p className="text-on-surface-variant">Frees car through middle (helps <strong className="text-on-surface">tight</strong>)</p></div>
                   <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">RF ↓</span><p className="text-on-surface-variant">Adds front grip (helps <strong className="text-on-surface">push/tight-in</strong>)</p></div>
@@ -944,9 +959,9 @@ export default function QuickReferenceView() {
                 <p className="text-[10px] uppercase font-bold text-on-surface tracking-wider">Spring Rate per Corner</p>
                 <p className="text-[9px] text-on-surface-variant">Front steps ≈ <strong className="text-on-surface">25–50 lb/in</strong>; Rear steps ≈ <strong className="text-on-surface">10–25 lb/in</strong>. Re-scale after every change.</p>
                 <div className="grid grid-cols-1 gap-1.5 text-[10px] font-mono">
-                  <div className="bg-surface-container-high rounded p-2"><span className="text-[#ff5555] font-bold">Tight on Entry</span><p className="text-on-surface-variant">Soften <strong className="text-on-surface">LF</strong> and/or stiffen <strong className="text-on-surface">RF</strong> (≈25–50). Also: RF −25–50 or RR +25. Re-check toe & crossweight.</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-error font-bold">Tight on Entry</span><p className="text-on-surface-variant">Soften <strong className="text-on-surface">LF</strong> and/or stiffen <strong className="text-on-surface">RF</strong> (≈25–50). Also: RF −25–50 or RR +25. Re-check toe & crossweight.</p></div>
                   <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">Loose on Entry</span><p className="text-on-surface-variant">Stiffen <strong className="text-on-surface">LF</strong> and/or soften <strong className="text-on-surface">RF</strong>.</p></div>
-                  <div className="bg-surface-container-high rounded p-2"><span className="text-[#ff5555] font-bold">Tight off (Exit)</span><p className="text-on-surface-variant">Soften <strong className="text-on-surface">LR</strong> and/or stiffen <strong className="text-on-surface">RR</strong>; or soften LF. Verify throttle application.</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-error font-bold">Tight off (Exit)</span><p className="text-on-surface-variant">Soften <strong className="text-on-surface">LR</strong> and/or stiffen <strong className="text-on-surface">RR</strong>; or soften LF. Verify throttle application.</p></div>
                   <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">Loose off (Exit)</span><p className="text-on-surface-variant">Stiffen <strong className="text-on-surface">LR</strong> to calm rotation. Commonly: stiffen RR 25 or soften LR 25. Check rear steer & shock rebound.</p></div>
                 </div>
               </div>
@@ -956,7 +971,7 @@ export default function QuickReferenceView() {
                 <p className="text-[10px] uppercase font-bold text-on-surface tracking-wider">Weight Distribution &amp; Crossweight (Wedge)</p>
                 <p className="text-[9px] text-on-surface-variant">Crossweight = LR% + RF%. Raising ride height at a corner <strong className="text-on-surface">adds</strong> weight there AND at the diagonal opposite.</p>
                 <div className="grid grid-cols-1 gap-1.5 text-[10px] font-mono">
-                  <div className="bg-surface-container-high rounded p-2"><span className="text-[#ff5555] font-bold">More Wedge</span><p className="text-on-surface-variant">More push into/through middle, but LR carries more → drives off better. <strong className="text-on-surface">Too much</strong> = loose into & through middle.</p></div>
+                  <div className="bg-surface-container-high rounded p-2"><span className="text-error font-bold">More Wedge</span><p className="text-on-surface-variant">More push into/through middle, but LR carries more → drives off better. <strong className="text-on-surface">Too much</strong> = loose into & through middle.</p></div>
                   <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">Too Little Wedge</span><p className="text-on-surface-variant">Tight into and through the middle.</p></div>
                   <div className="bg-surface-container-high rounded p-2"><span className="text-on-surface font-bold">Dirt Starting Window</span><p className="text-on-surface-variant">Left-side ≈ <strong className="text-on-surface">53.5–55%</strong>. Roughly <strong className="text-on-surface">75–125 lb of wedge</strong>. Adjust to track/tackiness.</p></div>
                 </div>
@@ -975,8 +990,8 @@ export default function QuickReferenceView() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-xl">linear_scale</span>
             <div className="text-left">
-              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">4-Link Adjustments</h3>
-              <p className="text-[10px] font-mono text-on-surface-variant">All four bars — entry, center &amp; exit handling impacts</p>
+              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Chassis-Specific 4-Link Adjustments</h3>
+              <p className="text-[10px] font-mono text-on-surface-variant">Use only when this geometry applies; verify the applicable AFCO/chassis sheet</p>
             </div>
           </div>
           <span className="material-symbols-outlined text-on-surface-variant">{fourLinkOpen ? 'expand_less' : 'expand_more'}</span>
@@ -986,7 +1001,7 @@ export default function QuickReferenceView() {
 
             {/* Quick-read angle key */}
             <div className="flex gap-3 text-[10px]">
-              <span className="px-2 py-0.5 rounded bg-[#ba1a20]/20 border border-[#ba1a20]/40 text-[#ff5555] font-bold">Steeper ↑</span>
+              <span className="px-2 py-0.5 rounded bg-error/20 border border-error/40 text-error font-bold">Steeper ↑</span>
               <span className="text-on-surface-variant">=</span>
               <span className="text-on-surface-variant">Raise chassis-side mount OR lower birdcage/axle-side mount</span>
             </div>
@@ -1001,7 +1016,7 @@ export default function QuickReferenceView() {
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">LR Lower Bar (Controls Hike-Up Speed &amp; Rear Steer)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
-                  <p className="text-[#ff5555] font-bold text-[10px] uppercase">Steeper Angle (raise chassis / lower birdcage)</p>
+                  <p className="text-error font-bold text-[10px] uppercase">Steeper Angle (raise chassis / lower birdcage)</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Faster LR chassis hike-up under acceleration</li>
                     <li>More aggressive rear steer → loosens exit, promotes rotation</li>
@@ -1024,7 +1039,7 @@ export default function QuickReferenceView() {
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">LR Upper Bar / Drive Bar (Controls Anti-Squat &amp; Forward Bite)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
-                  <p className="text-[#ff5555] font-bold text-[10px] uppercase">Steeper Angle (raise chassis / lower birdcage)</p>
+                  <p className="text-error font-bold text-[10px] uppercase">Steeper Angle (raise chassis / lower birdcage)</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Maximum anti-squat — LR tire mechanically clamped into track</li>
                     <li>Maximum forward bite under acceleration</li>
@@ -1047,7 +1062,7 @@ export default function QuickReferenceView() {
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">RR Lower Bar (Controls Entry Roll Steer)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
-                  <p className="text-[#ff5555] font-bold text-[10px] uppercase">Steeper Angle</p>
+                  <p className="text-error font-bold text-[10px] uppercase">Steeper Angle</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>More RR roll steer on corner entry → forces RR wheel forward</li>
                     <li>Promotes rotation — loosens entry</li>
@@ -1070,7 +1085,7 @@ export default function QuickReferenceView() {
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">RR Upper Bar (RR Anti-Squat &amp; Side Bite)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
-                  <p className="text-[#ff5555] font-bold text-[10px] uppercase">Steeper Angle</p>
+                  <p className="text-error font-bold text-[10px] uppercase">Steeper Angle</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>More RR anti-squat — loads RR tire harder under power</li>
                     <li>Increases RR side bite, tightens exit</li>
@@ -1099,7 +1114,7 @@ export default function QuickReferenceView() {
                       <th className="text-left p-1.5 border border-outline-variant/30">Handling Result</th>
                     </tr>
                   </thead>
-                  <tbody className="text-[#dfdad8]">
+                  <tbody className="text-on-surface">
                     {[
                       ['Loose Entry', 'RR Lower', 'Flatter — lower on chassis', 'Less roll steer → rear axle tracks squarer, more stable on turn-in'],
                       ['Tight Entry', 'RR Lower', 'Steeper — raise chassis', 'More roll steer → forces RR wheel forward, promotes rotation at turn-in'],
@@ -1136,8 +1151,8 @@ export default function QuickReferenceView() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-xl">straighten</span>
             <div className="text-left">
-              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">J-Bar / Panhard Bar Reference</h3>
-              <p className="text-[10px] font-mono text-on-surface-variant">Frame side (entry) · Pinion side (exit) · Height &amp; rake effects</p>
+              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Chassis-Specific J-Bar / Panhard Reference</h3>
+              <p className="text-[10px] font-mono text-on-surface-variant">Verify this geometry and direction against the applicable AFCO/chassis sheet</p>
             </div>
           </div>
           <span className="material-symbols-outlined text-on-surface-variant">{jBarOpen ? 'expand_less' : 'expand_more'}</span>
@@ -1150,7 +1165,7 @@ export default function QuickReferenceView() {
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Frame / Chassis Side — Controls Corner Entry</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
-                  <p className="text-[#ff5555] font-bold text-[10px] uppercase">Raise Frame Mount</p>
+                  <p className="text-error font-bold text-[10px] uppercase">Raise Frame Mount</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Raises rear roll center</li>
                     <li>Faster, more direct lateral weight transfer on entry</li>
@@ -1175,7 +1190,7 @@ export default function QuickReferenceView() {
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Pinion / Axle Side — Controls Corner Exit &amp; Forward Bite</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
-                  <p className="text-[#ff5555] font-bold text-[10px] uppercase">Lower Pinion Mount (Steepen Rake)</p>
+                  <p className="text-error font-bold text-[10px] uppercase">Lower Pinion Mount (Steepen Rake)</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Steeper J-bar rake angle under power</li>
                     <li>Converts lateral forces into vertical downforce on LR</li>
@@ -1201,7 +1216,7 @@ export default function QuickReferenceView() {
               <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Overall Height — Moving Both Ends Equally</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
-                  <p className="text-[#ff5555] font-bold text-[10px] uppercase">Raise Both Ends</p>
+                  <p className="text-error font-bold text-[10px] uppercase">Raise Both Ends</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Higher overall roll center</li>
                     <li>Quicker, more abrupt weight transfer</li>

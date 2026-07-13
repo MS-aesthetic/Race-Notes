@@ -24,6 +24,57 @@ export const STARTER_TEMPLATES: Array<Pick<ChecklistTemplate, 'name' | 'category
   },
 ];
 
+type StarterTemplate = (typeof STARTER_TEMPLATES)[number];
+type FingerprintTemplate = Pick<ChecklistTemplate, 'name' | 'category'> & {
+  items: Array<ChecklistTemplate['items'][number] | string>;
+};
+
+function templateItemTexts(template: Pick<FingerprintTemplate, 'items'>): string[] {
+  return (template.items as unknown[]).map(item => typeof item === 'string'
+    ? item
+    : ((item as Partial<ChecklistTemplate['items'][number]> | null)?.text ?? ''));
+}
+
+/** Exact semantic identity for an untouched starter. No trim, case-fold, sort, or ID. */
+export function untouchedStarterFingerprint(template: FingerprintTemplate): string {
+  return JSON.stringify({ name: template.name ?? '', category: template.category ?? 'Custom', items: templateItemTexts(template) });
+}
+
+const starterFingerprints = new Set(STARTER_TEMPLATES.map(starter => untouchedStarterFingerprint({ name: starter.name, category: starter.category, items: starter.items })));
+
+export function isUntouchedStarterTemplate(template: ChecklistTemplate): boolean {
+  return starterFingerprints.has(untouchedStarterFingerprint(template));
+}
+
+export interface StarterReconciliation {
+  templates: ChecklistTemplate[];
+  seeded: ChecklistTemplate[];
+  discardedIds: string[];
+}
+
+/** Keeps one exact untouched copy per canonical starter; custom/same-name rows pass through. */
+export function reconcileStarterTemplates(
+  templates: ChecklistTemplate[],
+  materialize: (starter: StarterTemplate) => ChecklistTemplate = materializeStarterTemplate,
+): StarterReconciliation {
+  const byFingerprint = new Map<string, ChecklistTemplate[]>();
+  for (const template of templates) {
+    const fingerprint = untouchedStarterFingerprint(template);
+    if (!starterFingerprints.has(fingerprint)) continue;
+    const matches = byFingerprint.get(fingerprint) ?? [];
+    matches.push(template);
+    byFingerprint.set(fingerprint, matches);
+  }
+  const discardedIds = [...byFingerprint.values()]
+    .flatMap(matches => [...matches].sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '') || a.id.localeCompare(b.id)).slice(1).map(template => template.id))
+    .sort();
+  const discarded = new Set(discardedIds);
+  const seeded = STARTER_TEMPLATES
+    .filter(starter => !byFingerprint.has(untouchedStarterFingerprint({ name: starter.name, category: starter.category, items: starter.items })))
+    .map(starter => materialize(starter));
+  return { templates: [...templates.filter(template => !discarded.has(template.id)), ...seeded], seeded, discardedIds };
+}
+
 const uid = (p: string) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 /** Turn a starter-template definition into a real, user-owned ChecklistTemplate

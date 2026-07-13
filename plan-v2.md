@@ -1,8 +1,8 @@
 # CREW CHIEF — Build Plan v2 (Multi-Agent): ERP · Checklists · Location/Push · Truck Directions
 
 > **2026-07-12 active-track override:** this document remains authority for the
-> WS-N…Z batch, but current UX feature work is on `preview-v3`. Chunks 1–4 are
-> complete; Chunk 5 is next. Use `docs/IMPLEMENTATION_PLAN_2026-07-12.md`,
+> WS-N…Z batch, but current UX feature work is on `preview-v3`. Chunks 1–4 and
+> urgent repair UX-R1 are complete; Chunk 5 is next and unblocked. Use `docs/IMPLEMENTATION_PLAN_2026-07-12.md`,
 > `ralph/CURRENT_TASK.md`, `ralph/STATE.md`, and `HANDOFF.md` for that track.
 > Do not follow the stale `preview-v2` branch directions below for UX work.
 
@@ -125,8 +125,9 @@ coordination; decisions affecting scope/status must be persisted.
 | `ws-fixer` | `.github/agents/ws-fixer.agent.md` | GPT 5.6 SOL High | Implementation takeover after third failed QA review |
 
 QA failures 1–2 return to Terra. Failure 3 (more than two failed QA reviews)
-transfers implementation to SOL; SOL performs final QA afterward. If exact models
-are unavailable, disclose limitation and never claim they ran.
+transfers implementation to SOL; SOL performs final QA afterward. Model identity
+must come from rollout `turn_context.payload.model`, not prose self-identification.
+Use explicit task-turn model overrides and `scripts/verify-agent-handoff.ps1`.
 
 **QA grading rubric (ws-qa; every gate is hard — any miss = FAIL):**
 1. `npm run lint` — zero errors beyond the 3-error baseline.

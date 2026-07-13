@@ -9,7 +9,7 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 >
 > **🧭 NEW AGENT? START WITH [`HANDOFF.md`](./HANDOFF.md)** — consolidated onboarding: current status, session history, worktree/branch gotchas, build/deploy procedures, and the Ralph-loop workflow.
 >
-> **🎨 UX OVERHAUL in progress on branch `preview-v3`** (4 of 7 chunks done). Current routing: **GPT 5.6 SOL High plans and QAs; GPT 5.6 Terra High builds; `/caveman full`** for status. Plan: [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md); audit: [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md); status/backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
+> **🎨 UX OVERHAUL in progress on branch `preview-v3`** (4 of 7 chunks plus urgent UX-R1 repair done; Chunk 5 next). Current routing: **GPT 5.6 SOL High plans and QAs; GPT 5.6 Terra High builds; `/caveman full`** for status. Plan: [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md); audit: [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md); status/backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
 >
 > This file is current workflow authority. For v2 status trust
 > [`plan-v2.md`](./plan-v2.md), [`ralph/STATE.md`](./ralph/STATE.md), and
@@ -41,8 +41,16 @@ review, and user-facing status message in this repository.
    to GPT 5.6 SOL High, then SOL performs final QA. Bounded read-only
    `cavecrew-investigator` scans may use Terra Medium for fast evidence gathering;
    SOL retains interpretation and decisions.
-5. If named models are unavailable, state limitation. Never claim unavailable
-   model ran. Preserve role split with best available models only after disclosure.
+5. Model identity comes from Codex runtime metadata (`turn_context.payload.model`),
+   not the agent's prose self-identification. Do not infer unavailability from a
+   generic "Codex" identity message. If runtime metadata is unavailable, report
+   the model as **unverified**, not unavailable. Preserve the role split with a
+   fallback only after an actual dispatch failure.
+6. Model handoff uses a persistent Codex task plus an explicit model override on
+   each turn: SOL planning/QA → Terra implementation → SOL QA. The Codex
+   `handoff_thread` operation moves checkout/worktree/host state; it does not
+   select a model. Verify executed handoffs with
+   `scripts/verify-agent-handoff.ps1`.
 
 ---
 
