@@ -1,8 +1,8 @@
 # CREW CHIEF — Build Plan v2 (Multi-Agent): ERP · Checklists · Location/Push · Truck Directions
 
 > **2026-07-12 active-track override:** this document remains authority for the
-> WS-N…Z batch, but current UX feature work is on `preview-v3`. Chunks 1–4 and
-> urgent repair UX-R1 are complete; Chunk 5 is next and unblocked. Use `docs/IMPLEMENTATION_PLAN_2026-07-12.md`,
+> WS-N…Z batch, but current UX feature work is on `preview-v3`. Chunks 1–5 and
+> urgent repair UX-R1 are complete; Chunk 6 is next and unblocked. Use `docs/IMPLEMENTATION_PLAN_2026-07-12.md`,
 > `ralph/CURRENT_TASK.md`, `ralph/STATE.md`, and `HANDOFF.md` for that track.
 > Do not follow the stale `preview-v2` branch directions below for UX work.
 

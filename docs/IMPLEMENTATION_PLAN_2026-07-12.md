@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunk 1 `e04b15c` ✅ · Chunk 2 `306445d` ✅ · Chunk 3 `c68f27d` ✅ · Chunk 4 `21405e9` ✅ · urgent UX-R1 regression repair `b6d702e` ✅ · Chunks 5-7 pending. Chunk 5 is next and unblocked but not started. Owner reversed rec #18 — four-bar is a top trackside adjustment, make it FAST (chunk 5), not folded. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; rollout runtime metadata verifies SOL → Terra → SOL handoff. `/caveman full`. Status + backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
+> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunk 1 `e04b15c` ✅ · Chunk 2 `306445d` ✅ · Chunk 3 `c68f27d` ✅ · Chunk 4 `21405e9` ✅ · urgent UX-R1 regression repair `b6d702e` ✅ · Chunk 5 `d5ef1f4` ✅ · Chunks 6-7 pending. Chunk 5 shipped the always-visible four-bar/birdcage panel, physical corner cards/steppers, same-car copy/blank/diff flows, pressure provenance, and active-car Tires view. Chunk 6 is next. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; real SOL → Terra → SOL handoff ran in one persistent task. `/caveman full`. Status + backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:
@@ -134,6 +134,10 @@ QA is consolidated per chunk: each chunk ends with one test pass covering everyt
 | **[21] Tires sub-view in Setups** | Add a segmented sub-view toggle at the top of SetupView: **Setup | Tires**. Tires view surfaces `tireHistory.ts` data for the active car: current tire set (sizes, compounds, stagger computed), pressure history per corner (last 5 sessions, small table, `font-mono`), and tire log entries. Read-mostly; edits happen through existing tire fields. Empty state via `<EmptyState>`. Acceptance: stagger and pressure history visible without leaving Setups; no new persistence â€” renders from existing `tireHistory` helpers. | New: `src/components/TiresSubView.tsx`. Modify: `src/components/SetupView.tsx` (sub-toggle + mount). | Med | tireHistory (existing) |
 
 **Consolidated QA â€” Chunk 5** (one pass, seeded car with â‰¥2 setups + sessions):
+- **Final 2026-07-13:** PASS at `d5ef1f4`. Both pure harnesses, exact three-error
+  lint baseline, 539-module build, cavecrew final review, Netlify draft, and
+  Android 320 CSS px / XX-Large quick-log/four-bar/Tires drills passed. Final
+  draft: `https://6a5509763fc2865568212af7--crew-chief-race-notes.netlify.app`.
 - Grep: no `input type="number"` left for corner fields in SetupView; step constants only in `setupSteps.ts`; new types are optional fields only (backward-compatible with synced data) â€” **CODE-VERIFIABLE**.
 - `setupCompat` round-trip: clone an old-shape setup fixture through `cloneSetup`, confirm no field loss (scratch harness) â€” **CODE-VERIFIABLE (harness)**.
 - Trackside four-bar drill: Setups tab â†’ RR birdcage +1 hole via stepper â†’ value persists, provenance/change line recorded â†’ open quick-log â†’ Changes â†’ Four-bar sheet shows the SAME value â†’ LR angle âˆ’0.5Â° â†’ both surfaces agree after close â€” **RUNTIME, NEEDS-DATA (active setup with four-bar fields)**.

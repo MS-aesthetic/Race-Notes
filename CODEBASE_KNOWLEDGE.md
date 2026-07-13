@@ -1,10 +1,10 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-01 (session 8 — Google OAuth, mandatory auth gate, tire usage history, shock-compare, 3-tier zoom sizing, Android API 36)
+> Last updated: 2026-07-13 (UX Chunk 5 — trackside setups, four-bar, Tires, model handoffs)
 > Branch at time of writing: `master` (all features merged — car-profiles, session-v2, weekend-v2, session-8 features below)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
-> ⚠️ **2026-07-12:** A UX overhaul is in progress on branch **`preview-v3`** (7 chunks; 1-4 done). It adds `src/components/ui/*` primitives, `src/lib/{undo,backStack,saveStatus,sessionSequence,serviceLog}.ts`, `ContextStrip`, a 5-tab nav, moves weekend/session modals into `RaceWeekendView`, and turns Dashboard into a race-day launchpad. For current UX state see `HANDOFF.md` (UX section), `docs/IMPLEMENTATION_PLAN_2026-07-12.md`, and `ralph/STATE.md`.
+> ⚠️ **2026-07-13:** A UX overhaul is in progress on branch **`preview-v3`** (7 chunks; 1-5 done plus UX-R1). It adds `src/components/ui/*` primitives, `src/lib/{undo,backStack,saveStatus,sessionSequence,serviceLog,setupSteps}.ts`, `ContextStrip`, a 5-tab nav, moves weekend/session modals into `RaceWeekendView`, turns Dashboard into a race-day launchpad, and rebuilds Setups for trackside four-bar/Tires work. For current UX state see `HANDOFF.md`, `docs/IMPLEMENTATION_PLAN_2026-07-12.md`, and `ralph/STATE.md`.
 
 ## 2026-07-12 UX Chunk 4 override
 
@@ -1082,3 +1082,62 @@ See §2 "UI scaling — 3-tier `zoom` system" for the full mechanism (constant `
   not model selection. Runtime truth is rollout `turn_context.payload.model`.
   Verify config plus a smoke-token sequence with
   `powershell -ExecutionPolicy Bypass -File scripts/verify-agent-handoff.ps1 -Token <token>`.
+
+---
+
+## 24. UX Chunk 5 — Trackside Setups (2026-07-13, `d5ef1f4`)
+
+### Canonical setup state and car isolation
+
+- `App.tsx` now routes Setups and quick-log through one full-array save seam:
+  update React `savedSetups`, persist `race_notes_saved_setups`, optionally set
+  and persist active `setup`, then `pushSetups(fullMasterArray, ...)` when signed in.
+- Car switches select only `pickLatestSetupForCar(savedSetups, carId)`. A car with
+  no setup never sees or uses the previous car's setup.
+- `src/lib/setupCompat.ts` exports newest/prior same-car selectors, `cloneSetup`,
+  and `makeBlankSetup`. Clone is deep; cross-car tire inventory links are cleared.
+
+### Numeric and pressure compatibility
+
+- `src/lib/setupSteps.ts` centralizes step size, decimals, units, legacy numeric
+  parsing, canonical formatting, four-bar adjustment IDs/labels, fractional-safe
+  stagger, linked tire-size resolution, and pressure-block compatibility.
+- Corner storage remains string-based. Rendering never rewrites a legacy string;
+  the first deliberate stepper edit writes canonical numeric text.
+- `mergeImportedSetupPressure()` prevents a blank setup pressure from erasing an
+  existing manual/logged tire pressure or session pressure-block value. A real
+  setup pressure replaces both. If no pressure imports, existing provenance stays.
+- `SessionRecord.pressures` and `TireDetails.airPressure` are resolved/mirrored by
+  shared helpers. Optional `pressureSourceNote` carries prior-session/setup origin;
+  a manual edit clears stale carry provenance.
+
+### UI surfaces
+
+- Setups retains four controls: Setups, Loads, Tires, Compare.
+- `FourBarQuickAdjust.tsx` is controlled, always visible before setup creation and
+  cards, and presents LR Full Droop + RR Ride Height top/bottom length, frame hole,
+  birdcage hole, and angle fields. Ordinary rear corner forms no longer duplicate
+  those controls.
+- Corner forms render physical order LF/RF then LR/RR. Numeric fields use
+  `NumberStepper`; tire size remains free text so values such as `86 1/2` work.
+- New setup defaults to copying the newest same-car setup; Start Blank remains.
+  A first setup for a car activates immediately. Setup/session Compare opens with
+  the selected setup and immediate same-car prior setup.
+- Quick-log `FOUR-BAR QUICK-ADJUST` uses the same setup object/component contract.
+  Each field has one stable `SetupAdjustment` ID, so repeated taps update one row.
+- `TiresSubView.tsx` shows current linked set, stagger, last-five pressure history,
+  active-car inventory CRUD, sorting/filtering, CSV/report, lifecycle and usage.
+
+### Verification and rollout
+
+- Harnesses: `scripts/chunk5-setup-harness.ts` and
+  `scripts/chunk5-tires-harness.ts`; both print PASS and exit nonzero on failure.
+- Type-check remains exactly the three documented baseline errors. Production
+  Vite build: 539 modules; Workbox: 16 precache entries.
+- Android QA used debug versionCode 16/versionName 4.1 at 320 CSS px / XX-Large.
+  `adb install -r` initially served stale Workbox files; deleting only WebView
+  Service Worker/HTTP/code cache with `run-as` preserved localStorage and loaded
+  the current bundle. `pm clear --cache-only` did not remove Service Worker data.
+- Final Netlify draft:
+  `https://6a5509763fc2865568212af7--crew-chief-race-notes.netlify.app`.
+  Production, `master`, root release APK, and remote branch were not changed.

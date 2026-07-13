@@ -1,6 +1,6 @@
 # Current Task — UX Chunk 5: Trackside Setups
 
-**Status:** CODE PASS + RUNTIME PASS — attempt 1; ready to commit
+**Status:** COMPLETE — CODE PASS + RUNTIME PASS · feature commit `d5ef1f4`
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Priority:** four-bar/birdcage first. Always prominent. Fast with gloves.
 
