@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ShockSession, ShockCorner, ShockDataPoint } from '../types';
 import { byActiveCar } from '../lib/scope';
 import { buildComparisonRows, downloadComparisonCsv } from '../lib/shockCompare';
+import EmptyState from './ui/EmptyState';
 
 // ─── Local type aliases (for readability within this file) ────────────────────
 
@@ -17,6 +18,7 @@ interface SmasherLoadsViewProps {
   sessions?: ShockSession[];
   /** When lifted to App.tsx, save handler is passed in */
   onSave?: (sessions: ShockSession[]) => void;
+  onGoToGarage?: () => void;
 }
 
 // ─── Image compression helper ─────────────────────────────────────────────────
@@ -372,7 +374,7 @@ function saveToStorage(sessions: ShockSession[]) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function SmasherLoadsView({ activeCarId = null, sessions: sessionsProp, onSave }: SmasherLoadsViewProps = {}) {
+export default function SmasherLoadsView({ activeCarId = null, sessions: sessionsProp, onSave, onGoToGarage }: SmasherLoadsViewProps = {}) {
   // When lifted state is provided use it; otherwise fall back to localStorage.
   const [localSessions, setLocalSessions] = useState<ShockSession[]>(loadFromStorage);
   const sessions = sessionsProp ?? localSessions;
@@ -418,7 +420,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
   }, [sessionsProp]);
 
   // Display only sessions belonging to the active car
-  const displayedSessions = byActiveCar<ShockSession>(sessions, activeCarId);
+  const displayedSessions = activeCarId ? byActiveCar<ShockSession>(sessions, activeCarId) : [];
 
   const toggleCompareId = (id: string) => {
     setCompareIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -434,6 +436,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
 
   const handleCreateSession = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!activeCarId) return;
     const newSession: ShockSession = {
       id: `shock-${Date.now()}`,
       label: formLabel.trim() || `${formCorner} Session`,
@@ -442,7 +445,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
       shock: formShock,
       date: new Date().toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }),
       points: [],
-      carId: activeCarId ?? undefined,
+      carId: activeCarId,
     };
     const next = [newSession, ...sessions];
     persist(next);
@@ -551,13 +554,11 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
             )}
             <button
               id="new-shock-session-btn"
-              onClick={() => { if (activeCarId) setShowNewForm(true); }}
-              disabled={!activeCarId}
-              title={!activeCarId ? 'Add a car in Settings → Garage to start.' : undefined}
-              className={`h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 flex-shrink-0 ${!activeCarId ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-90'}`}
+              onClick={() => activeCarId ? setShowNewForm(true) : onGoToGarage?.()}
+              className="h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 flex-shrink-0 hover:opacity-90"
             >
-              <span className="material-symbols-outlined text-[15px]">add</span>
-              New Session
+              <span className="material-symbols-outlined text-[15px]">{activeCarId ? 'add' : 'directions_car'}</span>
+              {activeCarId ? 'New Session' : 'Go to Garage'}
             </button>
           </div>
         </div>
@@ -585,6 +586,15 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
           </div>
         )}
       </div>
+
+      {!activeCarId && (
+        <EmptyState
+          icon="directions_car"
+          title="Add a car before logging load graphs"
+          body="Load graphs stay tied to one car so shock data cannot cross cars."
+          cta={{ label: 'Go to Garage', onClick: () => onGoToGarage?.() }}
+        />
+      )}
 
       {/* ── Compare / Overlay mode ── */}
       {compareMode && displayedSessions.length > 0 && (
@@ -695,7 +705,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
       )}
 
       {/* ── Empty state ── */}
-      {!compareMode && displayedSessions.length === 0 && (
+      {activeCarId && !compareMode && displayedSessions.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
           <span className="material-symbols-outlined text-5xl text-on-surface-variant/30">show_chart</span>
           <p className="text-on-surface-variant text-sm font-mono uppercase">No shock sessions yet</p>
@@ -948,7 +958,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
       )}
 
       {/* ── New session modal ── */}
-      {showNewForm && (
+      {showNewForm && activeCarId && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-surface border-2 border-outline rounded-lg p-6 max-w-sm w-full space-y-4 shadow-2xl relative text-on-surface">
             <button

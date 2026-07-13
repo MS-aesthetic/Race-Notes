@@ -5,11 +5,14 @@ import { diffSetups, groupDiffRows, SetupDiffRow } from '../lib/setupDiff';
 interface SetupDiffViewProps {
   setups: Setup[];
   onClose: () => void;
+  initialAId?: string;
+  initialBId?: string;
 }
 
-export default function SetupDiffView({ setups, onClose }: SetupDiffViewProps) {
-  const [setupAId, setSetupAId] = useState<string>(setups[0]?.id || '');
-  const [setupBId, setSetupBId] = useState<string>(setups[1]?.id || setups[0]?.id || '');
+export default function SetupDiffView({ setups, onClose, initialAId, initialBId }: SetupDiffViewProps) {
+  const valid = (id: string | undefined) => !!id && setups.some(s => s.id === id);
+  const [setupAId, setSetupAId] = useState<string>(() => valid(initialAId) ? initialAId! : (setups[0]?.id || ''));
+  const [setupBId, setSetupBId] = useState<string>(() => valid(initialBId) ? initialBId! : (setups[1]?.id || setups[0]?.id || ''));
   const [onlyChanges, setOnlyChanges] = useState(true);
 
   const setupA = setups.find(s => s.id === setupAId);

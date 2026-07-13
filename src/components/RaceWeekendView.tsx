@@ -4,13 +4,17 @@ import { sortBySize } from '../lib/tireSize';
 import { sortWeekends } from '../lib/scope';
 import { useBackClosable } from '../lib/backStack';
 import { useUndoableDelete } from '../lib/undo';
-import { suggestNextSession, buildSessionNameFrom, SessionPrefill } from '../lib/sessionSequence';
+import { filterCompatibleSessions, suggestNextSession, buildSessionNameFrom, SessionPrefill } from '../lib/sessionSequence';
 import SegmentedGrid from './ui/SegmentedGrid';
 import NumberStepper from './ui/NumberStepper';
 import EmptyState from './ui/EmptyState';
 import LapTimeKeypad from './ui/LapTimeKeypad';
 import UndoToast from './ui/UndoToast';
 import BottomSheet from './ui/BottomSheet';
+import FourBarQuickAdjust from './FourBarQuickAdjust';
+import SetupDiffView from './SetupDiffView';
+import { NumericCornerField, formatPsiValue, fourBarAdjustmentId, fourBarAdjustmentLabel, mergeImportedSetupPressure } from '../lib/setupSteps';
+import { pickImmediatePriorSetupForCar, setupUsedUniquelyMatchesCar } from '../lib/setupCompat';
 
 // ── Data passed up to App's create handlers ([15]) ───────────────────────────
 
@@ -31,6 +35,7 @@ export interface NewSessionData {
   /** [11] carried from the most recent session when available */
   prefillPressures?: { lf: string; rf: string; lr: string; rr: string };
   prefillTires?: { lf: TireDetails; rf: TireDetails; lr: TireDetails; rr: TireDetails };
+  pressureSourceNote?: string;
 }
 
 interface RaceWeekendViewProps {
@@ -49,6 +54,8 @@ interface RaceWeekendViewProps {
   onActivateWeekend: (weekendId: string) => void;
   onCreateWeekend: (data: NewWeekendData) => void;
   onCreateSession: (data: NewSessionData) => void;
+  activeSetup?: Setup | null;
+  onUpdateActiveSetup?: (setup: Setup) => void;
   /** [15] One-shot: open a creation modal as soon as the tab mounts. */
   initialAction?: 'new-session' | 'new-weekend';
   onInitialActionConsumed?: () => void;
@@ -115,7 +122,7 @@ export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
   onUpdateSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
   activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
-  initialAction, onInitialActionConsumed,
+  activeSetup = null, onUpdateActiveSetup, initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
   const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
@@ -158,10 +165,13 @@ export default function RaceWeekendView({
 
   // [13] Lap-time keypad
   const [lapPadOpen, setLapPadOpen] = useState(false);
+  const [fourBarOpen, setFourBarOpen] = useState(false);
+  const [sessionDiff, setSessionDiff] = useState<{ a: string; b: string } | null>(null);
 
   // Android hardware back closes these modals first ([29])
   useBackClosable(wkFormOpen, () => setWkFormOpen(false));
   useBackClosable(nsOpen, () => setNsOpen(false));
+  useBackClosable(fourBarOpen, () => setFourBarOpen(false));
 
   // Weekend pending delete stays hidden everywhere until undo/commit resolves.
   const pendingDeleteId = weekendUndo.pending?.id ?? null;
@@ -174,6 +184,19 @@ export default function RaceWeekendView({
 
   // [10] Canonical ordering shared with ContextStrip/Dashboard.
   const sortedWeekends = sortWeekends(visibleWeekends, activeWeekendId);
+  const scopedTireInventory = activeCarId ? tireInventory.filter(tire => tire.carId === activeCarId) : [];
+  const scopedSetups = activeCarId ? savedSetups.filter(setup => setup.carId === activeCarId) : [];
+  const getSessionDiffPair = (record: SessionRecord, weekendId: string): { a: string; b: string } | null => {
+    const weekend = weekends.find(item => item.id === weekendId);
+    const byWeekend = scopedSetups.find(setup => setup.id === weekend?.setupId);
+    const bySetupUsed = setupUsedUniquelyMatchesCar(record.setupUsed, savedSetups, activeCarId)
+      ? scopedSetups.find(setup => setup.chassis.trim().toLowerCase() === record.setupUsed?.trim().toLowerCase()) ?? null
+      : null;
+    const target = byWeekend ?? bySetupUsed;
+    if (!target) return null;
+    const prior = pickImmediatePriorSetupForCar(scopedSetups, target);
+    return prior ? { a: prior.id, b: target.id } : null;
+  };
 
   // ── Session helpers ──────────────────────────────────────────────────────────
 
@@ -217,11 +240,17 @@ export default function RaceWeekendView({
     };
     const updatedTires = { ...currentTires, [corner]: { ...currentTires[corner], [field]: val } };
     const updatedPressures = { ...session.pressures, [corner]: field === 'airPressure' ? val : currentTires[corner].airPressure };
-    onUpdateSession({ ...session, tires: updatedTires, pressures: updatedPressures });
+    const hasPressure = Object.values(updatedPressures).some(value => value.trim() !== '');
+    onUpdateSession({
+      ...session,
+      tires: updatedTires,
+      pressures: updatedPressures,
+      ...(field === 'airPressure' ? { pressureSourceNote: hasPressure ? 'Adjusted in this run' : undefined } : {}),
+    });
   };
 
   const handleTireInventorySelect = (corner: 'lf' | 'rf' | 'lr' | 'rr', tireId: string) => {
-    const tire = tireInventory.find(t => t.id === tireId);
+    const tire = scopedTireInventory.find(t => t.id === tireId);
     const currentTires = session.tires || {
       lf: { compound: '', size: '', airPressure: session.pressures?.lf || '' },
       rf: { compound: '', size: '', airPressure: session.pressures?.rf || '' },
@@ -244,8 +273,7 @@ export default function RaceWeekendView({
   // ── Import tires from bound setup ───────────────────────────────────────────
 
   const handleImportTiresFromSetup = () => {
-    if (!currentWeekend?.setupId) return;
-    const boundSetup = savedSetups.find(s => s.id === currentWeekend.setupId);
+    const boundSetup = activeSetup;
     if (!boundSetup) return;
     const currentTires = session.tires || {
       lf: { compound: '', size: '', airPressure: '' },
@@ -256,20 +284,48 @@ export default function RaceWeekendView({
     const corners = ['lf', 'rf', 'lr', 'rr'] as const;
     const updatedTires = { ...currentTires };
     const updatedPressures = { ...session.pressures };
+    let importedPressure = false;
     for (const corner of corners) {
       const c = boundSetup[corner];
-      const matchedTire = c.tireInventoryId ? tireInventory.find(t => t.id === c.tireInventoryId) : null;
+      const matchedTire = c.tireInventoryId ? scopedTireInventory.find(t => t.id === c.tireInventoryId) : null;
+      const pressure = mergeImportedSetupPressure(
+        c.tirePress,
+        currentTires[corner].airPressure,
+        updatedPressures[corner],
+      );
+      importedPressure ||= !!pressure.imported;
       updatedTires[corner] = {
         ...currentTires[corner],
         compound: matchedTire?.compound || c.tireComp || currentTires[corner].compound,
         size: matchedTire?.size || c.tireSize || currentTires[corner].size,
         tireId: matchedTire?.id || currentTires[corner].tireId,
         durometer: matchedTire?.durometer || currentTires[corner].durometer,
-        airPressure: c.tirePress || currentTires[corner].airPressure,
+        airPressure: pressure.tirePressure,
       };
-      updatedPressures[corner] = c.tirePress || updatedPressures[corner];
+      updatedPressures[corner] = pressure.blockPressure;
     }
-    onUpdateSession({ ...session, tires: updatedTires, pressures: updatedPressures });
+    onUpdateSession({
+      ...session,
+      tires: updatedTires,
+      pressures: updatedPressures,
+      pressureSourceNote: importedPressure ? `Pressures carried from ${boundSetup.chassis}` : session.pressureSourceNote,
+    });
+  };
+
+  const handleQuickFourBarChange = (corner: 'lr' | 'rr', field: NumericCornerField, value: string, previous: string) => {
+    if (!activeSetup || !onUpdateActiveSetup) return;
+    const nextSetup: Setup = { ...activeSetup, [corner]: { ...activeSetup[corner], [field]: value } };
+    onUpdateActiveSetup(nextSetup);
+    const id = fourBarAdjustmentId(corner, field);
+    const adjustment = {
+      id,
+      icon: 'height',
+      label: fourBarAdjustmentLabel(corner, field),
+      value: `${previous || '—'} → ${value || '—'}`,
+    };
+    const existing = session.adjustments || [];
+    const adjustments = [adjustment, ...existing.filter(item => item.id !== id)];
+    onUpdateSession({ ...session, adjustments });
   };
 
   // ── Photo helpers ────────────────────────────────────────────────────────────
@@ -367,7 +423,7 @@ export default function RaceWeekendView({
     setWkName(editing?.name ?? '');
     setWkTrack(editing?.track ?? '');
     setWkDate(editing?.date ?? new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
-    setWkSetupId(editing?.setupId ?? '');
+    setWkSetupId(scopedSetups.some(setup => setup.id === editing?.setupId) ? editing?.setupId ?? '' : '');
     setWkFormOpen(true);
   };
 
@@ -377,7 +433,7 @@ export default function RaceWeekendView({
     if (wkEditingId) {
       const wk = weekends.find(w => w.id === wkEditingId);
       if (wk) {
-        const boundSetup = savedSetups.find(s => s.id === wkSetupId) || null;
+        const boundSetup = scopedSetups.find(s => s.id === wkSetupId) || null;
         onUpdateWeekend({
           ...wk,
           name: wkName,
@@ -388,7 +444,8 @@ export default function RaceWeekendView({
         });
       }
     } else {
-      onCreateWeekend({ name: wkName, track: wkTrack, date: wkDate, setupId: wkSetupId || undefined });
+      const boundSetup = scopedSetups.find(s => s.id === wkSetupId) || null;
+      onCreateWeekend({ name: wkName, track: wkTrack, date: wkDate, setupId: boundSetup?.id });
     }
     setWkFormOpen(false);
   };
@@ -397,7 +454,15 @@ export default function RaceWeekendView({
 
   const openNewSession = () => {
     if (!currentWeekend) { openWeekendForm(); return; }
-    const sugg = suggestNextSession(currentWeekend.sessions);
+    const activeTireIds = new Set(scopedTireInventory.map(tire => tire.id));
+    const weekendSetupMatches = scopedSetups.some(setup => setup.id === currentWeekend.setupId);
+    const compatibleSessions = filterCompatibleSessions(
+      currentWeekend.sessions,
+      activeTireIds,
+      weekendSetupMatches,
+      session => setupUsedUniquelyMatchesCar(session.setupUsed, savedSetups, activeCarId),
+    );
+    const sugg = suggestNextSession(compatibleSessions);
     setNsType(sugg.type);
     setNsSuggestedType(sugg.type);
     setNsTrackCondition(sugg.prefill.trackCondition ?? '');
@@ -421,6 +486,7 @@ export default function RaceWeekendView({
       weather: nsWxStr,
       prefillPressures: nsPrefill.pressures,
       prefillTires: nsPrefill.tires,
+      pressureSourceNote: nsPrefill.pressureSourceNote,
     });
     setNsOpen(false);
   };
@@ -582,7 +648,7 @@ export default function RaceWeekendView({
             />
           </div>
 
-          {savedSetups.length > 0 && (
+          {scopedSetups.length > 0 && (
             <div>
               <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
                 Bind a Setup (optional)
@@ -595,7 +661,7 @@ export default function RaceWeekendView({
                 >
                   <option value="">-- No setup selected --</option>
                   {/* Decision 3: filter to active car's setups */}
-                  {savedSetups.filter(s => !activeCarId || s.carId === activeCarId).map(s => (
+                  {scopedSetups.map(s => (
                     <option key={s.id} value={s.id}>{s.chassis}{s.carType ? ` (${s.carType})` : ''}</option>
                   ))}
                 </select>
@@ -1131,7 +1197,7 @@ export default function RaceWeekendView({
         <div className="pt-4 border-t border-outline-variant/60 mb-6">
           <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
             <h3 className="font-mono text-xs uppercase text-on-surface-variant">Tires & Pressures</h3>
-            {currentWeekend?.setupId && savedSetups.find(s => s.id === currentWeekend.setupId) && (
+            {activeSetup && (
               <button
                 type="button"
                 onClick={handleImportTiresFromSetup}
@@ -1142,6 +1208,7 @@ export default function RaceWeekendView({
               </button>
             )}
           </div>
+          {session.pressureSourceNote && <p className="mb-2 font-mono text-xs text-on-surface-variant">{session.pressureSourceNote}</p>}
           <div className="grid grid-cols-2 gap-2">
             {(['lf', 'rf', 'lr', 'rr'] as const).map(corner => {
               const selectedTireId = session.tires?.[corner]?.tireId || '';
@@ -1151,11 +1218,11 @@ export default function RaceWeekendView({
                 .filter(c => c !== corner)
                 .map(c => session.tires?.[c]?.tireId)
                 .filter(Boolean) as string[];
-              const availableTires = sortBySize(tireInventory.filter(t => !usedByOthers.includes(t.id) || t.id === selectedTireId));
+              const availableTires = sortBySize(scopedTireInventory.filter(t => !usedByOthers.includes(t.id) || t.id === selectedTireId));
               return (
                 <div key={corner} className="bg-[#0e0e0e] border border-outline-variant rounded p-2 space-y-2">
                   <span className="text-[10px] font-bold text-primary uppercase block">{corner.toUpperCase()}</span>
-                  {tireInventory.length > 0 && (
+                  {scopedTireInventory.length > 0 && (
                     <div className="relative">
                       <select
                         value={selectedTireId}
@@ -1171,7 +1238,7 @@ export default function RaceWeekendView({
                     </div>
                   )}
                   {selectedTireId && (() => {
-                    const t = tireInventory.find(x => x.id === selectedTireId);
+                    const t = scopedTireInventory.find(x => x.id === selectedTireId);
                     return t ? (
                       <p className="font-mono text-[9px] text-on-surface-variant/60">{t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS</p>
                     ) : null;
@@ -1208,15 +1275,14 @@ export default function RaceWeekendView({
               </div>
             ))}
           </div>
-          {/* TODO C5: FourBarQuickAdjust — mount the four-bar quick-adjust sheet here */}
           <button
             type="button"
-            disabled
-            className="w-full flex items-center justify-center gap-2 min-h-12 rounded-xl border border-dashed border-outline-variant text-on-surface-variant/50 font-mono text-[11px] font-bold uppercase tracking-wider opacity-60 cursor-not-allowed"
+            onClick={() => setFourBarOpen(true)}
+            disabled={!activeSetup || !onUpdateActiveSetup}
+            className={`w-full flex items-center justify-center gap-2 min-h-12 rounded-xl border font-mono text-[11px] font-bold uppercase tracking-wider ${activeSetup && onUpdateActiveSetup ? 'border-primary/60 bg-primary/10 text-primary hover:bg-primary/15' : 'border-dashed border-outline-variant text-on-surface-variant/50 cursor-not-allowed'}`}
           >
             <span className="material-symbols-outlined text-[16px]">tune</span>
             Four-bar quick-adjust
-            <span className="text-[9px] normal-case font-normal">(coming soon)</span>
           </button>
         </div>
 
@@ -1435,6 +1501,20 @@ export default function RaceWeekendView({
             </button>
             <button
               type="button"
+              onClick={() => {
+                const pair = getSessionDiffPair(menuSession.session, menuSession.weekendId);
+                if (!pair) return;
+                setSessionDiff(pair);
+                setMenuSession(null);
+              }}
+              disabled={!getSessionDiffPair(menuSession.session, menuSession.weekendId)}
+              className={`tap-target-block w-full gap-3 rounded-xl px-3 text-left ${getSessionDiffPair(menuSession.session, menuSession.weekendId) ? 'text-on-surface hover:bg-surface-container-high' : 'text-on-surface-variant/40 cursor-not-allowed'}`}
+            >
+              <span className="material-symbols-outlined text-primary">compare_arrows</span>
+              Compare setup
+            </button>
+            <button
+              type="button"
               onClick={() => requestDeleteSession(menuSession.weekendId, menuSession.session)}
               className="tap-target-block w-full gap-3 rounded-xl px-3 text-left text-red-400 hover:bg-surface-container-high"
             >
@@ -1444,6 +1524,19 @@ export default function RaceWeekendView({
           </div>
         )}
       </BottomSheet>
+
+      <BottomSheet open={fourBarOpen} onClose={() => setFourBarOpen(false)} title="Four-bar quick-adjust">
+        <FourBarQuickAdjust setup={activeSetup} compact onFieldChange={handleQuickFourBarChange} />
+      </BottomSheet>
+
+      {sessionDiff && (
+        <SetupDiffView
+          setups={scopedSetups}
+          initialAId={sessionDiff.a}
+          initialBId={sessionDiff.b}
+          onClose={() => setSessionDiff(null)}
+        />
+      )}
 
       <BottomSheet
         open={!!menuWeekend}

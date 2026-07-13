@@ -18,6 +18,8 @@ export interface CornerSetup {
   wheelSpacerUnit?: string; // in
   tirePress: string;
   tirePressUnit?: string; // psi
+  /** Where this corner's current pressure block was copied from. */
+  pressureSourceNote?: string;
   tireInventoryId?: string; // reference to TireInventoryItem.id
   backspacing?: string; // wheel backspacing in inches
 
@@ -205,6 +207,8 @@ export interface SessionRecord {
     lr: string;
     rr: string;
   };
+  /** Where this session pressure block was copied from. */
+  pressureSourceNote?: string;
   competitionNotes?: string;
   weather?: string;
   time?: string;
@@ -306,6 +310,8 @@ export interface ActiveSession {
     lr: string;
     rr: string;
   };
+  /** Where this active-session pressure block was copied from. */
+  pressureSourceNote?: string;
   competitionNotes: string;
   screenshots?: string[];
   /** Shock dyno graph images (base64) */

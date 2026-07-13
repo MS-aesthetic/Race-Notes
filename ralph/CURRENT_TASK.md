@@ -1,205 +1,413 @@
-# Current Task — UX-R1: Urgent Pre-Chunk-5 Regression Repair
+# Current Task — UX Chunk 5: Trackside Setups
 
-**Status:** COMPLETE — CODE_PASS + RUNTIME_PASS (2026-07-13)
-**Priority:** CLOSED — UX Chunk 5 is unblocked but has not started.
+**Status:** CODE PASS + RUNTIME PASS — attempt 1; ready to commit
+**Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
+**Priority:** four-bar/birdcage first. Always prominent. Fast with gloves.
 
 ## Routing
 
-- GPT 5.6 SOL High owns this specification and final QA.
-- GPT 5.6 Terra High owns implementation. QA failures 1–2 return to Terra.
-- Third failed QA review transfers implementation and final QA to SOL.
-- Runtime metadata, not prose self-identification, proves which model ran.
-- Use `/caveman full`. Use cavecrew only for bounded investigation or diff review.
-- Evidence is settled. Do not browse or broaden product scope.
+- GPT 5.6 SOL High owns plan and QA. GPT 5.6 Terra High owns build.
+- QA failures 1–2 return to Terra. Failure 3 transfers build + final QA to SOL.
+- Runtime `turn_context.payload.model` is model authority.
+- Use `/caveman full`. Cavecrew only for bounded tracing/review.
+- Preserve all committed UX-R1 behavior: banner, light contrast, 12px floor,
+  Tuning Guide, starter convergence, local icon font/PWA precache, zoom-safe shell/nav.
 
 ## Goal
 
-Repair four regressions before Setups work resumes: restore team identity at the
-top of Dashboard, make light-mode accent and metadata readable, restore a safe
-and clearly scoped Tuning Guide without adding a sixth tab, and make starter
-checklist hydration deterministic across offline and signed-in use.
+Make Setups thumb-operable at track. Promote existing LR/RR four-bar and
+birdcage values to an always-visible quick-adjust surface. Add safe numeric
+steppers, same-car copy-last creation, setup-card/session diff entry, pressure
+provenance, and useful tire summary/history. Keep local-first/cloud behavior and
+active-car isolation exact.
 
-## Required behavior
+## Settled current-code facts
 
-### 1. Team banner leads Dashboard
+- `SetupView` already has four controls: Setups, Loads, Tires, Compare. Tires is
+  already a rich active-car-filtered inventory/usage view. Do not add a redundant
+  `Setup | Tires` toggle or remove Loads/Compare.
+- `CornerForm` is four serial full-width cards. Values are strings. Rear
+  four-bar data already exists: top/bottom length, frame hole, birdcage hole,
+  top angle, bottom angle. RR top angle uses `topBarAngRH`; LR uses
+  `topBarAngFD`.
+- `NumberStepper` consumes `number | ''`; adapters are required. Stored setup
+  strings remain strings. Legacy strings such as `Hole 3`, `12°`, fractions,
+  and empty values must not be destroyed by render.
+- `SetupView.onSaveSetups` → App is current full-array dual-write/cloud seam.
+  Reuse/centralize it. Do not add component-local persistence.
+- Current new-setup path can clone a foreign/global setup, can leave a new
+  second-car setup inactive, and uses array position instead of a same-car
+  recency rule. Fix all three.
+- `RaceWeekendView` receives full tires/setups but no setup mutation callback.
+  Its Changes section has a disabled Chunk-5 four-bar placeholder.
+- App car switching does not select that car's setup. Current session creation
+  can therefore use a foreign setup. Fix before quick-adjust wiring.
+- `SetupDiffView` has no initial IDs. Setup cards expose Share/Clone/Delete
+  icon actions; global Compare already exists. Preserve those actions.
+- No provenance fields exist. Session payloads and setup corners already live in
+  JSONB, so optional fields can round-trip without schema work.
+- No-car Add Tire/New Smasher actions still use disabled prerequisite UI.
 
-- Render the existing team banner as Dashboard's first content block, before
-  Get Race-Ready, `+ LOG RUN`, launchpad cards, service, and accounting content.
-- Keep current team data and edit/navigation behavior. Do not create duplicate
-  team state or a second banner elsewhere.
-- Team name and metadata must remain readable over every supplied/custom image.
-  Use a deterministic scrim, gradient, or opaque text surface; never depend on
-  image brightness. Normal text must meet WCAG AA 4.5:1 and large text 3:1.
-- Missing image/team details must keep a deliberate, compact fallback with no
-  layout jump or empty decorative block.
+## Required build
 
-### 2. Readable rendered accent and global text floor
+### 1. Pure setup compatibility and step contracts
 
-- Keep the user's stored accent value byte-for-byte unchanged. Do not migrate,
-  clamp, or overwrite `race_notes_theme` or the Style picker value.
-- Add a pure helper that derives the rendered light-theme accent from the stored
-  accent and the actual light surface. Preserve hue as closely as practical,
-  adjust only presentation, and deterministically choose the nearest color that
-  meets WCAG AA: 4.5:1 where used for normal text and 3:1 for large text,
-  controls, icons, borders, and focus indicators. Dark-theme rendering must not
-  regress.
-- Feed derived color through existing CSS theme variables. Components continue
-  using semantic tokens; no component-local hardcoded color fixes.
-- Raise global tiny-copy floor to 12 CSS px at standard zoom. Remove utilities or
-  transforms that render app labels/metadata below that floor.
-- Strengthen faint light-mode metadata and secondary-text tokens to 4.5:1 on
-  their normal surfaces. Disabled-state and purely decorative exceptions must
-  remain distinguishable and must not carry essential information alone.
-- Verify standard, large, xlarge, and xxlarge zoom. No clipping, overlap, hidden
-  actions, or horizontal page scroll.
+In `src/lib/setupCompat.ts`:
 
-### 3. Prominent, scoped, safe Tuning Guide
+- Keep legacy `load` → `loadWeight` normalization unchanged.
+- Add pure `pickLatestSetupForCar(setups, carId)` (exact name may vary only if
+  exported names stay clear). Filter strictly to `setup.carId === carId`.
+  Never fall back to another car or `setups[0]`.
+- Recency rule: parse valid `setup.date`; newest wins. When dates are equal or
+  unparseable, preserve master-array recency (lower index is newer), then use ID
+  as deterministic final tie-break. Do not add `Setup.updatedAt`; current domain
+  does not retain it.
+- Add pure `cloneSetup(source, overrides)` using a real deep copy. Preserve all
+  same-car fields, photos policy, corner fields, and same-car tire inventory IDs.
+  Never mutate source. New ID/date/name/carId come from overrides. Cross-car copy
+  is not a valid default path; if helper is called cross-car, clear all four
+  `tireInventoryId` values.
+- Add pure blank-setup factory from `INITIAL_SETUP` semantics if useful. It must
+  stamp current car and never reuse another car's values.
 
-- Retain exactly five bottom tabs. Do not restore `quickref` as a tab.
-- Add a prominent action labeled exactly **Tuning Guide** to the existing help
-  entry surface so it is named and reachable in one tap from the persistent help
-  control. Preserve other HelpSheet content and back behavior.
-- Label guide applicability at both guide and row/section level. Separate
-  **Modified** and **Dirt Late Model** guidance; never present chassis-specific
-  AFCO direction as universal advice. State that these are baseline diagnostic
-  directions and chassis, tire, shock-builder, and track rules prevail.
-- Correct the already-flagged contradictory or unsafe setup rows only from the
-  supplied official AFCO Modified and Dirt Late Model evidence. Keep conflicting
-  application-specific directions in separate labeled rows. Do not invent a
-  blended rule or perform new web research.
-- Remove every universal claim that a pressure change of `5 PSI`, or any fixed
-  pressure change, is a minimum or inherently safe. Pressure guidance must defer
-  to tire manufacturer, chassis builder, measured hot pressure, and track rules.
-- Preserve and surface the warning to change one item at a time, record the
-  result, and revert if behavior worsens.
-- Keep factual source attribution in the guide: official AFCO Modified and Dirt
-  Late Model setup guidance. Do not add unsupported safety or performance claims.
+In new `src/lib/setupSteps.ts`:
 
-### 4. Exact starter-template reconciliation
+- Centralize step/unit/decimal metadata and numeric string adapters.
+- Required numeric contracts:
+  - `loadWeight`: 5 lb, 0 decimals
+  - `loadCtoC`, `springHeight`, `droop`, `preload`: 0.125 in, 3 decimals
+  - `caster`, `camber`, `topBarAngRH`, `topBarAngFD`, `bottomBarAngle`: 0.5°, 1 decimal
+  - `tirePress`: 0.5 psi, 1 decimal
+  - `backspacing`: 0.25 in, 2 decimals
+  - `topBarLength`, `bottomBarLength`: 0.25 in, 2 decimals
+  - `topBarHFrame`, `topBarHBird`, `botBarHFrame`, `botBarHBird`: 1 hole, 0 decimals, minimum 0
+- Parsing may extract one numeric token from legacy unit text. Rendering alone
+  must not rewrite stored bytes. First user edit writes a canonical numeric
+  string; empty stays empty. Unparseable non-empty legacy text stays visible in
+  a caption/fallback until user deliberately edits it; never coerce silently to 0.
+- Keep free-text inputs for spring/shock identifiers, tire compound, fractional
+  tire size, toe, chassis, track, notes, and other genuinely nonnumeric values.
 
-- Add a pure, exported helper for an **untouched starter fingerprint**. Fingerprint
-  only canonical starter semantics: starter name plus ordered item text and any
-  starter-defined behavior fields. Ignore generated IDs, owner/team IDs, cloud
-  timestamps, and bookkeeping fields. Comparison is exact after applying only
-  existing persisted-data defaults; do not lowercase, trim, sort, fuzzy-match,
-  or identify a starter by name alone.
-- A customized starter is not an untouched starter. A user template with the same
-  name is not an untouched starter. Preserve both unchanged.
-- During hydration, reconcile each canonical starter independently:
-  1. Keep one exact untouched copy using an order-independent deterministic
-     keeper rule with ID as final tie-break.
-  2. Seed only canonical starters whose exact fingerprint is absent.
-  3. Remove only additional exact untouched copies.
-- Signed-out/offline-local hydration may reconcile after local hydration. When a
-  user is signed in, do not seed or dedupe until the signed-in cloud pull attempt
-  has settled and local/cloud data has been merged. No transient defaults may be
-  pushed before pull completion.
-- Persist the reconciled survivor set to React state and localStorage. When signed
-  in, push newly seeded survivors and call the existing checklist-template cloud
-  delete helper for every discarded duplicate ID. Never delete by name or
-  fingerprint query.
-- Repeated hydration, array reordering, offline restart, login, logout, pull
-  success, and pull failure must converge without creating another starter or
-  deleting customized/same-name templates.
+### 2. Active-car setup invariant and one save seam
 
-## Explicit file scope
+In `src/App.tsx`:
 
-Implementation may touch only these production areas:
+- Extract one canonical full-array setup save handler used by `SetupView` and
+  quick-log. Order: React `savedSetups` → `race_notes_saved_setups` → when an
+  active ID is supplied, `setup` + `race_notes_setup` → signed-in
+  `pushSetups(fullMasterArray, user.id, setSyncStatus)`.
+- Never push only the displayed active-car subset.
+- On car switch, select/persist that car's latest saved setup when one exists.
+  If none exists, no session/four-bar/tire code may read the previous car's
+  setup. Do not invent or push a saved setup merely by switching cars.
+- New first setup for any car becomes active, even when other cars already have
+  setups.
+- Quick-log and Setups must resolve the same current-car active setup. A foreign
+  weekend-bound setup cannot override active-car isolation.
+- Thread only minimal props: current setup, canonical save/update callback,
+  info-toast callback, and Garage teaching navigation.
+- Current setup edits propagate pressures to the active session only when
+  pressure values actually changed or a setup was deliberately activated.
+  Metadata/four-bar edits must not rewrite pressure blocks or emit pressure toast.
 
-- `src/App.tsx` — minimal hydration/theme/help wiring only.
-- `src/index.css` — semantic theme-token contrast and global type floor.
-- `src/components/DashboardView.tsx` and its existing team-banner component, if
-  already extracted — ordering/fallback/contrast only.
-- `src/components/ui/HelpSheet.tsx` — named Tuning Guide entry and in-sheet
-  navigation only.
-- Existing Tuning/Quick Reference guide component or data module — applicability,
-  AFCO-backed row corrections, pressure disclaimer, and warning only.
-- Existing checklist template manager component — reconciliation wiring only.
-- `src/lib/checklists.ts` — fingerprint, classification, deterministic reconcile.
-- `src/lib/sync.ts` — only existing pull/delete integration needed for convergence.
-- One new pure color helper under `src/lib/`.
-- New focused harness files under `scripts/` for color contrast and starter
-  reconciliation.
+### 3. Prominent four-bar/birdcage quick-adjust
 
-Builder may use bounded `rg` to resolve an existing extracted component's exact
-filename. Any other production file requires planner approval before editing.
-No schema, migration, dependency, router, tab-count, or unrelated Chunk 5/6/7
-changes.
+Create `src/components/FourBarQuickAdjust.tsx`.
 
-## Required harnesses
+- Controlled component only: receives one `Setup`, change callback, optional
+  compact/sheet mode, and optional disabled reason. No own setup state,
+  localStorage, cloud calls, or cloned setup object.
+- Render LR and RR cards. Expose all existing top and bottom bar values:
+  length, frame hole, birdcage hole, and angle. Use correct LR Full Droop and RR
+  Ride Height labels. Use `NumberStepper` + `setupSteps` adapters.
+- Setups entry: mount at top of Setups sub-view, before create form and setup
+  accordion. Exact heading `FOUR-BAR / BIRDCAGE`. Keep controls always visible;
+  no collapsed default, hidden expander, separate screen, or saved collapsed
+  state. RR birdcage stepper must be reachable immediately after opening Setups.
+- Remove duplicate rear four-bar fields from ordinary corner forms after this
+  component becomes canonical. Other rear fields remain.
+- Quick-log entry: replace disabled placeholder in Changes Made with enabled
+  `Four-bar quick-adjust` action. One tap opens existing `BottomSheet` containing
+  the same component instance contract and same setup object.
+- Each quick-log change updates the setup through App's canonical save seam and
+  upserts one stable `SetupAdjustment` line keyed by corner+field. Long-press or
+  repeated stepper taps update that line; do not flood session changes with one
+  row per tick. Example: `RR top birdcage: hole 2 → 3`.
+- Quick-log setup update must also flow through `handleUpdateSession`, preserving
+  active-session localStorage/cloud plus the matching weekend session record.
+- Setups-surface baseline edits do not fabricate a run adjustment when no
+  quick-log action occurred.
 
-1. **Accent harness:** representative user accents including very light, very
-   dark, saturated, achromatic, short hex, and invalid legacy input. Assert
-   deterministic fallback, unchanged stored input, and required contrast against
-   actual light surfaces for every semantic use.
-2. **Starter harness:** empty state; one untouched copy; duplicate untouched
-   copies in every order; customized starter; same-name custom template; missing
-   one starter; legacy missing optional fields; offline repeat; merged local/cloud
-   repeat. Assert idempotence, order-independent keeper, exact seed/delete ID sets,
-   and preservation of every non-exact template.
+### 4. Physical corner cards and numeric steppers
 
-Harnesses must run from documented Windows commands without network access and
-must fail nonzero on any assertion.
+In `src/components/SetupView.tsx`:
 
-## Acceptance and QA gates
+- Keep existing four corner semantics and tire uniqueness.
+- Render LF/RF/LR/RR as a physical 2×2 grid: row 1 LF/RF, row 2 LR/RR; left
+  column is car left. DOM order must be LF, RF, LR, RR.
+- Cards may use one internal column at narrow width. No fixed content height.
+  Labels and values wrap safely at 320×800 XX-Large.
+- Replace every truly numeric corner text field listed in `setupSteps.ts` with
+  `NumberStepper`. Keep string storage adapters. No raw `type="number"` or plain
+  numeric text input remains for those fields.
+- Preserve calculated stagger, weight percentages, inventory selection,
+  attachments, legacy load compatibility, and autosave behavior.
+- Do not turn tire size into a numeric-only control: `86 1/2` must still work.
 
-1. Dashboard banner is visually first and its text meets stated contrast on
-   bright, dark, and high-detail images plus no-image fallback.
-2. Stored accent remains exact; rendered light accent and metadata meet stated
-   WCAG ratios. Dark theme remains readable.
-3. No app text renders below 12 CSS px at standard zoom. Light/dark at standard,
-   large, xlarge, and xxlarge show no clipping, overlap, lost actions, or page
-   horizontal scroll.
-4. Exactly five bottom tabs remain. **Tuning Guide** is prominent, named, one-tap
-   reachable from help, and back behavior returns to prior view.
-5. Guide clearly separates Modified from Dirt Late Model applicability, matches
-   supplied official AFCO evidence, contains no contradictory blended rows or
-   universal `5 PSI`/fixed-pressure safety claim, and retains one-change-at-a-time
-   warning.
-6. Starter harness proves exact-only, idempotent, order-independent reconciliation.
-   Customized and same-name templates survive byte-for-byte.
-7. Signed-in pull is settled before reconciliation. Offline-first use, then login,
-   and a second device/cloud pull converge to one copy of each untouched starter.
-   Every discarded exact duplicate ID receives cloud delete; no other ID does.
-8. Local-first writes, team sharing/RLS behavior, and existing checklist CRUD stay
-   intact. Pull failure settles safely and does not create repeated defaults.
-9. `npm run lint` reports exactly the three known baseline errors and no new error.
-10. `npm run build` succeeds in the v3 worktree with required environment files.
-11. Both focused harnesses pass. Record exact commands and output summaries.
-12. Deploy a Netlify **draft** only. Hard-refresh/incognito visual QA covers bright
-    and dark banners, light/dark themes, all four zooms, five tabs, Tuning Guide,
-    and checklist reload/login convergence. Production remains untouched.
-13. Build Android through the documented v3-dist-to-main bridge, bump installable
-    versionCode/versionName, install with app data cleared, and repeat critical
-    banner/theme/guide/checklist flows. Record APK path and version.
-14. Terra reports exact files changed, harness evidence, lint baseline, build,
-    draft URL, offline/login convergence evidence, and Android evidence. SOL QA
-    independently verifies diff scope and all gates before unblocking Chunk 5.
+### 5. Same-car copy-last creation
 
-## Completion record — 2026-07-13
+In `SetupView` using `setupCompat` helpers:
 
-- Commit: `b6d702e` on `preview-v3`.
-- Product: banner leads Dashboard; light accent derives against the darkest light
-  surface; explicit 8–11px utilities floor at 12px; five-tab shell exposes a named
-  Tuning Guide; AFCO applicability/pressure language corrected; starter hydration
-  converges without deleting customized or same-name templates.
-- Offline: Material Symbols Outlined bundled locally and included in Workbox's
-  WOFF2 precache. Cold Android launch passed with Wi-Fi/data disabled and WebView
-  HTTP/service-worker caches removed.
-- Responsive runtime: Android WebView at 320×800 passed dark/light × Standard,
-  Large, X-Large, and XX-Large. Root/shell/nav had no horizontal scroll; five tab
-  labels/icons and Tuning Guide remained visible.
-- Gates: both UX-R1 harnesses PASS; build PASS; lint remained exactly the three
-  known baseline errors; independent cavecrew review found no product defect.
-- Android: debug APK versionCode 15/versionName 4.0 at
-  `C:\Users\maxx\antigravity\Race-Notes\race_notes.apk`.
-- Netlify draft: `https://6a54e5f9c0cf5c7bcc9280a4--crew-chief-race-notes.netlify.app`.
-  Draft auth gate rendered without horizontal overflow and loaded the local icon
-  font. Production remained untouched.
-- Model routing: fresh token `handoff-live-7139` passed SOL → Terra → SOL in one
-  task. Rollout `turn_context.payload.model` recorded `gpt-5.6-sol` →
-  `gpt-5.6-terra` → `gpt-5.6-sol`, all high effort. Verify with
-  `scripts/verify-agent-handoff.ps1 -Token handoff-live-7139`.
-- Scope exception: `material-symbols@0.45.7`, `package*.json`, and `vite.config.ts`
-  were added after runtime failure proved externally hosted icons broke offline
-  layout. Workbox now precaches the emitted WOFF2 under a 5 MiB cap.
+- With a prior active-car setup, primary create path copies latest same-car
+  setup. Suggested name identifies source track/date. User name override stays
+  supported. Show info toast `Copied from <source>`.
+- Add explicit secondary `Start blank` action. With no active-car setup, blank
+  baseline is primary; no foreign fallback.
+- Always activate and expand new setup. Preserve full master array and other
+  cars byte-for-byte.
+- Same-car copy preserves current physical tire links by design. No cross-car
+  copy occurs. Cross-car helper safety still clears links.
+- Stamp copied corner pressure provenance (below); keep source setup unchanged.
+
+### 6. Pressure provenance without migration
+
+In `src/types.ts`, add only these backward-compatible optional fields:
+
+- `CornerSetup.pressureSourceNote?: string`
+- `ActiveSession.pressureSourceNote?: string`
+- `SessionRecord.pressureSourceNote?: string`
+
+No other domain type addition. No required field. No migration.
+
+Behavior:
+
+- Copy-last stamps each receiving corner: `Copied from <setup label>` and shows
+  a small semantic-token caption below its pressure control.
+- `suggestNextSession` includes a pressure source only when it actually carries
+  pressures from the latest compatible session. App threads it into both active
+  and saved session records. Caption: `Pressures carried from <session>`.
+- When session pressures come from active setup baseline instead, caption names
+  that setup. Do not claim a source when values are defaults/blank.
+- Show one info toast when a pressure block is auto-filled, not on every render
+  or unrelated setup edit.
+- Manual pressure edit may replace source caption with `Adjusted in this run`;
+  it must not keep a false carried-from label.
+- JSONB persistence paths already carry these fields: corners in setup JSONB,
+  sessions in `race_weekends.sessions`, active session in `active_sessions.data`.
+  Update App's active→saved session copy so the optional field is not dropped.
+  `src/lib/sync.ts` must not change.
+
+### 7. Setup diff entry points
+
+- Extend `SetupDiffView` with optional `initialAId`/`initialBId`; validate IDs
+  against supplied setup list, fall back to current standalone defaults, and
+  keep both selectors editable.
+- Keep global Compare control.
+- Add Compare to each setup card's existing action cluster; do not rebuild
+  Share/Clone/Delete into a new menu. Open with selected setup versus previous
+  same-car setup from the pure recency helper. If no previous setup, disable or
+  explain; never compare across cars.
+- Add Compare to session card action sheet only when a same-car associated setup
+  can be resolved from `setupUsed`/current weekend. Preselect that setup versus
+  previous same-car setup. Missing/ambiguous legacy association means no action,
+  not a guessed foreign comparison.
+- Target: rendered diff in at most two taps from either card.
+
+### 8. Tires sub-view: augment, do not duplicate
+
+Create `src/components/TiresSubView.tsx` by extracting the existing Tires-tab UI
+from `SetupView`, then add summary/history. Preserve existing inventory CRUD,
+sort/filter, lifecycle, usage expansion, CSV/report, compound quick-picks, and
+delete-cloud callback.
+
+- Controlled props receive full master tire array, active car ID, active setup,
+  saved setups, weekends, save callback, and delete callback.
+- Filter for display only. Add/delete/edit must reconstruct and pass the full
+  master array. Never overwrite another car's tires with the displayed subset.
+- Current tire-set summary uses active same-car setup: four corner tire number
+  when linked, size, compound, pressure; front/rear stagger from current tire
+  sizes. Do not add persistence.
+- Extend pure `src/lib/tireHistory.ts` with last-five pressure history per corner.
+  Car inclusion requires active-car evidence: matching setup association or a
+  session tire ID belonging to active-car inventory. Exclude unresolved/foreign
+  sessions. Sort newest first deterministically; return maximum five per corner.
+- Keep current Setups/Loads/Tires/Compare header. Do not add another segmented
+  toggle.
+- Replace no-car Add Tire and New Smasher disabled walls with `EmptyState`
+  teaching content and working `Go to Garage` action. Modify
+  `SmasherLoadsView.tsx` only for this bounded no-car flow.
+
+## Exact file scope
+
+### Existing production files allowed
+
+- `src/App.tsx`
+- `src/types.ts` — only three optional provenance fields above
+- `src/components/SetupView.tsx`
+- `src/components/RaceWeekendView.tsx`
+- `src/components/SetupDiffView.tsx`
+- `src/components/SmasherLoadsView.tsx` — no-car teaching flow only
+- `src/lib/setupCompat.ts`
+- `src/lib/sessionSequence.ts`
+- `src/lib/tireHistory.ts`
+
+### New production files required
+
+- `src/components/FourBarQuickAdjust.tsx`
+- `src/components/TiresSubView.tsx`
+- `src/lib/setupSteps.ts`
+
+### New harnesses required
+
+- `scripts/chunk5-setup-harness.ts`
+- `scripts/chunk5-tires-harness.ts`
+
+No other product file without planner approval. In particular: no dependency,
+`vite.config.ts`, service worker, `src/index.css`, `src/lib/sync.ts`, migration,
+Supabase, Tuning Guide, Dashboard, nav, or native Android source edits.
+
+## Pure harness contracts
+
+Run offline; fail nonzero.
+
+`npx tsx scripts/chunk5-setup-harness.ts`
+
+- Legacy `load` normalization retains every field.
+- Recent selection: two cars, mixed valid/invalid/equal dates, reordered input,
+  deterministic tie-break, no foreign fallback.
+- Clone is deep, source unchanged, all nested fields retained, same-car tire IDs
+  retained, cross-car tire IDs cleared, new first setup activation contract.
+- Blank factory contains no source/foreign values.
+- Numeric adapters cover empty, decimals, negatives where valid, `Hole 3`, unit
+  suffixes, garbage preservation, step rounding, and no render-time rewrite.
+- Four-bar stable adjustment key/label helper coalesces repeated changes.
+
+`npx tsx scripts/chunk5-tires-harness.ts`
+
+- Current-set stagger handles decimal and fractional sizes.
+- Last-five pressure history orders correctly, caps five per corner, retains
+  labels, and excludes other-car/unresolved sessions.
+- Missing pressures/tires/setup associations do not crash.
+- Master-array tire update preserves another car's rows byte-for-byte.
+- Pressure prefill source: compatible prior session, active setup baseline,
+  manual edit clearing stale source, and no-source blank/default path.
+
+## Code gates
+
+1. Both harnesses PASS.
+2. `npm run lint` reports exactly three known baseline TypeScript errors; no new
+   error. Record exact messages, not stale line numbers.
+3. `npm run build` succeeds in v3 with `.env` + `.env.local` present.
+4. Static scan proves:
+   - only allowed files changed;
+   - no new raw hex in touched components;
+   - no `src/lib/sync.ts`, migration, dependency, CSS, PWA, or nav change;
+   - no duplicate ordinary-corner four-bar controls;
+   - `FOUR-BAR / BIRDCAGE` precedes create form/accordion;
+   - quick-log placeholder/`coming soon` removed;
+   - Setups/Loads/Tires/Compare controls preserved;
+   - active-car filtering occurs before quick-log setup/tire use;
+   - tire save path receives full master array.
+
+## Runtime acceptance matrix
+
+Seed: car A with 2+ dated setups, linked tires, and 6+ sessions; car B with one
+setup and separate tires; car C with none. Test web draft and Android 320×800.
+
+For every critical Setups/quick-log view: dark + light × Standard/Large/X-Large/
+XX-Large. No page horizontal overflow, clipped header/nav, clipped labels,
+overlap, hidden action, or sub-12px essential text.
+
+Required drills:
+
+1. Open Setups → `FOUR-BAR / BIRDCAGE` already visible → RR top birdcage +1.
+   Reload offline: value persists. Long-press repeat works; no adjustment spam.
+2. Open quick-log → Changes → Four-bar → LR angle −0.5°. Sheet and Setups show
+   identical live value. One coalesced run adjustment persists in session card.
+3. Switch A→B→C. Current setup/tire/four-bar never leaks across cars. C shows
+   teaching state. Create C baseline: it activates immediately.
+4. Copy-last on A chooses actual newest A setup, deep-copies it, shows toast and
+   pressure captions. Start blank remains blank. Other cars unchanged.
+5. Corner grid orientation LF/RF then LR/RR. Fractional tire size still accepts
+   `86 1/2`. Weight/stagger calculations remain correct.
+6. Session creation with prior compatible session shows prior-session pressure
+   provenance. Without it, same-car setup source appears. Manual pressure edit
+   clears false carry label. Unrelated metadata/four-bar edit emits no pressure
+   toast and changes no pressure.
+7. Setup-card Compare opens selected vs prior same-car setup. Session-card Compare
+   does same when association is exact. Both selectors remain editable.
+8. Tires keeps inventory CRUD/exports/usage. Current set and stagger match setup;
+   last-five history matches hand count. Tireless car gets useful empty state.
+9. Offline edits survive hard reload. Sign in/reconnect pushes full arrays; pull
+   converges without losing other-car rows or optional provenance.
+10. Five bottom tabs, named Tuning Guide, local offline icons, banner, and UX-R1
+    starter behavior remain intact.
+
+## Preview + Android bridge
+
+After code gates, deploy Netlify draft only when coordinator authorizes runtime
+QA. Hard-refresh/incognito; production untouched.
+
+Android uses v3-dist-to-main bridge only:
+
+1. Build v3 `dist`.
+2. Mirror v3 `dist` to `C:\Users\maxx\antigravity\Race-Notes\dist`.
+3. In main tree, re-check and bump gitignored
+   `android/app/build.gradle` versionCode/versionName for installable QA build.
+4. Run raw `npx cap sync android` in main. Never run main
+   `npm run android:sync`; it would rebuild master over v3 assets.
+5. Set JDK 21; run `android\gradlew.bat -p android assembleDebug`.
+6. Clear app data/PWA cache, install, run 320×800 matrix + cold offline icon
+   launch. Record APK path/version. Do not copy release artifacts to Drive unless
+   owner asks.
+
+## Explicit non-goals
+
+- No four-bar presets/history, tuning recommendations, or chassis advice.
+- No new setup/tire/session table or migration.
+- No new required type, router, tab, state store, context, dependency, or service.
+- No setup delete/Undo redesign, PDF/share work, Help anchor work, Trackers Chunk
+  6 work, copy-audit sweep, or broad style refactor.
+- No tire lifecycle schema change or guessed cross-car session association.
+- No production deploy, branch merge, commit, or push unless coordinator/owner
+  explicitly starts that separate action.
+
+## Builder report
+
+Report exact files changed; harness outputs; exact lint baseline; build output;
+static-scan results; same-car/offline/cloud evidence; runtime matrix; draft URL
+and Android APK/version only if those stages were authorized. Do not edit Ralph
+QA verdict/status.
+
+### Final report — 2026-07-13
+
+- Real model handoff ran in one persistent Codex task: GPT 5.6 SOL High plan/QA,
+  GPT 5.6 Terra High implementation/fixes, then GPT 5.6 SOL High takeover after
+  the third QA failure and final `CODE_PASS` adjudication.
+- Added canonical setup save/scoping, same-car latest/copy/blank helpers, numeric
+  adapters/steps, pressure provenance, setup/session diff entry, prominent shared
+  four-bar quick-adjust, 2×2 physical corner layout, and active-car Tires view.
+- Quick-log four-bar changes use the canonical setup writer plus serialized
+  session update and one stable corner+field adjustment row.
+- `CHUNK5_SETUP_HARNESS PASS`; `CHUNK5_TIRES_HARNESS PASS`.
+- `npm run lint`: exact three known baseline errors only (two upload
+  `unknown`→`File`; one React `key`/`CornerFormProps`). No new TypeScript error.
+- `npm run build`: PASS, 539 modules; Workbox precache 16 entries.
+- `git diff --check`: PASS. No migration, dependency, sync, CSS, PWA, nav,
+  Tuning Guide, Dashboard, or production change.
+- Netlify final draft deploy `6a5509763fc2865568212af7`:
+  `https://6a5509763fc2865568212af7--crew-chief-race-notes.netlify.app`.
+  Public shell/auth gate loaded; authenticated browser feature QA was unavailable
+  on the draft origin without credentials. Production stayed untouched.
+- Android debug 4.1 (16) built/installed from v3 in the isolated worktree. Real
+  WebView QA at 320 CSS px / XX-Large passed current packaged assets after
+  targeted HTTP/service-worker cache removal while preserving localStorage.
+  Verified baseline creation, FOUR-BAR/BIRDCAGE visibility, stepper mutation,
+  Tires current-set/inventory/form geometry, quick-log sheet, one coalesced
+  adjustment line across repeated taps, Save Run, cold relaunch, and zero fatal
+  logcat errors.
+- Cavecrew investigators traced scope/data hazards; cavecrew reviewer performed
+  independent pre-fix and final diff reviews. Final review caught and closed a
+  blank setup-pressure import data-loss path; its behavioral harness now proves
+  blank/divergent preservation and real-pressure replacement. Android/Web runtime
+  caught stale service-worker assets and confirmed the corrected cold-cache path.

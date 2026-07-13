@@ -1,4 +1,5 @@
-import { RaceWeekend, SessionRecord, SessionType, SESSION_TYPE_LAPS, TireInventoryItem } from '../types';
+import { RaceWeekend, SessionRecord, SessionType, SESSION_TYPE_LAPS, TireInventoryItem, Setup } from '../types';
+import { setupUsedUniquelyMatchesCar } from './setupCompat';
 
 // ─── Legacy session-type inference ────────────────────────────────────────────
 // Sessions logged before `sessionType` existed only have a `name`/`type`
@@ -33,6 +34,16 @@ export function estimatedLapsFor(session: Pick<SessionRecord, 'sessionType' | 'n
 // ─── Tire usage derivation ────────────────────────────────────────────────────
 
 export type TireCorner = 'lf' | 'rf' | 'lr' | 'rr';
+
+export interface PressureHistoryRow {
+  corner: TireCorner;
+  pressure: string;
+  date: string;
+  sessionName: string;
+  track: string;
+}
+
+export type PressureHistory = Record<TireCorner, PressureHistoryRow[]>;
 
 export interface TireUsageRecord {
   tireId: string;
@@ -83,6 +94,49 @@ export function getTireUsageHistory(tireId: string, weekends: RaceWeekend[]): Ti
 
 export function getTireTotalLaps(usage: TireUsageRecord[]): number {
   return usage.reduce((sum, r) => sum + r.estimatedLaps, 0);
+}
+
+/** Last logged pressures, scoped only by reliable active-car evidence. */
+export function getRecentPressureHistory(
+  weekends: RaceWeekend[],
+  setups: Setup[],
+  tires: TireInventoryItem[],
+  activeCarId: string | null | undefined,
+  limit = 5,
+): PressureHistory {
+  const result: PressureHistory = { lf: [], rf: [], lr: [], rr: [] };
+  if (!activeCarId) return result;
+  const tireIds = new Set(tires.filter(t => t.carId === activeCarId).map(t => t.id));
+  const rows: Array<PressureHistoryRow & { weekendIndex: number; sessionIndex: number; time: number }> = [];
+  weekends.forEach((weekend, weekendIndex) => {
+    const setupMatches = setups.find(s => s.id === weekend.setupId)?.carId === activeCarId;
+    weekend.sessions.forEach((session, sessionIndex) => {
+      const uniqueNamedSetupMatches = setupUsedUniquelyMatchesCar(session.setupUsed, setups, activeCarId);
+      const tireMatches = CORNERS.some(corner => {
+        const id = session.tires?.[corner]?.tireId;
+        return !!id && tireIds.has(id);
+      });
+      if (!setupMatches && !uniqueNamedSetupMatches && !tireMatches) return;
+      for (const corner of CORNERS) {
+        const pressure = session.pressures?.[corner] || session.tires?.[corner]?.airPressure || '';
+        if (!pressure) continue;
+        const parsedDate = Date.parse(weekend.date);
+        rows.push({
+          corner, pressure, date: weekend.date, sessionName: session.name,
+          track: session.track || weekend.track, weekendIndex, sessionIndex,
+          time: Number.isFinite(parsedDate) ? parsedDate : Number.NEGATIVE_INFINITY,
+        });
+      }
+    });
+  });
+  rows.sort((a, b) => b.time - a.time || a.weekendIndex - b.weekendIndex || a.sessionIndex - b.sessionIndex);
+  for (const row of rows) {
+    if (result[row.corner].length < limit) {
+      const { weekendIndex, sessionIndex, time, ...value } = row;
+      result[row.corner].push(value);
+    }
+  }
+  return result;
 }
 
 /** Derive and stamp lifecycle fields onto tire inventory from weekend/session data.

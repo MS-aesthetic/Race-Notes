@@ -18,7 +18,8 @@ import AuthView from './components/AuthView';
 import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, deleteMaintenanceComponentFromCloud, pushMaintenanceLogs, pullMaintenanceLogs, deleteMaintenanceLogFromCloud, pushChecklistTemplates, pullChecklistTemplates, deleteChecklistTemplateFromCloud, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
 import { registerForPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
-import { normalizeSetup, normalizeSetups } from './lib/setupCompat';
+import { normalizeSetup, normalizeSetups, pickLatestSetupForCar } from './lib/setupCompat';
+import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
 import { materializeMainChecklist } from './lib/mainChecklist';
 import { reconcileStarterTemplates } from './lib/checklists';
 import { deriveReadableLightAccent, readableOnColor } from './lib/colorContrast';
@@ -42,6 +43,39 @@ import { Todo } from './types';
 
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
 
+const applyActiveSessionToWeekends = (
+  source: RaceWeekend[],
+  updatedSession: ActiveSession,
+): RaceWeekend[] => source.map((weekend) => {
+  if (updatedSession.weekendId && weekend.id !== updatedSession.weekendId) return weekend;
+  return {
+    ...weekend,
+    sessions: weekend.sessions.map((session) => {
+      const matches = (updatedSession.id && session.id === updatedSession.id)
+        || (!updatedSession.id
+          && session.name.toUpperCase() === updatedSession.name.toUpperCase()
+          && session.track.toLowerCase() === updatedSession.track.toLowerCase());
+      if (!matches) return session;
+      return {
+        ...session,
+        bestLap: `${updatedSession.bestLap}s`,
+        avgLap: updatedSession.avgLap,
+        finishPos: updatedSession.finishPos,
+        gap: updatedSession.gap,
+        maxRpm: updatedSession.maxRpm,
+        leaderLap: updatedSession.leaderLap,
+        leaderGap: updatedSession.leaderGap,
+        diagnostics: { ...updatedSession.diagnostics },
+        adjustments: [...updatedSession.adjustments],
+        tires: updatedSession.tires ? { ...updatedSession.tires } : undefined,
+        pressures: { ...updatedSession.pressures },
+        pressureSourceNote: updatedSession.pressureSourceNote,
+        competitionNotes: updatedSession.competitionNotes,
+      };
+    }),
+  };
+});
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'trackers'>('dashboard');
   const [setup, setSetup] = useState<Setup>(INITIAL_SETUP);
@@ -51,6 +85,11 @@ export default function App() {
     localStorage.getItem(ACTIVE_WEEKEND_KEY)
   );
   const [activeSession, setActiveSession] = useState<ActiveSession>(INITIAL_ACTIVE_SESSION);
+  const activeSessionRef = useRef(activeSession);
+  const weekendsRef = useRef(weekends);
+  const sessionCloudQueueRef = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => { activeSessionRef.current = activeSession; }, [activeSession]);
+  useEffect(() => { weekendsRef.current = weekends; }, [weekends]);
   const [todos, setTodos] = useState<Todo[]>(() => {
     const saved = localStorage.getItem('race_notes_todos');
     if (!saved) return [];
@@ -116,6 +155,8 @@ export default function App() {
   });
 
   const activeCar = cars.find(c => c.id === activeCarId) ?? null;
+  const savedActiveSetup = setup.carId === activeCarId ? savedSetups.find(item => item.id === setup.id) ?? null : null;
+  const activeCarSetup = savedActiveSetup ?? pickLatestSetupForCar(savedSetups, activeCarId);
 
   // ── [27] Help sheet, [37]/[5] info toast, [33] online status ──────────────
   const [helpOpen, setHelpOpen] = useState(false);
@@ -152,7 +193,11 @@ export default function App() {
     }
     setActiveCarId(carId);
     localStorage.setItem('race_notes_active_car', carId);
-    // No data reload — views re-filter on activeCarId
+    const nextSetup = pickLatestSetupForCar(savedSetups, carId);
+    if (nextSetup) {
+      setSetup(nextSetup);
+      localStorage.setItem('race_notes_setup', JSON.stringify(nextSetup));
+    }
   };
 
   const handleSaveShockSessions = (updated: ShockSession[]) => {
@@ -790,105 +835,65 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authReady, user, pullDone, cars, savedSetups, tireInventory, shockSessions]);
 
-  const saveSetup = (updatedSetup: Setup) => {
-    setSetup(updatedSetup);
-    localStorage.setItem('race_notes_setup', JSON.stringify(updatedSetup));
+  const handleSaveSetups = (updatedSetups: Setup[], activeId?: string, preserveInfoToast = false) => {
+    setSavedSetups(updatedSetups);
+    localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
 
-    // Cloud sync
-    if (user) {
-      const merged = savedSetups.map(s => s.id === updatedSetup.id ? updatedSetup : s);
-      if (!merged.find(s => s.id === updatedSetup.id)) merged.push(updatedSetup);
-      pushSetups(merged, user.id, setSyncStatus);
+    const nextActive = activeId ? updatedSetups.find(item => item.id === activeId) : null;
+    if (activeId === '') {
+      setSetup(INITIAL_SETUP);
+      localStorage.removeItem('race_notes_setup');
     }
-    
-    // Auto sync setup baseline tire pressures to the active logging view for engineering consistency
-    setActiveSession((prev) => {
-      const livePressures = {
-        lf: `${updatedSetup.lf.tirePress} psi`,
-        rf: `${updatedSetup.rf.tirePress} psi`,
-        lr: `${updatedSetup.lr.tirePress} psi`,
-        rr: `${updatedSetup.rr.tirePress} psi`,
-      };
-      const liveTires = {
-        lf: {
-          compound: updatedSetup.lf.tireComp || prev.tires?.lf.compound || '',
-          size: updatedSetup.lf.tireSize || prev.tires?.lf.size || '',
-          airPressure: `${updatedSetup.lf.tirePress} psi`,
-        },
-        rf: {
-          compound: updatedSetup.rf.tireComp || prev.tires?.rf.compound || '',
-          size: updatedSetup.rf.tireSize || prev.tires?.rf.size || '',
-          airPressure: `${updatedSetup.rf.tirePress} psi`,
-        },
-        lr: {
-          compound: updatedSetup.lr.tireComp || prev.tires?.lr.compound || '',
-          size: updatedSetup.lr.tireSize || prev.tires?.lr.size || '',
-          airPressure: `${updatedSetup.lr.tirePress} psi`,
-        },
-        rr: {
-          compound: updatedSetup.rr.tireComp || prev.tires?.rr.compound || '',
-          size: updatedSetup.rr.tireSize || prev.tires?.rr.size || '',
-          airPressure: `${updatedSetup.rr.tirePress} psi`,
-        },
-      };
-      const updated = {
-        ...prev,
-        pressures: livePressures,
-        tires: liveTires,
-      };
-      localStorage.setItem('race_notes_active_session', JSON.stringify(updated));
-      return updated;
-    });
-
-    setActiveTab('dashboard');
+    if (nextActive) {
+      const prior = savedSetups.find(item => item.id === nextActive.id);
+      const activated = setup.id !== nextActive.id;
+      const pressuresChanged = !prior || (['lf', 'rf', 'lr', 'rr'] as const).some(corner => prior[corner].tirePress !== nextActive[corner].tirePress);
+      setSetup(nextActive);
+      localStorage.setItem('race_notes_setup', JSON.stringify(nextActive));
+      if (activated || pressuresChanged) {
+        const pressures = setupPressureBlock(nextActive);
+        const hasPressureSource = pressureBlockHasValue(pressures);
+        const sourceNote = `Pressures carried from ${nextActive.chassis}`;
+        handleUpdateSession(current => {
+          const tireDetails = {
+            lf: { ...current.tires?.lf, compound: nextActive.lf.tireComp || current.tires?.lf.compound || '', size: nextActive.lf.tireSize || current.tires?.lf.size || '', airPressure: pressures.lf },
+            rf: { ...current.tires?.rf, compound: nextActive.rf.tireComp || current.tires?.rf.compound || '', size: nextActive.rf.tireSize || current.tires?.rf.size || '', airPressure: pressures.rf },
+            lr: { ...current.tires?.lr, compound: nextActive.lr.tireComp || current.tires?.lr.compound || '', size: nextActive.lr.tireSize || current.tires?.lr.size || '', airPressure: pressures.lr },
+            rr: { ...current.tires?.rr, compound: nextActive.rr.tireComp || current.tires?.rr.compound || '', size: nextActive.rr.tireSize || current.tires?.rr.size || '', airPressure: pressures.rr },
+          };
+          const tires = mirrorPressureBlockToTires(tireDetails, pressures);
+          return { ...current, setupUsed: nextActive.chassis, pressures, tires, pressureSourceNote: hasPressureSource ? sourceNote : undefined };
+        });
+        if (hasPressureSource && !preserveInfoToast) setInfoToast(sourceNote);
+        else if (!preserveInfoToast) setInfoToast(null);
+      }
+    }
+    if (user) pushSetups(updatedSetups, user.id, setSyncStatus);
   };
 
-  const handleUpdateSession = (updatedSession: ActiveSession) => {
+  const handleUpdateSession = (update: ActiveSession | ((current: ActiveSession) => ActiveSession)) => {
+    const updatedSession = typeof update === 'function' ? update(activeSessionRef.current) : update;
+    const updatedWeekends = applyActiveSessionToWeekends(weekendsRef.current, updatedSession);
+
+    // Refs serialize rapid updates before React renders; every external write happens once here.
+    activeSessionRef.current = updatedSession;
+    weekendsRef.current = updatedWeekends;
     setActiveSession(updatedSession);
+    setWeekends(updatedWeekends);
     localStorage.setItem('race_notes_active_session', JSON.stringify(updatedSession));
+    localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
 
-    // Cloud sync
     if (user) {
-      pushActiveSession(updatedSession, user.id);
-    }
-
-    // Also update this session's entry structure inside weekends state log to sync them!
-    setWeekends((prev) => {
-      const updated = prev.map((wknd) => {
-        // If we know the weekend ID, match tightly
-        if (updatedSession.weekendId && wknd.id !== updatedSession.weekendId) return wknd;
-
-        const updatedSessions = wknd.sessions.map((s) => {
-          if ((updatedSession.id && s.id === updatedSession.id) || (!updatedSession.id && s.name.toUpperCase() === updatedSession.name.toUpperCase() && s.track.toLowerCase() === updatedSession.track.toLowerCase())) {
-            return {
-              ...s,
-              bestLap: `${updatedSession.bestLap}s`,
-              avgLap: updatedSession.avgLap,
-              finishPos: updatedSession.finishPos,
-              gap: updatedSession.gap,
-              maxRpm: updatedSession.maxRpm,
-              leaderLap: updatedSession.leaderLap,
-              leaderGap: updatedSession.leaderGap,
-              diagnostics: { ...updatedSession.diagnostics },
-              adjustments: [...updatedSession.adjustments],
-              tires: updatedSession.tires ? { ...updatedSession.tires } : undefined,
-              pressures: { ...updatedSession.pressures },
-              competitionNotes: updatedSession.competitionNotes,
-            };
-          }
-          return s;
+      const userId = user.id;
+      sessionCloudQueueRef.current = sessionCloudQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          await Promise.all([
+            pushActiveSession(updatedSession, userId),
+            pushWeekends(updatedWeekends, userId),
+          ]);
         });
-
-        return {
-          ...wknd,
-          sessions: updatedSessions,
-        };
-      });
-
-      localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
-      if (user) pushWeekends(updated, user.id);
-      return updated;
-    });
+    }
   };
 
   // Session weather helpers moved into RaceWeekendView ([15]).
@@ -927,7 +932,9 @@ export default function App() {
   const handleCreateNewWeekend = (data: NewWeekendData) => {
     if (!data.name.trim() || !data.track.trim()) return;
 
-    const boundSetup = savedSetups.find(s => s.id === data.setupId) || null;
+    const boundSetup = activeCarId
+      ? savedSetups.find(s => s.id === data.setupId && s.carId === activeCarId) || null
+      : null;
 
     const newWknd: RaceWeekend = {
       id: `wknd-${Date.now()}`,
@@ -963,40 +970,43 @@ export default function App() {
     const targetWeekend = weekends.find(w => w.id === activeWeekendId);
     if (!targetWeekend) return;
 
+    // Never use a setup from another active car as a run baseline.
+    const sessionSetup = activeCarSetup;
+
     // Load setup baseline pressures as initial psi values for convenience
-    const defaultPressures = {
-      lf: `${setup.lf.tirePress} psi`,
-      rf: `${setup.rf.tirePress} psi`,
-      lr: `${setup.lr.tirePress} psi`,
-      rr: `${setup.rr.tirePress} psi`,
-    };
+    const defaultPressures = setupPressureBlock(sessionSetup);
 
     const defaultTires = {
       lf: {
-        compound: setup.lf.tireComp || 'D20',
-        size: setup.lf.tireSize || '82.0"',
-        airPressure: `${setup.lf.tirePress} psi`,
+        compound: sessionSetup?.lf.tireComp || '',
+        size: sessionSetup?.lf.tireSize || '',
+        airPressure: defaultPressures.lf,
       },
       rf: {
-        compound: setup.rf.tireComp || 'D20',
-        size: setup.rf.tireSize || '84.0"',
-        airPressure: `${setup.rf.tirePress} psi`,
+        compound: sessionSetup?.rf.tireComp || '',
+        size: sessionSetup?.rf.tireSize || '',
+        airPressure: defaultPressures.rf,
       },
       lr: {
-        compound: setup.lr.tireComp || 'D60',
-        size: setup.lr.tireSize || '86.0"',
-        airPressure: `${setup.lr.tirePress} psi`,
+        compound: sessionSetup?.lr.tireComp || '',
+        size: sessionSetup?.lr.tireSize || '',
+        airPressure: defaultPressures.lr,
       },
       rr: {
-        compound: setup.rr.tireComp || 'D60',
-        size: setup.rr.tireSize || '88.0"',
-        airPressure: `${setup.rr.tirePress} psi`,
+        compound: sessionSetup?.rr.tireComp || '',
+        size: sessionSetup?.rr.tireSize || '',
+        airPressure: defaultPressures.rr,
       },
     };
 
     // [11] Prefill carried from the previous session wins over setup baselines
-    const initialPressures = data.prefillPressures ?? defaultPressures;
-    const initialTires = data.prefillTires ?? defaultTires;
+    const prefillPressures = formatPressureBlock(data.prefillPressures);
+    const hasPrefillPressures = pressureBlockHasValue(prefillPressures);
+    const initialPressures = hasPrefillPressures ? prefillPressures : defaultPressures;
+    const initialTires = mirrorPressureBlockToTires(data.prefillTires ?? defaultTires, initialPressures);
+    const pressureSourceNote = hasPrefillPressures
+      ? data.pressureSourceNote
+      : (pressureBlockHasValue(defaultPressures) && sessionSetup ? `Pressures carried from ${sessionSetup.chassis}` : undefined);
 
     // Auto-number session name (same convention as always)
     const sessionName = buildSessionNameFrom(targetWeekend.sessions, data.type);
@@ -1010,7 +1020,7 @@ export default function App() {
       sessionType: data.type,
       name: sessionName,
       track: targetWeekend.track,
-      setupUsed: setup.chassis || 'Default Setup',
+      setupUsed: sessionSetup?.chassis || 'No setup baseline',
       condition: '',
       trackConditionPreset: data.trackCondition || undefined,
       conditionNotes: data.conditionNotes || undefined,
@@ -1034,6 +1044,7 @@ export default function App() {
       adjustments: [],
       tires: initialTires,
       pressures: initialPressures,
+      pressureSourceNote,
       competitionNotes: '',
       screenshots: []
     };
@@ -1065,10 +1076,11 @@ export default function App() {
       adjustments: [],
       tires: initialTires,
       pressures: initialPressures,
+      pressureSourceNote,
       competitionNotes: '',
       time: resolvedTime,
       weather: data.weather || '',
-      setupUsed: setup.chassis || 'Default Setup',
+      setupUsed: sessionSetup?.chassis || 'No setup baseline',
       screenshots: []
     };
 
@@ -1094,6 +1106,7 @@ export default function App() {
 
     setActiveSession(nextSession);
     localStorage.setItem('race_notes_active_session', JSON.stringify(nextSession));
+    if (pressureSourceNote) setInfoToast(pressureSourceNote);
 
     setActiveTab('raceweekend');
   };
@@ -1209,13 +1222,21 @@ export default function App() {
 
   const handleSelectRecentSession = (rec: SessionRecord, weekendId: string) => {
     handleActivateWeekend(weekendId);
+    const currentCarSetup = activeCarSetup;
+    const restoredPressures = resolveSessionPressureBlock(rec.pressures, rec.tires);
+    const restoredTires = mirrorPressureBlockToTires(rec.tires || {
+      lf: { compound: currentCarSetup?.lf.tireComp || '', size: currentCarSetup?.lf.tireSize || '', airPressure: '' },
+      rf: { compound: currentCarSetup?.rf.tireComp || '', size: currentCarSetup?.rf.tireSize || '', airPressure: '' },
+      lr: { compound: currentCarSetup?.lr.tireComp || '', size: currentCarSetup?.lr.tireSize || '', airPressure: '' },
+      rr: { compound: currentCarSetup?.rr.tireComp || '', size: currentCarSetup?.rr.tireSize || '', airPressure: '' },
+    }, restoredPressures);
     // Dynamically spawn details in modal or swap session
     const restoredSession: ActiveSession = {
       id: rec.id,
       weekendId: weekendId,
       name: rec.name.toUpperCase(),
       track: rec.track,
-      setupUsed: rec.setupUsed || setup.chassis.toUpperCase(),
+      setupUsed: rec.setupUsed || currentCarSetup?.chassis || 'No setup baseline',
       condition: rec.condition.toUpperCase(),
       weather: rec.weather || '76°F',
       time: rec.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1235,22 +1256,14 @@ export default function App() {
         cornerExitNotes: '',
       },
       adjustments: rec.adjustments || [],
-      tires: rec.tires || {
-        lf: { compound: setup.lf.tireComp || '', size: setup.lf.tireSize || '', airPressure: rec.pressures?.lf || '10.0 psi' },
-        rf: { compound: setup.rf.tireComp || '', size: setup.rf.tireSize || '', airPressure: rec.pressures?.rf || '11.0 psi' },
-        lr: { compound: setup.lr.tireComp || '', size: setup.lr.tireSize || '', airPressure: rec.pressures?.lr || '8.00 psi' },
-        rr: { compound: setup.rr.tireComp || '', size: setup.rr.tireSize || '', airPressure: rec.pressures?.rr || '8.00 psi' },
-      },
-      pressures: rec.pressures || {
-        lf: '12.5 psi',
-        rf: '14.0 psi',
-        lr: '11.5 psi',
-        rr: '13.5 psi',
-      },
+      tires: restoredTires,
+      pressures: restoredPressures,
+      pressureSourceNote: pressureBlockHasValue(restoredPressures) ? rec.pressureSourceNote : undefined,
       competitionNotes: rec.competitionNotes || 'Enter comments here...',
       screenshots: rec.screenshots || [],
       dynoPhotos: rec.dynoPhotos || [],
     };
+    activeSessionRef.current = restoredSession;
     setActiveSession(restoredSession);
     localStorage.setItem('race_notes_active_session', JSON.stringify(restoredSession));
   };
@@ -1459,71 +1472,9 @@ export default function App() {
                   onSaveShockSessions={handleSaveShockSessions}
                   weekends={weekends}
                   initialSubTab={setupSubTab}
-                  onSaveSetups={(updatedSetups, activeId) => {
-                    setSavedSetups(updatedSetups);
-                    localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
-                    if (user) pushSetups(updatedSetups, user.id, setSyncStatus);
-                    
-                    if (activeId) {
-                      const active = updatedSetups.find(s => s.id === activeId);
-                      if (active) {
-                        setSetup(active);
-                        localStorage.setItem('race_notes_setup', JSON.stringify(active));
-                        
-                        // Auto sync setup baseline tire pressures to the active logging view for engineering consistency
-                        setActiveSession((prev) => {
-                          const livePressures = {
-                            lf: `${active.lf.tirePress || '10.0'} psi`,
-                            rf: `${active.rf.tirePress || '11.0'} psi`,
-                            lr: `${active.lr.tirePress || '8.0'} psi`,
-                            rr: `${active.rr.tirePress || '8.0'} psi`,
-                          };
-                          const liveTires = {
-                            lf: {
-                              tireId: prev.tires?.lf.tireId || '',
-                              compound: active.lf.tireComp || prev.tires?.lf.compound || '',
-                              size: active.lf.tireSize || prev.tires?.lf.size || '',
-                              durometer: prev.tires?.lf.durometer || '',
-                              airPressure: `${active.lf.tirePress || '10.0'} psi`,
-                              backSpacing: prev.tires?.lf.backSpacing || '',
-                            },
-                            rf: {
-                              tireId: prev.tires?.rf.tireId || '',
-                              compound: active.rf.tireComp || prev.tires?.rf.compound || '',
-                              size: active.rf.tireSize || prev.tires?.rf.size || '',
-                              durometer: prev.tires?.rf.durometer || '',
-                              airPressure: `${active.rf.tirePress || '11.0'} psi`,
-                              backSpacing: prev.tires?.rf.backSpacing || '',
-                            },
-                            lr: {
-                              tireId: prev.tires?.lr.tireId || '',
-                              compound: active.lr.tireComp || prev.tires?.lr.compound || '',
-                              size: active.lr.tireSize || prev.tires?.lr.size || '',
-                              durometer: prev.tires?.lr.durometer || '',
-                              airPressure: `${active.lr.tirePress || '8.0'} psi`,
-                              backSpacing: prev.tires?.lr.backSpacing || '',
-                            },
-                            rr: {
-                              tireId: prev.tires?.rr.tireId || '',
-                              compound: active.rr.tireComp || prev.tires?.rr.compound || '',
-                              size: active.rr.tireSize || prev.tires?.rr.size || '',
-                              durometer: prev.tires?.rr.durometer || '',
-                              airPressure: `${active.rr.tirePress || '8.0'} psi`,
-                              backSpacing: prev.tires?.rr.backSpacing || '',
-                            },
-                          };
-                          const updated = {
-                            ...prev,
-                            setupUsed: active.chassis.toUpperCase(),
-                            pressures: livePressures,
-                            tires: liveTires,
-                          };
-                          localStorage.setItem('race_notes_active_session', JSON.stringify(updated));
-                          return updated;
-                        });
-                      }
-                    }
-                  }}
+                  onSaveSetups={handleSaveSetups}
+                  onInfo={setInfoToast}
+                  onGoToGarage={() => setActiveTab('settings')}
                 />
               )}
 
@@ -1543,6 +1494,8 @@ export default function App() {
                   onActivateWeekend={handleActivateWeekend}
                   onCreateWeekend={handleCreateNewWeekend}
                   onCreateSession={handleCreateNewSession}
+                  activeSetup={activeCarSetup}
+                  onUpdateActiveSetup={(updated) => handleSaveSetups(savedSetups.map(item => item.id === updated.id ? updated : item), updated.id)}
                   initialAction={rwInitialAction ?? undefined}
                   onInitialActionConsumed={() => setRwInitialAction(null)}
                 />
