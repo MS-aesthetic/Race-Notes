@@ -1,20 +1,56 @@
-import React, { useState } from 'react';
-import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup } from '../types';
+import React, { useEffect, useState } from 'react';
+import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS } from '../types';
 import { sortBySize } from '../lib/tireSize';
+import { parseWeekendDate } from '../lib/scope';
+import { useBackClosable } from '../lib/backStack';
+import { useUndoableDelete } from '../lib/undo';
+import { suggestNextSession, buildSessionNameFrom, SessionPrefill } from '../lib/sessionSequence';
+import SegmentedGrid from './ui/SegmentedGrid';
+import NumberStepper from './ui/NumberStepper';
+import EmptyState from './ui/EmptyState';
+import LapTimeKeypad from './ui/LapTimeKeypad';
+import UndoToast from './ui/UndoToast';
+
+// ── Data passed up to App's create handlers ([15]) ───────────────────────────
+
+export interface NewWeekendData {
+  name: string;
+  track: string;
+  date: string;
+  setupId?: string;
+}
+
+export interface NewSessionData {
+  weekendId: string;
+  type: SessionType;
+  trackCondition?: TrackConditionPreset | '';
+  conditionNotes?: string;
+  timeOfDay: 'current' | 'Afternoon' | 'Evening' | 'Night';
+  weather?: string;
+  /** [11] carried from the most recent session when available */
+  prefillPressures?: { lf: string; rf: string; lr: string; rr: string };
+  prefillTires?: { lf: TireDetails; rf: TireDetails; lr: TireDetails; rr: TireDetails };
+}
 
 interface RaceWeekendViewProps {
   session: ActiveSession;
   weekends: RaceWeekend[];
   tireInventory?: TireInventoryItem[];
   savedSetups?: Setup[];
+  activeCarId?: string | null;
   onUpdateSession: (updatedSession: ActiveSession) => void;
   onUpdateWeekend: (updated: RaceWeekend) => void;
   onDeleteSession: (weekendId: string, sessionId: string) => void;
+  /** Immediate weekend delete (no confirm — the undo toast is the safety net). */
+  onDeleteWeekend: (weekendId: string) => void;
   onSelectSession: (session: SessionRecord, weekendId?: string) => void;
   activeWeekendId: string | null;
   onActivateWeekend: (weekendId: string) => void;
-  onNewSession?: () => void;
-  onCreateWeekend: () => void;
+  onCreateWeekend: (data: NewWeekendData) => void;
+  onCreateSession: (data: NewSessionData) => void;
+  /** [15] One-shot: open a creation modal as soon as the tab mounts. */
+  initialAction?: 'new-session' | 'new-weekend';
+  onInitialActionConsumed?: () => void;
 }
 
 // ── Weather condition code → label ────────────────────────────────────────────
@@ -58,11 +94,27 @@ function compressImage(file: File, maxPx = 1024, quality = 0.82): Promise<string
   });
 }
 
+/** Parse a "11.5 psi"-style string into a number for the stepper. */
+function parsePsi(s: string | undefined): number | '' {
+  const m = String(s ?? '').match(/-?\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0]) : '';
+}
+
+const SESSION_TYPE_CHIPS = [
+  { key: 'Test', code: 'Test' },
+  { key: 'Hot Laps', code: 'HL' },
+  { key: 'Qualifying', code: 'Qual' },
+  { key: 'Heat Race', code: 'Heat' },
+  { key: 'Feature', code: 'Feat.' },
+] as const;
+
 // ── Main RaceWeekendView ──────────────────────────────────────────────────────
 
 export default function RaceWeekendView({
-  session, weekends, tireInventory = [], savedSetups = [], onUpdateSession, onUpdateWeekend, onDeleteSession, onSelectSession,
-  activeWeekendId, onActivateWeekend, onNewSession, onCreateWeekend,
+  session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
+  onUpdateSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
+  activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
+  initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
   const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
@@ -75,10 +127,54 @@ export default function RaceWeekendView({
     () => new Set([weekends.find(w => w.id === session.weekendId)?.id ?? weekends[0]?.id ?? ''].filter(Boolean))
   );
 
-  const currentWeekend = weekends.find(w => w.id === activeWeekendId);
+  // [15] Weekend create/edit modal state (moved out of App.tsx)
+  const [wkFormOpen, setWkFormOpen] = useState(false);
+  const [wkEditingId, setWkEditingId] = useState<string | null>(null);
+  const [wkName, setWkName] = useState('');
+  const [wkTrack, setWkTrack] = useState('');
+  const [wkDate, setWkDate] = useState('');
+  const [wkSetupId, setWkSetupId] = useState('');
+
+  // [15]/[11] New-session modal state (moved out of App.tsx)
+  const [nsOpen, setNsOpen] = useState(false);
+  const [nsType, setNsType] = useState<SessionType>('Test');
+  const [nsSuggestedType, setNsSuggestedType] = useState<SessionType | null>(null);
+  const [nsTrackCondition, setNsTrackCondition] = useState<TrackConditionPreset | ''>('');
+  const [nsConditionNotes, setNsConditionNotes] = useState('');
+  const [nsTimeOfDay, setNsTimeOfDay] = useState<'current' | 'Afternoon' | 'Evening' | 'Night'>('current');
+  const [nsPrefill, setNsPrefill] = useState<SessionPrefill>({});
+  const [nsWxStr, setNsWxStr] = useState('');
+  const [nsWxLoading, setNsWxLoading] = useState(false);
+  const [nsWxError, setNsWxError] = useState('');
+  const [nsShowZip, setNsShowZip] = useState(false);
+  const [nsZip, setNsZip] = useState('');
+
+  // Per-weekend ⋯ menu + undoable delete
+  const [menuWeekendId, setMenuWeekendId] = useState<string | null>(null);
+  const weekendUndo = useUndoableDelete<RaceWeekend>();
+
+  // [13] Lap-time keypad
+  const [lapPadOpen, setLapPadOpen] = useState(false);
+
+  // Android hardware back closes these modals first ([29])
+  useBackClosable(wkFormOpen, () => setWkFormOpen(false));
+  useBackClosable(nsOpen, () => setNsOpen(false));
+
+  // Weekend pending delete stays hidden everywhere until undo/commit resolves.
+  const pendingDeleteId = weekendUndo.pending?.id ?? null;
+  const visibleWeekends = weekends.filter(w => w.id !== pendingDeleteId);
+
+  const currentWeekend = visibleWeekends.find(w => w.id === activeWeekendId);
   const hasActiveSession = !!session.id && session.weekendId === activeWeekendId;
 
-  const displaySessions = currentWeekend?.sessions || [];
+  // Active first, then date descending (same ordering as ContextStrip).
+  const sortedWeekends = [...visibleWeekends].sort((a, b) => {
+    if (a.id === activeWeekendId) return -1;
+    if (b.id === activeWeekendId) return 1;
+    const ta = parseWeekendDate(a.date)?.getTime() ?? -Infinity;
+    const tb = parseWeekendDate(b.date)?.getTime() ?? -Infinity;
+    return tb - ta;
+  });
 
   // ── Session helpers ──────────────────────────────────────────────────────────
 
@@ -191,7 +287,7 @@ export default function RaceWeekendView({
     onUpdateSession({ ...session, screenshots: (session.screenshots || []).filter((_, i) => i !== idx) });
   };
 
-  // ── Weather fetch ────────────────────────────────────────────────────────────
+  // ── Weekend weather fetch ────────────────────────────────────────────────────
 
   const fetchWeatherFromCoords = async (lat: number, lon: number): Promise<WeatherSnapshot> => {
     let locationName = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
@@ -265,16 +361,459 @@ export default function RaceWeekendView({
     onUpdateWeekend({ ...currentWeekend, notes });
   };
 
-  if (weekends.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center">
+  // ── [15] Weekend create/edit modal ──────────────────────────────────────────
+
+  const openWeekendForm = (editing?: RaceWeekend) => {
+    setWkEditingId(editing?.id ?? null);
+    setWkName(editing?.name ?? '');
+    setWkTrack(editing?.track ?? '');
+    setWkDate(editing?.date ?? new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
+    setWkSetupId(editing?.setupId ?? '');
+    setWkFormOpen(true);
+  };
+
+  const handleWeekendFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!wkName.trim() || !wkTrack.trim()) return;
+    if (wkEditingId) {
+      const wk = weekends.find(w => w.id === wkEditingId);
+      if (wk) {
+        const boundSetup = savedSetups.find(s => s.id === wkSetupId) || null;
+        onUpdateWeekend({
+          ...wk,
+          name: wkName,
+          track: wkTrack,
+          date: wkDate || wk.date,
+          setupId: boundSetup?.id,
+          setupName: boundSetup?.chassis,
+        });
+      }
+    } else {
+      onCreateWeekend({ name: wkName, track: wkTrack, date: wkDate, setupId: wkSetupId || undefined });
+    }
+    setWkFormOpen(false);
+  };
+
+  // ── [15]/[11] New-session modal (pre-populated by suggestNextSession) ──────
+
+  const openNewSession = () => {
+    if (!currentWeekend) { openWeekendForm(); return; }
+    const sugg = suggestNextSession(currentWeekend.sessions);
+    setNsType(sugg.type);
+    setNsSuggestedType(sugg.type);
+    setNsTrackCondition(sugg.prefill.trackCondition ?? '');
+    setNsConditionNotes('');
+    setNsTimeOfDay('current');
+    setNsPrefill(sugg.prefill);
+    setNsWxStr(''); setNsWxError(''); setNsWxLoading(false);
+    setNsShowZip(false); setNsZip('');
+    setNsOpen(true);
+  };
+
+  const handleNewSessionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentWeekend) return;
+    onCreateSession({
+      weekendId: currentWeekend.id,
+      type: nsType,
+      trackCondition: nsTrackCondition,
+      conditionNotes: nsConditionNotes,
+      timeOfDay: nsTimeOfDay,
+      weather: nsWxStr,
+      prefillPressures: nsPrefill.pressures,
+      prefillTires: nsPrefill.tires,
+    });
+    setNsOpen(false);
+  };
+
+  // ── Session weather (string) fetch for the new-session modal ───────────────
+
+  const fetchNsWeatherFromCoords = async (lat: number, lon: number) => {
+    let location = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+    try {
+      const geo = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+      const gj = await geo.json();
+      const city = gj.address?.city || gj.address?.town || gj.address?.village || gj.address?.county || '';
+      const state = gj.address?.state_code || '';
+      if (city || state) location = [city, state].filter(Boolean).join(', ');
+    } catch { /* keep coords */ }
+    const wr = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`);
+    const wj = await wr.json();
+    const temp = Math.round(wj.current.temperature_2m);
+    const cond = weatherLabel(wj.current.weather_code);
+    setNsWxStr(`${temp}°F, ${cond} — ${location}`);
+    setNsWxLoading(false);
+  };
+
+  const handleNsGPSWeather = () => {
+    setNsWxLoading(true); setNsWxError(''); setNsWxStr('');
+    if (!navigator.geolocation) {
+      setNsWxError('GPS not available.'); setNsWxLoading(false); setNsShowZip(true); return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        try { await fetchNsWeatherFromCoords(pos.coords.latitude, pos.coords.longitude); }
+        catch { setNsWxError('Could not fetch weather.'); setNsWxLoading(false); }
+      },
+      err => {
+        setNsWxError(err.code === 1 ? 'Location denied — enter zip code.' : 'Could not get location.');
+        setNsWxLoading(false); setNsShowZip(true);
+      },
+      { timeout: 10000 }
+    );
+  };
+
+  const handleNsZipWeather = async () => {
+    if (!nsZip.trim()) return;
+    setNsWxLoading(true); setNsWxError('');
+    try {
+      const gr = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${nsZip.trim()}&country=US&format=json&limit=1`);
+      const gj = await gr.json();
+      if (!gj.length) { setNsWxError('Zip not found.'); setNsWxLoading(false); return; }
+      await fetchNsWeatherFromCoords(parseFloat(gj[0].lat), parseFloat(gj[0].lon));
+      setNsShowZip(false); setNsZip('');
+    } catch { setNsWxError('Could not fetch weather.'); setNsWxLoading(false); }
+  };
+
+  // ── Weekend delete (⋯ menu) with undo window ────────────────────────────────
+
+  const requestDeleteWeekend = (wk: RaceWeekend) => {
+    setMenuWeekendId(null);
+    weekendUndo.requestDelete({
+      id: wk.id,
+      label: wk.name,
+      item: wk,
+      // Local removal/restore is handled by filtering on `pending.id` in render.
+      removeFromState: () => {},
+      restoreToState: () => {},
+      // Commit runs App's delete handler (state + localStorage + deleteWeekendFromCloud).
+      commit: () => onDeleteWeekend(wk.id),
+    });
+  };
+
+  // ── [15] Consume initialAction (from App header / dashboard shortcuts) ─────
+
+  useEffect(() => {
+    if (!initialAction) return;
+    if (initialAction === 'new-weekend') openWeekendForm();
+    else openNewSession();
+    onInitialActionConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAction]);
+
+  // ── [14] Save Run: force-persist the session + collapse the editor ─────────
+
+  const handleSaveRun = () => {
+    onUpdateSession({ ...session });
+    setEditorCollapsed(true);
+  };
+
+  // ── Modal JSX (rendered from every return branch) ───────────────────────────
+
+  const weekendFormModal = wkFormOpen && (
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in shadow-2xl">
+      <div className="bg-surface border-2 border-outline rounded-lg p-6 max-w-sm w-full space-y-4 shadow-2xl relative text-on-surface max-h-[85vh] overflow-y-auto">
         <button
-          onClick={onCreateWeekend}
-          className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl border-2 border-dashed border-primary/60 bg-primary/10 text-primary font-display font-bold uppercase tracking-wider"
+          onClick={() => setWkFormOpen(false)}
+          className="absolute top-4 right-4 text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
         >
-          <span className="material-symbols-outlined">add_circle</span>
-          Create Weekend
+          <span className="material-symbols-outlined text-sm">close</span>
         </button>
+
+        <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-2">
+          <span className="material-symbols-outlined text-primary">calendar_today</span>
+          <h3 className="font-display text-base font-bold uppercase text-on-surface tracking-wide">
+            {wkEditingId ? 'Edit Race Weekend' : 'Create Race Weekend'}
+          </h3>
+        </div>
+
+        <form onSubmit={handleWeekendFormSubmit} className="space-y-3">
+          <div>
+            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+              Weekend Event Name
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Knoxville Nationals"
+              value={wkName}
+              onChange={(e) => setWkName(e.target.value)}
+              className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+              Track Name / Speedway
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Knoxville Raceway"
+              value={wkTrack}
+              onChange={(e) => setWkTrack(e.target.value)}
+              className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+              Date Range
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. June 12-14, 2026"
+              value={wkDate}
+              onChange={(e) => setWkDate(e.target.value)}
+              className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+            />
+          </div>
+
+          {savedSetups.length > 0 && (
+            <div>
+              <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+                Bind a Setup (optional)
+              </label>
+              <div className="relative">
+                <select
+                  value={wkSetupId}
+                  onChange={e => setWkSetupId(e.target.value)}
+                  className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
+                >
+                  <option value="">-- No setup selected --</option>
+                  {/* Decision 3: filter to active car's setups */}
+                  {savedSetups.filter(s => !activeCarId || s.carId === activeCarId).map(s => (
+                    <option key={s.id} value={s.id}>{s.chassis}{s.carType ? ` (${s.carType})` : ''}</option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[14px]">expand_more</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2 justify-end text-xs font-mono">
+            <button
+              type="button"
+              onClick={() => setWkFormOpen(false)}
+              className="px-3 py-2 border border-outline-variant hover:bg-surface-container-high text-on-surface-variant uppercase cursor-pointer rounded"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
+            >
+              {wkEditingId ? 'SAVE CHANGES' : 'CREATE WEEKEND'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  const sessionFormModal = nsOpen && currentWeekend && (
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in shadow-2xl">
+      <div className="bg-surface border-2 border-outline rounded-lg p-6 max-w-sm w-full space-y-4 shadow-2xl relative text-on-surface">
+        <button
+          onClick={() => setNsOpen(false)}
+          className="absolute top-4 right-4 text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+        >
+          <span className="material-symbols-outlined text-sm">close</span>
+        </button>
+
+        <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-2">
+          <span className="material-symbols-outlined text-primary">add_circle</span>
+          <h3 className="font-display text-base font-bold uppercase text-on-surface tracking-wide">
+            Start New Logger Session
+          </h3>
+        </div>
+
+        <form onSubmit={handleNewSessionSubmit} className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
+          {/* Session always belongs to device-active weekend. */}
+          <div>
+            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Active Weekend</label>
+            <div className="w-full bg-surface-container text-xs text-on-surface p-2.5 border border-outline-variant rounded font-mono">
+              {currentWeekend.name} ({currentWeekend.track})
+            </div>
+          </div>
+
+          {/* Session type — [11] pre-selected by suggestNextSession, one-tap editable */}
+          <div>
+            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Session Type</label>
+            <div className="grid grid-cols-5 gap-1">
+              {SESSION_TYPE_CHIPS.map(({ key, code }) => (
+                <button
+                  key={key}
+                  type="button"
+                  title={key}
+                  onClick={() => setNsType(key)}
+                  className={`py-2 px-1 rounded border font-mono text-[10px] font-bold uppercase transition-all text-center leading-tight ${
+                    nsType === key
+                      ? 'bg-primary/20 border-primary text-primary'
+                      : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                  }`}
+                >{code}</button>
+              ))}
+            </div>
+            <p className="font-mono text-[10px] text-on-surface-variant/50 mt-1">
+              Will be named: <span className="text-primary font-bold">{buildSessionNameFrom(currentWeekend.sessions, nsType)}</span>
+              {nsSuggestedType === nsType && <span className="ml-1 text-on-surface-variant/40">(suggested)</span>}
+            </p>
+          </div>
+
+          {/* Track Condition Presets (WS-L) — prefilled from the last session */}
+          <div>
+            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Track Condition</label>
+            <div className="grid grid-cols-3 gap-1 mb-2">
+              {TRACK_CONDITION_PRESETS.map(preset => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setNsTrackCondition(p => p === preset ? '' : preset)}
+                  className={`py-2 px-1 rounded border font-mono text-[10px] font-bold transition-all text-center leading-tight ${
+                    nsTrackCondition === preset
+                      ? 'bg-primary/20 border-primary text-primary'
+                      : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                  }`}
+                >{preset}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Surface conditions / free-text notes */}
+          <div>
+            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Surface Notes (free text)</label>
+            <input
+              type="text"
+              placeholder="e.g. Rough, Dusty, One Lane..."
+              value={nsConditionNotes}
+              onChange={(e) => setNsConditionNotes(e.target.value)}
+              className="w-full bg-surface-container text-xs text-on-surface p-2 border border-outline-variant focus:border-primary rounded"
+            />
+          </div>
+
+          {/* [11] Carry-over hint */}
+          {(nsPrefill.pressures || nsPrefill.tires) && (
+            <p className="font-mono text-[10px] text-on-surface-variant/50 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[13px] text-primary">history</span>
+              Pressures &amp; tires carried over from the last session.
+            </p>
+          )}
+
+          {/* Time of Day */}
+          <div>
+            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Time of Day</label>
+            <div className="grid grid-cols-4 gap-1">
+              {([
+                { value: 'current', label: 'Current Time' },
+                { value: 'Afternoon', label: 'Afternoon' },
+                { value: 'Evening', label: 'Evening' },
+                { value: 'Night', label: 'Night' },
+              ] as const).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setNsTimeOfDay(opt.value)}
+                  className={`py-2 px-1 rounded border font-mono text-[9px] font-bold uppercase transition-all text-center leading-tight ${
+                    nsTimeOfDay === opt.value
+                      ? 'bg-primary/20 border-primary text-primary'
+                      : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                  }`}
+                >{opt.label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Weather */}
+          <div>
+            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Weather (optional)</label>
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={handleNsGPSWeather}
+                disabled={nsWxLoading}
+                className="flex items-center gap-1 text-[10px] font-mono font-bold uppercase px-2.5 py-1.5 rounded border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[13px]">my_location</span>
+                {nsWxLoading ? 'Fetching…' : 'GPS'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setNsShowZip(v => !v)}
+                className={`flex items-center gap-1 text-[10px] font-mono font-bold uppercase px-2.5 py-1.5 rounded border transition-colors ${nsShowZip ? 'border-primary text-primary bg-primary/10' : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'}`}
+              >
+                <span className="material-symbols-outlined text-[13px]">pin_drop</span>
+                Zip
+              </button>
+              {nsWxStr && (
+                <button type="button" onClick={() => { setNsWxStr(''); setNsWxError(''); }} className="ml-auto text-[10px] font-mono text-on-surface-variant/50 hover:text-error">clear</button>
+              )}
+            </div>
+            {nsShowZip && (
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={5}
+                  placeholder="ZIP code"
+                  value={nsZip}
+                  onChange={e => setNsZip(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleNsZipWeather(); } }}
+                  className="flex-1 bg-surface-container border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-xs text-on-surface outline-none"
+                />
+                <button type="button" onClick={() => void handleNsZipWeather()} disabled={nsWxLoading} className="bg-primary text-on-primary px-3 py-2 rounded font-mono text-[10px] font-bold uppercase disabled:opacity-50">
+                  {nsWxLoading ? '…' : 'Get'}
+                </button>
+              </div>
+            )}
+            {nsWxError && <p className="font-mono text-[11px] text-red-400 mb-1">{nsWxError}</p>}
+            {nsWxStr ? (
+              <div className="bg-surface-container border border-primary/30 rounded px-3 py-2 font-mono text-xs text-on-surface flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>cloud</span>
+                {nsWxStr}
+              </div>
+            ) : (
+              <p className="font-mono text-[10px] text-on-surface-variant/40 italic">No weather fetched — session will log without it.</p>
+            )}
+          </div>
+
+          <div className="flex gap-2 pt-2 justify-end text-xs font-mono">
+            <button
+              type="button"
+              onClick={() => setNsOpen(false)}
+              className="px-3 py-2 border border-outline-variant hover:bg-surface-container-high text-on-surface-variant uppercase cursor-pointer rounded"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
+            >
+              START SESSION
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  const undoToastEl = (
+    <UndoToast pending={weekendUndo.pending} onUndo={weekendUndo.undo} onDismiss={weekendUndo.dismiss} />
+  );
+
+  // ── Empty / no-selection states ─────────────────────────────────────────────
+
+  if (visibleWeekends.length === 0) {
+    return (
+      <div className="h-full">
+        <EmptyState
+          icon="event"
+          title="No race weekends yet — where are you racing next?"
+          cta={{ label: 'New weekend', icon: 'add', onClick: () => openWeekendForm() }}
+        />
+        {weekendFormModal}
+        {undoToastEl}
       </div>
     );
   }
@@ -284,12 +823,15 @@ export default function RaceWeekendView({
       <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
         <p className="font-mono text-sm text-on-surface-variant">Select an active weekend.</p>
         <div className="flex flex-wrap justify-center gap-2">
-          {weekends.map(weekend => (
+          {sortedWeekends.map(weekend => (
             <button key={weekend.id} onClick={() => onActivateWeekend(weekend.id)} className="px-3 py-2 border border-primary/50 rounded text-primary font-mono text-xs font-bold uppercase">
               {weekend.name}
             </button>
           ))}
         </div>
+        {weekendFormModal}
+        {sessionFormModal}
+        {undoToastEl}
       </div>
     );
   }
@@ -319,6 +861,14 @@ export default function RaceWeekendView({
                 {currentWeekend.sessions.length} Session{currentWeekend.sessions.length !== 1 ? 's' : ''} logged
               </p>
             </div>
+            <button
+              type="button"
+              aria-label="Edit weekend"
+              onClick={() => openWeekendForm(currentWeekend)}
+              className="flex min-w-12 min-h-12 items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">edit</span>
+            </button>
           </div>
 
           {/* Weather */}
@@ -408,17 +958,15 @@ export default function RaceWeekendView({
         </section>
       )}
 
-      {onNewSession && (
-        <button
-          onClick={onNewSession}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-primary font-display font-bold uppercase tracking-wider text-sm"
-        >
-          <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
-          New Session
-        </button>
-      )}
+      <button
+        onClick={openNewSession}
+        className="w-full flex items-center justify-center gap-2 py-3 min-h-12 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-primary font-display font-bold uppercase tracking-wider text-sm"
+      >
+        <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
+        New Session
+      </button>
 
-      {/* ── Active Session Editor ─────────────────────────────────────────── */}
+      {/* ── Active Session Editor — [14] top-to-bottom quick-log ──────────── */}
       {hasActiveSession && (
       <section className="bg-surface-container rounded-lg border border-outline-variant">
         {/* Collapsible header */}
@@ -437,74 +985,137 @@ export default function RaceWeekendView({
         </button>
 
         {editorCollapsed ? null : (
+        <>
         <div className="p-4 pt-0">
 
-        {/* Core Inputs */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {[
-            { label: 'Best Lap', key: 'bestLap' as const },
-            { label: 'Quick Time', key: 'leaderLap' as const },
-            { label: 'Finish Pos', key: 'finishPos' as const },
-            { label: 'Max RPM', key: 'maxRpm' as const },
-            { label: 'Condition', key: 'condition' as const },
-            { label: 'Weather', key: 'weather' as const },
-          ].map(({ label, key }) => (
-            <label key={key} className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase font-mono text-on-surface-variant">{label}</span>
-              <input
-                type="text"
-                className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
-                value={(session as any)[key] || ''}
-                onChange={e => onUpdateSession({ ...session, [key]: e.target.value })}
-              />
-            </label>
-          ))}
+        {/* 1 ── Identity */}
+        <div className="mb-6">
+          <p className="font-mono text-[10px] text-on-surface-variant/70 mb-2">
+            {session.track}{session.time ? ` · ${session.time}` : ''}{session.setupUsed ? ` · ${session.setupUsed}` : ''}
+          </p>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase font-mono text-on-surface-variant">Weather</span>
+            <input
+              type="text"
+              className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+              value={session.weather || ''}
+              onChange={e => onUpdateSession({ ...session, weather: e.target.value })}
+            />
+          </label>
         </div>
 
-        {/* Driver Feedback Diagnostics */}
-        <div className="space-y-4 mb-6 pt-4 border-t border-outline-variant/60">
-          <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Driver Feedback Diagnostics</h3>
-          {(['cornerEntry', 'centerApex', 'cornerExit'] as const).map(phase => {
-            const val = session.diagnostics[phase];
-            const notesField = `${phase}Notes` as const;
-            const notesVal = session.diagnostics[notesField] || '';
-            const labels = { cornerEntry: 'Corner Entry', centerApex: 'Center Apex', cornerExit: 'Corner Exit' };
-            return (
-              <div key={phase} className="bg-[#0a0a0a] border border-outline-variant/50 rounded-lg p-3">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs uppercase font-mono font-bold text-on-surface">{labels[phase]}</span>
-                  <div className="flex rounded overflow-hidden border border-outline-variant/50">
-                    {(['LOOSE', 'NEUTRAL', 'TIGHT'] as const).map((opt, idx) => (
-                      <button
-                        key={opt}
-                        onClick={() => updateDiagnostics(phase, opt)}
-                        className={`px-3 py-1 text-[10px] font-mono font-bold uppercase transition-colors ${idx === 1 ? 'border-x border-outline-variant/50' : ''} ${
-                          val === opt
-                            ? opt === 'LOOSE' ? 'bg-red-500/20 text-red-400'
-                            : opt === 'NEUTRAL' ? 'bg-green-500/20 text-green-400'
-                            : 'bg-blue-500/20 text-blue-400'
-                            : 'bg-surface text-on-surface-variant hover:bg-surface-bright'
-                        }`}
-                      >{opt[0] + opt.slice(1).toLowerCase()}</button>
-                    ))}
-                  </div>
-                </div>
+        {/* 2 ── Track condition */}
+        <div className="mb-6 pt-4 border-t border-outline-variant/60">
+          <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Track Condition</h3>
+          <div className="grid grid-cols-3 gap-1 mb-3">
+            {TRACK_CONDITION_PRESETS.map(preset => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => onUpdateSession({ ...session, trackConditionPreset: session.trackConditionPreset === preset ? undefined : preset })}
+                className={`py-2 px-1 min-h-12 rounded border font-mono text-[10px] font-bold transition-all text-center leading-tight ${
+                  session.trackConditionPreset === preset
+                    ? 'bg-primary/20 border-primary text-primary'
+                    : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                }`}
+              >{preset}</button>
+            ))}
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase font-mono text-on-surface-variant">Condition (free text)</span>
+            <input
+              type="text"
+              className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+              value={session.condition || ''}
+              onChange={e => onUpdateSession({ ...session, condition: e.target.value })}
+            />
+          </label>
+        </div>
+
+        {/* 3 ── Laps & result */}
+        <div className="mb-6 pt-4 border-t border-outline-variant/60">
+          <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Laps & Result</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase font-mono text-on-surface-variant">Best Lap</span>
+              {/* [13] Opens the lap-time keypad — OS keyboard suppressed */}
+              <input
+                type="text"
+                inputMode="none"
+                readOnly
+                placeholder="--.---"
+                className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono cursor-pointer"
+                value={session.bestLap || ''}
+                onFocus={() => setLapPadOpen(true)}
+                onClick={() => setLapPadOpen(true)}
+              />
+            </label>
+            {[
+              { label: 'Finish Pos', key: 'finishPos' as const },
+              { label: 'Quick Time', key: 'leaderLap' as const },
+              { label: 'Max RPM', key: 'maxRpm' as const },
+            ].map(({ label, key }) => (
+              <label key={key} className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase font-mono text-on-surface-variant">{label}</span>
                 <input
                   type="text"
-                  placeholder="Additional driver notes…"
-                  value={notesVal}
-                  onChange={e => handleNotesChange(notesField, e.target.value)}
-                  className="w-full bg-surface border border-outline-variant/50 text-on-surface text-xs font-mono p-2 rounded"
+                  className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+                  value={(session as any)[key] || ''}
+                  onChange={e => onUpdateSession({ ...session, [key]: e.target.value })}
                 />
-              </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* 4 ── Handling diagnostics — [12] 3×3 single-tap grid */}
+        <div className="space-y-3 mb-6 pt-4 border-t border-outline-variant/60">
+          <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Handling Diagnostics</h3>
+          <SegmentedGrid
+            rows={[
+              { id: 'cornerEntry', label: 'Entry' },
+              { id: 'centerApex', label: 'Middle' },
+              { id: 'cornerExit', label: 'Exit' },
+            ]}
+            cols={[
+              { id: 'tight', label: 'Tight', tone: 'info' },
+              { id: 'neutral', label: 'Neutral' },
+              { id: 'loose', label: 'Loose', tone: 'warn' },
+            ]}
+            value={{
+              cornerEntry: session.diagnostics.cornerEntry ? session.diagnostics.cornerEntry.toLowerCase() : null,
+              centerApex: session.diagnostics.centerApex ? session.diagnostics.centerApex.toLowerCase() : null,
+              cornerExit: session.diagnostics.cornerExit ? session.diagnostics.cornerExit.toLowerCase() : null,
+            }}
+            onChange={(rowId, colId) =>
+              updateDiagnostics(
+                rowId as 'cornerEntry' | 'centerApex' | 'cornerExit',
+                colId.toUpperCase() as 'TIGHT' | 'NEUTRAL' | 'LOOSE',
+              )
+            }
+          />
+          {/* Legacy per-phase driver notes preserved */}
+          {(['cornerEntry', 'centerApex', 'cornerExit'] as const).map(phase => {
+            const notesField = `${phase}Notes` as const;
+            const notesVal = session.diagnostics[notesField] || '';
+            const labels = { cornerEntry: 'Entry notes', centerApex: 'Middle notes', cornerExit: 'Exit notes' };
+            return (
+              <input
+                key={phase}
+                type="text"
+                placeholder={`${labels[phase]}…`}
+                value={notesVal}
+                onChange={e => handleNotesChange(notesField, e.target.value)}
+                className="w-full bg-surface border border-outline-variant/50 text-on-surface text-xs font-mono p-2 rounded"
+              />
             );
           })}
         </div>
 
-        {/* Tire Selection */}
+        {/* 5 ── Tires & pressures */}
         <div className="pt-4 border-t border-outline-variant/60 mb-6">
           <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            <h3 className="font-mono text-xs uppercase text-on-surface-variant">Tires Installed</h3>
+            <h3 className="font-mono text-xs uppercase text-on-surface-variant">Tires & Pressures</h3>
             {currentWeekend?.setupId && savedSetups.find(s => s.id === currentWeekend.setupId) && (
               <button
                 type="button"
@@ -550,31 +1161,31 @@ export default function RaceWeekendView({
                       <p className="font-mono text-[9px] text-on-surface-variant/60">{t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS</p>
                     ) : null;
                   })()}
-                  <div>
-                    <label className="block text-[9px] font-mono uppercase text-on-surface-variant/60 mb-0.5">Air Pressure (psi)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="e.g. 11.5"
-                      value={airPressure}
-                      onChange={e => handleTireChange(corner, 'airPressure', e.target.value)}
-                      className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 rounded outline-none"
-                    />
-                  </div>
+                  <NumberStepper
+                    value={parsePsi(airPressure)}
+                    onChange={(v) => handleTireChange(corner, 'airPressure', v === '' ? '' : `${v} psi`)}
+                    step={0.5}
+                    bigStep={1}
+                    min={0}
+                    max={60}
+                    decimals={1}
+                    unit="psi"
+                    ariaLabel={`${corner.toUpperCase()} air pressure`}
+                  />
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Setup Adjustments */}
+        {/* 6 ── Changes made */}
         <div className="pt-4 border-t border-outline-variant/60 mb-6">
-          <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Setup Adjustments</h3>
+          <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Changes Made</h3>
           <form onSubmit={handleAddAdjustment} className="flex gap-2 mb-3">
             <input type="text" className="flex-1 bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm font-mono" placeholder="e.g. +1/2 inch track bar" value={newAdjInput} onChange={e => setNewAdjInput(e.target.value)} />
             <button type="submit" className="bg-primary text-on-primary font-bold px-4 rounded">+</button>
           </form>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 mb-3">
             {session.adjustments?.map(adj => (
               <div key={adj.id} className="flex justify-between bg-surface p-2 rounded text-xs font-mono">
                 <span className="text-on-surface-variant">{adj.label}</span>
@@ -582,9 +1193,19 @@ export default function RaceWeekendView({
               </div>
             ))}
           </div>
+          {/* TODO C5: FourBarQuickAdjust — mount the four-bar quick-adjust sheet here */}
+          <button
+            type="button"
+            disabled
+            className="w-full flex items-center justify-center gap-2 min-h-12 rounded-xl border border-dashed border-outline-variant text-on-surface-variant/50 font-mono text-[11px] font-bold uppercase tracking-wider opacity-60 cursor-not-allowed"
+          >
+            <span className="material-symbols-outlined text-[16px]">tune</span>
+            Four-bar quick-adjust
+            <span className="text-[9px] normal-case font-normal">(coming soon)</span>
+          </button>
         </div>
 
-        {/* Competition Notes */}
+        {/* 7 ── Notes & attachments */}
         <div className="pt-4 border-t border-outline-variant/60 mb-6">
           <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Competition Notes</h3>
           <textarea
@@ -595,7 +1216,6 @@ export default function RaceWeekendView({
           />
         </div>
 
-        {/* Attachments / Time Slips */}
         <div className="pt-4 border-t border-outline-variant/60">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-mono text-xs uppercase text-on-surface-variant">Attachments / Time Slips</h3>
@@ -618,19 +1238,32 @@ export default function RaceWeekendView({
           )}
         </div>
         </div>
+
+        {/* [14] Sticky save bar — always visible while the log is open */}
+        <div className="sticky-action-bar rounded-b-lg">
+          <button
+            type="button"
+            onClick={handleSaveRun}
+            className="w-full flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary font-display font-bold uppercase tracking-wider text-on-primary active:opacity-90"
+          >
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>save</span>
+            SAVE RUN
+          </button>
+        </div>
+        </>
         )}
       </section>
       )}
 
-      {/* ── All Weekends (each collapsible, all sessions inside) ─────────── */}
-      {weekends.length > 0 && (
+      {/* ── All Weekends (active first, then date desc — [15]) ────────────── */}
+      {sortedWeekends.length > 0 && (
         <section>
           <h2 className="text-on-surface font-display font-bold uppercase mb-3 text-sm tracking-wide">
             All Weekends
           </h2>
 
           <div className="flex flex-col gap-3">
-            {[...weekends].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(wk => {
+            {sortedWeekends.map(wk => {
               const isActiveWk = wk.id === activeWeekendId;
               const isWkExpanded = expandedWeekendIds.has(wk.id);
               const wkSessions = wk.sessions || [];
@@ -654,7 +1287,7 @@ export default function RaceWeekendView({
                         {wk.track}{wk.date ? ` · ${wk.date}` : ''} · {wkSessions.length} session{wkSessions.length !== 1 ? 's' : ''}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       {!isActiveWk && (
                         <span
                           role="button"
@@ -664,11 +1297,44 @@ export default function RaceWeekendView({
                           className="px-2 py-1 rounded border border-primary/40 text-primary font-mono text-[9px] font-bold uppercase"
                         >Set Active</span>
                       )}
+                      {/* ⋯ menu: edit / delete */}
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Weekend actions for ${wk.name}`}
+                        onClick={event => { event.stopPropagation(); setMenuWeekendId(prev => prev === wk.id ? null : wk.id); }}
+                        onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setMenuWeekendId(prev => prev === wk.id ? null : wk.id); } }}
+                        className="flex min-w-12 min-h-12 items-center justify-center rounded-full text-on-surface-variant hover:text-primary"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">more_horiz</span>
+                      </span>
                       <span className="material-symbols-outlined text-on-surface-variant">
                         {isWkExpanded ? 'expand_less' : 'expand_more'}
                       </span>
                     </div>
                   </button>
+
+                  {/* ⋯ action row */}
+                  {menuWeekendId === wk.id && (
+                    <div className="flex gap-2 border-t border-outline-variant/30 p-2">
+                      <button
+                        type="button"
+                        onClick={() => { setMenuWeekendId(null); openWeekendForm(wk); }}
+                        className="flex-1 flex min-h-12 items-center justify-center gap-1.5 rounded border border-outline-variant font-mono text-[10px] font-bold uppercase text-on-surface hover:border-primary hover:text-primary transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">edit</span>
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => requestDeleteWeekend(wk)}
+                        className="flex-1 flex min-h-12 items-center justify-center gap-1.5 rounded border border-outline-variant font-mono text-[10px] font-bold uppercase text-on-surface-variant hover:border-red-500/50 hover:text-red-400 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">delete</span>
+                        Delete
+                      </button>
+                    </div>
+                  )}
 
                   {/* Sessions inside this weekend */}
                   {isWkExpanded && (
@@ -741,6 +1407,19 @@ export default function RaceWeekendView({
           </div>
         </section>
       )}
+
+      {/* [13] Lap-time keypad bottom sheet */}
+      <LapTimeKeypad
+        open={lapPadOpen}
+        title="Best lap"
+        initialValue={session.bestLap || ''}
+        onClose={() => setLapPadOpen(false)}
+        onCommit={(v) => onUpdateSession({ ...session, bestLap: v })}
+      />
+
+      {weekendFormModal}
+      {sessionFormModal}
+      {undoToastEl}
     </div>
   );
 }

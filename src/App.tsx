@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
-import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem, Car, ShockSession, CAR_TYPES, TRACK_CONDITION_PRESETS, TrackConditionPreset, MaintenanceComponent, MaintenanceLog, ChecklistTemplate, WeekendChecklist } from './types';
+import { Setup, SessionRecord, ActiveSession, RaceWeekend, AppTheme, TireInventoryItem, AccountingEntry, ShoppingItem, Car, ShockSession, CAR_TYPES, MaintenanceComponent, MaintenanceLog, ChecklistTemplate, WeekendChecklist } from './types';
 import {
   INITIAL_SETUP,
   INITIAL_SETUPS,
@@ -24,6 +24,8 @@ import { materializeMainChecklist } from './lib/mainChecklist';
 import DashboardView from './components/DashboardView';
 import SetupView from './components/SetupView';
 import RaceWeekendView from './components/RaceWeekendView';
+import type { NewSessionData, NewWeekendData } from './components/RaceWeekendView';
+import { buildSessionNameFrom } from './lib/sessionSequence';
 import SettingsView from './components/SettingsView';
 import QuickReferenceView from './components/QuickReferenceView';
 import TrackersView from './components/TrackersView';
@@ -337,24 +339,13 @@ export default function App() {
     return () => clearTimeout(t);
   }, [syncStatus]);
 
-  // Modal / forms tracking state
-  const [showNewWeekendForm, setShowNewWeekendForm] = useState(false);
-  const [newWeekendName, setNewWeekendName] = useState('');
-  const [newWeekendTrack, setNewWeekendTrack] = useState('');
-  const [newWeekendDate, setNewWeekendDate] = useState('');
-
-  // New weekend form — setup binding
-  const [newWeekendSetupId, setNewWeekendSetupId] = useState('');
-
-  const [showNewSessionForm, setShowNewSessionForm] = useState(false);
-  const [newSessionWeekendId, setNewSessionWeekendId] = useState(INITIAL_WEEKENDS[0]?.id || '');
-  const [newSessionTrack, setNewSessionTrack] = useState('');
-  const [newSessionType, setNewSessionType] = useState<'Test' | 'Hot Laps' | 'Qualifying' | 'Heat Race' | 'Feature'>('Test');
-  const [newSessionCond, setNewSessionCond] = useState('');
-  const [newSessionTrackCondition, setNewSessionTrackCondition] = useState<TrackConditionPreset | ''>('');
-  const [newSessionConditionNotes, setNewSessionConditionNotes] = useState('');
-  const [newSessionTimeOfDay, setNewSessionTimeOfDay] = useState<'current' | 'Afternoon' | 'Evening' | 'Night'>('current');
-  const activeWeekend = weekends.find(w => w.id === activeWeekendId) ?? null;
+  // [15] Weekend/session creation modals now live in RaceWeekendView.
+  // This one-shot action tells the Sessions tab to open a modal on arrival.
+  const [rwInitialAction, setRwInitialAction] = useState<'new-session' | 'new-weekend' | null>(null);
+  const openRaceWeekendAction = (action: 'new-session' | 'new-weekend') => {
+    setRwInitialAction(action);
+    setActiveTab('raceweekend');
+  };
 
   // ── [29] Tab scroll preservation ───────────────────────────────────────────
   const mainRef = useRef<HTMLElement | null>(null);
@@ -370,23 +361,14 @@ export default function App() {
     return () => { cancelAnimationFrame(raf); clearTimeout(t); };
   }, [activeTab]);
 
-  // ── [29] Android back: sheets close first (via useBackClosable), then
-  // modals, then non-dashboard tabs fall back to Dashboard, then exit. ───────
-  const showNewWeekendFormRef = useRef(false);
-  const showNewSessionFormRef = useRef(false);
-  showNewWeekendFormRef.current = showNewWeekendForm;
-  showNewSessionFormRef.current = showNewSessionForm;
+  // ── [29] Android back: sheets/modals close first (via useBackClosable —
+  // the creation modals in RaceWeekendView register there too), then
+  // non-dashboard tabs fall back to Dashboard, then exit. ────────────────────
   useEffect(() => {
     window.history.pushState({ __cc_root: true }, '');
     const onPop = () => {
       if (isPopSuppressed()) return;       // programmatic history.back() from a sheet
-      if (hasOpenSheets()) return;         // the topmost BottomSheet consumes this pop
-      if (showNewWeekendFormRef.current || showNewSessionFormRef.current) {
-        setShowNewWeekendForm(false);
-        setShowNewSessionForm(false);
-        window.history.pushState({ __cc_root: true }, '');
-        return;
-      }
+      if (hasOpenSheets()) return;         // the topmost sheet/modal consumes this pop
       if (activeTabRef.current !== 'dashboard') {
         setActiveTab('dashboard');
         window.history.pushState({ __cc_root: true }, '');
@@ -429,13 +411,6 @@ export default function App() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekends, activeWeekendId]);
-  // Session weather fetch state
-  const [sessionWeatherStr, setSessionWeatherStr] = useState('');
-  const [sessionWeatherLoading, setSessionWeatherLoading] = useState(false);
-  const [sessionWeatherError, setSessionWeatherError] = useState('');
-  const [showSessionZipInput, setShowSessionZipInput] = useState(false);
-  const [sessionZipCode, setSessionZipCode] = useState('');
-
   // Clock state matching real timing context
   const [timeStr, setTimeStr] = useState('11:20 AM');
 
@@ -462,11 +437,7 @@ export default function App() {
     }
     if (savedWeekends) {
       try {
-        const parsed = JSON.parse(savedWeekends);
-        setWeekends(parsed);
-        if (parsed.length > 0) {
-          setNewSessionWeekendId(parsed[0].id);
-        }
+        setWeekends(JSON.parse(savedWeekends));
       } catch { /* ignore */ }
     }
     if (savedActive) {
@@ -863,79 +834,13 @@ export default function App() {
     });
   };
 
-  // ── Session weather helpers ──────────────────────────────────────────────────
-
-  const weatherCodeToStr = (code: number): string => {
-    if (code === 0) return 'Clear';
-    if (code <= 3) return 'Partly Cloudy';
-    if (code <= 9) return 'Fog';
-    if (code <= 29) return 'Rain';
-    if (code <= 39) return 'Snow';
-    if (code <= 59) return 'Drizzle';
-    if (code <= 69) return 'Rain';
-    if (code <= 79) return 'Snow';
-    if (code <= 84) return 'Rain Showers';
-    if (code <= 94) return 'Thunderstorm';
-    return 'Severe Storm';
-  };
-
-  const fetchSessionWeatherFromCoords = async (lat: number, lon: number) => {
-    let location = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
-    try {
-      const geo = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-      const gj = await geo.json();
-      const city = gj.address?.city || gj.address?.town || gj.address?.village || gj.address?.county || '';
-      const state = gj.address?.state_code || '';
-      if (city || state) location = [city, state].filter(Boolean).join(', ');
-    } catch { /* keep coords */ }
-    const wr = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`);
-    const wj = await wr.json();
-    const temp = Math.round(wj.current.temperature_2m);
-    const cond = weatherCodeToStr(wj.current.weather_code);
-    setSessionWeatherStr(`${temp}°F, ${cond} — ${location}`);
-    setSessionWeatherLoading(false);
-  };
-
-  const handleSessionGPSWeather = () => {
-    setSessionWeatherLoading(true); setSessionWeatherError(''); setSessionWeatherStr('');
-    if (!navigator.geolocation) {
-      setSessionWeatherError('GPS not available.'); setSessionWeatherLoading(false); setShowSessionZipInput(true); return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        try { await fetchSessionWeatherFromCoords(pos.coords.latitude, pos.coords.longitude); }
-        catch { setSessionWeatherError('Could not fetch weather.'); setSessionWeatherLoading(false); }
-      },
-      err => {
-        setSessionWeatherError(err.code === 1 ? 'Location denied — enter zip code.' : 'Could not get location.');
-        setSessionWeatherLoading(false); setShowSessionZipInput(true);
-      },
-      { timeout: 10000 }
-    );
-  };
-
-  const handleSessionZipWeather = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sessionZipCode.trim()) return;
-    setSessionWeatherLoading(true); setSessionWeatherError('');
-    try {
-      const gr = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${sessionZipCode.trim()}&country=US&format=json&limit=1`);
-      const gj = await gr.json();
-      if (!gj.length) { setSessionWeatherError('Zip not found.'); setSessionWeatherLoading(false); return; }
-      await fetchSessionWeatherFromCoords(parseFloat(gj[0].lat), parseFloat(gj[0].lon));
-      setShowSessionZipInput(false); setSessionZipCode('');
-    } catch { setSessionWeatherError('Could not fetch weather.'); setSessionWeatherLoading(false); }
-  };
-
-  // ── Open session creation form ────────────────────────────────────────────────
+  // Session weather helpers moved into RaceWeekendView ([15]).
 
   const handleActivateWeekend = (weekendId: string) => {
     const target = weekends.find(w => w.id === weekendId);
     if (!target) return;
     setActiveWeekendId(target.id);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, target.id);
-    setNewSessionWeekendId(target.id);
-    setNewSessionTrack(target.track);
   };
 
   const handleDeleteMaintenanceComponent = (componentId: string) => {
@@ -960,54 +865,18 @@ export default function App() {
     });
   };
 
-  const handleOpenNewSessionForm = () => {
-    if (!activeWeekend) return;
-    setNewSessionWeekendId(activeWeekend.id);
-    setNewSessionTrack(activeWeekend.track);
-    setNewSessionType('Test');
-    setNewSessionCond('');
-    setNewSessionTrackCondition('');
-    setNewSessionConditionNotes('');
-    setSessionWeatherStr('');
-    setSessionWeatherError('');
-    setShowSessionZipInput(false);
-    setSessionZipCode('');
-    setNewSessionTimeOfDay('current');
-    setShowNewSessionForm(true);
-  };
+  // ── Create weekend ([15]: form lives in RaceWeekendView, data arrives here) ──
 
-  // ── Session type → short code mapping ────────────────────────────────────────
+  const handleCreateNewWeekend = (data: NewWeekendData) => {
+    if (!data.name.trim() || !data.track.trim()) return;
 
-  const SESSION_CODES: Record<string, string> = {
-    'Test': 'Test',
-    'Hot Laps': 'HL',
-    'Qualifying': 'Qual',
-    'Heat Race': 'Heat',
-    'Feature': 'Feat.',
-  };
-
-  // ── Auto-number session name ─────────────────────────────────────────────────
-
-  const buildSessionName = (type: string, weekendId: string): string => {
-    const code = SESSION_CODES[type] ?? type;
-    const weekend = weekends.find(w => w.id === weekendId);
-    if (!weekend) return code;
-    const existing = weekend.sessions.filter(s => s.name === code || s.name.startsWith(`${code} `));
-    if (existing.length === 0) return code;
-    return `${code} ${existing.length + 1}`;
-  };
-
-  const handleCreateNewWeekend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newWeekendName.trim() || !newWeekendTrack.trim()) return;
-
-    const boundSetup = savedSetups.find(s => s.id === newWeekendSetupId) || null;
+    const boundSetup = savedSetups.find(s => s.id === data.setupId) || null;
 
     const newWknd: RaceWeekend = {
       id: `wknd-${Date.now()}`,
-      name: newWeekendName,
-      track: newWeekendTrack,
-      date: newWeekendDate || new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
+      name: data.name,
+      track: data.track,
+      date: data.date || new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
       sessions: [],
       setupId: boundSetup?.id,
       setupName: boundSetup?.chassis,
@@ -1020,17 +889,14 @@ export default function App() {
       return updated;
     });
 
-    setNewSessionWeekendId(newWknd.id);
-    setNewSessionTrack(newWknd.track);
     setActiveWeekendId(newWknd.id);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, newWknd.id);
     setInfoToast(`Active: ${newWknd.name}`);
-    setShowNewWeekendForm(false);
   };
 
-  const handleCreateNewSession = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeWeekendId || newSessionWeekendId !== activeWeekendId) return;
+  const handleCreateNewSession = (data: NewSessionData) => {
+    // Sessions may only be created under the device-active weekend.
+    if (!activeWeekendId || data.weekendId !== activeWeekendId) return;
 
     const targetWeekend = weekends.find(w => w.id === activeWeekendId);
     if (!targetWeekend) return;
@@ -1066,23 +932,27 @@ export default function App() {
       },
     };
 
-    // Auto-number session name
-    const sessionName = buildSessionName(newSessionType, newSessionWeekendId);
+    // [11] Prefill carried from the previous session wins over setup baselines
+    const initialPressures = data.prefillPressures ?? defaultPressures;
+    const initialTires = data.prefillTires ?? defaultTires;
+
+    // Auto-number session name (same convention as always)
+    const sessionName = buildSessionNameFrom(targetWeekend.sessions, data.type);
 
     // Resolve time
-    const resolvedTime = newSessionTimeOfDay === 'current'
+    const resolvedTime = data.timeOfDay === 'current'
       ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : newSessionTimeOfDay;
+      : data.timeOfDay;
 
     const nextSession: ActiveSession = {
-      sessionType: newSessionType,
+      sessionType: data.type,
       name: sessionName,
       track: targetWeekend.track,
       setupUsed: setup.chassis || 'Default Setup',
-      condition: newSessionCond || '',
-      trackConditionPreset: newSessionTrackCondition || undefined,
-      conditionNotes: newSessionConditionNotes || undefined,
-      weather: sessionWeatherStr || '',
+      condition: '',
+      trackConditionPreset: data.trackCondition || undefined,
+      conditionNotes: data.conditionNotes || undefined,
+      weather: data.weather || '',
       time: resolvedTime,
       bestLap: '',
       avgLap: '',
@@ -1100,8 +970,8 @@ export default function App() {
         cornerExitNotes: '',
       },
       adjustments: [],
-      tires: defaultTires,
-      pressures: defaultPressures,
+      tires: initialTires,
+      pressures: initialPressures,
       competitionNotes: '',
       screenshots: []
     };
@@ -1109,12 +979,12 @@ export default function App() {
     const newRecord: SessionRecord = {
       id: `session-rec-${Date.now()}`,
       type: sessionName,
-      sessionType: newSessionType,
+      sessionType: data.type,
       name: sessionName,
       track: targetWeekend.track,
-      condition: newSessionCond,
-      trackConditionPreset: newSessionTrackCondition || undefined,
-      conditionNotes: newSessionConditionNotes || undefined,
+      condition: '',
+      trackConditionPreset: data.trackCondition || undefined,
+      conditionNotes: data.conditionNotes || undefined,
       bestLap: '',
       avgLap: '',
       finishPos: '',
@@ -1131,17 +1001,17 @@ export default function App() {
         cornerExitNotes: '',
       },
       adjustments: [],
-      tires: defaultTires,
-      pressures: defaultPressures,
+      tires: initialTires,
+      pressures: initialPressures,
       competitionNotes: '',
       time: resolvedTime,
-      weather: sessionWeatherStr || '',
+      weather: data.weather || '',
       setupUsed: setup.chassis || 'Default Setup',
       screenshots: []
     };
 
     nextSession.id = newRecord.id;
-    nextSession.weekendId = newSessionWeekendId;
+    nextSession.weekendId = data.weekendId;
 
     setWeekends((prev) => {
       const updated = prev.map(w => w.id === targetWeekend.id ? {
@@ -1163,19 +1033,12 @@ export default function App() {
     setActiveSession(nextSession);
     localStorage.setItem('race_notes_active_session', JSON.stringify(nextSession));
 
-    setShowNewSessionForm(false);
-    setNewSessionType('Test');
-    setNewSessionCond('');
-    setSessionWeatherStr('');
-    setSessionWeatherError('');
-    setShowSessionZipInput(false);
-    setSessionZipCode('');
-    setNewSessionTimeOfDay('current');
     setActiveTab('raceweekend');
   };
 
-  const handleDeleteWeekend = (weekendId: string) => {
-    if (!window.confirm('Delete this race weekend and all its sessions? This cannot be undone.')) return;
+  // Immediate delete — no confirm. RaceWeekendView wraps this in the undo
+  // toast pattern; Dashboard keeps the window.confirm wrapper below.
+  const deleteWeekendNow = (weekendId: string) => {
     const updated = weekends.filter(w => w.id !== weekendId);
     setWeekends(updated);
     localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
@@ -1183,7 +1046,6 @@ export default function App() {
     deleteWeekendFromCloud(weekendId);
     if (user) pushWeekends(updated, user.id);
     if (activeWeekendId === weekendId) {
-      setShowNewSessionForm(false);
       const nextId = updated[0]?.id ?? null;
       setActiveWeekendId(nextId);
       if (nextId) localStorage.setItem(ACTIVE_WEEKEND_KEY, nextId);
@@ -1199,6 +1061,11 @@ export default function App() {
       c.weekendId === weekendId ? { ...c, weekendId: undefined, weekendName: undefined } : c
     );
     handleSaveWeekendChecklists(updatedChecklists);
+  };
+
+  const handleDeleteWeekend = (weekendId: string) => {
+    if (!window.confirm('Delete this race weekend and all its sessions? This cannot be undone.')) return;
+    deleteWeekendNow(weekendId);
   };
 
   const handleDeleteSession = (weekendId: string, sessionId: string) => {
@@ -1382,12 +1249,7 @@ export default function App() {
             activeWeekendId={activeWeekendId}
             onSelectCar={handleSelectCar}
             onSelectWeekend={handleActivateWeekend}
-            onNewWeekend={() => {
-              setNewWeekendName('');
-              setNewWeekendTrack('');
-              setNewWeekendDate(new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
-              setShowNewWeekendForm(true);
-            }}
+            onNewWeekend={() => openRaceWeekendAction('new-weekend')}
           />
         )}
 
@@ -1452,13 +1314,8 @@ export default function App() {
                   activeCarId={activeCarId}
                   activeWeekendId={activeWeekendId}
                   onActivateWeekend={handleActivateWeekend}
-                  onStartNewWeekend={() => {
-                    setNewWeekendName('');
-                    setNewWeekendTrack('');
-                    setNewWeekendDate(new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
-                    setShowNewWeekendForm(true);
-                  }}
-                  onStartNewSession={handleOpenNewSessionForm}
+                  onStartNewWeekend={() => openRaceWeekendAction('new-weekend')}
+                  onStartNewSession={() => openRaceWeekendAction('new-session')}
                   onSelectSession={(rec, weekendId) => {
                     handleSelectRecentSession(rec, weekendId || '');
                     setActiveTab('raceweekend');
@@ -1567,20 +1424,18 @@ export default function App() {
                   weekends={weekends}
                   tireInventory={tireInventory}
                   savedSetups={savedSetups}
+                  activeCarId={activeCarId}
                   onUpdateSession={handleUpdateSession}
                   onUpdateWeekend={handleUpdateWeekend}
                   onDeleteSession={handleDeleteSession}
+                  onDeleteWeekend={deleteWeekendNow}
                   onSelectSession={(rec, weekendId) => handleSelectRecentSession(rec, weekendId)}
                   activeWeekendId={activeWeekendId}
                   onActivateWeekend={handleActivateWeekend}
-                  onNewSession={handleOpenNewSessionForm}
-                  onCreateWeekend={() => {
-                    setActiveTab('dashboard');
-                    setNewWeekendName('');
-                    setNewWeekendTrack('');
-                    setNewWeekendDate(new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
-                    setShowNewWeekendForm(true);
-                  }}
+                  onCreateWeekend={handleCreateNewWeekend}
+                  onCreateSession={handleCreateNewSession}
+                  initialAction={rwInitialAction ?? undefined}
+                  onInitialActionConsumed={() => setRwInitialAction(null)}
                 />
               )}
 
@@ -1758,313 +1613,6 @@ export default function App() {
         onClose={() => setInfoToast(null)}
       />
 
-      {/* NEW WEEKEND FORM DIALOG */}
-      {showNewWeekendForm && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in shadow-2xl">
-          <div className="bg-surface border-2 border-outline rounded-lg p-6 max-w-sm w-full space-y-4 shadow-2xl relative text-on-surface">
-            <button
-              onClick={() => setShowNewWeekendForm(false)}
-              className="absolute top-4 right-4 text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-sm">close</span>
-            </button>
-            
-            <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-2">
-              <span className="material-symbols-outlined text-primary">calendar_today</span>
-              <h3 className="font-display text-base font-bold uppercase text-on-surface tracking-wide">
-                Create Race Weekend
-              </h3>
-            </div>
-
-            <form onSubmit={handleCreateNewWeekend} className="space-y-3">
-              <div>
-                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
-                  Weekend Event Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Knoxville Nationals"
-                  value={newWeekendName}
-                  onChange={(e) => setNewWeekendName(e.target.value)}
-                  className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
-                  Track Name / Speedway
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Knoxville Raceway"
-                  value={newWeekendTrack}
-                  onChange={(e) => setNewWeekendTrack(e.target.value)}
-                  className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
-                  Date Range
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. June 12-14, 2026"
-                  value={newWeekendDate}
-                  onChange={(e) => setNewWeekendDate(e.target.value)}
-                  className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
-                />
-              </div>
-
-              {savedSetups.length > 0 && (
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
-                    Bind a Setup (optional)
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={newWeekendSetupId}
-                      onChange={e => setNewWeekendSetupId(e.target.value)}
-                      className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
-                    >
-                      <option value="">-- No setup selected --</option>
-                      {/* Decision 3: filter to active car's setups */}
-                      {savedSetups.filter(s => !activeCarId || s.carId === activeCarId).map(s => (
-                        <option key={s.id} value={s.id}>{s.chassis}{s.carType ? ` (${s.carType})` : ''}</option>
-                      ))}
-                    </select>
-                    <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[14px]">expand_more</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2 justify-end text-xs font-mono">
-                <button
-                  type="button"
-                  onClick={() => setShowNewWeekendForm(false)}
-                  className="px-3 py-2 border border-outline-variant hover:bg-surface-container-high text-on-surface-variant uppercase cursor-pointer rounded"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
-                >
-                  CREATE WEEKEND
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* NEW SESSION FORM DIALOG / DRAWER POPUP */}
-      {showNewSessionForm && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in shadow-2xl">
-          <div className="bg-surface border-2 border-outline rounded-lg p-6 max-w-sm w-full space-y-4 shadow-2xl relative text-on-surface">
-            <button
-              onClick={() => setShowNewSessionForm(false)}
-              className="absolute top-4 right-4 text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-sm">close</span>
-            </button>
-            
-            <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-2">
-              <span className="material-symbols-outlined text-primary">add_circle</span>
-              <h3 className="font-display text-base font-bold uppercase text-on-surface tracking-wide">
-                Start New Logger Session
-              </h3>
-            </div>
-
-            {weekends.length === 0 ? (
-              <div className="text-center py-4 space-y-3">
-                <p className="text-xs text-on-surface-variant uppercase font-mono">No race weekends found.</p>
-                <p className="text-[11px] text-on-surface-variant/60 mb-2">Create a Race Weekend event first to log sessions under it!</p>
-                <button
-                  onClick={() => {
-                    setShowNewSessionForm(false);
-                    setActiveTab('dashboard');
-                    setShowNewWeekendForm(true);
-                  }}
-                  className="px-4 py-2 bg-primary text-on-primary font-bold text-xs uppercase cursor-pointer rounded block w-full"
-                >
-                  Create Race Weekend
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleCreateNewSession} className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
-                {/* Session always belongs to device-active weekend. */}
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Active Weekend</label>
-                  <div className="w-full bg-surface-container text-xs text-on-surface p-2.5 border border-outline-variant rounded font-mono">
-                    {activeWeekend?.name} ({activeWeekend?.track})
-                  </div>
-                </div>
-
-                {/* Session type */}
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Session Type</label>
-                  <div className="grid grid-cols-5 gap-1">
-                    {([
-                      { key: 'Test', code: 'Test' },
-                      { key: 'Hot Laps', code: 'HL' },
-                      { key: 'Qualifying', code: 'Qual' },
-                      { key: 'Heat Race', code: 'Heat' },
-                      { key: 'Feature', code: 'Feat.' },
-                    ] as const).map(({ key, code }) => (
-                      <button
-                        key={key}
-                        type="button"
-                        title={key}
-                        onClick={() => setNewSessionType(key)}
-                        className={`py-2 px-1 rounded border font-mono text-[10px] font-bold uppercase transition-all text-center leading-tight ${
-                          newSessionType === key
-                            ? 'bg-primary/20 border-primary text-primary'
-                            : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
-                        }`}
-                      >{code}</button>
-                    ))}
-                  </div>
-                  {newSessionWeekendId && (
-                    <p className="font-mono text-[10px] text-on-surface-variant/50 mt-1">
-                      Will be named: <span className="text-primary font-bold">{buildSessionName(newSessionType, newSessionWeekendId)}</span>
-                    </p>
-                  )}
-                </div>
-
-                {/* Track Condition Presets (WS-L) */}
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Track Condition</label>
-                  <div className="grid grid-cols-3 gap-1 mb-2">
-                    {TRACK_CONDITION_PRESETS.map(preset => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setNewSessionTrackCondition(p => p === preset ? '' : preset)}
-                        className={`py-2 px-1 rounded border font-mono text-[10px] font-bold transition-all text-center leading-tight ${
-                          newSessionTrackCondition === preset
-                            ? 'bg-primary/20 border-primary text-primary'
-                            : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
-                        }`}
-                      >{preset}</button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Surface conditions / free-text notes */}
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Surface Notes (free text)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Rough, Dusty, One Lane..."
-                    value={newSessionConditionNotes}
-                    onChange={(e) => setNewSessionConditionNotes(e.target.value)}
-                    className="w-full bg-surface-container text-xs text-on-surface p-2 border border-outline-variant focus:border-primary rounded"
-                  />
-                </div>
-
-                {/* Legacy condition field — kept for backward compat but deprecated */}
-                <input type="hidden" value={newSessionCond} />
-
-                {/* Time of Day */}
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Time of Day</label>
-                  <div className="grid grid-cols-4 gap-1">
-                    {([
-                      { value: 'current', label: 'Current Time' },
-                      { value: 'Afternoon', label: 'Afternoon' },
-                      { value: 'Evening', label: 'Evening' },
-                      { value: 'Night', label: 'Night' },
-                    ] as const).map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setNewSessionTimeOfDay(opt.value)}
-                        className={`py-2 px-1 rounded border font-mono text-[9px] font-bold uppercase transition-all text-center leading-tight ${
-                          newSessionTimeOfDay === opt.value
-                            ? 'bg-primary/20 border-primary text-primary'
-                            : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
-                        }`}
-                      >{opt.label}</button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Weather */}
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Weather (optional)</label>
-                  <div className="flex gap-2 mb-2">
-                    <button
-                      type="button"
-                      onClick={handleSessionGPSWeather}
-                      disabled={sessionWeatherLoading}
-                      className="flex items-center gap-1 text-[10px] font-mono font-bold uppercase px-2.5 py-1.5 rounded border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
-                    >
-                      <span className="material-symbols-outlined text-[13px]">my_location</span>
-                      {sessionWeatherLoading ? 'Fetching…' : 'GPS'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowSessionZipInput(v => !v)}
-                      className={`flex items-center gap-1 text-[10px] font-mono font-bold uppercase px-2.5 py-1.5 rounded border transition-colors ${showSessionZipInput ? 'border-primary text-primary bg-primary/10' : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'}`}
-                    >
-                      <span className="material-symbols-outlined text-[13px]">pin_drop</span>
-                      Zip
-                    </button>
-                    {sessionWeatherStr && (
-                      <button type="button" onClick={() => { setSessionWeatherStr(''); setSessionWeatherError(''); }} className="ml-auto text-[10px] font-mono text-on-surface-variant/50 hover:text-error">clear</button>
-                    )}
-                  </div>
-                  {showSessionZipInput && (
-                    <form onSubmit={handleSessionZipWeather} className="flex gap-2 mb-2">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={5}
-                        placeholder="ZIP code"
-                        value={sessionZipCode}
-                        onChange={e => setSessionZipCode(e.target.value)}
-                        className="flex-1 bg-surface-container border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-xs text-on-surface outline-none"
-                      />
-                      <button type="submit" disabled={sessionWeatherLoading} className="bg-primary text-on-primary px-3 py-2 rounded font-mono text-[10px] font-bold uppercase disabled:opacity-50">
-                        {sessionWeatherLoading ? '…' : 'Get'}
-                      </button>
-                    </form>
-                  )}
-                  {sessionWeatherError && <p className="font-mono text-[11px] text-red-400 mb-1">{sessionWeatherError}</p>}
-                  {sessionWeatherStr ? (
-                    <div className="bg-surface-container border border-primary/30 rounded px-3 py-2 font-mono text-xs text-on-surface flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>cloud</span>
-                      {sessionWeatherStr}
-                    </div>
-                  ) : (
-                    <p className="font-mono text-[10px] text-on-surface-variant/40 italic">No weather fetched — session will log without it.</p>
-                  )}
-                </div>
-
-                <div className="flex gap-2 pt-2 justify-end text-xs font-mono">
-                  <button
-                    type="button"
-                    onClick={() => setShowNewSessionForm(false)}
-                    className="px-3 py-2 border border-outline-variant hover:bg-surface-container-high text-on-surface-variant uppercase cursor-pointer rounded"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
-                  >
-                    START SESSION
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
