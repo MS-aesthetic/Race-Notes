@@ -1,6 +1,6 @@
 # Current Task — UXF-8 Docs and Loop-State Hygiene
 
-**Status:** CODE_PASS — SOL fixer attempt 2; awaiting independent SOL QA
+**Status:** QA FAIL — SOL QA attempt 2; route one remaining repair to SOL fixer attempt 3
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Next workstream after independent PASS:** UXF-1
@@ -63,3 +63,9 @@ Remove stale v2 onboarding and loop-state directions before application work sta
 Passing evidence: commit contains no `src/`, `scripts/`, schema, package, or Android change; `git diff --check` passes; current Markdown links resolve; archive moves preserve historical files; migration 014 is recorded complete; UXF table exists; worktree was clean before QA notes. Cavecrew review totals: 4 critical, 3 major, 0 minor, 0 questions.
 
 Attempt 2 evidence: repair diff touches only four `.github/agents` roles, `plan-v3-ux-corrections.md`, `PROJECT_INSTRUCTIONS.md`, `HANDOFF.md`, and durable task/state notes. Current-link scan passes; active-role stale-routing grep is zero; no application-source delta; `git diff --check` passes. Cavecrew final re-review: `No issues.` Documentation-only repair requires no lint/build.
+
+## QA attempt 2 finding
+
+1. **Native Codex fixer metadata still contradicts first-failure routing.** `.codex/agents/ws-fixer.toml:2` says SOL takes over “after three failed QA reviews,” while its body and every active GitHub role correctly use first-failure takeover. Change the description to first-failure takeover. Re-grep all active `.codex/agents/*.toml` and `.github/agents/*.agent.md` routing text, then return to independent SOL QA. No other finding remains.
+
+Passing evidence retained: the four `.github` roles, archived handoff path, PROJECT conflict authority, HANDOFF live row, archive preservation, current links, applied migration state, UXF table, no-source-change scope, diff check, and clean worktree all pass. Cavecrew QA attempt 2 review found only the native fixer metadata mismatch above.

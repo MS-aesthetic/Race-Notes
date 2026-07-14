@@ -101,10 +101,11 @@ Separate track from WS-N…Z. Chunks 1–9 are historical and archived under `do
 | UXF-5 | Copy tone + Tuning Guide/App Guide separation | pending | 0 | — | — | Owner tone review required to close. |
 | UXF-6 | Races/Days maintenance intervals + starting usage | pending | 0 | — | — | No current test-data compatibility burden. |
 | UXF-7 | Main Checklist redesign proposal | pending | 0 | — | — | Spec-only; Maxx design session gates follow-on build. |
-| UXF-8 | Docs and loop-state hygiene | in_progress | 2 | 82 | fe59cf0 | SOL fixer attempt 2 CODE_PASS: active role routing, plan path, conflict rule, and live handoff row repaired; cavecrew re-review clean. Awaiting independent QA attempt 2. |
+| UXF-8 | Docs and loop-state hygiene | in_progress | 3 | 88 | 2c94361 | SOL QA attempt 2 FAIL: `.codex/agents/ws-fixer.toml` description still says takeover after three failures. Route single metadata repair to SOL fixer attempt 3; all other gates pass. |
 | UXF-9 | Batch regression, draft, and owner acceptance | pending | 0 | — | — | Last; absorbs remaining WS-Z runtime checks. |
 
 ### UX chunk grade log
+- 2026-07-14 · UXF-8 · SOL High QA attempt 2 · FAIL · 88 · Four active GitHub roles, archived source path, PROJECT authority, HANDOFF live row, archive preservation, links, migration state, UXF table, scope, diff, and clean tree pass. Cavecrew found one remaining active native-agent mismatch: `.codex/agents/ws-fixer.toml:2` still says takeover after three failed reviews. Route to SOL fixer attempt 3.
 - 2026-07-14 · UXF-8 · SOL High QA attempt 1 · FAIL · 82 · Archive moves, current Markdown links, migration state, UXF table, diff check, and no-source-change gate pass. Active `.github/agents` role files still route to retired `plan-v2.md`/`preview-v2`; fixer description still says third failure; active plan source path, PROJECT conflict rule, and live HANDOFF status are stale. First-failure policy routes repair to SOL fixer.
 - 2026-07-12 · UX-C1 · Fable QA · PASS-WITH-NOTES · primitives safe (undo state-machine no early-fire/leak; applied pagehide-commit + stepper keyboard). lint 3-baseline, build green, isolated (App.tsx untouched).
 - 2026-07-12 · UX-C2 · Fable QA · PASS (no blockers) · back-handling no trap/double-handle; one-shot guards (auto-car/weekend) correct; `byActiveCar` byte-identical; dual-writes intact. Backlog: dashboard 2-press exit; auto-car dup if signed-in pull errors→[]; reportSave(synced) TODO; prune `'quickref'` union.
