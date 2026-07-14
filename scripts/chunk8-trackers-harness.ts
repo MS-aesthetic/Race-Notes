@@ -8,8 +8,9 @@ import {
   resetMainChecklist,
   todoItemKind,
 } from '../src/lib/checklistMaintenance';
+import { activeChecklistItems } from '../src/lib/mainChecklist';
 import { lastAccountingCategory, localDateValue, recentAccountingRepeats } from '../src/lib/accountingDefaults';
-import type { AccountingEntry, MaintenanceComponent, Todo, TodoItem } from '../src/types';
+import { MAINTENANCE_CATEGORIES, type AccountingEntry, type MaintenanceComponent, type Todo, type TodoItem } from '../src/types';
 
 const core: TodoItem = { id: 'core', text: 'Torque wheels', done: true, completionNote: '80 ft-lb', completedAt: '2026-07-13', removedUntilReset: true };
 const adhoc: TodoItem = { id: 'adhoc', text: 'Grab fuel', done: true, kind: 'adhoc', sourceType: 'manual' };
@@ -25,6 +26,20 @@ assert.equal(resetCore.completionNote, undefined);
 const main: Todo = { id: 'main', user_id: '', title: 'Main Checklist', items: [core, adhoc], updated_at: 'old' };
 assert.equal(resetMainChecklist([main], false, 'new')[0].items.length, 1);
 assert.equal(resetMainChecklist([main], true, 'new')[0].items.length, 2);
+
+const activeProjection = activeChecklistItems({
+  ...main,
+  items: [
+    { id: 'removed-core', text: 'Hidden core job', done: false, kind: 'core', removedUntilReset: true },
+    { id: 'open', text: 'Visible open job', done: false, kind: 'core' },
+    { id: 'done', text: 'Visible done job', done: true, kind: 'core' },
+  ],
+});
+assert.deepEqual(activeProjection.map(item => item.id), ['open', 'done']);
+assert.equal(activeProjection.filter(item => !item.done).length, 1);
+assert.equal(activeProjection.filter(item => item.done).length, 1);
+const roundTripProjection = activeChecklistItems(JSON.parse(JSON.stringify({ ...main, items: activeProjection })) as Todo);
+assert.deepEqual(roundTripProjection.map(item => item.id), ['open', 'done']);
 
 const imported: TodoItem[] = [
   { id: 'old-a', text: 'Old wording', done: false, kind: 'core', sourceType: 'template', sourceId: 'template:t1:a', removedUntilReset: true },
@@ -93,7 +108,11 @@ const dashboardSource = readFileSync(join(root, 'src/components/DashboardView.ts
 assert.match(trackersSource, /label: 'Maintenance Logs'/);
 assert.doesNotMatch(trackersSource, /label: 'Service'/);
 assert.doesNotMatch(trackersSource, /label: 'Templates'/);
+assert.equal(MAINTENANCE_CATEGORIES.filter(category => category === 'Other').length, 1);
+assert.doesNotMatch(trackersSource, /<option value="Other">Other<\/option>/);
 assert.match(todoSource, /Edit List/);
+assert.match(todoSource, /activeChecklistItems\(activeTodo\)/);
+assert.match(dashboardSource, /activeChecklistItems\(mainChecklist\)/);
 assert.match(dashboardSource, /Maintenance Due/);
 
 console.log('Chunk 8 Trackers harness PASS');

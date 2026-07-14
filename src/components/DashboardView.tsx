@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Setup, SessionRecord, RaceWeekend, Team, TireInventoryItem, Todo, MaintenanceComponent } from '../types';
 import { byActiveCar, sortWeekends } from '../lib/scope';
 import { getComponentStatus } from '../lib/maintenance';
-import { getMainChecklist } from '../lib/mainChecklist';
+import { activeChecklistItems, getMainChecklist } from '../lib/mainChecklist';
 import {
   describeServiceStatus,
   pickWorstComponent,
@@ -104,10 +104,11 @@ export default function DashboardView({
   const displayedTires = byActiveCar(tireInventory, activeCarId);
 
   const mainChecklist = getMainChecklist(todos);
+  const mainChecklistItems = mainChecklist ? activeChecklistItems(mainChecklist) : [];
   const openTaskLists = mainChecklist ? [{
     list: mainChecklist,
-    openItems: (mainChecklist.items ?? []).filter(i => !i.done),
-    assignedToMe: (mainChecklist.items ?? []).filter(i => !i.done && userId && i.assignedTo === userId),
+    openItems: mainChecklistItems.filter(i => !i.done),
+    assignedToMe: mainChecklistItems.filter(i => !i.done && userId && i.assignedTo === userId),
   }].filter(entry => entry.openItems.length > 0) : [];
   const openTaskCount = openTaskLists.reduce((n, e) => n + e.openItems.length, 0);
 

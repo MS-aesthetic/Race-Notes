@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChecklistTemplate, Todo, TodoItem } from '../types';
 import { AppUser } from '../lib/supabase';
-import { getMainChecklist, MAIN_CHECKLIST_TITLE } from '../lib/mainChecklist';
+import { activeChecklistItems, getMainChecklist, MAIN_CHECKLIST_TITLE } from '../lib/mainChecklist';
 import { editChecklistItem, KEEP_ADDED_ITEMS_KEY, resetMainChecklist, todoItemKind } from '../lib/checklistMaintenance';
 
 // ── Completion confirmation modal ─────────────────────────────────────────
@@ -241,7 +241,7 @@ export default function ToDoView({
 
   // ── Derived ────────────────────────────────────────────────────────────
 
-  const visibleItems = activeTodo?.items.filter(item => !item.removedUntilReset) ?? [];
+  const visibleItems = activeTodo ? activeChecklistItems(activeTodo) : [];
   const allOpen    = visibleItems.filter(i => !i.done);
   const allDone    = visibleItems.filter(i => i.done);
   const activeTodoId = activeTodo?.id ?? '';

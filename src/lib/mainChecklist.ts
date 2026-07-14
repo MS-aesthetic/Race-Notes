@@ -11,6 +11,11 @@ export function getMainChecklist(todos: Todo[]): Todo | undefined {
   return titled ?? [...normal].sort((a, b) => a.id.localeCompare(b.id))[0];
 }
 
+/** Items currently shown by Main Checklist consumers. */
+export function activeChecklistItems(list: Todo): TodoItem[] {
+  return (list.items ?? []).filter(item => !item.removedUntilReset);
+}
+
 const sameItem = (a: TodoItem, b: TodoItem): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 /**

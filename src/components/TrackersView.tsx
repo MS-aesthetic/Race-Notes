@@ -584,7 +584,6 @@ function ServiceTab({
               <select value={addCategory} onChange={e => setAddCategory(e.target.value as MaintenanceCategory)}
                 className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-xs outline-none">
                 {(MAINTENANCE_CATEGORIES as readonly string[]).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                <option value="Other">Other</option>
               </select>
             </div>
             <div>
