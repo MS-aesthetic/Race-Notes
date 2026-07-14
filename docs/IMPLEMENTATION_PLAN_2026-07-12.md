@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-14) — branch `preview-v3`:** Chunks 1–8 ✅ SOL QA PASS · Chunk 9 SOL QA attempt 1 FAIL after `c8c4a21`; Terra owns display-copy-only repair. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
+> **PROGRESS (2026-07-14) — branch `preview-v3`:** Chunks 1–8 ✅ SOL QA PASS · Chunk 9 Terra repair 1 CODE_PASS at `254d928`, awaiting SOL QA 2/final closure. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:
@@ -191,6 +191,12 @@ Original seven-chunk plan below remains implementation history. Current remainin
    but direct Shock/J-Bar/Four-bar rows still render academic phrases because they bypass
    `plainRacerEffect`. Terra repair is limited to plain visible copy plus focused source
    fixtures; no SQL, package, native, or deploy work is needed.
+
+   **Terra repair 1 CODE_PASS (`254d928`):** direct guide tables and translated effect
+   output now use accurate plain racer language. Harness renders/audits every real effect,
+   checks direct copy separately, and guards broken grammar. Focused harness, exact lint
+   baseline, 554-module/18-entry build, diff check, and cavecrew review pass. Await SOL
+   QA attempt 2; no other subsystem or deployment changed.
 
 Dependency: 6A → 6B → 7; 6B → 8; 7+8 → 9. Feature builds stay serial. Test once per coherent slice, then consolidated Android/preview regression per completed chunk.
 

@@ -1,6 +1,6 @@
 # Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** IN PROGRESS — C9 SOL QA ATTEMPT 1 FAIL; RETURN TO TERRA
+**Status:** IN PROGRESS — C9 TERRA REPAIR 1 CODE_PASS; AWAITING SOL QA 2
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -390,6 +390,22 @@ performance-policy warnings predate this column-only migration. C7 remains locke
   or console errors. Android cold-launches authenticated light/Large data with empty crash
   buffer. These passing gates need only focused regression after copy repair.
 - C9 remains open. Repair returns to Terra High; no SQL/package/native/deploy change needed.
+
+### C9 Terra repair 1 — CODE_PASS
+
+- Repair commit `254d928`. Direct Shock/J-Bar/Four-bar rows now use plain racer wording
+  while retaining adjustment direction and cautions. `plainRacerEffect` uses ordered,
+  meaning-safe phrases for roll steer, tire loading under power, weight movement, side
+  load, roll point, car lean, and tire-on-dirt descriptions.
+- C9 harness now extracts and decodes every real `Adjustment.effect`, renders each through
+  `plainRacerEffect`, and audits the resulting corpus. Direct component copy is audited
+  separately, so raw researched strings cannot hide a visible regression. Grammar guards
+  catch repeated and broken replacement phrases.
+- Focused C9 harness PASS. Lint remains exact three-error baseline. Production build PASS:
+  554 modules/18 PWA entries. Diff check and final cavecrew re-review PASS with no issues.
+- Copy-only repair changes no PDF/share/help routing, lifecycle, sync, schema, package,
+  native config, Android artifact, or deploy. Prior final draft/Android evidence remains
+  applicable. Await independent SOL C9 QA attempt 2 and final Chunks 6B–9 closure.
 
 ## Execution / QA consolidation
 

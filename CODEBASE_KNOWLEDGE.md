@@ -1373,3 +1373,9 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   transfer. Raw research strings are safe only when rendered through the translator.
   Terra should repair displayed rows and extend source fixtures; no PDF/share/lifecycle,
   sync, schema, package, native, or deploy repair is indicated.
+- Terra repair `254d928` closes the C9 copy blocker. Direct guide tables use plain racer
+  phrasing. `plainRacerEffect` now applies ordered, meaning-safe phrase translation and
+  grammar cleanup. C9 harness decodes every raw effect literal, renders it through the
+  translator, audits the full rendered corpus, and audits direct component copy separately.
+  Focused harness, exact lint baseline, 554-module/18-entry build, diff check, and cavecrew
+  review pass. Await SOL QA attempt 2; no other subsystem changed.
