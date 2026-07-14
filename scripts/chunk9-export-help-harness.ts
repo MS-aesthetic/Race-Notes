@@ -116,6 +116,40 @@ assert.match(diffView, /onHelp\('setup-diff'\)/);
 assert.match(weekendView, /Share weekend PDF/);
 assert.doesNotMatch(pdfSource, /from ['"]react['"]/);
 assert.doesNotMatch([quickRef, setupView, weekendView].join('\n'), /AFCO|chassis-specific|package-specific|Package-dependent|Share with Team|Start New Logger Session|Shock Adjustment Handling Impacts|Adjustment Matrix/i);
+const quickReferenceDataStart = quickRef.indexOf('const BEHAVIOR_DATA:');
+const quickReferenceComponentStart = quickRef.indexOf('export default function QuickReferenceView');
+assert.notEqual(quickReferenceDataStart, -1);
+assert.notEqual(quickReferenceComponentStart, -1);
+const translatedAdjustmentData = quickRef.slice(quickReferenceDataStart, quickReferenceComponentStart);
+const directQuickReferenceCopy = quickRef.slice(quickReferenceComponentStart);
+assert.match(translatedAdjustmentData, /rear roll center[\s\S]*weight transfer[\s\S]*rear steer geometry[\s\S]*apex/i);
+assert.match(directQuickReferenceCopy, /\{plainRacerEffect\(adj\.effect\)\}/);
+const researchedEffectLiteral = /effect:\s*'(?:\\.|[^'\\])*'/g;
+const untranslatedAdjustmentLabels = translatedAdjustmentData.replace(researchedEffectLiteral, 'effect: translated-at-render');
+assert.doesNotMatch(
+  `${untranslatedAdjustmentLabels}\n${directQuickReferenceCopy}`,
+  /trailing arm geometry|rear roll center|\broll center\b|(?:chassis|body) roll|\bweight transfer(?:s)?\b|\bapex\b|\banti-squat\b|\broll steer\b|(?:mechanical|vertical) clamping force|(?:tire )?(?:footprint|contact patch)|directional stability|\blateral\b|\bdeceleration\b|\bacceleration\b|\bkinematic(?:s)?\b|AFCO|chassis-specific|package-specific|Package-dependent/i,
+);
+const encodedEffects = [...translatedAdjustmentData.matchAll(/effect:\s*'((?:\\.|[^'\\])*)'/g)].map(match => match[1]);
+assert.equal(encodedEffects.length, (translatedAdjustmentData.match(/\beffect:/g) ?? []).length);
+const decodeSingleQuotedLiteral = (encoded: string) => encoded.replace(/\\(['\\nrt])/g, (_match, token: string) => ({
+  "'": "'",
+  '\\': '\\',
+  n: '\n',
+  r: '\r',
+  t: '\t',
+})[token] ?? token);
+const renderedEffectCorpus = encodedEffects.map(effect => plainRacerEffect(decodeSingleQuotedLiteral(effect))).join('\n');
+assert.doesNotMatch(
+  renderedEffectCorpus,
+  /rear roll center|\broll center\b|(?:chassis|body) roll|\bweight transfer(?:s)?\b|\bapex\b|\banti-squat\b|\broll steer\b|rear steer geometry|trailing arm (?:design angles?|geometry)|(?:mechanical|vertical) clamping force|(?:tire )?(?:footprint|contact patch)|\blateral (?:roll |cornering )?forces?\b|\bdeceleration\b|\bacceleration\b|\bdynamically\b|\bprogressive(?:ly)?\b|\bcompliant\b|forward pitch|rear steer onset|leverage arc|vertical downward pressure|pull bar compliance|mechanical changes?/i,
+);
+assert.doesNotMatch(
+  renderedEffectCorpus,
+  /\b([a-z]{3,})[\s,]+\1\b|under the car leaning|during weight moving|all how fast weight moves|promoting the car leaning|direct weight moving|weight moving (?:cushions|off)|part of the (?:RR )?tire on the track on|smoothly and smoothly|the car to lean the car leaning|under getting on the gas/i,
+);
+assert.doesNotMatch(renderedEffectCorpus, /(?:allows|resists|keeps|on) The car/);
+assert.doesNotMatch(renderedEffectCorpus, /(?:^|[.!?]\s+)[a-z]/m);
 const shopCopy = plainRacerEffect('The rear roll center changes forward weight transfer and rear steer geometry at the apex. This preserves the tire contact patch during braking transitions. Make one small change and check the next run.');
 assert.equal(shopCopy, 'The rear roll point changes weight moving to the front and bar angles and rear steer in the middle. This keeps the part of the tire touching the track during braking. Make one small change and check the next run.');
 assert.doesNotMatch(shopCopy, /roll center|weight transfer|geometry|apex|contact patch|transition/i);
