@@ -1,6 +1,6 @@
 # Current Task — UXF-4 Load Graph Travel Axis
 
-**Status:** CODE_PASS — SOL fixer attempt 2 complete at `12d932f`; independent SOL QA attempt 2 required
+**Status:** COMPLETE — SOL High QA attempt 2 PASS (96)
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-3 closed by SOL QA at `04f1351`; feature `72ea4f8`
@@ -96,3 +96,11 @@ Routing: first QA failure transfers implementation to SOL High fixer. Terra is n
 - Component-scoped harness slices independently require hit target, focus ring, and focus/blur handlers in each chart path.
 - Full chunk6a harness PASS; exact three-error lint baseline; 554-module/18-entry build; diff check and byte-unchanged data boundaries pass.
 - Cavecrew first found global-only harness coverage; after scoped repair, re-review returned `No issues.`
+
+## SOL QA attempt 2 — PASS (96) — 2026-07-14
+
+- Attempt-1 blocker closed: both chart paths retain radius-4 visible points, own transparent radius-12 hit targets, and render explicit radius-7 focus rings through `onFocus`/`onBlur`. Enter, Space, click, accessible names, and Travel/Height titles remain.
+- Component-scoped harness independently proves interaction treatment in single and comparison charts.
+- Regressed common/single travel zero, upward coordinate mapping, equal-height floor behavior, ticks, load axis, fill, static PNG height text, edge treatment, raw-height CSV/table, storage/sync/types, and byte-unchanged `shockCompare.ts`.
+- Full chunk6a harness PASS; exact three-error lint baseline; production build PASS (554 modules, 18 PWA entries); full/repair diff checks and clean tree PASS.
+- Seeded SSR chart rendered upward polyline `54,176 160.4,112.8 320,18` with Travel axis and raw-height detail. Independent cavecrew reviewer: `No issues.`
