@@ -1470,3 +1470,29 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
 - Exact UXF-10 build authority is `ralph/CURRENT_TASK.md`. It keeps one canonical Todo,
   stores optional `archivedAt` inside existing JSONB, requires no SQL, and routes Terra's
   initial build back to SOL for independent QA.
+
+## 33. UXF-10 — Main Checklist Redesign Build (2026-07-14)
+
+- Feature `3b40a1e` implements the approved UXF-7 package. `TodoItem.archivedAt` remains an
+  optional field inside the existing Todo `items` JSONB. No SQL/table or second checklist.
+- `src/lib/mainChecklist.ts` owns ordered open/current-completed/history projections.
+  `src/lib/checklistMaintenance.ts` owns deterministic recurrence identity, archive, clear,
+  reset, idempotent saved-list import, completion/Undo transitions, and maintenance-cycle
+  reconciliation. Archived rows and current occurrences always have unique IDs.
+- Clear removes unfinished ad-hoc rows, tombstones unfinished recurring rows, and archives
+  current completions. Reset archives current completions, optionally carries only unfinished
+  ad-hoc rows, and opens exactly one eligible core/template/maintenance occurrence. A due
+  maintenance tombstone blocks same-cycle recreation until reset; archived history does not.
+- Checklist UI is active-first: compact counts/Manage, immediate completion with six-second
+  Undo, collapsed completed summary, Mark open and completion note actions, and one Back-safe
+  Manage sheet for saved lists, carry preference, reset, clear, clear completed, and History.
+  Dashboard has one count-only Checklist launcher with no task previews.
+- `src/lib/todoSync.ts` is the pure existing-row-shape mapper used by `sync.ts`; all lifecycle,
+  assignment, provenance, and completion fields round-trip through `items` unchanged.
+- App new-weekend reset and manual Trackers reset both receive templates plus current
+  maintenance/weekend/setup context so serviced or no-longer-due jobs do not reopen.
+- Evidence: expanded Chunk 8 harness PASS; exact known three-error lint baseline; 557 modules /
+  18 PWA entries build; diff and cavecrew re-review clean; Android signed-in debug verified
+  Dashboard/Checklist/Manage/Back, completion/Mark open, light/dark and Default/Large. Draft
+  `6a56c2018589bea4d591667d` has a clean 390px signed-out shell; authenticated preview data was
+  unavailable and is not claimed. SOL independent QA is pending.

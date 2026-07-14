@@ -1,6 +1,6 @@
 # Current Task — UXF-10 Approved Main Checklist Redesign
 
-**Status:** READY FOR TERRA HIGH INITIAL BUILD
+**Status:** CODE_PASS — AWAITING SOL HIGH INDEPENDENT QA
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md` → UXF-10
 **Approved design:** `docs/MAIN_CHECKLIST_REDESIGN_PROPOSAL.md`
@@ -154,6 +154,28 @@ Expand `scripts/chunk8-trackers-harness.ts` before broad runtime work. Required 
    `CODEBASE_KNOWLEDGE.md`, and plan with actual evidence. Commit feature and docs.
 7. Return same persistent task to GPT 5.6 SOL High for independent UXF-10 QA. Any QA failure
    stays with SOL fixer; Terra is not re-invoked.
+
+## Terra implementation result — 2026-07-14
+
+- Feature commit: `3b40a1e`.
+- One canonical Main Checklist preserved. Optional `archivedAt` stays inside existing Todo
+  `items` JSONB; no SQL, schema, package, or native-config change.
+- Pure projections, recurrence identity, archive/clear/reset, saved-list import, maintenance
+  cycle handling, exactly-once completion/Undo restore, and pure Todo cloud-row mapping are
+  covered by the expanded Chunk 8 harness.
+- `App.tsx` change is the required new-weekend reset context bridge; `TrackersView.tsx` passes
+  the same maintenance/weekend/setup context into manual reset; `sync.ts` now calls the
+  extracted byte-equivalent pure Todo mapper. These are required lifecycle/persistence bridges,
+  not new stores or behavior outside the approved checklist package.
+- Gates: Chunk 8 harness PASS; lint is the exact known three-error baseline; production build
+  PASS at 557 modules / 18 PWA entries; `git diff --check` PASS; final cavecrew re-review found
+  no blockers.
+- Android debug installed with existing local data. Verified compact Dashboard launcher,
+  active-first list, completion toast, completed summary, Mark open, Manage sheet Android Back,
+  light/dark, and Default/Large. Test state was restored afterward. No release APK created.
+- Draft: `https://6a56c2018589bea4d591667d--crew-chief-race-notes.netlify.app/`.
+  Signed-out shell is clean at 390px with no overflow or console warnings. Unique preview origin
+  had no remembered authentication; authenticated preview cloud data is not claimed.
 
 ## Out of scope
 

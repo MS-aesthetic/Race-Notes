@@ -611,6 +611,16 @@ independent QA after Terra's one initial build pass. Any QA failure transfers fi
 
 **Human prerequisites:** cleared by Maxx approval on 2026-07-14.
 
+**Implementation status (2026-07-14): CODE_PASS / awaiting SOL QA.** Terra feature `3b40a1e`
+implements the approved one-list lifecycle and active-first UI with no SQL. Focused lifecycle,
+maintenance, import, completion/Undo, Dashboard, and Todo cloud-row fixtures pass; lint remains
+the exact known three-error baseline; the 557-module/18-entry build, diff, cavecrew re-review,
+Android signed-in runtime, and draft `6a56c2018589bea4d591667d` pass. Required bridge scope was
+slightly broader than the initial file matrix: `App.tsx` supplies new-weekend maintenance
+eligibility, `TrackersView.tsx` supplies the same context to manual reset, and `sync.ts` calls a
+new pure byte-equivalent `todoSync.ts` mapper so JSONB round-trip is executable in the harness.
+No new store, mapper column, schema, package, or native configuration was introduced.
+
 ---
 
 ## UXF-8 — Docs & loop-state hygiene *(do first)*
