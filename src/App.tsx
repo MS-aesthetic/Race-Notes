@@ -1192,7 +1192,11 @@ export default function App() {
     }
 
     const keepAddedItems = localStorage.getItem(KEEP_ADDED_ITEMS_KEY) !== 'false';
-    handleSaveTodos(resetMainChecklist(todos, keepAddedItems, now, checklistTemplates));
+    handleSaveTodos(resetMainChecklist(todos, keepAddedItems, now, checklistTemplates, {
+      components: maintenance,
+      weekends: updatedWeekends,
+      setups: updatedSetups,
+    }));
 
     setActiveWeekendId(lifecycle.weekend.id);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, lifecycle.weekend.id);

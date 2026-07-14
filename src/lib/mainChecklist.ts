@@ -11,9 +11,24 @@ export function getMainChecklist(todos: Todo[]): Todo | undefined {
   return titled ?? [...normal].sort((a, b) => a.id.localeCompare(b.id))[0];
 }
 
-/** Items currently shown by Main Checklist consumers. */
+/** Open work shared by Main Checklist and Dashboard. */
 export function activeChecklistItems(list: Todo): TodoItem[] {
-  return (list.items ?? []).filter(item => !item.removedUntilReset);
+  return (list.items ?? []).filter(item => !item.done && !item.removedUntilReset && !item.archivedAt);
+}
+
+/** Current-cycle rows, including completed work, but excluding hidden/history rows. */
+export function currentChecklistItems(list: Todo): TodoItem[] {
+  return (list.items ?? []).filter(item => !item.removedUntilReset && !item.archivedAt);
+}
+
+/** Completed work retained until clear/reset archives it. */
+export function completedChecklistItems(list: Todo): TodoItem[] {
+  return (list.items ?? []).filter(item => item.done && !item.removedUntilReset && !item.archivedAt);
+}
+
+/** Immutable completed occurrences shown in checklist history. */
+export function checklistHistoryItems(list: Todo): TodoItem[] {
+  return (list.items ?? []).filter(item => item.done && !!item.archivedAt);
 }
 
 const sameItem = (a: TodoItem, b: TodoItem): boolean => JSON.stringify(a) === JSON.stringify(b);

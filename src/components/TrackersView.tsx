@@ -937,6 +937,9 @@ export default function TrackersView({
             currentUserId={currentUserId}
             templates={checklistTemplates}
             onManageTemplates={() => setShowTemplateManager(true)}
+            maintenance={maintenance}
+            weekends={weekends}
+            savedSetups={savedSetups}
           />
         )}
         {subTab === 'checklist' && showTemplateManager && (

@@ -1,95 +1,40 @@
-import React, { useState } from 'react';
-import { ChecklistTemplate, Todo, TodoItem } from '../types';
-import { AppUser } from '../lib/supabase';
-import { activeChecklistItems, getMainChecklist, MAIN_CHECKLIST_TITLE } from '../lib/mainChecklist';
-import { editChecklistItem, KEEP_ADDED_ITEMS_KEY, resetMainChecklist, todoItemKind } from '../lib/checklistMaintenance';
-
-// ── Completion confirmation modal ─────────────────────────────────────────
-
-interface CompletionModalProps {
-  item: TodoItem;
-  onConfirm: (note: string) => void;
-  onCancel: () => void;
-}
-
-function CompletionModal({ item, onConfirm, onCancel }: CompletionModalProps) {
-  const [note, setNote] = useState('');
-
-  return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-surface border-2 border-outline rounded-lg p-5 max-w-sm w-full shadow-2xl space-y-4">
-        <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-3">
-          <span
-            className="material-symbols-outlined text-green-400 text-xl"
-            style={{ fontVariationSettings: "'FILL' 1" }}
-          >
-            check_circle
-          </span>
-          <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">
-            Mark Task Complete
-          </h3>
-        </div>
-
-        <div>
-          <p className="font-mono text-xs text-primary uppercase font-bold mb-1 leading-snug">
-            {item.text}
-          </p>
-          {item.desc && (
-            <p className="text-[11px] text-on-surface-variant font-mono italic leading-relaxed">
-              "{item.desc}"
-            </p>
-          )}
-          {item.assignedToName && (
-            <p className="text-[10px] text-on-surface-variant/60 font-mono mt-1">
-              Assigned to: {item.assignedToName}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-[10px] font-mono uppercase text-on-surface-variant mb-1.5 tracking-wider">
-            Completion Note <span className="text-on-surface-variant/40 normal-case">(optional)</span>
-          </label>
-          <textarea
-            autoFocus
-            placeholder="e.g. Installed 250lb spring. Torqued to 80 ft-lbs. Will re-check after heat race."
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            rows={3}
-            className="w-full bg-surface-container border border-outline-variant focus:border-primary text-sm text-on-surface font-mono p-2.5 rounded outline-none resize-none"
-          />
-        </div>
-
-        <div className="flex gap-2 justify-end text-xs font-mono">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-3 py-2 border border-outline-variant text-on-surface-variant uppercase rounded hover:bg-surface-container transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => onConfirm(note.trim())}
-            className="px-4 py-2 bg-green-700 hover:bg-green-600 text-white font-bold uppercase rounded transition-colors"
-          >
-            Mark Done
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Main ToDoView ─────────────────────────────────────────────────────────
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import type { ChecklistTemplate, MaintenanceComponent, RaceWeekend, Setup, Todo, TodoItem } from '../types';
+import type { AppUser } from '../lib/supabase';
+import {
+  activeChecklistItems,
+  checklistHistoryItems,
+  completedChecklistItems,
+  getMainChecklist,
+  MAIN_CHECKLIST_TITLE,
+} from '../lib/mainChecklist';
+import {
+  archiveCompletedMainChecklist,
+  clearChecklistItems,
+  clearMainChecklist,
+  completeChecklistItem,
+  editChecklistItem,
+  importTemplateItems,
+  KEEP_ADDED_ITEMS_KEY,
+  resetMainChecklist,
+  restoreChecklistItem,
+  type ChecklistCompletionUndo,
+} from '../lib/checklistMaintenance';
+import BottomSheet from './ui/BottomSheet';
+import CollapsibleSection from './ui/CollapsibleSection';
+import EmptyState from './ui/EmptyState';
+import { InfoToast } from './ui/UndoToast';
 
 interface ToDoViewProps {
   todos: Todo[];
-  onSaveTodos: (t: Todo[]) => void;
+  onSaveTodos: (todos: Todo[]) => void;
   teamMembers?: AppUser[];
   currentUserId?: string | null;
   templates?: ChecklistTemplate[];
   onManageTemplates?: () => void;
+  maintenance?: MaintenanceComponent[];
+  weekends?: RaceWeekend[];
+  savedSetups?: Setup[];
 }
 
 export default function ToDoView({
@@ -99,63 +44,88 @@ export default function ToDoView({
   currentUserId = null,
   templates = [],
   onManageTemplates,
+  maintenance = [],
+  weekends = [],
+  savedSetups = [],
 }: ToDoViewProps) {
-  const activeTodo = getMainChecklist(todos);
-  const [newItemText, setNewItemText]           = useState('');
-  const [newItemDesc, setNewItemDesc]           = useState('');
-  const [showDescInput, setShowDescInput]       = useState(false);
-  const [newItemAssignee, setNewItemAssignee]   = useState<string>('');
+  const todosRef = useRef(todos);
+  todosRef.current = todos;
+  const addInputRef = useRef<HTMLInputElement>(null);
+
+  const [newItemText, setNewItemText] = useState('');
+  const [newItemDesc, setNewItemDesc] = useState('');
+  const [showDescInput, setShowDescInput] = useState(false);
+  const [newItemAssignee, setNewItemAssignee] = useState('');
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
-  const [pendingComplete, setPendingComplete]   = useState<{ todoId: string; item: TodoItem } | null>(null);
-  const [showMyTasks, setShowMyTasks]           = useState(false);
-  const [editingItem, setEditingItem] = useState<TodoItem | null>(null);
+  const [showMyTasks, setShowMyTasks] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [rowMenuItemId, setRowMenuItemId] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editAssignee, setEditAssignee] = useState('');
-  const [keepAddedItems, setKeepAddedItems] = useState(() => localStorage.getItem(KEEP_ADDED_ITEMS_KEY) !== 'false');
+  const [noteItemId, setNoteItemId] = useState<string | null>(null);
+  const [completionNote, setCompletionNote] = useState('');
+  const [completionUndo, setCompletionUndo] = useState<ChecklistCompletionUndo | null>(null);
+  const [keepAddedItems, setKeepAddedItems] = useState(
+    () => localStorage.getItem(KEEP_ADDED_ITEMS_KEY) !== 'false',
+  );
 
-  const saveMainItems = (items: TodoItem[]) => {
+  useEffect(() => {
+    if (!completionUndo) return;
+    const timer = window.setTimeout(() => setCompletionUndo(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [completionUndo]);
+
+  const commitTodos = (updated: Todo[]) => {
+    todosRef.current = updated;
+    onSaveTodos(updated);
+  };
+
+  const updateMainItems = (updater: (items: TodoItem[], listId: string) => TodoItem[]) => {
+    const currentTodos = todosRef.current;
+    const currentMain = getMainChecklist(currentTodos);
+    const listId = currentMain?.id ?? `todo-main-${Date.now()}`;
+    const currentItems = currentMain?.items ?? [];
+    const nextItems = updater(currentItems, listId);
+    if (nextItems === currentItems) return false;
     const now = new Date().toISOString();
-    if (activeTodo) {
-      onSaveTodos(todos.map(todo => todo.id === activeTodo.id
-        ? { ...todo, title: MAIN_CHECKLIST_TITLE, weekendId: undefined, weekendName: undefined, items, updated_at: now }
-        : todo));
-      return;
-    }
-    onSaveTodos([{
-      id: `todo-main-${Date.now()}`,
-      user_id: '',
-      title: MAIN_CHECKLIST_TITLE,
-      items,
-      updated_at: now,
-    }, ...todos]);
+    const updated = currentMain
+      ? currentTodos.map(todo => todo.id === currentMain.id
+        ? { ...todo, title: MAIN_CHECKLIST_TITLE, weekendId: undefined, weekendName: undefined, items: nextItems, updated_at: now }
+        : todo)
+      : [{ id: listId, user_id: '', title: MAIN_CHECKLIST_TITLE, items: nextItems, updated_at: now }, ...currentTodos];
+    commitTodos(updated);
+    return true;
   };
 
-  const importTemplate = () => {
-    const template = templates.find(item => item.id === selectedTemplateId);
-    if (!template) return;
-    if (activeTodo?.items.length && !window.confirm(`Add ${template.items.length} jobs from ${template.name} to Main Checklist?`)) return;
-    const stamp = Date.now();
-    const imported: TodoItem[] = template.items.map((item, index) => ({
-      id: `item-${stamp}-${index}-${Math.random().toString(36).slice(2, 7)}`,
-      text: item.text,
-      done: false,
-      kind: 'core',
-      sourceType: 'template',
-      sourceId: `template:${template.id}:${item.id}`,
-    }));
-    saveMainItems([...(activeTodo?.items ?? []), ...imported]);
-    setSelectedTemplateId('');
+  const currentMain = getMainChecklist(todos);
+  const openItems = currentMain ? activeChecklistItems(currentMain) : [];
+  const completedItems = currentMain ? completedChecklistItems(currentMain) : [];
+  const historyItems = currentMain ? checklistHistoryItems(currentMain) : [];
+  const myTaskCount = openItems.filter(item => item.assignedTo === currentUserId).length;
+  const displayOpen = showMyTasks && currentUserId
+    ? openItems.filter(item => item.assignedTo === currentUserId)
+    : openItems;
+  const displayCompleted = showMyTasks && currentUserId
+    ? completedItems.filter(item => item.assignedTo === currentUserId)
+    : completedItems;
+  const rowMenuItem = currentMain?.items.find(item => item.id === rowMenuItemId) ?? null;
+  const editingItem = currentMain?.items.find(item => item.id === editingItemId) ?? null;
+  const noteItem = currentMain?.items.find(item => item.id === noteItemId) ?? null;
+
+  const setKeepPreference = (value: boolean) => {
+    setKeepAddedItems(value);
+    localStorage.setItem(KEEP_ADDED_ITEMS_KEY, String(value));
   };
 
-  // ── Item management ────────────────────────────────────────────────────
-
-  const addItem = (e: React.FormEvent) => {
-    e.preventDefault();
+  const addItem = (event: FormEvent) => {
+    event.preventDefault();
     if (!newItemText.trim()) return;
-    const assignee = teamMembers.find(m => m.id === newItemAssignee);
-    const newItem: TodoItem = {
+    const assignee = teamMembers.find(member => member.id === newItemAssignee);
+    const item: TodoItem = {
       id: `item-${Date.now()}`,
       text: newItemText.trim(),
       desc: newItemDesc.trim() || undefined,
@@ -163,11 +133,9 @@ export default function ToDoView({
       kind: 'adhoc',
       sourceType: 'manual',
       assignedTo: assignee?.id || undefined,
-      assignedToName: assignee
-        ? (assignee.displayName || assignee.email || 'Team Member')
-        : undefined,
+      assignedToName: assignee ? (assignee.displayName || assignee.email || 'Team Member') : undefined,
     };
-    saveMainItems([...(activeTodo?.items ?? []), newItem]);
+    updateMainItems(items => [...items, item]);
     setNewItemText('');
     setNewItemDesc('');
     setNewItemAssignee('');
@@ -175,42 +143,60 @@ export default function ToDoView({
     setShowAssignPicker(false);
   };
 
-  const handleCheckboxClick = (todoId: string, item: TodoItem) => {
-    if (item.done) {
-      saveMainItems((activeTodo?.items ?? []).map(i =>
-        i.id === item.id ? { ...i, done: false, completionNote: undefined, completedAt: undefined } : i
-      ));
-    } else {
-      setPendingComplete({ todoId, item });
-    }
+  const importSelectedTemplate = () => {
+    const template = templates.find(candidate => candidate.id === selectedTemplateId);
+    if (!template) return;
+    updateMainItems(items => importTemplateItems(items, template));
+    setSelectedTemplateId('');
   };
 
-  const handleConfirmComplete = (note: string) => {
-    if (!pendingComplete) return;
-    const { item } = pendingComplete;
-    saveMainItems((activeTodo?.items ?? []).map(i =>
-      i.id === item.id
-        ? { ...i, done: true, completionNote: note || undefined, completedAt: new Date().toISOString() }
-        : i
-    ));
-    setPendingComplete(null);
+  const completeItem = (itemId: string) => {
+    let undo: ChecklistCompletionUndo | null = null;
+    const changed = updateMainItems(items => {
+      const result = completeChecklistItem(items, itemId);
+      undo = result.undo ?? null;
+      return result.items;
+    });
+    if (changed && undo) setCompletionUndo(undo);
   };
 
-  const deleteItem = (_todoId: string, itemId: string) => {
-    saveMainItems((activeTodo?.items ?? []).flatMap(item => {
+  const undoCompletion = () => {
+    if (!completionUndo) return;
+    updateMainItems(items => restoreChecklistItem(items, completionUndo));
+    setCompletionUndo(null);
+  };
+
+  const markOpen = (itemId: string) => {
+    updateMainItems(items => items.map(item => item.id === itemId
+      ? {
+          ...item,
+          done: false,
+          completedAt: undefined,
+          completionNote: undefined,
+          archivedAt: undefined,
+          removedUntilReset: undefined,
+        }
+      : item));
+    setRowMenuItemId(null);
+  };
+
+  const removeItem = (itemId: string) => {
+    updateMainItems((items, listId) => items.flatMap(item => {
       if (item.id !== itemId) return [item];
-      return todoItemKind(item) === 'core' ? [{ ...item, removedUntilReset: true }] : [];
+      return clearChecklistItems([item], listId, new Date().toISOString());
     }));
+    setRowMenuItemId(null);
   };
 
   const openEdit = (item: TodoItem) => {
-    setEditingItem(item);
+    setRowMenuItemId(null);
+    setEditingItemId(item.id);
     setEditText(item.text);
     setEditDesc(item.desc || '');
     setEditAssignee(item.assignedTo || '');
   };
 
-  const saveEdit = (event: React.FormEvent) => {
+  const saveEdit = (event: FormEvent) => {
     event.preventDefault();
     if (!editingItem || !editText.trim()) return;
     const assignee = teamMembers.find(member => member.id === editAssignee);
@@ -218,408 +204,386 @@ export default function ToDoView({
     const assignedToName = editAssignee === ''
       ? undefined
       : (assignee ? (assignee.displayName || assignee.email || 'Team Member') : editingItem.assignedToName);
-    saveMainItems((activeTodo?.items ?? []).map(item => item.id === editingItem.id
-      ? editChecklistItem(item, {
-          text: editText,
-          notes: editDesc,
-          assignedTo,
-          assignedToName,
-        })
+    updateMainItems(items => items.map(item => item.id === editingItem.id
+      ? editChecklistItem(item, { text: editText, notes: editDesc, assignedTo, assignedToName })
       : item));
-    setEditingItem(null);
+    setEditingItemId(null);
   };
 
-  const setKeepPreference = (value: boolean) => {
-    setKeepAddedItems(value);
-    localStorage.setItem(KEEP_ADDED_ITEMS_KEY, String(value));
+  const openCompletionNote = (item: TodoItem) => {
+    setRowMenuItemId(null);
+    setNoteItemId(item.id);
+    setCompletionNote(item.completionNote || '');
+  };
+
+  const saveCompletionNote = (event: FormEvent) => {
+    event.preventDefault();
+    if (!noteItem) return;
+    updateMainItems(items => items.map(item => item.id === noteItem.id
+      ? { ...item, completionNote: completionNote.trim() || undefined }
+      : item));
+    setNoteItemId(null);
   };
 
   const resetForWeekend = () => {
-    if (!window.confirm('Reset Main Checklist for a new weekend? Completed marks and completion notes will be cleared.')) return;
-    onSaveTodos(resetMainChecklist(todos, keepAddedItems, new Date().toISOString(), templates));
+    if (!window.confirm('Reset for a new weekend? Completed work moves to History. Eligible recurring jobs return. Unfinished added jobs follow your carry setting.')) return;
+    setCompletionUndo(null);
+    commitTodos(resetMainChecklist(
+      todosRef.current,
+      keepAddedItems,
+      new Date().toISOString(),
+      templates,
+      { components: maintenance, weekends, setups: savedSetups },
+    ));
+    setManageOpen(false);
   };
 
-  // ── Derived ────────────────────────────────────────────────────────────
+  const clearCurrentList = () => {
+    if (!window.confirm('Clear current checklist? Completed work moves to History, recurring jobs stay hidden until reset, and unfinished added jobs are removed.')) return;
+    setCompletionUndo(null);
+    commitTodos(clearMainChecklist(todosRef.current));
+    setManageOpen(false);
+  };
 
-  const visibleItems = activeTodo ? activeChecklistItems(activeTodo) : [];
-  const allOpen    = visibleItems.filter(i => !i.done);
-  const allDone    = visibleItems.filter(i => i.done);
-  const activeTodoId = activeTodo?.id ?? '';
+  const clearCompleted = () => {
+    if (!window.confirm('Move completed work to History? Open jobs stay unchanged.')) return;
+    setCompletionUndo(null);
+    commitTodos(archiveCompletedMainChecklist(todosRef.current));
+  };
 
-  const myTaskCount  = allOpen.filter(i => i.assignedTo === currentUserId).length;
-  const displayOpen  = showMyTasks && currentUserId ? allOpen.filter(i => i.assignedTo === currentUserId) : allOpen;
-  const displayDone  = showMyTasks && currentUserId ? allDone.filter(i => i.assignedTo === currentUserId) : allDone;
+  const focusAddTask = () => {
+    setManageOpen(false);
+    window.setTimeout(() => addInputRef.current?.focus(), 0);
+  };
 
-  // ── Assignee badge helper ──────────────────────────────────────────────
+  const groupedHistory = historyItems.reduce<Record<string, TodoItem[]>>((groups, item) => {
+    const raw = item.completedAt || item.archivedAt;
+    const parsed = raw ? new Date(raw) : null;
+    const label = parsed && !Number.isNaN(parsed.getTime())
+      ? parsed.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
+      : 'Earlier';
+    groups[label] = [...(groups[label] ?? []), item];
+    return groups;
+  }, {});
 
   const AssigneeBadge = ({ item }: { item: TodoItem }) => {
     if (!item.assignedToName) return null;
-    const isMe = item.assignedTo === currentUserId;
+    const mine = item.assignedTo === currentUserId;
     return (
-      <span className={`inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border ${
-        isMe
-          ? 'bg-primary/20 text-primary border-primary/40'
-          : 'bg-surface-container-high text-on-surface-variant border-outline-variant/50'
-      }`}>
-        <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
-        {isMe ? 'YOU' : item.assignedToName}
+      <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[9px] font-bold ${mine
+        ? 'border-primary/40 bg-primary/20 text-primary'
+        : 'border-outline-variant/40 text-on-surface-variant'}`}
+      >
+        {mine ? 'YOU' : item.assignedToName}
       </span>
     );
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────
-
   return (
-    <div className="flex flex-col gap-4 h-full text-on-surface">
+    <div className="space-y-3 pb-6">
+      <section className="rounded-2xl border border-outline-variant bg-surface-container p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="font-display text-lg font-bold text-on-surface">Checklist</h2>
+            <p className="font-mono text-[10px] uppercase text-on-surface-variant">
+              {openItems.length} open{myTaskCount > 0 ? ` · ${myTaskCount} mine` : ''}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {currentUserId && teamMembers.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowMyTasks(value => !value)}
+                aria-pressed={showMyTasks}
+                className={`min-h-11 rounded-xl border px-3 font-mono text-[10px] font-bold uppercase ${showMyTasks
+                  ? 'border-primary bg-primary/15 text-primary'
+                  : 'border-outline-variant text-on-surface-variant'}`}
+              >
+                My Tasks{myTaskCount > 0 ? ` ${myTaskCount}` : ''}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setManageOpen(true)}
+              className="min-h-11 rounded-xl border border-outline-variant px-3 font-mono text-[10px] font-bold uppercase text-primary"
+            >
+              Manage
+            </button>
+          </div>
+        </div>
+      </section>
 
-      {pendingComplete && (
-        <CompletionModal
-          item={pendingComplete.item}
-          onConfirm={handleConfirmComplete}
-          onCancel={() => setPendingComplete(null)}
+      <form onSubmit={addItem} className="space-y-2 rounded-2xl border border-outline-variant bg-surface-container p-3">
+        <div className="flex gap-2">
+          <input
+            ref={addInputRef}
+            value={newItemText}
+            onChange={event => setNewItemText(event.target.value)}
+            placeholder="What needs to be done?"
+            className="min-h-12 min-w-0 flex-1 rounded-xl border border-outline-variant bg-surface px-3 font-mono text-sm text-on-surface outline-none focus:border-primary"
+          />
+          <button
+            type="button"
+            onClick={() => setShowDescInput(value => !value)}
+            aria-label="Add task note"
+            className={`min-h-12 min-w-12 rounded-xl border ${showDescInput ? 'border-primary text-primary' : 'border-outline-variant text-on-surface-variant'}`}
+          >
+            <span className="material-symbols-outlined">sticky_note_2</span>
+          </button>
+          {teamMembers.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAssignPicker(value => !value)}
+              aria-label="Assign task"
+              className={`min-h-12 min-w-12 rounded-xl border ${showAssignPicker || newItemAssignee ? 'border-primary text-primary' : 'border-outline-variant text-on-surface-variant'}`}
+            >
+              <span className="material-symbols-outlined">person_add</span>
+            </button>
+          )}
+          <button type="submit" className="min-h-12 min-w-12 rounded-xl bg-primary text-xl font-bold text-on-primary">+</button>
+        </div>
+        {showDescInput && (
+          <textarea
+            value={newItemDesc}
+            onChange={event => setNewItemDesc(event.target.value)}
+            rows={2}
+            placeholder="Optional task note"
+            className="w-full resize-none rounded-xl border border-outline-variant bg-surface p-3 font-mono text-xs text-on-surface outline-none focus:border-primary"
+          />
+        )}
+        {showAssignPicker && teamMembers.length > 0 && (
+          <select
+            value={newItemAssignee}
+            onChange={event => setNewItemAssignee(event.target.value)}
+            className="min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3 font-mono text-xs text-on-surface"
+          >
+            <option value="">Unassigned</option>
+            {teamMembers.map(member => (
+              <option key={member.id} value={member.id}>
+                {member.displayName || member.email || member.id}{member.id === currentUserId ? ' (You)' : ''}
+              </option>
+            ))}
+          </select>
+        )}
+      </form>
+
+      {displayOpen.length > 0 ? (
+        <div className="space-y-2">
+          {displayOpen.map(item => (
+            <div
+              key={item.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => completeItem(item.id)}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  completeItem(item.id);
+                }
+              }}
+              className={`relative flex min-h-14 cursor-pointer items-start gap-3 rounded-xl border p-3 ${item.assignedTo === currentUserId
+                ? 'border-primary/40 bg-primary/5'
+                : 'border-outline-variant bg-surface-container'}`}
+            >
+              <input
+                type="checkbox"
+                checked={false}
+                onClick={event => event.stopPropagation()}
+                onChange={() => completeItem(item.id)}
+                className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
+              />
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-sm text-on-surface">{item.text}</span>
+                  <AssigneeBadge item={item} />
+                </div>
+                {item.desc && <p className="font-mono text-[11px] text-on-surface-variant">{item.desc}</p>}
+              </div>
+              <button
+                type="button"
+                aria-label={`Actions for ${item.text}`}
+                onClick={event => { event.stopPropagation(); setRowMenuItemId(item.id); }}
+                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container-high hover:text-primary"
+              >
+                <span className="material-symbols-outlined">more_vert</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon="task_alt"
+          title={showMyTasks ? 'No tasks assigned to you' : 'Checklist clear'}
+          cta={{ label: 'Add task', onClick: focusAddTask, icon: 'add' }}
+          secondaryCta={{ label: 'Add from saved list', onClick: () => setManageOpen(true) }}
         />
       )}
 
-      {editingItem && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <form onSubmit={saveEdit} className="bg-surface border-2 border-outline rounded-lg p-5 max-w-sm w-full shadow-2xl space-y-4">
-            <h3 className="font-display font-bold uppercase text-sm text-on-surface">Edit Task</h3>
-            <div>
-              <label className="block text-[10px] font-mono uppercase text-on-surface-variant mb-1">Task</label>
-              <input autoFocus value={editText} onChange={event => setEditText(event.target.value)} className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-mono uppercase text-on-surface-variant mb-1">Notes</label>
-              <textarea value={editDesc} onChange={event => setEditDesc(event.target.value)} rows={3} className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none resize-none" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-mono uppercase text-on-surface-variant mb-1">Assigned To</label>
-              <select value={editAssignee} onChange={event => setEditAssignee(event.target.value)} className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none">
+      {displayCompleted.length > 0 && (
+        <CollapsibleSection
+          title="Completed since last reset"
+          subtitle={`${displayCompleted.length} completed`}
+          storageKey="race_notes_checklist_completed_open"
+          defaultOpen={false}
+        >
+          <div className="space-y-2 pt-2">
+            {displayCompleted.map(item => (
+              <div key={item.id} className="flex min-h-14 items-start gap-3 rounded-xl border border-outline-variant/40 bg-surface p-3">
+                <span className="material-symbols-outlined mt-0.5 text-green-500">check_circle</span>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-sm text-on-surface-variant line-through">{item.text}</span>
+                    <AssigneeBadge item={item} />
+                  </div>
+                  {item.desc && <p className="font-mono text-[11px] text-on-surface-variant">{item.desc}</p>}
+                  {item.completionNote && <p className="font-mono text-[11px] text-on-surface-variant">{item.completionNote}</p>}
+                  {item.completedAt && (
+                    <p className="font-mono text-[10px] text-on-surface-variant/70">
+                      Completed {new Date(item.completedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  aria-label={`Actions for completed ${item.text}`}
+                  onClick={() => setRowMenuItemId(item.id)}
+                  className="flex min-h-11 min-w-11 items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container-high hover:text-primary"
+                >
+                  <span className="material-symbols-outlined">more_vert</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      <BottomSheet open={manageOpen} onClose={() => setManageOpen(false)} title="Manage checklist">
+        <div className="space-y-4 pb-2">
+          <section className="space-y-2">
+            <h3 className="font-mono text-[10px] font-bold uppercase text-on-surface-variant">Add from saved list</h3>
+            {templates.length > 0 ? (
+              <div className="flex gap-2">
+                <select
+                  value={selectedTemplateId}
+                  onChange={event => setSelectedTemplateId(event.target.value)}
+                  className="min-h-12 min-w-0 flex-1 rounded-xl border border-outline-variant bg-surface px-3 font-mono text-xs text-on-surface"
+                >
+                  <option value="">Select saved list</option>
+                  {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
+                </select>
+                <button
+                  type="button"
+                  disabled={!selectedTemplateId}
+                  onClick={importSelectedTemplate}
+                  className="min-h-12 rounded-xl bg-primary px-4 font-mono text-[10px] font-bold uppercase text-on-primary disabled:opacity-40"
+                >
+                  Add
+                </button>
+              </div>
+            ) : (
+              <p className="font-mono text-xs text-on-surface-variant">No saved lists yet.</p>
+            )}
+            {onManageTemplates && (
+              <button
+                type="button"
+                onClick={() => { setManageOpen(false); onManageTemplates(); }}
+                className="min-h-12 w-full rounded-xl border border-outline-variant px-4 text-left font-mono text-xs font-bold text-primary"
+              >
+                Manage saved lists
+              </button>
+            )}
+          </section>
+
+          <label className="flex min-h-14 items-center gap-3 rounded-xl border border-outline-variant p-3 font-mono text-xs text-on-surface">
+            <input
+              type="checkbox"
+              checked={keepAddedItems}
+              onChange={event => setKeepPreference(event.target.checked)}
+              className="h-5 w-5 accent-primary"
+            />
+            Carry unfinished added jobs to next weekend
+          </label>
+
+          <div className="grid gap-2">
+            <button type="button" onClick={resetForWeekend} className="min-h-12 rounded-xl border border-outline-variant px-4 text-left font-mono text-xs font-bold text-on-surface">Reset for new weekend</button>
+            <button type="button" onClick={clearCompleted} disabled={completedItems.length === 0} className="min-h-12 rounded-xl border border-outline-variant px-4 text-left font-mono text-xs font-bold text-on-surface disabled:opacity-40">Clear completed</button>
+            <button type="button" onClick={clearCurrentList} className="min-h-12 rounded-xl border border-red-500/50 px-4 text-left font-mono text-xs font-bold text-red-400">Clear current list</button>
+            <button type="button" onClick={() => setShowHistory(value => !value)} className="min-h-12 rounded-xl border border-outline-variant px-4 text-left font-mono text-xs font-bold text-primary">
+              {showHistory ? 'Hide history' : `View history${historyItems.length ? ` (${historyItems.length})` : ''}`}
+            </button>
+          </div>
+
+          {showHistory && (
+            <section className="space-y-4 border-t border-outline-variant pt-4">
+              {historyItems.length === 0 ? (
+                <p className="py-4 text-center font-mono text-xs text-on-surface-variant">No completed history yet.</p>
+              ) : Object.entries(groupedHistory).map(([date, items]) => (
+                <div key={date} className="space-y-2">
+                  <h4 className="font-mono text-[10px] font-bold uppercase text-on-surface-variant">{date}</h4>
+                  {items.map(item => (
+                    <div key={item.id} className="rounded-xl border border-outline-variant/40 bg-surface p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs text-on-surface">{item.text}</span>
+                        <AssigneeBadge item={item} />
+                      </div>
+                      {item.completionNote && <p className="mt-1 font-mono text-[11px] text-on-surface-variant">{item.completionNote}</p>}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </section>
+          )}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={!!rowMenuItem} onClose={() => setRowMenuItemId(null)} title={rowMenuItem?.text ?? 'Task actions'}>
+        {rowMenuItem && (
+          <div className="space-y-2 pb-2">
+            <button type="button" onClick={() => openEdit(rowMenuItem)} className="min-h-12 w-full rounded-xl px-3 text-left font-mono text-sm text-on-surface hover:bg-surface-container-high">Edit task</button>
+            {rowMenuItem.done ? (
+              <>
+                <button type="button" onClick={() => markOpen(rowMenuItem.id)} className="min-h-12 w-full rounded-xl px-3 text-left font-mono text-sm text-on-surface hover:bg-surface-container-high">Mark open</button>
+                <button type="button" onClick={() => openCompletionNote(rowMenuItem)} className="min-h-12 w-full rounded-xl px-3 text-left font-mono text-sm text-on-surface hover:bg-surface-container-high">{rowMenuItem.completionNote ? 'Edit completion note' : 'Add completion note'}</button>
+              </>
+            ) : (
+              <button type="button" onClick={() => removeItem(rowMenuItem.id)} className="min-h-12 w-full rounded-xl px-3 text-left font-mono text-sm text-red-400 hover:bg-surface-container-high">Remove</button>
+            )}
+          </div>
+        )}
+      </BottomSheet>
+
+      <BottomSheet open={!!editingItem} onClose={() => setEditingItemId(null)} title="Edit task">
+        {editingItem && (
+          <form onSubmit={saveEdit} className="space-y-3 pb-2">
+            <input value={editText} onChange={event => setEditText(event.target.value)} className="min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3 font-mono text-sm text-on-surface" />
+            <textarea value={editDesc} onChange={event => setEditDesc(event.target.value)} rows={3} placeholder="Optional task note" className="w-full rounded-xl border border-outline-variant bg-surface p-3 font-mono text-sm text-on-surface" />
+            {teamMembers.length > 0 && (
+              <select value={editAssignee} onChange={event => setEditAssignee(event.target.value)} className="min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3 font-mono text-xs text-on-surface">
                 <option value="">Unassigned</option>
                 {teamMembers.map(member => <option key={member.id} value={member.id}>{member.displayName || member.email || member.id}</option>)}
               </select>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => setEditingItem(null)} className="px-3 py-2 border border-outline-variant rounded font-mono text-xs uppercase">Cancel</button>
-              <button type="submit" className="px-4 py-2 bg-primary text-on-primary rounded font-mono text-xs font-bold uppercase">Save Task</button>
-            </div>
+            )}
+            <button type="submit" className="min-h-12 w-full rounded-xl bg-primary font-display font-bold text-on-primary">Save task</button>
           </form>
-        </div>
-      )}
-
-      {/* ── One global Main Checklist ─────────────────────────────── */}
-      <div className="flex flex-col gap-3 bg-surface p-3 rounded-lg border border-outline-variant/50">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="font-display font-bold uppercase text-primary text-sm tracking-wide">Main Checklist</h3>
-            <p className="font-mono text-[10px] text-on-surface-variant/60 mt-1">One active team list. Add jobs or bring them in from a saved list.</p>
-          </div>
-          {onManageTemplates && (
-            <button type="button" onClick={onManageTemplates} className="shrink-0 min-h-11 px-3 border border-outline-variant rounded font-mono text-[10px] font-bold uppercase text-on-surface-variant hover:text-primary hover:border-primary">
-              Edit List
-            </button>
-          )}
-        </div>
-        {templates.length > 0 && (
-          <div className="flex gap-2">
-            <select
-              className="flex-1 min-w-0 p-2 bg-surface-container border border-outline-variant rounded text-xs font-mono"
-              value={selectedTemplateId}
-              onChange={e => setSelectedTemplateId(e.target.value)}
-            >
-              <option value="">Select template…</option>
-              {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
-            </select>
-            <button
-              type="button"
-              disabled={!selectedTemplateId}
-              onClick={importTemplate}
-              className="px-3 py-2 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded disabled:opacity-40"
-            >
-              Import
-            </button>
-          </div>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-outline-variant/40">
-          <label className="flex items-center gap-2 min-h-11 cursor-pointer font-mono text-[10px] uppercase text-on-surface-variant">
-            <input type="checkbox" checked={keepAddedItems} onChange={event => setKeepPreference(event.target.checked)} className="w-5 h-5 accent-primary" />
-            Keep added jobs on reset
-          </label>
-          <button type="button" onClick={resetForWeekend} className="min-h-11 px-3 border border-outline-variant rounded font-mono text-[10px] uppercase font-bold text-on-surface-variant hover:text-primary hover:border-primary">
-            Reset for New Weekend
-          </button>
-        </div>
-      </div>
+      </BottomSheet>
 
-      {/* ── Active list ──────────────────────────────────────────────── */}
-      <div className="bg-surface-container border border-outline-variant rounded-lg p-4 flex-1 flex flex-col overflow-hidden">
-
-          {/* List header */}
-          <div className="flex justify-between items-center mb-3 gap-2 flex-wrap">
-            <span className="font-mono text-[10px] uppercase text-on-surface-variant font-bold">{allOpen.length} open · {allDone.length} completed</span>
-            <div className="flex gap-2 items-center">
-              {/* My tasks toggle — only when signed in with a team */}
-              {currentUserId && teamMembers.length > 0 && (
-                <button
-                  onClick={() => setShowMyTasks(v => !v)}
-                  title={showMyTasks ? 'Show all tasks' : 'Show only my tasks'}
-                  className={`relative flex items-center gap-1 text-[9px] font-mono font-bold px-2 py-1 rounded-full border transition-all ${
-                    showMyTasks
-                      ? 'bg-primary/20 border-primary text-primary'
-                      : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
-                  MY TASKS
-                  {myTaskCount > 0 && !showMyTasks && (
-                    <span className="bg-primary text-on-primary rounded-full text-[8px] px-1.5 py-0.5 font-black ml-0.5 leading-none">
-                      {myTaskCount}
-                    </span>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* ── Add item form ─────────────────────────────────────────── */}
-          <form onSubmit={addItem} className="mb-4 space-y-2">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="What needs to be done?"
-                className="flex-1 p-2 bg-surface-container border border-outline-variant/50 focus:border-primary text-sm font-mono rounded outline-none"
-                value={newItemText}
-                onChange={e => setNewItemText(e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => setShowDescInput(v => !v)}
-                title={showDescInput ? 'Hide notes' : 'Add notes'}
-                className={`p-2 rounded border transition-colors shrink-0 ${
-                  showDescInput ? 'bg-primary/10 border-primary text-primary' : 'border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[18px]">sticky_note_2</span>
-              </button>
-              {teamMembers.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowAssignPicker(v => !v)}
-                  title={showAssignPicker ? 'Hide assignee' : 'Assign to team member'}
-                  className={`p-2 rounded border transition-colors shrink-0 ${
-                    newItemAssignee || showAssignPicker
-                      ? 'bg-primary/10 border-primary text-primary'
-                      : 'border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[18px]">person_add</span>
-                </button>
-              )}
-              <button type="submit" className="bg-primary text-[#0e0e0e] px-4 font-bold rounded text-xl leading-none shrink-0">+</button>
-            </div>
-
-            {showDescInput && (
-              <textarea
-                placeholder="Optional task notes..."
-                rows={2}
-                className="w-full p-2 bg-surface-container border border-outline-variant/50 focus:border-primary text-xs font-mono rounded outline-none resize-none text-on-surface-variant"
-                value={newItemDesc}
-                onChange={e => setNewItemDesc(e.target.value)}
-              />
-            )}
-
-            {showAssignPicker && teamMembers.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-on-surface-variant text-[15px] shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
-                <select
-                  value={newItemAssignee}
-                  onChange={e => setNewItemAssignee(e.target.value)}
-                  className="flex-1 p-2 bg-surface-container border border-outline-variant/50 focus:border-primary text-xs font-mono rounded outline-none"
-                >
-                  <option value="">Unassigned</option>
-                  {teamMembers.map(m => (
-                    <option key={m.id} value={m.id}>
-                      {m.displayName || m.email || m.id}
-                      {m.id === currentUserId ? ' (You)' : ''}
-                    </option>
-                  ))}
-                </select>
-                {newItemAssignee && (
-                  <button
-                    type="button"
-                    onClick={() => setNewItemAssignee('')}
-                    className="material-symbols-outlined text-on-surface-variant/60 hover:text-red-400 text-[15px]"
-                  >
-                    close
-                  </button>
-                )}
-              </div>
-            )}
+      <BottomSheet open={!!noteItem} onClose={() => setNoteItemId(null)} title="Completion note">
+        {noteItem && (
+          <form onSubmit={saveCompletionNote} className="space-y-3 pb-2">
+            <textarea autoFocus value={completionNote} onChange={event => setCompletionNote(event.target.value)} rows={4} placeholder="Optional completion note" className="w-full rounded-xl border border-outline-variant bg-surface p-3 font-mono text-sm text-on-surface" />
+            <button type="submit" className="min-h-12 w-full rounded-xl bg-primary font-display font-bold text-on-primary">Save note</button>
           </form>
+        )}
+      </BottomSheet>
 
-          {/* ── Items list ───────────────────────────────────────────── */}
-          <div className="flex flex-col gap-3 overflow-y-auto flex-1 custom-scrollbar pr-1">
-
-            {/* Open tasks */}
-            {displayOpen.length > 0 && (
-              <div className="space-y-2">
-                {displayOpen.map(item => {
-                  const isAssignedToMe = item.assignedTo === currentUserId;
-                  return (
-                    <div
-                      key={item.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleCheckboxClick(activeTodoId, item)}
-                      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleCheckboxClick(activeTodoId, item); } }}
-                      className={`relative min-h-14 flex items-start gap-3 p-3 rounded border transition-colors cursor-pointer ${
-                        isAssignedToMe
-                          ? 'bg-primary/5 border-primary/40 hover:border-primary/70'
-                          : 'bg-surface-container border-outline-variant/30 hover:border-primary/30'
-                      }`}
-                    >
-                      {/* Left accent stripe for my tasks */}
-                      {isAssignedToMe && (
-                        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary rounded-l-sm" />
-                      )}
-                      <input
-                        type="checkbox"
-                        checked={false}
-                        onClick={event => event.stopPropagation()}
-                        onChange={() => handleCheckboxClick(activeTodoId, item)}
-                        className="w-5 h-5 accent-primary cursor-pointer shrink-0 mt-0.5"
-                      />
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-sm text-on-surface leading-snug">{item.text}</span>
-                          <AssigneeBadge item={item} />
-                        </div>
-                        {item.desc && (
-                          <span className="font-mono text-[11px] text-on-surface-variant/70 italic block leading-relaxed">
-                            {item.desc}
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={event => { event.stopPropagation(); openEdit(item); }}
-                        aria-label={`Edit ${item.text}`}
-                        className="shrink-0 material-symbols-outlined text-[18px] text-on-surface-variant/50 hover:text-primary mt-0.5"
-                      >edit</button>
-                      <button
-                        type="button"
-                        onClick={event => { event.stopPropagation(); deleteItem(activeTodoId, item.id); }}
-                        className="shrink-0 material-symbols-outlined text-[16px] text-on-surface-variant/40 hover:text-red-400 mt-0.5"
-                      >
-                        close
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Empty my-tasks state */}
-            {showMyTasks && displayOpen.length === 0 && displayDone.length === 0 && (
-              <div className="text-center py-8 space-y-2">
-                <span className="material-symbols-outlined text-on-surface-variant/30 text-4xl">task_alt</span>
-                <p className="font-mono text-xs text-on-surface-variant/50">No tasks assigned to you in this list.</p>
-              </div>
-            )}
-
-            {/* Divider */}
-            {displayOpen.length > 0 && displayDone.length > 0 && (
-              <div className="flex items-center gap-2 py-1">
-                <div className="flex-1 border-t border-outline-variant/30" />
-                <span className="font-mono text-[10px] text-on-surface-variant/50 uppercase tracking-wider whitespace-nowrap">
-                  {displayDone.length} Completed
-                </span>
-                <div className="flex-1 border-t border-outline-variant/30" />
-              </div>
-            )}
-
-            {/* Completed tasks */}
-            {displayDone.length > 0 && (
-              <div className="space-y-2">
-                {displayDone.map(item => (
-                  <div
-                    key={item.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleCheckboxClick(activeTodoId, item)}
-                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleCheckboxClick(activeTodoId, item); } }}
-                    className="min-h-14 flex items-start gap-3 p-3 bg-surface-container/50 rounded border border-outline-variant/20 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={true}
-                      onClick={event => event.stopPropagation()}
-                      onChange={() => handleCheckboxClick(activeTodoId, item)}
-                      className="w-5 h-5 accent-primary cursor-pointer shrink-0 mt-0.5"
-                    />
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-sm line-through text-on-surface-variant/40 leading-snug">
-                          {item.text}
-                        </span>
-                        {item.assignedToName && (
-                          <span className="text-[9px] font-mono text-on-surface-variant/30 border border-outline-variant/20 px-1.5 py-0.5 rounded-full">
-                            {item.assignedTo === currentUserId ? 'YOU' : item.assignedToName}
-                          </span>
-                        )}
-                      </div>
-                      {item.desc && (
-                        <span className="font-mono text-[11px] line-through text-on-surface-variant/25 italic block leading-relaxed">
-                          {item.desc}
-                        </span>
-                      )}
-                      {item.completionNote && (
-                        <div className="flex items-start gap-1.5 mt-1.5 bg-green-950/40 border border-green-800/30 rounded-md p-2">
-                          <span
-                            className="material-symbols-outlined text-green-500/80 text-[13px] mt-0.5 shrink-0"
-                            style={{ fontVariationSettings: "'FILL' 1" }}
-                          >
-                            check_circle
-                          </span>
-                          <span className="font-mono text-[11px] text-green-400/80 leading-relaxed">
-                            {item.completionNote}
-                          </span>
-                        </div>
-                      )}
-                      {item.completedAt && (
-                        <span className="font-mono text-[10px] text-on-surface-variant/30 block">
-                          Completed {new Date(item.completedAt).toLocaleString([], {
-                            month: 'short', day: 'numeric',
-                            hour: '2-digit', minute: '2-digit',
-                          })}
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={event => { event.stopPropagation(); openEdit(item); }}
-                      aria-label={`Edit ${item.text}`}
-                      className="shrink-0 material-symbols-outlined text-[18px] text-on-surface-variant/40 hover:text-primary mt-0.5"
-                    >edit</button>
-                    <button
-                      type="button"
-                      onClick={event => { event.stopPropagation(); deleteItem(activeTodoId, item.id); }}
-                      className="shrink-0 material-symbols-outlined text-[16px] text-on-surface-variant/25 hover:text-red-400 mt-0.5"
-                    >
-                      close
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {visibleItems.length === 0 && (
-              <p className="text-center text-on-surface-variant/50 font-mono text-xs mt-6">
-                List is empty. Add your first task above.
-              </p>
-            )}
-          </div>
-        </div>
+      <InfoToast
+        open={!!completionUndo}
+        title={completionUndo ? `${completionUndo.item.text} completed` : ''}
+        icon="check_circle"
+        action={completionUndo ? { label: 'UNDO', onClick: undoCompletion } : undefined}
+        onClose={() => setCompletionUndo(null)}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { Setup, RaceWeekend, ActiveSession, SessionRecord, Todo, TireInventoryItem, Car, ShockSession, WeatherHistoryDay, WeatherSnapshot, MaintenanceComponent, MaintenanceLog, ChecklistTemplate, WeekendChecklist, SavedTrip } from '../types';
 import { mergeTimestampedRecords } from './setupLifecycle';
 import { setupFromCloudRow, setupToCloudRow } from './setupSync';
+import { todoFromCloudRow, todoToCloudRow } from './todoSync';
 import { maintenanceComponentFromCloudRow, maintenanceComponentToCloudRow } from './maintenanceSync';
 export { setupFromCloudRow, setupToCloudRow } from './setupSync';
 export { maintenanceComponentFromCloudRow, maintenanceComponentToCloudRow } from './maintenanceSync';
@@ -469,16 +470,8 @@ export function pushTodos(todos: Todo[], userId: string, onStatus?: SyncCallback
   if (pushDebounceTimers.has(key)) clearTimeout(pushDebounceTimers.get(key)!);
   pushDebounceTimers.set(key, setTimeout(async () => {
     try {
-      const rows = todos.map(t => ({
-        id: t.id,
-        user_id: userId,
-        title: t.title,
-        items: t.items,
-        is_template: t.is_template ?? false,
-        weekend_id: t.weekendId || null,
-        weekend_name: t.weekendName || null,
-        updated_at: new Date().toISOString(),
-      }));
+      const updatedAt = new Date().toISOString();
+      const rows = todos.map(todo => todoToCloudRow(todo, userId, updatedAt));
       await supabase.from('todos').upsert(rows, { onConflict: 'id' });
       onStatus?.('To-Dos synced');
     } catch {}
@@ -489,16 +482,7 @@ export async function pullTodos(onStatus?: SyncCallback): Promise<Todo[]> {
   const { data } = await supabase.from('todos').select('*').order('updated_at', { ascending: false });
   if (data) {
     onStatus?.(`Pulled ${data.length} To-Do lists`);
-    return (data as any[]).map((r: Record<string, unknown>) => ({
-      id: r.id as string,
-      user_id: (r.user_id as string) || '',
-      title: (r.title as string) || '',
-      items: (r.items as Todo['items']) || [],
-      is_template: (r.is_template as boolean) || false,
-      weekendId: (r.weekend_id as string) || undefined,
-      weekendName: (r.weekend_name as string) || undefined,
-      updated_at: (r.updated_at as string) || new Date().toISOString(),
-    }));
+    return (data as any[]).map((row: Record<string, unknown>) => todoFromCloudRow(row));
   }
   return [];
 }

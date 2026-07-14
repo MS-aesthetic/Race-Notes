@@ -2,62 +2,136 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  archiveCompletedChecklistItems,
+  archiveCompletedMainChecklist,
+  clearChecklistItems,
+  clearMainChecklist,
+  completeChecklistItem,
   editChecklistItem,
+  importTemplateItems,
   reconcileMaintenanceChecklist,
   resetChecklistItems,
   resetMainChecklist,
+  restoreChecklistItem,
   todoItemKind,
 } from '../src/lib/checklistMaintenance';
-import { activeChecklistItems } from '../src/lib/mainChecklist';
+import { activeChecklistItems, checklistHistoryItems, completedChecklistItems, currentChecklistItems } from '../src/lib/mainChecklist';
 import { lastAccountingCategory, localDateValue, recentAccountingRepeats } from '../src/lib/accountingDefaults';
 import { applyServiceLog, calendarDaysSince, DEFAULT_COMPONENTS, getComponentStatus, normalizeStartingUsage } from '../src/lib/maintenance';
 import { maintenanceComponentFromCloudRow, maintenanceComponentToCloudRow } from '../src/lib/maintenanceSync';
+import { todoFromCloudRow, todoToCloudRow } from '../src/lib/todoSync';
 import { buildQuickServiceRecords } from '../src/lib/serviceLog';
 import { MAINTENANCE_CATEGORIES, type AccountingEntry, type MaintenanceComponent, type MaintenanceLog, type RaceWeekend, type Setup, type Todo, type TodoItem } from '../src/types';
 
-const core: TodoItem = { id: 'core', text: 'Torque wheels', done: true, completionNote: '80 ft-lb', completedAt: '2026-07-13', removedUntilReset: true };
+const core: TodoItem = { id: 'core', text: 'Torque wheels', done: true, completionNote: '80 ft-lb', completedAt: '2026-07-13' };
 const adhoc: TodoItem = { id: 'adhoc', text: 'Grab fuel', done: true, kind: 'adhoc', sourceType: 'manual' };
 assert.equal(todoItemKind(core), 'core');
 assert.equal(todoItemKind(adhoc), 'adhoc');
-assert.deepEqual(resetChecklistItems([core, adhoc], false).map(item => item.id), ['core']);
-assert.equal(resetChecklistItems([core, adhoc], true).length, 2);
-const resetCore = resetChecklistItems([core], true)[0];
-assert.equal(resetCore.done, false);
-assert.equal(resetCore.removedUntilReset, undefined);
-assert.equal(resetCore.completionNote, undefined);
-
-const main: Todo = { id: 'main', user_id: '', title: 'Main Checklist', items: [core, adhoc], updated_at: 'old' };
-assert.equal(resetMainChecklist([main], false, 'new')[0].items.length, 1);
-assert.equal(resetMainChecklist([main], true, 'new')[0].items.length, 2);
-
-const activeProjection = activeChecklistItems({
-  ...main,
-  items: [
-    { id: 'removed-core', text: 'Hidden core job', done: false, kind: 'core', removedUntilReset: true },
-    { id: 'open', text: 'Visible open job', done: false, kind: 'core' },
-    { id: 'done', text: 'Visible done job', done: true, kind: 'core' },
-  ],
-});
-assert.deepEqual(activeProjection.map(item => item.id), ['open', 'done']);
-assert.equal(activeProjection.filter(item => !item.done).length, 1);
-assert.equal(activeProjection.filter(item => item.done).length, 1);
-const roundTripProjection = activeChecklistItems(JSON.parse(JSON.stringify({ ...main, items: activeProjection })) as Todo);
-assert.deepEqual(roundTripProjection.map(item => item.id), ['open', 'done']);
-
-const imported: TodoItem[] = [
-  { id: 'old-a', text: 'Old wording', done: false, kind: 'core', sourceType: 'template', sourceId: 'template:t1:a', removedUntilReset: true },
-  { id: 'old-removed', text: 'Removed definition', done: false, kind: 'core', sourceType: 'template', sourceId: 'template:t1:removed' },
-];
 const templates = [{ id: 't1', name: 'Car Prep', category: 'Car Prep', updatedAt: 'now', items: [
   { id: 'a', text: 'Updated wording' }, { id: 'b', text: 'New core job' },
 ] }];
-const templateReset = resetChecklistItems(imported, true, templates);
-assert.deepEqual(templateReset.filter(item => !item.removedUntilReset).map(item => item.text).sort(), ['New core job', 'Updated wording']);
-assert.equal(templateReset.filter(item => !item.removedUntilReset).every(item => !item.done), true);
-const emptyTemplateReset = resetChecklistItems(imported, true, [{ ...templates[0], items: [] }]);
-assert.equal(emptyTemplateReset.every(item => item.removedUntilReset), true);
-const repopulatedTemplate = resetChecklistItems(emptyTemplateReset, true, [{ ...templates[0], items: [{ id: 'fresh', text: 'Fresh definition' }] }]);
-assert.equal(repopulatedTemplate.some(item => item.text === 'Fresh definition' && !item.removedUntilReset), true);
+
+const projectionItems: TodoItem[] = [
+  { id: 'open-a', text: 'Open A', done: false },
+  { id: 'done', text: 'Done', done: true },
+  { id: 'hidden', text: 'Hidden', done: false, removedUntilReset: true },
+  { id: 'history', text: 'History', done: true, archivedAt: '2026-07-01' },
+  { id: 'open-b', text: 'Open B', done: false },
+];
+const projectionList: Todo = { id: 'main', user_id: '', title: 'Main Checklist', items: projectionItems, updated_at: 'old' };
+assert.deepEqual(activeChecklistItems(projectionList).map(item => item.id), ['open-a', 'open-b']);
+assert.deepEqual(currentChecklistItems(projectionList).map(item => item.id), ['open-a', 'done', 'open-b']);
+assert.deepEqual(completedChecklistItems(projectionList).map(item => item.id), ['done']);
+assert.deepEqual(checklistHistoryItems(projectionList).map(item => item.id), ['history']);
+assert.equal(activeChecklistItems(projectionList)[0], projectionItems[0]);
+
+const main: Todo = { id: 'main', user_id: '', title: 'Main Checklist', items: [core, adhoc], updated_at: 'old' };
+const clearSource: TodoItem[] = [
+  { id: 'core-open', text: 'Core open', done: false, desc: 'Keep note' },
+  { id: 'adhoc-open', text: 'Ad-hoc open', done: false, kind: 'adhoc', sourceType: 'manual' },
+  { ...core, assignedTo: 'u1', assignedToName: 'Alex' },
+  { id: 'history-old', text: 'Old history', done: true, archivedAt: 'before' },
+];
+const cleared = clearChecklistItems(clearSource, 'main', 'clear-time');
+assert.equal(activeChecklistItems({ ...main, items: cleared }).length, 0);
+assert.equal(cleared.some(item => item.id === 'adhoc-open'), false);
+const clearedCore = cleared.find(item => item.id === 'core-open')!;
+assert.equal(clearedCore.removedUntilReset, true);
+assert.equal(clearedCore.sourceId, 'core:main:core-open');
+const archivedCore = cleared.find(item => item.id === 'core')!;
+assert.equal(archivedCore.archivedAt, 'clear-time');
+assert.equal(archivedCore.completionNote, '80 ft-lb');
+assert.equal(archivedCore.assignedToName, 'Alex');
+assert.equal(cleared.find(item => item.id === 'history-old'), clearSource[3]);
+
+const openBytes: TodoItem = { id: 'keep-open', text: 'Keep open', done: false, desc: 'unchanged' };
+const hiddenDone: TodoItem = { id: 'hidden-done', text: 'Hidden done', done: true, removedUntilReset: true };
+const clearCompletedItems = archiveCompletedChecklistItems([openBytes, core, hiddenDone], 'main', 'archive-time');
+assert.equal(clearCompletedItems[0], openBytes);
+assert.equal(clearCompletedItems[1].archivedAt, 'archive-time');
+assert.equal(clearCompletedItems[2], hiddenDone);
+const clearCompletedTodos = archiveCompletedMainChecklist([{ ...main, items: [openBytes, core] }], 'archive-time');
+assert.equal(activeChecklistItems(clearCompletedTodos[0])[0], openBytes);
+assert.equal(checklistHistoryItems(clearCompletedTodos[0]).length, 1);
+assert.equal(activeChecklistItems(clearMainChecklist([{ ...main, items: clearSource }], 'clear-time')[0]).length, 0);
+
+const resetSource: TodoItem[] = [
+  core,
+  adhoc,
+  { id: 'adhoc-open', text: 'Carry me', done: false, kind: 'adhoc', sourceType: 'manual' },
+  { id: 'template-a', text: 'Old wording', done: true, completionNote: 'done', sourceType: 'template', sourceId: 'template:t1:a' },
+  { id: 'template-removed', text: 'Removed definition', done: false, sourceType: 'template', sourceId: 'template:t1:removed' },
+  { id: 'old-history', text: 'Old history', done: true, archivedAt: 'old' },
+];
+const resetNoCarry = resetChecklistItems(resetSource, false, templates, { listId: 'main', now: 'reset-time' });
+assert.equal(resetNoCarry.some(item => item.id === 'adhoc-open'), false);
+assert.equal(resetNoCarry.filter(item => item.archivedAt === 'reset-time').length, 3);
+assert.equal(activeChecklistItems({ ...main, items: resetNoCarry }).filter(item => item.sourceId === 'core:main:core').length, 1);
+assert.equal(activeChecklistItems({ ...main, items: resetNoCarry }).filter(item => item.sourceId === 'template:t1:a').length, 1);
+assert.equal(activeChecklistItems({ ...main, items: resetNoCarry }).filter(item => item.sourceId === 'template:t1:b').length, 1);
+assert.equal(activeChecklistItems({ ...main, items: resetNoCarry }).some(item => item.sourceId === 'template:t1:removed'), false);
+assert.equal(resetNoCarry.find(item => item.sourceId === 'template:t1:removed')?.removedUntilReset, true);
+assert.equal(new Set(resetNoCarry.map(item => item.id)).size, resetNoCarry.length);
+const repeatReset = resetChecklistItems(resetNoCarry, false, templates, { listId: 'main', now: 'later' });
+assert.deepEqual(repeatReset, resetNoCarry);
+const resetCarry = resetChecklistItems(resetSource, true, templates, { listId: 'main', now: 'reset-time' });
+assert.equal(activeChecklistItems({ ...main, items: resetCarry }).some(item => item.id === 'adhoc-open'), true);
+
+const firstImport = importTemplateItems([], templates[0]);
+const repeatedImport = importTemplateItems(firstImport, templates[0]);
+assert.equal(repeatedImport, firstImport);
+const tombstoneImport = importTemplateItems([{ ...firstImport[0], removedUntilReset: true }], { ...templates[0], items: [templates[0].items[0]] });
+assert.equal(tombstoneImport.length, 1);
+assert.equal(tombstoneImport[0].removedUntilReset, true);
+const archivedImport = importTemplateItems([{ ...firstImport[0], done: true, archivedAt: 'history' }], { ...templates[0], items: [templates[0].items[0]] });
+assert.equal(archivedImport.length, 2);
+assert.notEqual(archivedImport[0].id, archivedImport[1].id);
+const completedCurrentImport = importTemplateItems([{ ...firstImport[0], done: true, completedAt: 'done' }], { ...templates[0], items: [templates[0].items[0]] });
+assert.equal(completedCurrentImport.length, 2);
+assert.notEqual(completedCurrentImport[0].id, completedCurrentImport[1].id);
+
+const deletedDefinition = resetChecklistItems(firstImport, true, [{ ...templates[0], items: [] }], { listId: 'main', now: 'deleted' });
+assert.equal(activeChecklistItems({ ...main, items: deletedDefinition }).length, 0);
+const restoredDefinition = resetChecklistItems(deletedDefinition, true, templates, { listId: 'main', now: 'restored' });
+assert.equal(activeChecklistItems({ ...main, items: restoredDefinition }).length, 2);
+
+const lifecycleRoundTrip = JSON.parse(JSON.stringify({ ...main, items: cleared })) as Todo;
+assert.equal(checklistHistoryItems(lifecycleRoundTrip).find(item => item.id === 'core')?.archivedAt, 'clear-time');
+assert.equal(lifecycleRoundTrip.items.find(item => item.id === 'core-open')?.sourceId, 'core:main:core-open');
+
+const completionPrior: TodoItem = {
+  id: 'complete-once', text: 'Set tire pressure', done: false, desc: '12 psi', assignedTo: 'u1', sourceId: 'core:main:complete-once',
+};
+const firstCompletion = completeChecklistItem([openBytes, completionPrior], completionPrior.id, 'completed-now');
+assert.equal(firstCompletion.undo?.item, completionPrior);
+assert.equal(firstCompletion.items[1].done, true);
+assert.equal(firstCompletion.items[1].completedAt, 'completed-now');
+const repeatedCompletion = completeChecklistItem(firstCompletion.items, completionPrior.id, 'completed-again');
+assert.equal(repeatedCompletion.items, firstCompletion.items);
+assert.equal(repeatedCompletion.undo, undefined);
+const restoredCompletion = restoreChecklistItem(firstCompletion.items, firstCompletion.undo!);
+assert.equal(restoredCompletion[1], completionPrior);
+assert.equal(JSON.stringify(restoredCompletion[1]), JSON.stringify(completionPrior));
 
 for (const sourceType of ['manual', 'template', 'maintenance'] as const) {
   const original: TodoItem = { id: sourceType, text: 'Old', done: false, sourceType };
@@ -84,11 +158,24 @@ due = reconcileMaintenanceChecklist(due, [component(100)], [], [], 'below');
 assert.equal(due[0].items.some(item => item.sourceType === 'maintenance' && !item.done), false);
 let completed = reconcileMaintenanceChecklist([main], [component(900)], [], [], 'due');
 completed[0].items = completed[0].items.map(item => item.sourceType === 'maintenance' ? { ...item, done: true, completedAt: 'done' } : item);
-const dueWeekendReset = resetMainChecklist(completed, true, 'weekend');
-assert.equal(dueWeekendReset[0].items.filter(item => item.sourceType === 'maintenance' && item.done).length, 1);
-assert.equal(dueWeekendReset[0].items.filter(item => item.sourceType === 'maintenance' && !item.done).length, 1);
+const dueWeekendReset = resetMainChecklist(completed, true, 'weekend', [], { components: [component(900)], weekends: [], setups: [] });
+assert.equal(checklistHistoryItems(dueWeekendReset[0]).filter(item => item.sourceType === 'maintenance').length, 1);
+assert.equal(activeChecklistItems(dueWeekendReset[0]).filter(item => item.sourceType === 'maintenance').length, 1);
+const dueForHidden = reconcileMaintenanceChecklist([main], [component(900)], [], [], 'due-hidden-source');
+const hiddenDue = dueForHidden.map(todo => ({ ...todo, items: todo.items.map(item => item.sourceType === 'maintenance' ? { ...item, removedUntilReset: true } : item) }));
+assert.deepEqual(reconcileMaintenanceChecklist(hiddenDue, [component(900)], [], [], 'hidden'), hiddenDue);
+const reopenedDue = resetMainChecklist(hiddenDue, true, 'reopen', [], { components: [component(900)], weekends: [], setups: [] });
+assert.equal(activeChecklistItems(reopenedDue[0]).filter(item => item.sourceType === 'maintenance').length, 1);
+const noLongerDue = resetMainChecklist(completed, true, 'not-due', [], { components: [component(100)], weekends: [], setups: [] });
+assert.equal(activeChecklistItems(noLongerDue[0]).some(item => item.sourceType === 'maintenance'), false);
 const afterReset = reconcileMaintenanceChecklist(completed, [component(100, '2026-07-14')], [], [], 'below');
 assert.equal(afterReset[0].items.some(item => item.sourceType === 'maintenance' && item.done), true);
+const archivedMaintenance = archiveCompletedMainChecklist(completed, 'archive-maintenance');
+const dueAfterArchive = reconcileMaintenanceChecklist(archivedMaintenance, [component(900)], [], [], 'due-after-archive');
+assert.equal(activeChecklistItems(dueAfterArchive[0]).filter(item => item.sourceType === 'maintenance').length, 1);
+assert.equal(new Set(dueAfterArchive[0].items.map(item => item.id)).size, dueAfterArchive[0].items.length);
+const laterCycle = reconcileMaintenanceChecklist(archivedMaintenance, [component(900, '2026-07-15')], [], [], 'later-cycle');
+assert.equal(activeChecklistItems(laterCycle[0]).filter(item => item.sourceType === 'maintenance').length, 1);
 
 const derivedComponent = (overrides: Partial<MaintenanceComponent> = {}): MaintenanceComponent => ({
   id: 'derived', scope: 'car', carId: 'car-a', name: 'Motor freshen', category: 'Motor', intervalType: 'races',
@@ -174,6 +261,19 @@ assert.deepEqual(DEFAULT_COMPONENTS.map(item => [item.name, item.intervalType, i
   ['Trailer bearings', 'days', 180],
 ]);
 
+const todoCloudSource: Todo = {
+  id: 'cloud-main', user_id: 'old-user', title: 'Main Checklist', updated_at: 'old', items: [{
+    id: 'history-cloud', text: 'Archived job', done: true, archivedAt: '2026-07-14T12:00:00Z',
+    removedUntilReset: true, completionNote: 'Done', completedAt: '2026-07-14T11:00:00Z',
+    assignedTo: 'u1', assignedToName: 'Alex', sourceType: 'template', sourceId: 'template:t1:a', sourceCycle: 'cycle-1',
+  }],
+};
+const todoCloudRow = todoToCloudRow(todoCloudSource, 'cloud-user', '2026-07-14T13:00:00Z');
+const todoCloudResult = todoFromCloudRow(todoCloudRow);
+assert.deepEqual(todoCloudResult.items, todoCloudSource.items);
+assert.equal(todoCloudResult.user_id, 'cloud-user');
+assert.equal(todoCloudResult.updated_at, '2026-07-14T13:00:00Z');
+
 const entries: AccountingEntry[] = [
   { id: '3', name: 'Pit fuel', description: '20 gal methanol', category: 'Fuel', amount: 100, type: 'expense', date: '2026-07-13T12:00:00Z' },
   { id: '2', name: 'Pit fuel duplicate', description: '20 gal methanol', category: 'Fuel', amount: 90, type: 'expense', date: '2026-07-12T12:00:00Z' },
@@ -195,14 +295,26 @@ const dashboardSource = readFileSync(join(root, 'src/components/DashboardView.ts
 const maintenanceSource = readFileSync(join(root, 'src/lib/maintenance.ts'), 'utf8');
 const serviceLogSource = readFileSync(join(root, 'src/lib/serviceLog.ts'), 'utf8');
 const typesSource = readFileSync(join(root, 'src/types.ts'), 'utf8');
+const syncSource = readFileSync(join(root, 'src/lib/sync.ts'), 'utf8');
 assert.match(trackersSource, /label: 'Maintenance Logs'/);
 assert.doesNotMatch(trackersSource, /label: 'Service'/);
 assert.doesNotMatch(trackersSource, /label: 'Templates'/);
 assert.equal(MAINTENANCE_CATEGORIES.filter(category => category === 'Other').length, 1);
 assert.doesNotMatch(trackersSource, /<option value="Other">Other<\/option>/);
-assert.match(todoSource, /Edit List/);
-assert.match(todoSource, /activeChecklistItems\(activeTodo\)/);
+assert.equal((todoSource.match(/>\s*Manage\s*</g) ?? []).length, 1);
+assert.match(todoSource, /title="Manage checklist"/);
+assert.match(todoSource, /activeChecklistItems\(currentMain\)/);
+assert.match(todoSource, /Completed since last reset/);
+assert.match(todoSource, /Checklist clear/);
+assert.match(todoSource, /6000/);
+assert.match(todoSource, /min-h-14/);
+assert.match(todoSource, /min-h-11 min-w-11/);
+assert.match(todoSource, /Mark open/);
+assert.match(todoSource, /Add completion note/);
+assert.doesNotMatch(todoSource, /CompletionModal|pendingComplete|Mark Task Complete|overflow-y-auto/);
 assert.match(dashboardSource, /activeChecklistItems\(mainChecklist\)/);
+assert.match(dashboardSource, /Checklist clear/);
+assert.doesNotMatch(dashboardSource, /openItems\.slice|\+\{openItems\.length - 3\} more/);
 assert.match(dashboardSource, /Maintenance Due/);
 assert.doesNotMatch(trackersSource, /Below 90%|At least 90% of the limit|Each item shows how much has been used/);
 assert.match(trackersSource, /Used \{status\.used\} · Limit \{status\.limit\} · Remaining \{remaining\}/);
@@ -218,5 +330,8 @@ assert.doesNotMatch(trackersSource, /<option value="laps">|<option value="sessio
 assert.doesNotMatch(maintenanceSource, /intervalType: 'laps'|intervalType: 'sessions'/);
 assert.doesNotMatch(serviceLogSource, /night|nights/);
 assert.match(typesSource, /MaintenanceIntervalType = 'races' \| 'days'/);
+assert.match(typesSource, /archivedAt\?: string/);
+assert.match(syncSource, /todoToCloudRow\(todo, userId, updatedAt\)/);
+assert.match(syncSource, /todoFromCloudRow\(row\)/);
 
 console.log('Chunk 8 Trackers harness PASS');

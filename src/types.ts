@@ -408,6 +408,8 @@ export interface TodoItem {
   sourceCycle?: string;
   /** Core jobs are hidden until the next reset instead of being destroyed. */
   removedUntilReset?: boolean;
+  /** Completed occurrence moved out of the current checklist into history. */
+  archivedAt?: string;
 }
 
 export interface Todo {

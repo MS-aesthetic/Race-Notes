@@ -106,12 +106,8 @@ export default function DashboardView({
 
   const mainChecklist = getMainChecklist(todos);
   const mainChecklistItems = mainChecklist ? activeChecklistItems(mainChecklist) : [];
-  const openTaskLists = mainChecklist ? [{
-    list: mainChecklist,
-    openItems: mainChecklistItems.filter(i => !i.done),
-    assignedToMe: mainChecklistItems.filter(i => !i.done && userId && i.assignedTo === userId),
-  }].filter(entry => entry.openItems.length > 0) : [];
-  const openTaskCount = openTaskLists.reduce((n, e) => n + e.openItems.length, 0);
+  const openTaskCount = mainChecklistItems.length;
+  const assignedTaskCount = mainChecklistItems.filter(item => userId && item.assignedTo === userId).length;
 
   // [25] Service chip + quick service sheet
   // Car parts follow active-car scope; rig parts remain team-global.
@@ -388,62 +384,19 @@ export default function DashboardView({
         </CollapsibleSection>
       )}
 
-      {/* MAIN CHECKLIST (collapsible) */}
-      <CollapsibleSection
-        title={`Main Checklist (${openTaskCount})`}
-        storageKey="race_notes_dash_checklist_open"
-        defaultOpen={false}
-        badge={openTaskLists.some(e => e.assignedToMe.length > 0) ? (
-          <span className="bg-primary/20 text-primary text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded shrink-0">
-            Assigned to me
-          </span>
-        ) : undefined}
+      <button
+        type="button"
+        onClick={onGoToTodos}
+        className="flex min-h-14 w-full items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container px-4 text-left transition-colors hover:bg-surface-container-high"
       >
-        {openTaskLists.length === 0 ? (
-          <EmptyState
-            icon="checklist"
-            title="Main Checklist clear"
-            body="Nothing outstanding — the rig's ready to roll."
-            cta={{ label: 'Open checklist', onClick: onGoToTodos }}
-          />
-        ) : (
-          <div className="border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
-            {openTaskLists.map(({ list, openItems, assignedToMe }) => (
-              <button
-                key={list.id}
-                onClick={onGoToTodos}
-                className="w-full px-4 py-3 min-h-12 bg-surface-container hover:bg-surface-container-high transition-colors text-left group"
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-mono text-xs font-bold text-on-surface group-hover:text-primary transition-colors">{list.title}</span>
-                  <div className="flex items-center gap-1.5">
-                    {assignedToMe.length > 0 && (
-                      <span className="bg-primary/20 text-primary text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded">
-                        {assignedToMe.length} mine
-                      </span>
-                    )}
-                    <span className="text-[10px] font-mono text-on-surface-variant">{openItems.length} open</span>
-                    <span className="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary text-[16px] transition-colors">chevron_right</span>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  {openItems.slice(0, 3).map(item => (
-                    <div key={item.id} className="flex items-center gap-1.5">
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.assignedTo === userId ? 'bg-primary' : 'bg-outline-variant'}`}></span>
-                      <span className={`font-mono text-[10px] truncate ${item.assignedTo === userId ? 'text-primary font-bold' : 'text-on-surface-variant'}`}>
-                        {item.text}
-                      </span>
-                    </div>
-                  ))}
-                  {openItems.length > 3 && (
-                    <span className="font-mono text-[9px] text-on-surface-variant/50 pl-3">+{openItems.length - 3} more</span>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </CollapsibleSection>
+        <span className="material-symbols-outlined text-primary">checklist</span>
+        <span className="min-w-0 flex-1 font-display font-semibold text-on-surface">
+          {openTaskCount === 0
+            ? 'Checklist clear'
+            : `Checklist · ${openTaskCount} open${assignedTaskCount > 0 ? ` · ${assignedTaskCount} mine` : ''}`}
+        </span>
+        <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+      </button>
 
       {/* [9] SETUPS / TIRES — one-line link-outs (full lists live in the Setups tab) */}
       <section className="grid grid-cols-2 gap-2" id="section-linkouts">
