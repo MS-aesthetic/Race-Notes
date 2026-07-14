@@ -1,7 +1,9 @@
 # CREW CHIEF — Agent Handoff & Onboarding
 
 > **Purpose:** single entry point for any new LLM/agent picking up this project.
-> Read this first, then the linked docs. Last updated **2026-07-13**.
+> Read this first, then the linked docs. Last updated **2026-07-14**.
+
+> **Owner UX correction handoff (2026-07-14):** Read [`docs/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md`](./docs/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md) before new UX planning or implementation. It reopens selected C6B–C9 product decisions after owner review. Prior technical QA remains useful regression evidence, but rejected language, Tuning Guide structure, per-click adjustment logging, setup progression presentation, load-graph direction, checklist UX, and maintenance choices are no longer approved behavior.
 
 > ### ⚡ Update 2026-07-12 (supersedes stale details below)
 > - **Two active trees.** Main tree `C:\Users\maxx\antigravity\Race-Notes` stays on `master` and owns the complete gitignored Android platform. UX work lives in `.worktrees\v3` on `preview-v3`. Web builds run in v3; APKs use the documented dist-to-main bridge. `.worktrees/v2` is retired.
