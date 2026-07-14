@@ -1,6 +1,6 @@
 # Current Task — UXF-3 Setup Lifecycle Display Labels
 
-**Status:** IN_PROGRESS — Terra initial build attempt 1
+**Status:** CODE_PASS — Terra initial build attempt 1 complete at `72ea4f8`; independent SOL QA required
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-2 closed by SOL QA at `0c55e7f`
@@ -54,3 +54,15 @@ Rename lifecycle presentation to Starting, Live-Trackside, Current, and evidence
 ## Routing
 
 Terra owns one initial build pass. Primary owns cross-cutting build; cavecrew handles bounded tracing/review. Commit feature and durable handoff, then return to SOL High QA. Any QA failure transfers repair to SOL fixer.
+
+## Terra attempt 1 evidence — 2026-07-14
+
+- Feature commit: `72ea4f8`.
+- Pure display helpers produce Starting, Live-Trackside, Current, and Feature-evidence Raced/otherwise Finished labels. Legacy `Feat. 1` and `A-MAIN` sessions use established session-type inference.
+- Legacy version labels, pressure-source notes, and `No setup baseline` session text translate only at render time. Harness confirms source object, JSON, and cloud-row bytes remain unchanged.
+- New lifecycle labels and visible Setup/Race Weekend/App/Guide/PDF copy use new vocabulary. Lifecycle roles, locks, finish transaction, merge, sync, and storage shapes are unchanged.
+- `npx tsx scripts/chunk6b-lifecycle-harness.ts`: PASS.
+- `npm run lint`: exact three known baseline errors only; no new errors.
+- `npm run build`: PASS, 554 modules and 18 PWA entries.
+- `git diff --check`: PASS. Old-role source sweep: only display-mapping literals/comments remain.
+- Cavecrew review required two bounded display repairs, then returned `No issues.`

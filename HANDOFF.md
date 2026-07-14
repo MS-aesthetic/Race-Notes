@@ -173,7 +173,7 @@ Git worktrees in play:
 | Path | Branch | Role |
 |---|---|---|
 | `C:\Users\maxx\antigravity\Race-Notes` | `master` | **Main/release tree.** Owns complete Android platform and gitignored Gradle/SDK/Firebase files. Preserve existing dirty host/generated files. |
-| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–9 and UXF-1/2/8 complete; UXF-3 next. Web build works here. Local gitignored debug-only Gradle scaffolding may exist from prior QA; it is not committed release configuration. |
+| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–9 and UXF-1/2/8 complete; UXF-3 Terra CODE_PASS at `72ea4f8`, independent SOL QA next. Web build works here. Local gitignored debug-only Gradle scaffolding may exist from prior QA; it is not committed release configuration. |
 
 Audited 2026-07-13: `preview-v3` includes UX-C5 `d5ef1f4`; `master` remains
 release/stable. Git refs do not indicate Netlify deployment state. Main-tree
