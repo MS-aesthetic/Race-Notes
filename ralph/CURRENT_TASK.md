@@ -251,6 +251,22 @@ performance-policy warnings predate this column-only migration. C7 remains locke
   fixtures. Re-run focused harness, exact lint baseline, diff check, cavecrew review.
   No SQL change. C8 stays locked until repair passes SOL QA attempt 2.
 
+### C7 Terra repair 1 CODE_PASS — awaiting SOL QA attempt 2
+
+- Repair commit `030122c`. Numeric normalization now preserves parsed values; +/-
+  commands add exact relative deltas and trim units/trailing zeroes without grid snap.
+  Expanded fixtures cover `510 ±25`, `9.10 ±0.25`, `9.125 +0.25`, and both J-Bar
+  fields in full Setup/run transactions.
+- `selectRaceWeekendSetupForSelection()` distinguishes no raw selection from stale,
+  invalid, or finished selection. Generic active-car Setup is available only with no
+  raw weekend ID; every raw invalid/finished event returns `null` to RaceWeekend UI.
+- `isQuickAdjustRunAvailable()` requires unfinished selected weekend, exact owned
+  Weekend Setup, matching active run IDs, and run membership in weekend sessions.
+  Deleted/stale runs and finished events no longer render editor/Quick Adjust.
+- Expanded C7 harness PASS; exact three-error lint baseline; `git diff --check` PASS;
+  cavecrew repair review `No issues.` No SQL/build/cloud/mobile/draft change. C8 stays
+  locked until independent SOL QA attempt 2.
+
 ## Chunk 8 — Trackers and Maintenance Logs
 
 - Rename visible Service wording/tab to Maintenance Logs; identifiers/storage stay stable.

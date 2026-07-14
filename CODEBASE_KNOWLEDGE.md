@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 7 — SOL QA attempt 1 FAIL)
+> Last updated: 2026-07-13 (UX Chunk 7 — Terra repair 1 CODE_PASS)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1301,3 +1301,10 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   `RaceWeekendView.hasActiveSession` omits unfinished status and current session-record
   membership, so stale/deleted runs can render Quick Adjust despite App write rejection.
   Repair belongs to Terra; C8 stays locked until SOL QA attempt 2 passes.
+- Terra repair `030122c` replaces grid snap with precision-preserving normalization
+  and exact relative addition. It adds `selectRaceWeekendSetupForSelection()` so only
+  an absent raw selection allows generic current-car Setup; stale/invalid/finished IDs
+  return null. `isQuickAdjustRunAvailable()` now gates UI on unfinished event, exact
+  owned Weekend Setup, matching run IDs, and session-record membership. Expanded
+  off-grid/selection/deleted-run fixtures pass; lint remains exact baseline; cavecrew
+  found no issues. Await SOL QA attempt 2; C8 remains locked.
