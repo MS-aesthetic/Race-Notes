@@ -1,107 +1,118 @@
-# Current Task — UXF-5 Copy Tone and Guide Separation
+# Current Task — UXF-6 Maintenance Intervals and Starting Usage
 
-**Status:** COMPLETE — SOL High technical QA PASS attempt 2; owner tone approved
+**Status:** PLANNED — ready for Terra High initial build
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
-**Prerequisite:** UXF-4 closed by SOL QA at `bbaab34`; feature `0c2c827`, repair `12d932f`
+**Prerequisite:** UXF-5 closed by owner approval at `40fcc5f`
 
 ## Goal
 
-Keep operational screens concise. The Tuning Guide is a tuning reference, while app operating instructions belong in the App Guide. Use professional dirt-racing shop language: clear without academic jargon or patronizing simplification.
+Replace redundant Laps / Sessions / Feature Races maintenance measurements with two clear choices: **Races** and **Days**. Let an existing part start with usage already on it, while preserving service history, car/rig scope, automatic checklist injection, local-first persistence, and cloud sync.
 
-## Scope
+## Confirmed behavior
 
-1. **Tuning Guide starts with tuning content.** In `src/components/QuickReferenceView.tsx`:
-   - Remove the four app-help cards/anchors: Setup Sheet, Four-Bar, Load Sessions, Compare Setups.
-   - Remove the entire `Before You Change Anything` block.
-   - The first rendered section must be the Pit-Side Adjustment Finder.
-   - Keep High / Medium / Low available in the tuning reference, compact and professional while preserving the owner-approved meaning: High = try first; Medium = try next if the first change did not fix it; Low = fine-tuning after the bigger items are checked. Do not add another how-to preamble.
-   - Do not remove tuning recommendations, direction, cautions, filters, tables, calculators, or condition content.
+1. **Interval choices:** `MaintenanceIntervalType` becomes exactly `'races' | 'days'`.
+   - Both car- and rig-scoped jobs offer the same choices.
+   - UI label is `Races`, not `Feature races`.
+   - No Laps/Sessions creation or display branch remains.
+2. **Race counting:** one race equals one race weekend containing at least one session where `inferSessionType(session) === 'Feature'`.
+   - Count a weekend once even if it contains multiple Feature sessions.
+   - Established inference must recognize current `sessionType`, `Feature`, `Feature 1`, `Feat. 1`, and `A-MAIN` forms.
+   - Race eligibility uses parsed `weekend.date`, not the session's time-only `time` string. A weekend must fall on a calendar date strictly after `lastServicedAt`; same-day service therefore resets the counter to zero. Add a same-day/next-day boundary fixture.
+3. **Scope stays unchanged:**
+   - Car jobs count only weekends resolved to that component's `carId` through the existing weekend/setup relationship.
+   - Rig jobs count qualifying weekends across all cars.
+   - Do not refactor lifecycle ownership, `byActiveCar`, deletion, or checklist scope.
+4. **Starting usage:** add `startingUsage?: number`, semantically defaulting to `0` when absent.
+   - Derived mode: `used = startingUsage + derivedUsage` for both Races and Days.
+   - `manualUnits` remains a full override. When numeric, it wins outright and starting/derived usage are ignored.
+   - Starting usage accepts finite, nonnegative whole numbers only.
+5. **Service reset:** every normal or quick service log sets `startingUsage` to `0`, advances `lastServicedAt`, and retains current `manualUnits` reset semantics (`0` when manual mode existed, otherwise omitted). Undo restores exact prior component bytes.
+6. **Default catalog:** use only Races/Days:
+   - Engine oil — 3 Races
+   - Motor freshen — 10 Races
+   - Transmission fluid — 60 Days
+   - Wheel bearings — 10 Races
+   - Shock rebuild — 10 Races
+   - Trailer bearings — 180 Days
 
-2. **Contextual help routes to the App Guide, not the Tuning Guide.** The existing `onHelp('setup' | 'four-bar' | 'loads' | 'setup-diff')` callers must remain useful after their Quick Reference anchors are removed.
-   - Add a small explicit section classifier/routing path in `src/App.tsx` (or an extracted pure helper) so those four section requests render App Guide content in the help sheet. A sectionless/global Help request continues to render `QuickReferenceView` as **Tuning Guide**.
-   - Extend `src/components/ui/HelpSheet.tsx` only as needed to accept an accurate title/intro for App Guide versus Tuning Guide and retain anchor scrolling. No silent fallback to the top of Tuning Guide.
-   - Extend `GuideView` with a minimal embedded/active-section API or equivalent. The requested topic must expand before it scrolls into view, and it must react on every section change/reopen rather than only initial mount. Normal Settings → Guide rendering remains unchanged.
-   - Preserve Android Back/bottom-sheet behavior and the four existing contextual-help call sites.
+## Implementation scope
 
-3. **Relocate app operating help.** In `src/components/GuideView.tsx` and `docs/USER_GUIDE.md`:
-   - Keep/enrich Setup Sheet instructions.
-   - Add a dedicated Four-Bar topic covering the stored fields and consistent measurement.
-   - Keep/enrich Load Sessions instructions for travel/load, raw measured height, and Ride Height C-to-C.
-   - Add a dedicated Compare Setups topic explaining Before, After, and highlighted changes without judging the change.
-   - Give the in-app topics exact anchors `setup`, `four-bar`, `loads`, and `setup-diff` for contextual routing.
-   - Put the maintenance 90% automatic-checklist rule in the Maintenance Logs guide section and USER_GUIDE, not on the working screen.
+1. `src/types.ts`
+   - Narrow `MaintenanceIntervalType` to `'races' | 'days'`.
+   - Add optional `startingUsage?: number` beside `manualUnits`.
+   - Update maintenance comments/examples only; no unrelated type work.
+2. `src/lib/maintenance.ts`
+   - Remove lap/session imports and helpers made dead by narrowing.
+   - Derive Races as distinct qualifying weekends using `inferSessionType` from `tireHistory.ts`.
+   - Keep current car-resolution exclusion for ambiguous/unbound weekends and rig-global behavior.
+   - Add normalized starting usage to derived Races/Days totals; non-finite, negative, or fractional legacy values act as `0`.
+   - Preserve `manualUnits` full override.
+   - Reset `startingUsage` in `applyServiceLog`.
+   - Replace `DEFAULT_COMPONENTS` with exact catalog above.
+3. `src/components/TrackersView.tsx`
+   - `Measure by` contains only Races and Days for both scopes.
+   - Add optional numeric field beside Interval. Dynamic label: `Races already run` or `Days already in service`.
+   - Min `0`, step `1`; reject invalid/negative/fractional values rather than silently changing them.
+   - Save omitted/blank as `0` or omitted with identical runtime meaning; reset form state after add.
+   - Defaults stamp starting usage `0`. Existing Used / Limit / Remaining display stays concise.
+4. `src/lib/serviceLog.ts`
+   - Narrow exhaustive unit labels to race/races and day/days.
+   - Replace stale `night(s)` wording. Record-building and undo contracts stay unchanged.
+5. `src/lib/maintenanceSync.ts` (new pure mapper) and `src/lib/sync.ts`
+   - Extract explicit component row mapping so the focused harness can round-trip without network.
+   - Push `starting_usage: component.startingUsage ?? 0`.
+   - Pull `startingUsage` only when it is a finite nonnegative integer; otherwise default `0`. Add negative/fractional/non-finite fixtures.
+   - Pull interval as `days` only when exact; otherwise `races`. This prevents pre-wipe invalid text from entering the narrowed TypeScript union without adding visible legacy modes. Because component pushes send the full array, saving maintenance before the owner wipe may persist that disposable test-data normalization; disclose this in QA rather than adding legacy modes.
+   - Preserve IDs, scope/car ownership, timestamps, notes, manual units, debounce, RLS behavior, and cloud delete paths.
+6. `supabase/migrations/`
+   - Create migration with `npx supabase migration new add_maintenance_starting_usage`; global CLI is unavailable.
+   - Exact reviewed SQL:
+     ```sql
+     alter table if exists public.maintenance_components
+       add column if not exists starting_usage integer not null default 0;
+     ```
+   - No interval rewrite, row deletion, constraint, RLS, index, grant, table, or log change.
+   - Apply once to project `swblfeayxoprodhwxqak` only after local review, then align committed migration version with remote history.
+7. `scripts/chunk8-trackers-harness.ts`
+   - Preserve all current checklist/template/accounting assertions.
+   - Add exact Races/Days source checks and no Laps/Sessions/Feature races option.
+   - Prove zero-session `startingUsage: 10` reports 10; one qualifying Feature weekend reports 11; multiple Features in one weekend still report 11.
+   - Prove `Feature 1`, `Feat. 1`, and `A-MAIN` inference.
+   - Prove car A excludes car B, while rig counts both.
+   - Prove manual override wins, immediate 90% checklist injection works, normal/quick service reset starting usage, and undo-compatible prior bytes remain intact.
+   - Prove pure cloud mapper round-trip for zero/nonzero starting usage and narrowed interval.
 
-4. **Remove maintenance explanation clutter without changing behavior.** In `src/lib/checklistMaintenance.ts` and `src/components/TrackersView.tsx`:
-   - Automatic maintenance task `desc` becomes exactly ```${used}/${limit} ${component.intervalType}```.
-   - Remove now-unused `remaining` from the automatic-task builder only. Keep `cycleId`, `sourceId`, `sourceCycle`, generated task ID, 90% threshold, reset/reopen, assignment, and reconciliation logic unchanged.
-   - Remove the permanent 90% explanation banner above Maintenance Logs.
-   - Remove each row's verbose reason paragraph, including “Below 90%...” and “At least 90%...”. Keep the status chip, progress bar, concise Used / Limit / Remaining line, Log action, and all calculations.
+## Live Supabase facts — verified 2026-07-14
 
-5. **Bounded professional-language audit.** Limit judgment-based copy edits to `QuickReferenceView.tsx`, `GuideView.tsx`, `docs/USER_GUIDE.md`, and the existing C9 translation layer in `plainRacerEffect`.
-   - Preserve all raw researched adjustment data and tuning direction. Fix ordered render-time translations only.
-   - Avoid the C9 flagged literals in rendered copy, but do not replace them with childish phrases such as “part of the tire touching the track,” “weight moving,” “the car leaning,” or “how the car sits.” Prefer established shop terms such as tire contact, load shift, car roll, bar angle/rear steer, braking, throttle, and mid-corner when technically accurate.
-   - Remove redundant coaching/commentary. Keep cautions that affect safety, applicability, tire rules, or technical direction.
-   - Fix grammar produced by chained replacements; the rendered adjustment corpus must read naturally.
+- Project `swblfeayxoprodhwxqak`; migrations applied through `20260714020037 setup_weekend_lifecycle`.
+- `public.maintenance_components` has RLS enabled and no `starting_usage` column.
+- Seven test rows exist: 2 Days, 3 Laps, 2 Races. Migration must not delete or rewrite them. Client pull safely normalizes unsupported interval text to Races, which may persist on a later full maintenance save; owner plans a test-data wipe before production.
+- Existing table/API grants remain valid for an added column. 2026 Data API new-table exposure change does not apply because this alters an existing exposed RLS table.
 
-6. **Harnesses.** Update:
-   - `scripts/chunk8-trackers-harness.ts`: exact terse description; source/cycle/idempotence/90%-boundary/removal/completed-history behavior unchanged; assert banner and row-reason copy are absent.
-   - `scripts/chunk9-export-help-harness.ts`: Quick Reference lacks the four app-help anchors and Before block; GuideView owns all four anchors/topics; App/HelpSheet route sectioned help to App Guide and sectionless help to Tuning Guide; USER_GUIDE contains all four topics and maintenance threshold guidance; all 134 raw effect literals still pass through `plainRacerEffect`; rendered corpus/grammar/professional tone checks pass.
-7. **Focused help runtime:** locally verify global Help opens Tuning Guide; each of the four contextual actions opens its expanded App Guide topic; sequential `setup → loads → setup-diff` requests update instead of showing stale content; Settings → Guide still behaves normally; close button/scrim and Android Back close the sheet correctly.
+## Verification gates
 
-## Primary files
-
-- `src/components/QuickReferenceView.tsx`
-- `src/components/GuideView.tsx`
-- `src/components/ui/HelpSheet.tsx`
-- `src/App.tsx`
-- `src/components/TrackersView.tsx`
-- `src/lib/checklistMaintenance.ts`
-- `docs/USER_GUIDE.md`
-- `scripts/chunk8-trackers-harness.ts`
-- `scripts/chunk9-export-help-harness.ts`
+1. `npx tsx scripts/chunk8-trackers-harness.ts` PASS.
+2. Exact three-error `npm run lint` baseline; no new errors.
+3. `npm run build` PASS.
+4. `git diff --check` PASS; scope audit clean; cavecrew reviewer finds no blocker.
+5. Live migration verification after safe apply:
+   - migration listed once;
+   - `starting_usage` is integer, `NOT NULL`, default `0`;
+   - row count remains 7 and existing rows read `0`;
+   - RLS remains enabled;
+   - security/performance advisors checked;
+   - authenticated Races/Days component push/pull/delete round trip if session available. Do not invent evidence when auth is unavailable.
+6. Runtime: 320/390 px, light/dark, Default/Large; add car and rig jobs; starting usage displays immediately; service resets it; automatic checklist appears at 90%; offline reload retains field.
+7. Create one Netlify draft after coherent PASS. Never production.
 
 ## Out of scope
 
-- No Main Checklist structural redesign, creation/reset flow change, or resurrection-policy change; UXF-7 owns redesign.
-- No interval type/measurement/start-usage change; UXF-6 owns that.
-- No lifecycle vocabulary/mechanics, setup/run data, tuning recommendation/data direction, storage/sync/type/schema/migration, package, native config, deploy, push, merge, or APK.
-- No app-wide copy rewrite outside the bounded files above.
-
-## Acceptance
-
-1. Opening normal Help shows Tuning Guide with Pit-Side Adjustment Finder first. It has no app-help cards and no Before block.
-2. Setup, Four-Bar, Load Sessions, and Compare Setups `?` actions open the matching expanded App Guide topic, including sequential topic changes/reopens; normal Settings → Guide still works.
-3. App Guide and USER_GUIDE contain all four operating topics plus the maintenance 90% rule.
-4. Maintenance working screens show concise state/action only. Automatic task description is exact and all threshold/cycle/idempotence behavior remains unchanged.
-5. Raw tuning data is unchanged; every rendered effect is translated; rendered/direct copy contains no banned academic literals, broken grammar, or patronizing repair phrases.
-6. Full chunk8 and chunk9 harnesses PASS; exact three-error lint baseline; production build PASS; `git diff --check` PASS; focused help runtime passes global/contextual/sequential/close/Android Back paths; cavecrew review finds no blocker.
-7. SOL performs independent technical QA. Technical PASS records **AWAITING OWNER TONE REVIEW** rather than closing UXF-5. Maxx's local/draft spot-review is the final product-acceptance gate.
+- No Main Checklist redesign or resurrection-policy changes; UXF-7 owns proposal.
+- No automatic checklist threshold/cycle/idempotence change.
+- No maintenance component edit flow, lifecycle/setup/run changes, accounting changes, package/native config, APK, production deploy, remote push, or merge.
+- No migration-time cleanup or conversion of current Laps/Sessions test rows. Safe client normalization described above is allowed for disposable test data; no visible legacy interval mode is allowed.
 
 ## Routing
 
-Terra owns one initial build pass. Primary owns this cross-file change; cavecrew handles bounded trace/review. Commit feature and durable handoff, then return to SOL High QA. Any QA failure transfers repair to SOL fixer; Terra is not re-invoked. Do not start UXF-6 before UXF-5 technical QA and owner tone disposition are recorded.
-
-## Terra attempt 1 evidence — 2026-07-14
-
-- Feature commit: `e2f0553`.
-- Tuning Guide now begins with Pit-Side Adjustment Finder. The four operating-help cards and the Before block are removed without changing the researched tuning records, directions, or cautions.
-- Sectioned Setup, Four-Bar, Load Sessions, and Compare Setups help routes to the matching expanded App Guide topic. Sectionless global Help still opens Tuning Guide; Settings → Guide retains its normal presentation.
-- Maintenance working screens retain status, progress, Used/Limit/Remaining, and Log action while removing the permanent threshold banner and row-level reason paragraphs. Automatic task descriptions are exactly `${used}/${limit} ${intervalType}`; reconciliation math, cycles, IDs, and storage shape are unchanged.
-- Professional shop-language repair is render-only. All 134 raw effect literals remain source data and pass through `plainRacerEffect`; focused corpus and grammar guards cover translated and direct copy.
-- `scripts/chunk8-trackers-harness.ts` PASS; `scripts/chunk9-export-help-harness.ts` PASS; lint reports only the exact three known errors; production build PASS with 555 modules and 18 PWA entries; `git diff --check` PASS; cavecrew final review found no issues.
-- Local signed-out auth shell opened with zero console errors. Authenticated contextual clicks were unavailable on that origin, so no such runtime claim is made. Sequential topic changes and embedded/normal Guide rendering are covered by focused SSR fixtures; existing BottomSheet close and Android Back handling remain source-verified.
-- No checklist redesign, interval behavior, lifecycle, schema, migration, sync shape, type, package, native config, deploy, push, merge, or APK change.
-
-## SOL technical QA — 2026-07-14
-
-- Attempt 1 found one medium copy blocker: five translated effects still produced awkward or academic output (`resists the chassis from rolling`, `keeping rear tire loading`, `cushioning the tire contact`, `Maximum mechanical forward traction`, and `allows weight to transfer`). Routing correctly transferred repair to SOL; Terra was not re-invoked.
-- SOL fixer commit `83e652f` adds ordered phrase-specific render translations and exact harness guards. `BEHAVIOR_DATA` remains byte-equal to plan commit `aeaa62f` after line-ending normalization.
-- QA attempt 2 PASS. Chunk8 and expanded chunk9 harnesses PASS; lint remains exact three-error baseline; production build PASS with 555 modules and 18 PWA entries; diff and clean-tree checks PASS; cavecrew re-review reports no issues.
-- After technical QA, UXF-5 remained open until Maxx reviewed guide tone on the draft. UXF-6 stayed locked during that review.
-
-## Owner acceptance — 2026-07-14
-
-- Netlify draft `https://6a5682d667a1ecb5c117bf39--crew-chief-race-notes.netlify.app/` deployed from closure commit `f12fb49` and verified HTTP 200.
-- Maxx approved UXF-5 tone after reviewing the draft.
-- UXF-5 is complete. UXF-6 is unlocked for SOL planning; no production deploy occurred.
+Terra High owns one initial cross-file build pass. Cavecrew handles bounded trace/review only. Commit feature and durable handoff, then return to SOL High for independent UXF-6 QA. Any QA failure transfers to SOL fixer; Terra is not re-invoked. UXF-7 stays locked until UXF-6 QA PASS.

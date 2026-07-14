@@ -173,7 +173,7 @@ Git worktrees in play:
 | Path | Branch | Role |
 |---|---|---|
 | `C:\Users\maxx\antigravity\Race-Notes` | `master` | **Main/release tree.** Owns complete Android platform and gitignored Gradle/SDK/Firebase files. Preserve existing dirty host/generated files. |
-| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–9 and UXF-1/2/3/4/5/8 complete. UXF-5 feature `e2f0553` plus SOL repair `83e652f` passed technical QA at 96; Maxx approved tone on draft `6a5682d667a1ecb5c117bf39`. UXF-6 is unlocked for SOL planning. Tuning Guide starts with the finder; operating help lives in contextual App Guide topics; maintenance working screens are concise; raw tuning data and behavior remain unchanged. No production/schema/package/native change. Local gitignored debug-only Gradle scaffolding may exist from prior QA; it is not committed release configuration. |
+| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–9 and UXF-1/2/3/4/5/8 complete. UXF-6 SOL work order is ready: Races/Days-only maintenance intervals, distinct Feature-weekend counting, optional starting usage, service reset, explicit sync mapping, and one additive `starting_usage` column. Live schema/history verified read-only; 7 test rows remain untouched. Terra initial build next; UXF-7 locked until QA PASS. No production/package/native change. Local gitignored debug-only Gradle scaffolding may exist from prior QA; it is not committed release configuration. |
 
 Audited 2026-07-13: `preview-v3` includes UX-C5 `d5ef1f4`; `master` remains
 release/stable. Git refs do not indicate Netlify deployment state. Main-tree
