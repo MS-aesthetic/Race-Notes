@@ -1,6 +1,6 @@
 # Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** IN PROGRESS — C6B TERRA REPAIR COMPLETE; AWAITING SOL QA ATTEMPT 2; C7 LOCKED
+**Status:** IN PROGRESS — C6B SOL QA FAIL 2; TERRA REPAIR 2 REQUIRED; C7 LOCKED
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -117,6 +117,34 @@
   legacy/partial recovery is covered by pure harness rather than authenticated UI.
 - Migration unchanged. Production, remote branch, `master`, and release APK unchanged.
   C7 remains locked pending independent SOL QA attempt 2.
+
+### C6B SOL QA attempt 2 — FAIL (2026-07-13)
+
+1. `src/App.tsx`: when an active weekend's owned Setup is missing/invalid,
+   `raceWeekendSetup` falls back to selected car's generic setup. RaceWeekend quick
+   edit can then expose/mutate another car. If an active weekend exists, pass only its
+   valid event-owned Setup or `null`; generic active-car fallback is allowed only when
+   no active weekend exists.
+2. `src/App.tsx`: legacy weekend with no `setupId` receives `activeCarSetup` as Finish
+   fallback. Switching selector before Finish silently copies that car's data. Use a
+   proven event-car source when one exists; otherwise create exact blank fallback.
+3. `src/lib/setupLifecycle.ts`: deterministic Final/Current rows are reused even when
+   matching Weekend Setup is still unlocked. Stale rows can replace newer active data.
+   Reuse recovery rows only when matching Weekend snapshot is already locked; otherwise
+   rebuild Final/Current from current Weekend Setup and replace deterministic IDs.
+4. Completed Weekend immutability depends only on `Setup.lockedAt`. A partial cloud
+   state can contain finished `RaceWeekend` plus unlocked Weekend Setup, which remains
+   editable/deletable. App boundary and UI lock checks must also treat a Weekend Setup
+   tied to a finished weekend as historical regardless of missing `lockedAt`.
+
+Required repair harness additions: missing event-owned setup never falls back through
+RaceWeekend UI; no-link legacy Finish after car switch uses blank/proven source only;
+unlocked Weekend plus stale deterministic rows rebuilds from Weekend data; finished
+weekend relationship locks an unlocked Weekend snapshot. Existing harness, exact
+three-error lint baseline, 540-module build, live migration/schema/RLS, and draft HTTP
+shell pass. Live `setups`/`race_weekends` contain zero rows, so no authenticated data
+round trip was available. Advisors show no setup/weekend security finding; existing
+performance-policy warnings predate this column-only migration. C7 remains locked.
 
 ## Chunk 7 — expanded Quick Adjust
 

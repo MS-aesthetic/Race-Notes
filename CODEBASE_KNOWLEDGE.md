@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 6B — setup weekend lifecycle Terra repair)
+> Last updated: 2026-07-13 (UX Chunk 6B — SOL QA attempt 2)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1223,4 +1223,13 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
 - Repair gate: harness PASS; cavecrew re-review clean; exact three-error lint baseline;
   build PASS (540 modules, 16 Workbox entries); 390 px draft shell and console PASS.
   Draft `https://6a55a024d663b44ca4f639c7--crew-chief-race-notes.netlify.app`.
-  Migration unchanged; C7 remains locked pending SOL QA attempt 2.
+  Migration unchanged; independent QA attempt 2 details follow.
+- SOL QA attempt 2 failed four remaining edges. `raceWeekendSetup` uses generic
+  selected-car fallback when event-owned setup cannot resolve; no-link legacy Finish
+  passes selected-car data as fallback; matching deterministic Final/Current rows can
+  be reused while Weekend Setup is still unlocked; and completed-weekend relationship
+  does not lock an unlocked partial-cloud Weekend snapshot at App/UI boundaries.
+- Direct fixture showed no-link legacy Finish copied `car-b`, and an unlocked Weekend
+  gear `7.00` reused stale Final gear `6.00`. Repair 2 must add event-only UI resolution,
+  blank/proven legacy fallback, locked-only recovery reuse, and relational finished-
+  weekend locking. Existing harness/build/schema gates remain green; C7 stays locked.
