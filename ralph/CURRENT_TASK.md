@@ -1,6 +1,6 @@
 # Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** IN PROGRESS — C8 TERRA CODE_PASS; AWAITING SOL QA; C9 LOCKED
+**Status:** IN PROGRESS — C8 SOL QA PASS; C9 UNLOCKED FOR TERRA
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -297,7 +297,7 @@ performance-policy warnings predate this column-only migration. C7 remains locke
 - Accounting new entry defaults date today and category last used; five recent distinct
   description/category chips fill repeat details but not amount.
 
-### C8 Terra CODE_PASS — awaiting SOL QA
+### C8 Terra CODE_PASS — implementation result
 
 - Feature commit `2f60420`. Visible Trackers/Dashboard/Guide copy now says
   Maintenance Logs while internal `service` identifiers, keys, and DB shapes stay stable.
@@ -321,6 +321,22 @@ performance-policy warnings predate this column-only migration. C7 remains locke
   Unique origin lacks remembered auth; authenticated cloud round trip remains unavailable.
 - Production, remote branch, `master`, release APK, and Supabase schema unchanged.
   C9 stays locked until independent SOL C8 + combined-gate verdict.
+
+### C8 SOL QA — PASS; C8 closed
+
+- Independently inspected feature `2f60420` and handoff `a871a4b`. Checklist reset,
+  template tombstones/re-materialization, assignment edits, 90% maintenance cycles,
+  accounting defaults/repeat chips, naming, and pull-gated App reconciliation pass.
+- C6A/C6B/C7/C8 focused harnesses PASS. `npm run lint` remains exactly the three
+  known baseline errors. Production build PASS: 545 modules and 16 PWA entries.
+  `git diff --check cb010b8..a871a4b` PASS; cavecrew independent review found no issues.
+- Todo source/type/cycle fields round-trip inside the existing `todos.items` JSONB;
+  no migration is required. Current Supabase changelog has no change affecting this
+  existing-table JSON payload. Authenticated live task data was unavailable and is
+  not claimed.
+- Combined Android current-bundle smoke and 320px draft shell evidence accepted.
+  Draft predates only the final hidden-template tombstone fixture; code and harness
+  independently cover that edge. C8 closed; C9 unlocked for Terra High.
 
 ## Chunk 9 — export, help, copy, final regression
 

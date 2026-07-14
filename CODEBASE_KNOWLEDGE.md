@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 8 — Terra CODE_PASS, SOL QA pending)
+> Last updated: 2026-07-13 (UX Chunk 8 — SOL QA PASS; Chunk 9 unlocked)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1316,7 +1316,7 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
 
 ## 28. UX Chunk 8 — Trackers and Maintenance Logs (2026-07-13)
 
-- Terra feature `2f60420` is CODE_PASS; C9 is locked pending independent SOL QA.
+- Terra feature `2f60420` passed independent SOL QA; C8 is closed and C9 is unlocked.
 - Visible UI uses **Maintenance Logs**. Internal `SubTab='service'`, `MaintenanceLog`
   values, localStorage keys, and Supabase table/column names are deliberately unchanged.
 - `TodoItem.kind` is optional `core|adhoc`; missing means core. Optional `sourceType`,
@@ -1345,3 +1345,9 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   harnesses pass. Lint exact baseline; build 545 modules/16 PWA entries; cavecrew clean.
   Android debug dark mobile smoke confirms current naming and due-job injection. Draft:
   `https://6a55b29bbc2a11f748b406a3--crew-chief-race-notes.netlify.app`.
+- SOL QA re-ran C6A/C6B/C7/C8 harnesses, exact three-error lint baseline, the
+  545-module/16-entry production build, and feature-range diff check. Independent
+  cavecrew review found no issues. Existing Todo JSONB carries the optional fields;
+  no migration is needed. Authenticated live Todo rows were unavailable and are not
+  claimed. The draft predates only the final hidden-template tombstone correction;
+  source inspection and the focused fixture cover that edge.

@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunks 1–7 ✅ SOL QA PASS · Chunk 8 Terra CODE_PASS at `2f60420`, awaiting SOL QA · 9 locked by dependencies. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
+> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunks 1–8 ✅ SOL QA PASS · Chunk 9 unlocked for Terra High. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:
@@ -170,7 +170,10 @@ Original seven-chunk plan below remains implementation history. Current remainin
    three-error lint baseline; 545-module/16-entry build; final cavecrew review clean;
    Android current-bundle dark mobile smoke and automatic task injection pass; draft
    `6a55b29bbc2a11f748b406a3` auth shell passes at 320px with zero console errors.
-   No SQL migration. Await independent SOL C8/combined-gate QA before C9.
+   No SQL migration. Independent SOL C8/combined-gate QA PASS: all C6A–C8 focused
+   harnesses, exact lint baseline, 545-module build, diff check, and cavecrew review
+   pass. Android/draft evidence accepted; authenticated task rows were unavailable
+   and are not claimed. C8 closed; C9 unlocked.
 5. **Chunk 9 — export/help/final regression.** Former Chunk 7 after all new screens stabilize.
 
 Dependency: 6A → 6B → 7; 6B → 8; 7+8 → 9. Feature builds stay serial. Test once per coherent slice, then consolidated Android/preview regression per completed chunk.

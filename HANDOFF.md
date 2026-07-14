@@ -15,7 +15,7 @@
 > A dedicated UX/UI overhaul is in progress on a NEW worktree **`.worktrees/v3` (branch `preview-v3`, created from `master` `3ea6648`)**. `master` is untouched; the overhaul lands on `preview-v3` and merges to `master` only on owner approval.
 > - **Source of the work:** [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md) (Fable expert UX audit — 37 recs, cost/benefit) → [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md) (spec-driven, 7 build chunks).
 > - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High owns implementation; QA failures 1–2 return to Terra and failure 3 transfers build+final QA to SOL. Codex model overrides and rollout metadata are now verified: SOL → Terra → SOL works in one persistent task. Generic prose self-identification is not model evidence. **`/caveman full`** stays on. One consolidated QA pass per chunk + standing `tsc --noEmit` (3-error baseline) and `vite build` gates.
-> - **Chunk status:** ✅ **1–7**. C8 Terra CODE_PASS at `2f60420`, awaiting SOL QA. Export/help/final sweep C9 stays locked until PASS.
+> - **Chunk status:** ✅ **1–8**. C8 SOL QA PASS at `2f60420`; export/help/final sweep C9 is unlocked for Terra High.
 > - **New reusable code (chunks 1-4):** `src/components/ui/` (`NumberStepper`, `UndoToast`+`InfoToast`, `EmptyState`, `CollapsibleSection`, `SegmentedGrid`, `BottomSheet`, `HelpSheet`, `LapTimeKeypad`); `src/lib/undo.ts`; `src/lib/backStack.ts`; `src/lib/saveStatus.ts`; `src/lib/sessionSequence.ts`; `src/lib/serviceLog.ts`; `src/lib/scope.ts` (`pickAutoWeekend`, `parseWeekendDate`, `sortWeekends`); `src/components/ContextStrip.tsx`; `src/components/GetRaceReadyCard.tsx`. CSS: `.tap-target`, `.sticky-action-bar`, `.status-chip` + light-theme contrast bump.
 > - **Owner UX answers baked into the plan:** (1) app used during the week + at the track after each run; (2) 95% single-user → assignment/concurrency deferred; (3) most teams 1 car (some 2-3) → car UI hidden at ≤1 car; (4) **four-bar changed VERY often trackside → make it FAST, not hidden** (reverses the "fold behind expander" rec — chunk 5); (5) dusk→night racing → sunlight/light-theme tuned; (6) Main Checklist = hybrid core-reset + ad-hoc (chunk 6).
 > - **Testing:** v3 APKs use the build-from-main bridge: run lint then build in v3; mirror v3 `dist` to main; run raw `npx cap sync android` (not main `npm run android:sync`, which rebuilds master); run `assembleDebug`. Current Chunk 4 APK is versionCode 14/versionName 3.9 at the standard debug output. Android emulator QA passed fresh-profile hero→weekend→new-session, quick-service cost→Accounting→Undo, and session ⋯ delete→Undo. Emulator native `screencap` showed white because WebView tile-memory/compositor warnings; direct WebView capture and DOM verified rendered UI.
@@ -71,8 +71,8 @@
 >   baseline, independent code inspection, and cavecrew review all pass. C7 closed;
 >   C8 unlocked. Combined build/cloud/mobile/Netlify gate remains due after C8.
 
-> ### 🧰 UX-C8 Trackers/Maintenance — Terra CODE_PASS 2026-07-13
-> - Feature `2f60420`; independent SOL QA pending. C9 remains locked.
+> ### 🧰 UX-C8 Trackers/Maintenance — SOL QA PASS 2026-07-13
+> - Feature `2f60420`; independent SOL QA passed. C8 closed; C9 unlocked.
 > - Visible Service copy is now Maintenance Logs across Trackers, Dashboard, Guide,
 >   and user guide. Internal `service` values, storage keys, and DB tables stay stable.
 > - `src/lib/checklistMaintenance.ts` owns optional `core|adhoc` compatibility,
@@ -89,6 +89,11 @@
 >   Android debug current bundle shows dark mobile Maintenance naming and automatic
 >   checklist injection with no crash. Draft `6a55b29bbc2a11f748b406a3` boots at 320px
 >   with zero console errors; unique origin has no remembered auth. No SQL/production.
+> - SOL independently re-ran C6A–C8 harnesses, exact lint baseline, 545-module build,
+>   and diff check. Cavecrew found no issues. Template tombstone/repopulation, completed
+>   maintenance history/current reopen, stale assignment, 90% boundary/idempotence,
+>   and accounting repeat semantics pass. Todo additions stay in existing JSONB; no
+>   migration. Authenticated task rows were unavailable and are not claimed.
 
 > ### 🧭 Owner revision — 2026-07-13
 > - Finish Weekend is always available at page bottom. No race/session gate; test days may be finished normally.
