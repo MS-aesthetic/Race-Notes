@@ -398,6 +398,16 @@ export interface TodoItem {
   /** Optional link to a race weekend */
   weekendId?: string;
   weekendName?: string;
+  /** Missing on legacy rows means a reusable core checklist job. */
+  kind?: 'core' | 'adhoc';
+  /** Where this task came from. Stored inside the existing Todo JSON payload. */
+  sourceType?: 'manual' | 'template' | 'maintenance';
+  /** Stable source identity used to reconcile automatic maintenance jobs. */
+  sourceId?: string;
+  /** Identifies the maintenance interval cycle without changing sourceId. */
+  sourceCycle?: string;
+  /** Core jobs are hidden until the next reset instead of being destroyed. */
+  removedUntilReset?: boolean;
 }
 
 export interface Todo {
@@ -440,6 +450,8 @@ export interface AccountingEntry {
   id: string;
   name: string;
   description?: string;
+  /** User-facing bookkeeping category. Missing legacy values fall back to name. */
+  category?: string;
   /** Positive value; type field determines income vs expense */
   amount: number;
   type: 'income' | 'expense';

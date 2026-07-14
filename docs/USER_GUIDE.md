@@ -87,13 +87,13 @@ A weekend is the event container holding sessions.
 - Without a team, tasks still work but are not assigned to a person.
 
 ## Creating templates
-- **Trackers** → **Templates**.
+- **Trackers** → **Checklist** → **Edit List**.
 - Create a template and add reusable preparation items.
 - Import it from Trackers → Checklist whenever needed.
 - Template edits never change items already imported into Main Checklist.
 
-## Logging service
-- **Trackers** → **Service**.
+## Logging maintenance
+- **Trackers** → **Maintenance Logs**.
 - Add car or rig components with lap/session/race/day intervals.
-- Log service, replacement, or inspection work.
-- Optional service cost creates an Accounting expense.
+- Log maintenance, replacement, or inspection work.
+- Optional maintenance cost creates an Accounting expense.

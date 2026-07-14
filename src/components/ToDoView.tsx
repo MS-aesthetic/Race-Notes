@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChecklistTemplate, Todo, TodoItem } from '../types';
 import { AppUser } from '../lib/supabase';
 import { getMainChecklist, MAIN_CHECKLIST_TITLE } from '../lib/mainChecklist';
+import { editChecklistItem, KEEP_ADDED_ITEMS_KEY, resetMainChecklist, todoItemKind } from '../lib/checklistMaintenance';
 
 // ── Completion confirmation modal ─────────────────────────────────────────
 
@@ -88,6 +89,7 @@ interface ToDoViewProps {
   teamMembers?: AppUser[];
   currentUserId?: string | null;
   templates?: ChecklistTemplate[];
+  onManageTemplates?: () => void;
 }
 
 export default function ToDoView({
@@ -96,6 +98,7 @@ export default function ToDoView({
   teamMembers = [],
   currentUserId = null,
   templates = [],
+  onManageTemplates,
 }: ToDoViewProps) {
   const activeTodo = getMainChecklist(todos);
   const [newItemText, setNewItemText]           = useState('');
@@ -106,6 +109,11 @@ export default function ToDoView({
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [pendingComplete, setPendingComplete]   = useState<{ todoId: string; item: TodoItem } | null>(null);
   const [showMyTasks, setShowMyTasks]           = useState(false);
+  const [editingItem, setEditingItem] = useState<TodoItem | null>(null);
+  const [editText, setEditText] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editAssignee, setEditAssignee] = useState('');
+  const [keepAddedItems, setKeepAddedItems] = useState(() => localStorage.getItem(KEEP_ADDED_ITEMS_KEY) !== 'false');
 
   const saveMainItems = (items: TodoItem[]) => {
     const now = new Date().toISOString();
@@ -133,6 +141,9 @@ export default function ToDoView({
       id: `item-${stamp}-${index}-${Math.random().toString(36).slice(2, 7)}`,
       text: item.text,
       done: false,
+      kind: 'core',
+      sourceType: 'template',
+      sourceId: `template:${template.id}:${item.id}`,
     }));
     saveMainItems([...(activeTodo?.items ?? []), ...imported]);
     setSelectedTemplateId('');
@@ -149,6 +160,8 @@ export default function ToDoView({
       text: newItemText.trim(),
       desc: newItemDesc.trim() || undefined,
       done: false,
+      kind: 'adhoc',
+      sourceType: 'manual',
       assignedTo: assignee?.id || undefined,
       assignedToName: assignee
         ? (assignee.displayName || assignee.email || 'Team Member')
@@ -184,13 +197,53 @@ export default function ToDoView({
   };
 
   const deleteItem = (_todoId: string, itemId: string) => {
-    saveMainItems((activeTodo?.items ?? []).filter(i => i.id !== itemId));
+    saveMainItems((activeTodo?.items ?? []).flatMap(item => {
+      if (item.id !== itemId) return [item];
+      return todoItemKind(item) === 'core' ? [{ ...item, removedUntilReset: true }] : [];
+    }));
+  };
+
+  const openEdit = (item: TodoItem) => {
+    setEditingItem(item);
+    setEditText(item.text);
+    setEditDesc(item.desc || '');
+    setEditAssignee(item.assignedTo || '');
+  };
+
+  const saveEdit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingItem || !editText.trim()) return;
+    const assignee = teamMembers.find(member => member.id === editAssignee);
+    const assignedTo = editAssignee === '' ? undefined : (assignee?.id || editingItem.assignedTo);
+    const assignedToName = editAssignee === ''
+      ? undefined
+      : (assignee ? (assignee.displayName || assignee.email || 'Team Member') : editingItem.assignedToName);
+    saveMainItems((activeTodo?.items ?? []).map(item => item.id === editingItem.id
+      ? editChecklistItem(item, {
+          text: editText,
+          notes: editDesc,
+          assignedTo,
+          assignedToName,
+        })
+      : item));
+    setEditingItem(null);
+  };
+
+  const setKeepPreference = (value: boolean) => {
+    setKeepAddedItems(value);
+    localStorage.setItem(KEEP_ADDED_ITEMS_KEY, String(value));
+  };
+
+  const resetForWeekend = () => {
+    if (!window.confirm('Reset Main Checklist for a new weekend? Completed marks and completion notes will be cleared.')) return;
+    onSaveTodos(resetMainChecklist(todos, keepAddedItems, new Date().toISOString(), templates));
   };
 
   // ── Derived ────────────────────────────────────────────────────────────
 
-  const allOpen    = activeTodo?.items.filter(i => !i.done) || [];
-  const allDone    = activeTodo?.items.filter(i => i.done)  || [];
+  const visibleItems = activeTodo?.items.filter(item => !item.removedUntilReset) ?? [];
+  const allOpen    = visibleItems.filter(i => !i.done);
+  const allDone    = visibleItems.filter(i => i.done);
   const activeTodoId = activeTodo?.id ?? '';
 
   const myTaskCount  = allOpen.filter(i => i.assignedTo === currentUserId).length;
@@ -227,11 +280,45 @@ export default function ToDoView({
         />
       )}
 
+      {editingItem && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={saveEdit} className="bg-surface border-2 border-outline rounded-lg p-5 max-w-sm w-full shadow-2xl space-y-4">
+            <h3 className="font-display font-bold uppercase text-sm text-on-surface">Edit Task</h3>
+            <div>
+              <label className="block text-[10px] font-mono uppercase text-on-surface-variant mb-1">Task</label>
+              <input autoFocus value={editText} onChange={event => setEditText(event.target.value)} className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono uppercase text-on-surface-variant mb-1">Notes</label>
+              <textarea value={editDesc} onChange={event => setEditDesc(event.target.value)} rows={3} className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none resize-none" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono uppercase text-on-surface-variant mb-1">Assigned To</label>
+              <select value={editAssignee} onChange={event => setEditAssignee(event.target.value)} className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none">
+                <option value="">Unassigned</option>
+                {teamMembers.map(member => <option key={member.id} value={member.id}>{member.displayName || member.email || member.id}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setEditingItem(null)} className="px-3 py-2 border border-outline-variant rounded font-mono text-xs uppercase">Cancel</button>
+              <button type="submit" className="px-4 py-2 bg-primary text-on-primary rounded font-mono text-xs font-bold uppercase">Save Task</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* ── One global Main Checklist ─────────────────────────────── */}
       <div className="flex flex-col gap-3 bg-surface p-3 rounded-lg border border-outline-variant/50">
-        <div>
-          <h3 className="font-display font-bold uppercase text-primary text-sm tracking-wide">Main Checklist</h3>
-          <p className="font-mono text-[10px] text-on-surface-variant/60 mt-1">One active team list. Add items manually or import a template.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-display font-bold uppercase text-primary text-sm tracking-wide">Main Checklist</h3>
+            <p className="font-mono text-[10px] text-on-surface-variant/60 mt-1">One active team list. Add items manually or import a template.</p>
+          </div>
+          {onManageTemplates && (
+            <button type="button" onClick={onManageTemplates} className="shrink-0 min-h-11 px-3 border border-outline-variant rounded font-mono text-[10px] font-bold uppercase text-on-surface-variant hover:text-primary hover:border-primary">
+              Edit List
+            </button>
+          )}
         </div>
         {templates.length > 0 && (
           <div className="flex gap-2">
@@ -253,6 +340,15 @@ export default function ToDoView({
             </button>
           </div>
         )}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-outline-variant/40">
+          <label className="flex items-center gap-2 min-h-11 cursor-pointer font-mono text-[10px] uppercase text-on-surface-variant">
+            <input type="checkbox" checked={keepAddedItems} onChange={event => setKeepPreference(event.target.checked)} className="w-5 h-5 accent-primary" />
+            Keep added items on reset
+          </label>
+          <button type="button" onClick={resetForWeekend} className="min-h-11 px-3 border border-outline-variant rounded font-mono text-[10px] uppercase font-bold text-on-surface-variant hover:text-primary hover:border-primary">
+            Reset for New Weekend
+          </button>
+        </div>
       </div>
 
       {/* ── Active list ──────────────────────────────────────────────── */}
@@ -372,7 +468,11 @@ export default function ToDoView({
                   return (
                     <div
                       key={item.id}
-                      className={`relative flex items-start gap-3 p-3 rounded border transition-colors ${
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleCheckboxClick(activeTodoId, item)}
+                      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleCheckboxClick(activeTodoId, item); } }}
+                      className={`relative min-h-14 flex items-start gap-3 p-3 rounded border transition-colors cursor-pointer ${
                         isAssignedToMe
                           ? 'bg-primary/5 border-primary/40 hover:border-primary/70'
                           : 'bg-surface-container border-outline-variant/30 hover:border-primary/30'
@@ -385,6 +485,7 @@ export default function ToDoView({
                       <input
                         type="checkbox"
                         checked={false}
+                        onClick={event => event.stopPropagation()}
                         onChange={() => handleCheckboxClick(activeTodoId, item)}
                         className="w-5 h-5 accent-primary cursor-pointer shrink-0 mt-0.5"
                       />
@@ -400,7 +501,14 @@ export default function ToDoView({
                         )}
                       </div>
                       <button
-                        onClick={() => deleteItem(activeTodoId, item.id)}
+                        type="button"
+                        onClick={event => { event.stopPropagation(); openEdit(item); }}
+                        aria-label={`Edit ${item.text}`}
+                        className="shrink-0 material-symbols-outlined text-[18px] text-on-surface-variant/50 hover:text-primary mt-0.5"
+                      >edit</button>
+                      <button
+                        type="button"
+                        onClick={event => { event.stopPropagation(); deleteItem(activeTodoId, item.id); }}
                         className="shrink-0 material-symbols-outlined text-[16px] text-on-surface-variant/40 hover:text-red-400 mt-0.5"
                       >
                         close
@@ -436,11 +544,16 @@ export default function ToDoView({
                 {displayDone.map(item => (
                   <div
                     key={item.id}
-                    className="flex items-start gap-3 p-3 bg-surface-container/50 rounded border border-outline-variant/20"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleCheckboxClick(activeTodoId, item)}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleCheckboxClick(activeTodoId, item); } }}
+                    className="min-h-14 flex items-start gap-3 p-3 bg-surface-container/50 rounded border border-outline-variant/20 cursor-pointer"
                   >
                     <input
                       type="checkbox"
                       checked={true}
+                      onClick={event => event.stopPropagation()}
                       onChange={() => handleCheckboxClick(activeTodoId, item)}
                       className="w-5 h-5 accent-primary cursor-pointer shrink-0 mt-0.5"
                     />
@@ -483,7 +596,14 @@ export default function ToDoView({
                       )}
                     </div>
                     <button
-                      onClick={() => deleteItem(activeTodoId, item.id)}
+                      type="button"
+                      onClick={event => { event.stopPropagation(); openEdit(item); }}
+                      aria-label={`Edit ${item.text}`}
+                      className="shrink-0 material-symbols-outlined text-[18px] text-on-surface-variant/40 hover:text-primary mt-0.5"
+                    >edit</button>
+                    <button
+                      type="button"
+                      onClick={event => { event.stopPropagation(); deleteItem(activeTodoId, item.id); }}
                       className="shrink-0 material-symbols-outlined text-[16px] text-on-surface-variant/25 hover:text-red-400 mt-0.5"
                     >
                       close
@@ -493,7 +613,7 @@ export default function ToDoView({
               </div>
             )}
 
-            {(activeTodo?.items.length ?? 0) === 0 && (
+            {visibleItems.length === 0 && (
               <p className="text-center text-on-surface-variant/50 font-mono text-xs mt-6">
                 List is empty. Add your first task above.
               </p>

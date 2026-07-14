@@ -64,6 +64,7 @@ export function buildQuickServiceRecords(
         id: rid('acct'),
         name: 'Maintenance',
         description: `${component.name}${request.notes ? ` — ${request.notes}` : ''}`,
+        category: 'Maintenance',
         amount: cost,
         type: 'expense',
         date,
@@ -116,7 +117,8 @@ export function describeServiceStatus(
   const [one, many] = UNIT_LABEL[component.intervalType] ?? ['unit', 'units'];
   if (status.state === 'overdue') {
     const over = Math.max(1, status.used - status.limit);
-    return `${over} ${over === 1 ? one : many} over`;
+    return `Used ${status.used} of ${status.limit} ${many}; ${over} ${over === 1 ? one : many} over the limit`;
   }
-  return `${status.used}/${status.limit} ${many}`;
+  const remaining = Math.max(0, status.limit - status.used);
+  return `Used ${status.used} of ${status.limit} ${many}; ${remaining} left`;
 }

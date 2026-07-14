@@ -254,7 +254,7 @@ export default function DashboardView({
             <EmptyState
               icon="sports_score"
               title="No race weekends yet"
-              body="Start a weekend and the dashboard lights up — sessions, laps and service all hang off it."
+              body="Start a weekend and the dashboard lights up — sessions, laps and maintenance all hang off it."
               cta={{ label: '+ Race Weekend', icon: 'calendar_today', onClick: onStartNewWeekend }}
             />
           </div>
@@ -319,7 +319,7 @@ export default function DashboardView({
           <button
             type="button"
             onClick={openQuickService}
-            aria-label={`Log service for ${worst.component.name}`}
+            aria-label={`Log maintenance for ${worst.component.name}`}
             className="flex min-h-12 w-full items-center gap-2 rounded-lg px-1 text-left active:opacity-80"
           >
             <span className="status-chip min-w-0">
@@ -331,7 +331,7 @@ export default function DashboardView({
                 {worst.component.name} — {describeServiceStatus(worst.component, worst.status)}
               </span>
             </span>
-            <span className="ml-auto shrink-0 font-mono text-[10px] font-bold uppercase text-primary">Log service</span>
+            <span className="ml-auto shrink-0 font-mono text-[10px] font-bold uppercase text-primary">Log maintenance</span>
           </button>
         </section>
       )}
@@ -339,7 +339,7 @@ export default function DashboardView({
       {/* SERVICE DUE (collapsible) */}
       {dueItems.length > 0 && (
         <CollapsibleSection
-          title={`Service Due (${dueItems.length})`}
+          title={`Maintenance Due (${dueItems.length})`}
           storageKey="race_notes_dash_service_open"
           defaultOpen={false}
           badge={dueItems.some(c => getComponentStatus(c, weekends, savedSetups).state === 'overdue') ? (
@@ -535,7 +535,7 @@ export default function DashboardView({
       <BottomSheet
         open={svcOpen}
         onClose={() => setSvcOpen(false)}
-        title={selectedServiceComponent ? `Log service — ${selectedServiceComponent.name}` : 'Log service'}
+        title={selectedServiceComponent ? `Log maintenance — ${selectedServiceComponent.name}` : 'Log maintenance'}
       >
         {selectedServiceComponent && selectedServiceStatus && (
           <div className="space-y-3 pb-2">
@@ -595,13 +595,13 @@ export default function DashboardView({
               onClick={saveQuickService}
               className="w-full min-h-14 bg-primary text-on-primary rounded-xl font-display font-bold uppercase tracking-wide active:opacity-90"
             >
-              Save service log
+              Save maintenance log
             </button>
             <button
               onClick={() => { setSvcOpen(false); onGoToService?.(); }}
               className="w-full min-h-12 text-primary font-mono text-xs font-bold uppercase tracking-wider"
             >
-              Full service tracker →
+              Full maintenance log →
             </button>
           </div>
         )}
@@ -611,7 +611,7 @@ export default function DashboardView({
       <UndoToast pending={weekendUndo.pending} onUndo={weekendUndo.undo} onDismiss={weekendUndo.dismiss} />
       <InfoToast
         open={!!svcToast}
-        title={svcToast?.result.accountingEntry ? 'Logged + added to accounting' : 'Service logged'}
+        title={svcToast?.result.accountingEntry ? 'Logged + added to accounting' : 'Maintenance logged'}
         icon="build_circle"
         action={svcToast ? {
           label: 'UNDO',

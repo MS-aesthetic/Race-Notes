@@ -5,6 +5,7 @@ import { getComponentStatus, applyServiceLog, DEFAULT_COMPONENTS } from '../lib/
 import { STARTER_TEMPLATES, isUntouchedStarterTemplate, materializeStarterTemplate } from '../lib/checklists';
 import ToDoView from './ToDoView';
 import EmptyState from './ui/EmptyState';
+import { lastAccountingCategory, localDateValue, recentAccountingRepeats } from '../lib/accountingDefaults';
 
 // ── Sub-tab type (declared early; used in Props and component) ───────────────
 
@@ -119,6 +120,8 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
   const [weekendName, setWeekendName] = useState('');
   const [receiptPhoto, setReceiptPhoto] = useState<string | undefined>();
   const [weekendFilter, setWeekendFilter] = useState('');
+  const [category, setCategory] = useState(() => lastAccountingCategory(entries));
+  const [entryDate, setEntryDate] = useState(() => localDateValue());
 
   const filtered = weekendFilter ? entries.filter(e => e.weekendId === weekendFilter) : entries;
   const totalIncome  = filtered.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
@@ -126,20 +129,32 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
   const net          = totalIncome - totalExpense;
 
   const sorted = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const recentRepeats = recentAccountingRepeats(entries);
+
+  const toggleForm = () => {
+    setShowForm(value => {
+      if (!value) {
+        setEntryDate(localDateValue());
+        setCategory(lastAccountingCategory(entries));
+      }
+      return !value;
+    });
+  };
 
   const handleAdd = (ev: React.FormEvent) => {
     ev.preventDefault();
     const parsed = parseFloat(amount);
-    if (!name.trim() || isNaN(parsed) || parsed <= 0) return;
+    if (!name.trim() || !entryDate || isNaN(parsed) || parsed <= 0) return;
     const entry: AccountingEntry = {
       id: `acct-${Date.now()}`,
       name: name.trim(),
       description: desc.trim() || undefined,
+      category: category.trim() || 'Other',
       amount: parsed,
       type,
       payer: payer.trim() || undefined,
       payee: payee.trim() || undefined,
-      date: new Date().toISOString(),
+      date: `${entryDate}T12:00:00.000Z`,
       weekendId: weekendId || undefined,
       weekendName: weekendName || undefined,
       receiptPhoto,
@@ -187,7 +202,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
 
       {/* Add button */}
       <button
-        onClick={() => setShowForm(v => !v)}
+        onClick={toggleForm}
         className="flex items-center justify-center gap-2 w-full py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80"
       >
         <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -211,6 +226,33 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
                 }`}
               >{t === 'income' ? '+ Income' : '− Expense'}</button>
             ))}
+          </div>
+
+          {recentRepeats.length > 0 && (
+            <div>
+              <p className="font-mono text-[10px] uppercase text-on-surface-variant mb-1.5">Repeat a recent entry</p>
+              <div className="flex flex-wrap gap-2">
+                {recentRepeats.map(repeat => (
+                  <button key={`${repeat.description}:${repeat.category}`} type="button"
+                    onClick={() => { setDesc(repeat.description); setCategory(repeat.category); }}
+                    className="min-h-11 px-3 rounded-full border border-outline-variant font-mono text-[10px] text-on-surface-variant hover:border-primary hover:text-primary"
+                  >{repeat.description} · {repeat.category}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">Category</label>
+              <input value={category} onChange={event => setCategory(event.target.value)} placeholder="Other"
+                className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+            </div>
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">Date</label>
+              <input required type="date" value={entryDate} onChange={event => setEntryDate(event.target.value)}
+                className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
+            </div>
           </div>
 
           {/* Name + Amount */}
@@ -285,6 +327,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
               <div className="flex-1 min-w-0 pl-1 space-y-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono text-sm font-bold text-on-surface">{e.name}</span>
+                  {e.category && <span className="font-mono text-[9px] text-on-surface-variant border border-outline-variant px-1.5 py-0.5 rounded">{e.category}</span>}
                   <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
                     e.type === 'income' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
                   }`}>
@@ -386,7 +429,7 @@ function ServiceTab({
   };
 
   const deleteComp = (id: string) => {
-    if (!window.confirm('Delete this component and all its service logs?')) return;
+    if (!window.confirm('Delete this item and all its maintenance logs?')) return;
     onDeleteComponent(id);
   };
 
@@ -436,8 +479,9 @@ function ServiceTab({
     if (log.cost && log.cost > 0) {
       const entry: AccountingEntry = {
         id: uid('acct'),
-        name: `Service: ${logModalComp.name}`,
+        name: logModalComp.name,
         description: log.notes,
+        category: 'Maintenance',
         amount: log.cost,
         type: 'expense',
         date: now,
@@ -452,6 +496,12 @@ function ServiceTab({
 
   const renderRow = (c: MaintenanceComponent) => {
     const status = getComponentStatus(c, weekends, savedSetups);
+    const remaining = Math.max(0, status.limit - status.used);
+    const reason = status.pct >= 1
+      ? `Past the ${status.limit} ${unitLabel(c)} limit. This job stays on Main Checklist until it is handled.`
+      : status.pct >= 0.9
+        ? 'At least 90% of the limit is used, so this job is on Main Checklist.'
+        : 'Below 90% of the limit, so it is not added to Main Checklist yet.';
     const barColor = status.state === 'overdue' ? 'bg-red-500' : status.state === 'due' ? 'bg-amber-400' : 'bg-green-500';
     const chipCls = {
       ok:      'bg-green-500/15 text-green-400 border-green-500/30',
@@ -476,6 +526,10 @@ function ServiceTab({
               {status.used}/{status.limit} {unitLabel(c)}
             </span>
           </div>
+          <p className="font-mono text-[10px] text-on-surface-variant mt-1">
+            Used {status.used} · Limit {status.limit} · Remaining {remaining} {unitLabel(c)}
+          </p>
+          <p className="font-mono text-[10px] text-on-surface-variant/70 mt-0.5">{reason}</p>
         </div>
         <button
           onClick={() => openLogModal(c)}
@@ -494,6 +548,11 @@ function ServiceTab({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="bg-primary/5 border border-primary/25 rounded-lg p-3">
+        <p className="font-mono text-xs text-on-surface leading-relaxed">
+          Each item shows how much has been used, the limit you set, and how much is left. At 90% of the limit, Crew Chief puts the job on Main Checklist so it does not get missed.
+        </p>
+      </div>
       {/* Header actions */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
@@ -501,7 +560,7 @@ function ServiceTab({
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary font-mono text-[11px] uppercase font-bold transition-colors"
         >
           <span className="material-symbols-outlined text-[15px]">{showAddForm ? 'close' : 'add'}</span>
-          {showAddForm ? 'Cancel' : 'Add Component'}
+          {showAddForm ? 'Cancel' : 'Add Maintenance Item'}
         </button>
         {components.length === 0 && !showAddForm && (
           <button
@@ -517,7 +576,7 @@ function ServiceTab({
       {/* Add component form */}
       {showAddForm && (
         <form onSubmit={handleAddSubmit} className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
-          <input required placeholder="Component name *" value={addName} onChange={e => setAddName(e.target.value)}
+          <input required placeholder="Maintenance item name *" value={addName} onChange={e => setAddName(e.target.value)}
             className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -555,7 +614,7 @@ function ServiceTab({
             </div>
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="flex-1 py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80">Add Component</button>
+            <button type="submit" className="flex-1 py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80">Add Maintenance Item</button>
             <button type="button" onClick={() => setShowAddForm(false)} className="px-4 py-2.5 border border-outline-variant rounded-lg font-mono text-xs text-on-surface-variant">Cancel</button>
           </div>
         </form>
@@ -565,10 +624,10 @@ function ServiceTab({
       {components.length === 0 && !showAddForm && (
         <EmptyState
           icon="build_circle"
-          title="No service items yet"
-          body="Add common race-car service intervals or build your own."
+          title="No maintenance items yet"
+          body="Add common race-car maintenance intervals or build your own."
           cta={{ label: 'Add common items', onClick: addDefaults }}
-          secondaryCta={{ label: 'Create service item', onClick: () => setShowAddForm(true) }}
+          secondaryCta={{ label: 'Create maintenance item', onClick: () => setShowAddForm(true) }}
         />
       )}
 
@@ -601,7 +660,7 @@ function ServiceTab({
           <form onSubmit={handleLogSubmit} onClick={e => e.stopPropagation()}
             className="w-full max-w-md bg-surface-container-high border border-outline-variant rounded-2xl p-6 space-y-4 shadow-2xl mb-2">
             <div className="flex items-center justify-between">
-              <h3 className="font-display font-bold text-base text-on-surface">Log Service</h3>
+              <h3 className="font-display font-bold text-base text-on-surface">Log Maintenance</h3>
               <button type="button" onClick={() => setLogModalComp(null)}
                 className="material-symbols-outlined text-on-surface-variant text-[22px]">close</button>
             </div>
@@ -610,7 +669,7 @@ function ServiceTab({
               {(['service', 'replace', 'inspect'] as const).map(t => (
                 <button key={t} type="button" onClick={() => setLogType(t)}
                   className={`py-2 rounded-lg border font-mono text-[10px] uppercase font-bold transition-all capitalize ${logType === t ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant text-on-surface-variant'}`}>
-                  {t}
+                  {t === 'service' ? 'maintenance' : t}
                 </button>
               ))}
             </div>
@@ -630,7 +689,7 @@ function ServiceTab({
               </div>
             </div>
             <button type="submit" className="w-full py-3 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-xl tracking-wider active:opacity-80">
-              Save &amp; Reset Counter
+              Save Maintenance &amp; Reset Counter
             </button>
           </form>
         </div>
@@ -828,8 +887,7 @@ function TemplatesTab({
 
 const SUB_TABS: { id: SubTab; label: string; icon: string }[] = [
   { id: 'checklist',  label: 'Checklist',  icon: 'checklist'        },
-  { id: 'service',    label: 'Service',    icon: 'build'            },
-  { id: 'templates',  label: 'Templates',  icon: 'fact_check'       },
+  { id: 'service',    label: 'Maintenance Logs', icon: 'build'       },
   { id: 'accounting', label: 'Accounting', icon: 'account_balance'  },
 ];
 
@@ -844,17 +902,18 @@ export default function TrackersView({
   initialSubTab,
   checklistTemplates, starterTemplatesReady, onSaveChecklistTemplates, onDeleteChecklistTemplate,
 }: TrackersViewProps) {
-  const [subTab, setSubTab] = useState<SubTab>(initialSubTab ?? 'checklist');
+  const [subTab, setSubTab] = useState<SubTab>(initialSubTab === 'templates' ? 'checklist' : (initialSubTab ?? 'checklist'));
+  const [showTemplateManager, setShowTemplateManager] = useState(initialSubTab === 'templates');
 
   return (
     <div className="flex flex-col gap-4 h-full">
 
       {/* Sub-tab bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-surface rounded-lg p-1 border border-outline-variant/30 text-xs font-mono uppercase tracking-wider">
+      <div className="grid grid-cols-3 gap-1 bg-surface rounded-lg p-1 border border-outline-variant/30 text-xs font-mono uppercase tracking-wider">
         {SUB_TABS.map(t => (
           <button
             key={t.id}
-            onClick={() => setSubTab(t.id)}
+            onClick={() => { setSubTab(t.id); setShowTemplateManager(false); }}
             className={`min-h-11 flex items-center justify-center gap-1 py-2.5 px-1 rounded-md transition-all ${
               subTab === t.id ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60 hover:text-on-surface'
             }`}
@@ -872,14 +931,29 @@ export default function TrackersView({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {subTab === 'checklist' && (
+        {subTab === 'checklist' && !showTemplateManager && (
           <ToDoView
             todos={todos}
             onSaveTodos={onSaveTodos}
             teamMembers={teamMembers}
             currentUserId={currentUserId}
             templates={checklistTemplates}
+            onManageTemplates={() => setShowTemplateManager(true)}
           />
+        )}
+        {subTab === 'checklist' && showTemplateManager && (
+          <div className="space-y-3">
+            <button type="button" onClick={() => setShowTemplateManager(false)} className="min-h-11 flex items-center gap-2 px-3 border border-outline-variant rounded font-mono text-[10px] font-bold uppercase text-on-surface-variant hover:text-primary hover:border-primary">
+              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+              Back to Checklist
+            </button>
+            <TemplatesTab
+              templates={checklistTemplates}
+              starterTemplatesReady={starterTemplatesReady}
+              onSaveTemplates={onSaveChecklistTemplates}
+              onDeleteTemplate={onDeleteChecklistTemplate}
+            />
+          </div>
         )}
         {subTab === 'accounting' && (
           <AccountingTab entries={accounting} onSave={onSaveAccounting} weekends={weekends} />
@@ -896,14 +970,6 @@ export default function TrackersView({
             activeCarId={activeCarId}
             accounting={accounting}
             onSaveAccounting={onSaveAccounting}
-          />
-        )}
-        {subTab === 'templates' && (
-          <TemplatesTab
-            templates={checklistTemplates}
-            starterTemplatesReady={starterTemplatesReady}
-            onSaveTemplates={onSaveChecklistTemplates}
-            onDeleteTemplate={onDeleteChecklistTemplate}
           />
         )}
       </div>

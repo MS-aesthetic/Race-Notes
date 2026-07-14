@@ -170,7 +170,7 @@ const SECTIONS: GuideSection[] = [
     title: 'Creating templates',
     summary: 'Build reusable checklist groups for repeated preparation work.',
     steps: [
-      { text: 'Open Trackers → Templates.' },
+      { text: 'Open Trackers → Checklist → Edit List.' },
       { text: 'Create a template, choose a category, then add reusable items.' },
       { text: 'Return to Checklist, choose the template, and tap Import.' },
       { text: 'Editing a template does not change items already imported into Main Checklist.' },
@@ -179,13 +179,13 @@ const SECTIONS: GuideSection[] = [
   {
     id: 'service',
     icon: 'build',
-    title: 'Using Service',
-    summary: 'Track car and rig maintenance intervals and service history.',
+    title: 'Using Maintenance Logs',
+    summary: 'Track car and rig maintenance limits and completed work.',
     steps: [
-      { text: 'Open Trackers → Service.' },
+      { text: 'Open Trackers → Maintenance Logs.' },
       { text: 'Add defaults or create a component with its interval.' },
-      { text: 'Log service, replacement, or inspection work when completed.' },
-      { text: 'Optional service cost automatically creates an Accounting expense.' },
+      { text: 'Log maintenance, replacement, or inspection work when completed.' },
+      { text: 'An optional maintenance cost automatically creates an Accounting expense.' },
     ],
   },
 ];

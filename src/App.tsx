@@ -23,6 +23,7 @@ import { finishWeekendLifecycle, isSetupLocked, isWeekendFinished, mergeTimestam
 import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
 import { applyQuickAdjust, resolveQuickAdjustTarget, type QuickAdjustCommand } from './lib/quickAdjust';
 import { materializeMainChecklist } from './lib/mainChecklist';
+import { KEEP_ADDED_ITEMS_KEY, reconcileMaintenanceChecklist, resetMainChecklist } from './lib/checklistMaintenance';
 import { reconcileStarterTemplates } from './lib/checklists';
 import { deriveReadableLightAccent, readableOnColor } from './lib/colorContrast';
 
@@ -260,6 +261,12 @@ export default function App() {
     if (user) pushMaintenanceComponents(updated, user.id, setSyncStatus);
   };
 
+  const handleSaveTodos = (updated: Todo[]) => {
+    setTodos(updated);
+    localStorage.setItem('race_notes_todos', JSON.stringify(updated));
+    if (user) pushTodos(updated, user.id, setSyncStatus);
+  };
+
   const handleSaveMaintenanceLogs = (updated: MaintenanceLog[]) => {
     setMaintenanceLogs(updated);
     localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(updated));
@@ -428,6 +435,15 @@ export default function App() {
       reconciled.discardedIds.forEach(id => { void deleteChecklistTemplateFromCloud(id); });
     }
   }, [authReady, checklistTemplates, pullDone, user]);
+
+  // Maintenance usage is derived from weekends. Reconcile only after the
+  // initial cloud merge so stale local counters cannot briefly create jobs.
+  useEffect(() => {
+    if (!authReady || (user && !pullDone)) return;
+    const reconciled = reconcileMaintenanceChecklist(todos, maintenance, weekends, savedSetups);
+    if (reconciled === todos) return;
+    handleSaveTodos(reconciled);
+  }, [authReady, maintenance, pullDone, savedSetups, todos, user, weekends]);
 
   // ── "Saved" flash toast ──────────────────────────────────────────────────
   // Local-first writes are instant; this gives users clear, prominent
@@ -1167,6 +1183,9 @@ export default function App() {
       pushWeekends(updatedWeekends, user.id, setSyncStatus);
     }
 
+    const keepAddedItems = localStorage.getItem(KEEP_ADDED_ITEMS_KEY) !== 'false';
+    handleSaveTodos(resetMainChecklist(todos, keepAddedItems, now, checklistTemplates));
+
     setActiveWeekendId(lifecycle.weekend.id);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, lifecycle.weekend.id);
     setInfoToast(`Active: ${lifecycle.weekend.name} · ${lifecycle.weekendSetup.versionLabel}`);
@@ -1833,11 +1852,7 @@ export default function App() {
                   teamMembers={teamMembers}
                   currentUserId={user?.id ?? null}
                   weekends={weekends}
-                  onSaveTodos={(updated) => {
-                    setTodos(updated);
-                    localStorage.setItem('race_notes_todos', JSON.stringify(updated));
-                    if (user) pushTodos(updated, user.id, setSyncStatus);
-                  }}
+                  onSaveTodos={handleSaveTodos}
                   accounting={accounting}
                   onSaveAccounting={(updated) => {
                     setAccounting(updated);
