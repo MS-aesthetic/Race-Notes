@@ -5,7 +5,8 @@ export type NumericCornerField = Extract<keyof CornerSetup,
   'loadWeight' | 'loadCtoC' | 'caster' | 'camber' | 'springHeight' |
   'tirePress' | 'backspacing' | 'topBarLength' | 'bottomBarLength' |
   'topBarHFrame' | 'topBarHBird' | 'botBarHFrame' | 'botBarHBird' |
-  'topBarAngRH' | 'topBarAngFD' | 'bottomBarAngle' | 'droop' | 'preload'>;
+  'topBarAngRH' | 'topBarAngFD' | 'bottomBarAngRH' | 'bottomBarAngFD' |
+  'bottomBarAngle' | 'droop' | 'preload'>;
 
 export interface SetupStep {
   step: number;
@@ -35,6 +36,8 @@ export const SETUP_STEPS: Record<NumericCornerField, SetupStep> = {
   botBarHBird: { step: 1, decimals: 0, unit: 'hole', min: 0 },
   topBarAngRH: { step: 0.5, decimals: 1, unit: '°' },
   topBarAngFD: { step: 0.5, decimals: 1, unit: '°' },
+  bottomBarAngRH: { step: 0.5, decimals: 1, unit: '°' },
+  bottomBarAngFD: { step: 0.5, decimals: 1, unit: '°' },
   bottomBarAngle: { step: 0.5, decimals: 1, unit: '°' },
   droop: { step: 0.125, decimals: 3, unit: 'in', min: 0 },
   preload: { step: 0.125, decimals: 3, unit: 'in' },
@@ -150,10 +153,11 @@ export function fourBarAdjustmentId(corner: 'lr' | 'rr', field: NumericCornerFie
 export function fourBarAdjustmentLabel(corner: 'lr' | 'rr', field: NumericCornerField): string {
   const names: Partial<Record<NumericCornerField, string>> = {
     topBarLength: 'top bar length', topBarHFrame: 'top frame hole',
-    topBarHBird: 'top birdcage hole', topBarAngRH: 'top bar angle',
-    topBarAngFD: 'top bar angle', bottomBarLength: 'bottom bar length',
+    topBarHBird: 'top birdcage hole', topBarAngRH: 'top angle at ride height',
+    topBarAngFD: 'top angle at full droop', bottomBarLength: 'bottom bar length',
     botBarHFrame: 'bottom frame hole', botBarHBird: 'bottom birdcage hole',
-    bottomBarAngle: 'bottom bar angle',
+    bottomBarAngRH: 'bottom angle at ride height', bottomBarAngFD: 'bottom angle at full droop',
+    bottomBarAngle: 'legacy bottom bar angle',
   };
   return `${corner.toUpperCase()} ${names[field] ?? field}`;
 }

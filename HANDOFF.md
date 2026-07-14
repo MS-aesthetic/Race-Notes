@@ -15,7 +15,7 @@
 > A dedicated UX/UI overhaul is in progress on a NEW worktree **`.worktrees/v3` (branch `preview-v3`, created from `master` `3ea6648`)**. `master` is untouched; the overhaul lands on `preview-v3` and merges to `master` only on owner approval.
 > - **Source of the work:** [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md) (Fable expert UX audit — 37 recs, cost/benefit) → [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md) (spec-driven, 7 build chunks).
 > - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High owns implementation; QA failures 1–2 return to Terra and failure 3 transfers build+final QA to SOL. Codex model overrides and rollout metadata are now verified: SOL → Terra → SOL works in one persistent task. Generic prose self-identification is not model evidence. **`/caveman full`** stays on. One consolidated QA pass per chunk + standing `tsc --noEmit` (3-error baseline) and `vite build` gates.
-> - **Chunk status:** ✅ **1** (`e04b15c`) · ✅ **2** (`306445d`) · ✅ **3** (`c68f27d`) · ✅ **4** (`21405e9`) · ✅ **UX-R1** (`b6d702e`) · ✅ **5** Trackside Setups (`d5ef1f4`). ⬜ **6** Trackers hybrid checklist/templates-merge is next · ⬜ **7** Export share/contextual help/copy audit/font-zoom sweep.
+> - **Chunk status:** ✅ **1–5** through Trackside Setups (`d5ef1f4`). **6A implementation is QA-ready**: code gates, focused harnesses, cavecrew review, mobile light/dark runtime, and live additive DB migration passed; commit/SOL adjudication pending. **6B** setup-history lifecycle is next after SOL approval, then **7** expanded Quick Adjust. Former Trackers chunk becomes **8**; export/help/final sweep becomes **9**.
 > - **New reusable code (chunks 1-4):** `src/components/ui/` (`NumberStepper`, `UndoToast`+`InfoToast`, `EmptyState`, `CollapsibleSection`, `SegmentedGrid`, `BottomSheet`, `HelpSheet`, `LapTimeKeypad`); `src/lib/undo.ts`; `src/lib/backStack.ts`; `src/lib/saveStatus.ts`; `src/lib/sessionSequence.ts`; `src/lib/serviceLog.ts`; `src/lib/scope.ts` (`pickAutoWeekend`, `parseWeekendDate`, `sortWeekends`); `src/components/ContextStrip.tsx`; `src/components/GetRaceReadyCard.tsx`. CSS: `.tap-target`, `.sticky-action-bar`, `.status-chip` + light-theme contrast bump.
 > - **Owner UX answers baked into the plan:** (1) app used during the week + at the track after each run; (2) 95% single-user → assignment/concurrency deferred; (3) most teams 1 car (some 2-3) → car UI hidden at ≤1 car; (4) **four-bar changed VERY often trackside → make it FAST, not hidden** (reverses the "fold behind expander" rec — chunk 5); (5) dusk→night racing → sunlight/light-theme tuned; (6) Main Checklist = hybrid core-reset + ad-hoc (chunk 6).
 > - **Testing:** v3 APKs use the build-from-main bridge: run lint then build in v3; mirror v3 `dist` to main; run raw `npx cap sync android` (not main `npm run android:sync`, which rebuilds master); run `assembleDebug`. Current Chunk 4 APK is versionCode 14/versionName 3.9 at the standard debug output. Android emulator QA passed fresh-profile hero→weekend→new-session, quick-service cost→Accounting→Undo, and session ⋯ delete→Undo. Emulator native `screencap` showed white because WebView tile-memory/compositor warnings; direct WebView capture and DOM verified rendered UI.
@@ -32,7 +32,15 @@
 > - `FourBarQuickAdjust.tsx` is controlled and shared by Setups and quick-log. Quick-log changes also serialize into the active session/weekend record and coalesce by `fourbar-{corner}-{field}`.
 > - `TiresSubView.tsx` remains active-car scoped and uses linked inventory size consistently for display and stagger. Existing CRUD, CSV/report, lifecycle, and usage-history paths remain.
 > - Runtime evidence: Android 4.1 (16), 320 CSS px / XX-Large, current Workbox assets after targeted cache purge; baseline creation, Setups, four-bar, Tires modal geometry, repeated quick-log adjustment, Save Run, cold relaunch, and logcat passed. Netlify draft shell/auth gate and final asset hash returned HTTP 200; unique draft origin had no remembered login.
-> - Chunk 6 is next. Do not redo C5 or alter `d5ef1f4` unless a new regression is demonstrated.
+> - C6A is built and awaiting SOL adjudication. Do not redo C5 or alter `d5ef1f4` unless a new regression is demonstrated. Do not start C6B until C6A QA closes.
+> - **C6A draft:** https://6a558ea45dc5716d3bed026a--crew-chief-race-notes.netlify.app. Production unchanged.
+
+> ### 🧭 Owner revision — 2026-07-13
+> - Finish Weekend is always available at page bottom. No race/session gate; test days may be finished normally.
+> - Setup ownership: immutable Baseline snapshot, editable Weekend Setup during event, immutable Final snapshot at finish, then editable Current Setup copied from Final. Historical snapshots never become normal edit targets.
+> - Four-bar UI lives at setup bottom and shows LR then RR. Each side has Top Bar and Bottom Bar rows: Frame Hole → Bar Length → Birdcage Hole; Angle at Ride Height → Angle at Full Droop.
+> - Tuning priority help must use plain racer language, not academic wording: High = try first; Medium = try next if first change did not fix it; Low = fine-tuning after bigger items are checked.
+> - Style offers two sizes only: **Default** uses existing 1.15 scale; **Large** uses existing 1.45 scale. Do not show numeric scale values. Normalize legacy Standard to Default and legacy XX-Large to Large without deleting theme data.
 
 CREW CHIEF (brand: all caps) is a React + TypeScript PWA + Android app that helps
 dirt-track racing teams track car setups, race sessions, tire inventory, weather,
@@ -73,7 +81,7 @@ Git worktrees in play:
 | Path | Branch | Role |
 |---|---|---|
 | `C:\Users\maxx\antigravity\Race-Notes` | `master` | **Main/release tree.** Owns complete Android platform and gitignored Gradle/SDK/Firebase files. Preserve existing dirty host/generated files. |
-| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–5 + UX-R1 complete; Chunk 6 next. Web build works here. Local gitignored debug-only Gradle scaffolding may exist from C5 QA; it is not committed release configuration. |
+| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–5 + UX-R1 complete; C6A QA-ready and C6B next after approval. Web build works here. Local gitignored debug-only Gradle scaffolding may exist from C5 QA; it is not committed release configuration. |
 
 Audited 2026-07-13: `preview-v3` includes UX-C5 `d5ef1f4`; `master` remains
 release/stable. Git refs do not indicate Netlify deployment state. Main-tree

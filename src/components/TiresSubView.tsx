@@ -40,7 +40,8 @@ export default function TiresSubView({
   const noCar = !activeCarId;
   const displayedTires = activeCarId ? byActiveCar<TireInventoryItem>(tires, activeCarId) : [];
   const resolvedSizes = activeSetup ? resolveLinkedTireSizes(activeSetup, displayedTires) : null;
-  const history = getRecentPressureHistory(weekends, setups, tires, activeCarId);
+  const linkedTireIds = activeSetup ? Object.fromEntries(CORNERS.map(corner => [corner, activeSetup[corner].tireInventoryId || ''])) : undefined;
+  const history = getRecentPressureHistory(weekends, setups, tires, activeCarId, 1, linkedTireIds);
   const compounds = Array.from(new Set(displayedTires.map(tire => tire.compound.trim()).filter(Boolean))).sort();
   const filtered = compoundFilter === 'all' ? displayedTires : displayedTires.filter(tire => tire.compound === compoundFilter);
   const sorted = [...filtered].sort((a, b) => {
@@ -90,22 +91,25 @@ export default function TiresSubView({
 
   return <div className="space-y-5">
     <section className="space-y-3 rounded-xl border border-outline-variant bg-surface-container p-4">
-      <div><h3 className="font-display text-lg font-bold uppercase text-on-surface">Current tire set</h3><p className="font-mono text-xs text-on-surface-variant">Active setup plus last five logged pressures.</p></div>
+      <div><h3 className="font-display text-lg font-bold uppercase text-on-surface">Current tire set</h3><p className="font-mono text-xs text-on-surface-variant">Latest logged pressure, heat cycles, and estimated laps.</p></div>
       {!noCar && activeSetup ? <>
         <div className="grid grid-cols-2 gap-2">
           {CORNERS.map(corner => {
             const setupCorner = activeSetup[corner];
             const tire = findTire(setupCorner.tireInventoryId);
+            const usage = tire ? getTireUsageHistory(tire.id, weekends) : [];
+            const lastPressure = history[corner][0]?.pressure;
             return <div key={corner} className="min-w-0 rounded border border-outline-variant bg-surface-container-low p-2">
               <p className="font-mono text-xs font-bold text-primary uppercase">{corner}</p>
               <p className="min-w-0 break-words font-mono text-xs text-on-surface">#{tire?.tireNumber || '—'} · {resolvedSizes?.[corner] || '—'}</p>
-              <p className="min-w-0 break-words font-mono text-xs text-on-surface-variant">{tire?.compound || setupCorner.tireComp || 'No compound'} · {formatPsiValue(setupCorner.tirePress) || '—'}</p>
+              <p className="min-w-0 break-words font-mono text-xs text-on-surface-variant">{tire?.compound || setupCorner.tireComp || 'No compound'}</p>
+              <p className="mt-1 font-mono text-xs text-on-surface-variant">Last pressure <span className="font-bold text-on-surface">{formatPsiValue(lastPressure) || '—'}</span></p>
+              <p className="font-mono text-xs text-on-surface-variant">Cycles <span className="font-bold text-on-surface">{tire ? tire.heatCycles ?? 0 : '—'}</span> · Est. laps <span className="font-bold text-on-surface">{tire ? getTireTotalLaps(usage) : '—'}</span></p>
             </div>;
           })}
         </div>
         <div className="grid grid-cols-2 gap-2 font-mono text-xs"><div className="min-w-0 break-words rounded bg-surface-container-low p-2 text-on-surface-variant">Front stagger <span className="text-primary">{stagger(resolvedSizes?.rf || '', resolvedSizes?.lf || '')}</span></div><div className="min-w-0 break-words rounded bg-surface-container-low p-2 text-on-surface-variant">Rear stagger <span className="text-primary">{stagger(resolvedSizes?.rr || '', resolvedSizes?.lr || '')}</span></div></div>
       </> : <p className="font-mono text-xs text-on-surface-variant">{noCar ? 'Select or add a car to view its tire set.' : 'Select a setup for this car to view linked tires.'}</p>}
-      <div className="grid grid-cols-2 gap-2">{CORNERS.map(corner => <div key={corner} className="min-w-0 rounded bg-surface-container-low p-2"><p className="font-mono text-xs font-bold uppercase text-on-surface-variant">{corner} last five</p>{history[corner].length ? <ul className="mt-1 space-y-1">{history[corner].map((row, index) => <li key={`${row.sessionName}-${index}`} className="font-mono text-xs text-on-surface break-words"><span className="text-primary">{row.pressure}</span> · {row.sessionName}</li>)}</ul> : <p className="mt-1 font-mono text-xs text-on-surface-variant">—</p>}</div>)}</div>
     </section>
 
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-display text-lg font-bold uppercase text-on-surface">Tire Inventory</h3><p className="font-mono text-xs text-on-surface-variant">{displayedTires.length} tire{displayedTires.length === 1 ? '' : 's'} logged</p></div><div className="flex flex-wrap items-center gap-2">{displayedTires.length > 0 && <><button onClick={() => downloadTireUsageCsv(displayedTires, weekends)} className="h-9 px-3 border border-outline-variant font-mono text-xs font-bold uppercase text-on-surface-variant rounded">CSV</button><button onClick={() => printTireUsageReport(displayedTires, weekends)} className="h-9 px-3 border border-outline-variant font-mono text-xs font-bold uppercase text-on-surface-variant rounded">Report</button></>}<button onClick={() => noCar ? onGoToGarage?.() : openAdd()} className="h-9 px-3 rounded bg-primary font-mono text-xs font-bold uppercase text-on-primary">{noCar ? 'Go to Garage' : 'Add Tire'}</button></div></div>

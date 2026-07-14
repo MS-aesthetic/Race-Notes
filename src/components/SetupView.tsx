@@ -126,9 +126,9 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
           </select>
         </div>
 
-        {/* Bound Smasher Graph */}
+        {/* Bound Load Graph */}
         <div className="col-span-1 lg:col-span-2 min-w-0 bg-surface-container p-2 rounded border border-outline-variant/30 flex flex-wrap items-center justify-between gap-2">
-          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant">Bound Smasher Graph</label>
+          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant">Bound Load Graph</label>
           <select value={data.boundGraphId || ''} onChange={(e) => onFieldChange('boundGraphId', e.target.value)}
             className="w-full min-w-0 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded">
             <option value="">-- None --</option>
@@ -157,7 +157,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         {!isRear && (
           <>
             <NumericCornerFieldInput label="Scale Weight" field="loadWeight" data={data} onFieldChange={onFieldChange} />
-            <NumericCornerFieldInput label="C-to-C" field="loadCtoC" data={data} onFieldChange={onFieldChange} />
+            <NumericCornerFieldInput label="Ride Height C-to-C" field="loadCtoC" data={data} onFieldChange={onFieldChange} />
             <NumericCornerFieldInput label="Caster" field="caster" data={data} onFieldChange={onFieldChange} />
             <NumericCornerFieldInput label="Camber" field="camber" data={data} onFieldChange={onFieldChange} />
           </>
@@ -167,7 +167,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         {isRear && (
           <>
             <NumericCornerFieldInput label="Scale Weight" field="loadWeight" data={data} onFieldChange={onFieldChange} />
-            <NumericCornerFieldInput label="C-to-C" field="loadCtoC" data={data} onFieldChange={onFieldChange} />
+            <NumericCornerFieldInput label="Ride Height C-to-C" field="loadCtoC" data={data} onFieldChange={onFieldChange} />
             <NumericCornerFieldInput label="Droop" field="droop" data={data} onFieldChange={onFieldChange} />
             <NumericCornerFieldInput label="Preload" field="preload" data={data} onFieldChange={onFieldChange} />
           </>
@@ -397,15 +397,6 @@ export default function SetupView({
       {/* ══ SETUPS TAB ══════════════════════════════════════════════════════════ */}
       {subTab === 'setups' && (
         <div className="space-y-6">
-
-          <FourBarQuickAdjust
-            setup={activeSetup}
-            disabledReason={noCar ? 'Add a car in Garage to adjust four-bar.' : 'Create a setup for this car to adjust four-bar.'}
-            onFieldChange={(corner, field, value) => {
-              if (!activeSetup) return;
-              handleCornerChange(activeSetup.id, corner, field, value);
-            }}
-          />
 
           {/* Create New Setup */}
           {noCar ? (
@@ -665,6 +656,12 @@ export default function SetupView({
                           );
                         })}
                       </div>
+
+                      {/* Four-bar is part of this setup, after all four corner values. */}
+                      <FourBarQuickAdjust
+                        setup={setupItem}
+                        onFieldChange={(corner, field, value) => handleCornerChange(setupItem.id, corner, field, value)}
+                      />
 
                       {/* Attachments */}
                       <div className="bg-surface-container/50 border border-outline-variant/60 rounded-lg p-4">

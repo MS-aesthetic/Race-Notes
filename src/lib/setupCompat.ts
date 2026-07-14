@@ -83,5 +83,12 @@ export function cloneSetup(source: Setup, overrides: Partial<Setup>): Setup {
 }
 
 export function makeBlankSetup(overrides: Partial<Setup>): Setup {
-  return cloneSetup(INITIAL_SETUP, overrides);
+  const blank = cloneSetup(INITIAL_SETUP, overrides);
+  return {
+    ...blank,
+    lf: { ...blank.lf, loadWeight: '500', loadCtoC: '17', tirePress: '10', caster: '3', camber: '4' },
+    rf: { ...blank.rf, loadWeight: '500', loadCtoC: '17', tirePress: '10', caster: '3', camber: '-4' },
+    lr: { ...blank.lr, loadWeight: '500', loadCtoC: '17', tirePress: '10' },
+    rr: { ...blank.rr, loadWeight: '500', loadCtoC: '17', tirePress: '10' },
+  };
 }

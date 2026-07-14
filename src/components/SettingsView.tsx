@@ -247,12 +247,10 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {([
-                  { value: 'standard', icon: 'format_size',   label: 'Standard', desc: '1x scale' },
-                  { value: 'large',    icon: 'text_increase', label: 'Large',    desc: '1.15x scale' },
-                  { value: 'xlarge',   icon: 'text_increase', label: 'X-Large',  desc: '1.45x scale' },
-                  { value: 'xxlarge',  icon: 'text_increase', label: 'XX-Large', desc: '1.7x scale' },
+                  { value: 'large',  icon: 'format_size', label: 'Default' },
+                  { value: 'xlarge', icon: 'text_increase', label: 'Large' },
                 ] as const).map(opt => {
-                  const active = (theme.fontSize ?? 'standard') === opt.value;
+                  const active = (theme.fontSize ?? 'large') === opt.value;
                   return (
                     <button
                       key={opt.value}
@@ -271,9 +269,6 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                       </span>
                       <span className={`font-mono text-xs uppercase font-bold ${active ? 'text-primary' : 'text-on-surface-variant'}`}>
                         {opt.label}
-                      </span>
-                      <span className={`font-mono text-[9px] ${active ? 'text-primary/70' : 'text-on-surface-variant/50'}`}>
-                        {opt.desc}
                       </span>
                     </button>
                   );

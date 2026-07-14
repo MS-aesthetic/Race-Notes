@@ -44,6 +44,14 @@ assert.equal(crossCar.rr.tireInventoryId, undefined);
 const blank = makeBlankSetup({ id: 'blank', carId: 'car-c', chassis: 'Blank', date: 'Jul 12, 2026', carType: 'Modified' });
 assert.equal(blank.carId, 'car-c');
 assert.notEqual(blank.lf.tireSize, newer.lf.tireSize);
+assert.deepEqual(['lf', 'rf', 'lr', 'rr'].map(corner => blank[corner as 'lf'].loadWeight), ['500', '500', '500', '500']);
+assert.deepEqual(['lf', 'rf', 'lr', 'rr'].map(corner => blank[corner as 'lf'].loadCtoC), ['17', '17', '17', '17']);
+assert.deepEqual(['lf', 'rf', 'lr', 'rr'].map(corner => blank[corner as 'lf'].tirePress), ['10', '10', '10', '10']);
+assert.equal(blank.lf.caster, '3');
+assert.equal(blank.rf.caster, '3');
+assert.equal(blank.lf.camber, '4');
+assert.equal(blank.rf.camber, '-4');
+assert.equal(blank.lr.caster, undefined);
 
 assert.equal(parseStoredNumber('Hole 3'), 3);
 assert.equal(parseStoredNumber('12°'), 12);
@@ -104,7 +112,8 @@ assert.deepEqual(
 assert.equal(calculateTireStagger('86 1/2', '86'), 0.5);
 assert.equal(calculateTireStagger('', '86'), null);
 assert.equal(fourBarAdjustmentId('rr', 'topBarHBird'), 'fourbar-rr-topBarHBird');
-assert.equal(fourBarAdjustmentLabel('lr', 'topBarAngFD'), 'LR top bar angle');
+assert.equal(fourBarAdjustmentLabel('lr', 'topBarAngFD'), 'LR top angle at full droop');
+assert.equal(fourBarAdjustmentLabel('rr', 'bottomBarAngRH'), 'RR bottom angle at ride height');
 
 const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 assert.match(appSource, /handleUpdateSession\(current =>/);
@@ -148,7 +157,12 @@ assert.match(smasherSource, /activeCarId && !compareMode && displayedSessions\.l
 assert.match(smasherSource, /showNewForm && activeCarId/);
 assert.doesNotMatch(smasherSource, /carId: activeCarId \?\? undefined/);
 const fourBarSource = readFileSync(new URL('../src/components/FourBarQuickAdjust.tsx', import.meta.url), 'utf8');
-assert.match(fourBarSource, /function PairedRow/);
+assert.match(fourBarSource, /function BarSection/);
+assert.ok(fourBarSource.indexOf("field: 'topBarHFrame'") < fourBarSource.indexOf("field: 'topBarLength'"));
+assert.ok(fourBarSource.indexOf("field: 'topBarLength'") < fourBarSource.indexOf("field: 'topBarHBird'"));
+assert.match(fourBarSource, /bottomBarAngRH/);
+assert.match(fourBarSource, /bottomBarAngFD/);
+assert.match(fourBarSource, /Legacy bottom angle/);
 assert.match(fourBarSource, /\[&_\[role=group\]\]:flex-wrap/);
 
 console.log('CHUNK5_SETUP_HARNESS PASS');

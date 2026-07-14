@@ -77,7 +77,7 @@ export default function GarageView({
           <span className="material-symbols-outlined text-primary text-lg">garage</span>
           <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Garage</h3>
         </div>
-        <p className="text-[11px] text-on-surface-variant font-mono">Select your active car. Setups, tires, and smasher sessions are scoped to it.</p>
+        <p className="text-[11px] text-on-surface-variant font-mono">Select your active car. Setups, tires, and load sessions stay tied to it.</p>
       </div>
 
       {/* Car list */}

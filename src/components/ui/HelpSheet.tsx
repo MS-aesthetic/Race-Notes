@@ -19,7 +19,7 @@ export default function HelpSheet({ open, onClose, section, children }: HelpShee
       <div data-help-section={section} className="space-y-3">
         <div className="rounded-lg border border-primary/50 bg-primary/10 p-3">
           <p className="font-display text-base font-bold uppercase text-on-surface">Tuning Guide</p>
-          <p className="mt-1 font-mono text-xs text-on-surface-variant">Modified and Dirt Late Model baseline references. Keep vehicle class, tire-maker, chassis-builder, shock-builder, and track rules in view.</p>
+          <p className="mt-1 font-mono text-xs text-on-surface-variant">Basic dirt-oval setup direction. Change one thing, test it, and follow your tire and track rules.</p>
         </div>
         {children ?? (
           <p className="py-4 text-sm text-on-surface-variant">

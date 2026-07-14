@@ -28,12 +28,12 @@ A team shares cars, setups, tires, weekends, and tasks automatically via Supabas
 - Team owner can fill a Driver/Team profile: Car #, Division, Hometown, Age, Transponder ID, MyRacePass URL. Members view read-only.
 
 ## Adding a car
-Every setup, tire, and shock graph is scoped to the **active car**.
+Every setup, tire, and load graph is scoped to the **active car**.
 
 - Settings → Garage → **Add Car**.
 - Pick car type (Dirt Late Model / A Mod / B Mod / custom), enter chassis, division, optional name. Save → becomes active car.
 - Switch cars by tapping one in the Garage list; the header car chip shows the active car.
-- A car can only be deleted when it owns no setups, tires, or shock graphs.
+- A car can only be deleted when it owns no setups, tires, or load graphs.
 
 ## Creating a setup
 - Ensure the right car is active → **Setups** tab → New Setup (chassis, track, date).
@@ -66,9 +66,9 @@ A weekend is the event container holding sessions.
 - Tires appear in every corner picker, **sorted by size**.
 - Inventory list sorts/filters by newest, oldest, size, or compound.
 
-## Adding spring smasher graphs
-- Right car active → Setups tab → Smasher / Shock Loads → New Session.
-- Pick corner, enter spring rate + shock ID.
+## Adding load sessions
+- Right car active → Setups tab → Load Graphs → New Load Session.
+- Pick corner, enter spring rate + shock ID, and optionally record Ride Height C-to-C.
 - Add height/load data points (plain number fields).
 - Attach a dyno graph photo (auto-compressed).
 - Overlay multiple graphs to compare. Bind a graph to a setup corner.

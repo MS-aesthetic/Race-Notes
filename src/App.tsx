@@ -15,7 +15,7 @@ import {
 
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, AppUser } from './lib/supabase';
 import AuthView from './components/AuthView';
-import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, deleteMaintenanceComponentFromCloud, pushMaintenanceLogs, pullMaintenanceLogs, deleteMaintenanceLogFromCloud, pushChecklistTemplates, pullChecklistTemplates, deleteChecklistTemplateFromCloud, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, deleteShockSessionFromCloud, pushMaintenanceComponents, pullMaintenanceComponents, deleteMaintenanceComponentFromCloud, pushMaintenanceLogs, pullMaintenanceLogs, deleteMaintenanceLogFromCloud, pushChecklistTemplates, pullChecklistTemplates, deleteChecklistTemplateFromCloud, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
 import { registerForPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
 import { normalizeSetup, normalizeSetups, pickLatestSetupForCar } from './lib/setupCompat';
@@ -42,6 +42,18 @@ import { hasOpenSheets, isPopSuppressed } from './lib/backStack';
 import { Todo } from './types';
 
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
+
+const normalizeTheme = (value: unknown): AppTheme => {
+  const saved = (value && typeof value === 'object' ? value : {}) as Partial<AppTheme>;
+  const fontSize: AppTheme['fontSize'] = saved.fontSize === 'xlarge' || saved.fontSize === 'xxlarge'
+    ? 'xlarge'
+    : 'large';
+  return {
+    mode: saved.mode === 'light' ? 'light' : 'dark',
+    accent: typeof saved.accent === 'string' && saved.accent ? saved.accent : '#ffb3ac',
+    fontSize,
+  };
+};
 
 const applyActiveSessionToWeekends = (
   source: RaceWeekend[],
@@ -201,6 +213,12 @@ export default function App() {
   };
 
   const handleSaveShockSessions = (updated: ShockSession[]) => {
+    if (user) {
+      const remainingIds = new Set(updated.map(session => session.id));
+      shockSessions
+        .filter(session => !remainingIds.has(session.id))
+        .forEach(session => deleteShockSessionFromCloud(session.id));
+    }
     setShockSessions(updated);
     localStorage.setItem('race_notes_shock_graphs', JSON.stringify(updated));
     if (user) pushShockSessions(updated, user.id, setSyncStatus);
@@ -310,14 +328,19 @@ export default function App() {
   const [theme, setTheme] = useState<AppTheme>(() => {
     try {
       const saved = localStorage.getItem('race_notes_theme');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const normalized = normalizeTheme(JSON.parse(saved));
+        localStorage.setItem('race_notes_theme', JSON.stringify(normalized));
+        return normalized;
+      }
     } catch {}
     return { mode: 'dark', accent: '#ffb3ac', fontSize: 'large' };
   });
 
   const handleThemeChange = (updated: AppTheme) => {
-    setTheme(updated);
-    localStorage.setItem('race_notes_theme', JSON.stringify(updated));
+    const normalized = normalizeTheme(updated);
+    setTheme(normalized);
+    localStorage.setItem('race_notes_theme', JSON.stringify(normalized));
   };
 
   // Apply theme tokens to document root whenever theme changes
@@ -337,8 +360,8 @@ export default function App() {
     // installed PWA (Chrome) vs the Capacitor APK (Android WebView) — both
     // Chromium, both respect `zoom` the same way.
     root.style.fontSize = '16px';
-    const ZOOM: Record<AppTheme['fontSize'], number> = { standard: 1, large: 1.15, xlarge: 1.45, xxlarge: 1.7 };
-    const zoom = ZOOM[theme.fontSize] ?? 1;
+    const ZOOM: Record<AppTheme['fontSize'], number> = { standard: 1.15, large: 1.15, xlarge: 1.45, xxlarge: 1.45 };
+    const zoom = ZOOM[theme.fontSize] ?? 1.15;
     root.style.setProperty('--ui-zoom', String(zoom));
   }, [theme]);
 

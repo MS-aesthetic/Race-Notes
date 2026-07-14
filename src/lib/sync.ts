@@ -466,6 +466,7 @@ export function pushShockSessions(sessions: ShockSession[], userId: string, onSt
         corner: s.corner,
         spring_rate: s.springRate,
         shock: s.shock,
+        ride_height_ctoc: s.rideHeightCtoC || '',
         date: s.date,
         points: s.points,
         photos: s.photos || [],
@@ -473,7 +474,7 @@ export function pushShockSessions(sessions: ShockSession[], userId: string, onSt
       }));
       const { error } = await supabase.from('shock_sessions').upsert(rows, { onConflict: 'id' });
       if (error) console.warn('Sync: pushShockSessions error:', error.message);
-      else onStatus?.('Shock sessions synced to cloud');
+      else onStatus?.('Load sessions synced to cloud');
     } catch (e) { console.warn('Sync: pushShockSessions failed', e); }
   }, 500));
 }
@@ -486,13 +487,14 @@ export async function pullShockSessions(userId: string, onStatus?: SyncCallback)
       .order('created_at', { ascending: false });
     if (error) { console.warn('Sync: pullShockSessions error:', error.message); return []; }
     if (!data) return [];
-    onStatus?.(`Pulled ${data.length} shock sessions from cloud`);
+    onStatus?.(`Pulled ${data.length} load sessions from cloud`);
     return data.map((r: Record<string, unknown>) => ({
       id: r.id as string,
       label: (r.label as string) || '',
       corner: (r.corner as ShockSession['corner']) || 'LF',
       springRate: (r.spring_rate as string) || '',
       shock: (r.shock as string) || '',
+      rideHeightCtoC: (r.ride_height_ctoc as string) || '',
       date: (r.date as string) || '',
       points: (r.points as ShockSession['points']) || [],
       photos: (r.photos as string[]) || [],

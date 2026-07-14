@@ -39,6 +39,13 @@ export interface CornerSetup {
   topBarAngFDUnit?: string;
   botBarHFrame?: string;
   botBarHBird?: string;
+  /** Bottom-bar angle measured with car at ride height. */
+  bottomBarAngRH?: string;
+  bottomBarAngRHUnit?: string;
+  /** Bottom-bar angle measured with suspension at full droop. */
+  bottomBarAngFD?: string;
+  bottomBarAngFDUnit?: string;
+  /** @deprecated Legacy single bottom-bar angle. Read as ride-height fallback. */
   bottomBarAngle?: string;
   bottomBarAngleUnit?: string;
   droop?: string;
@@ -80,6 +87,8 @@ export interface ShockSession {
   corner: ShockCorner;
   springRate: string;
   shock: string;
+  /** Optional car ride height recorded when this load session was started. */
+  rideHeightCtoC?: string;
   date: string;
   points: ShockDataPoint[];
   /** Base64 dyno graph photos */

@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunk 1 `e04b15c` ✅ · Chunk 2 `306445d` ✅ · Chunk 3 `c68f27d` ✅ · Chunk 4 `21405e9` ✅ · urgent UX-R1 regression repair `b6d702e` ✅ · Chunk 5 `d5ef1f4` ✅ · Chunks 6-7 pending. Chunk 5 shipped the always-visible four-bar/birdcage panel, physical corner cards/steppers, same-car copy/blank/diff flows, pressure provenance, and active-car Tires view. Chunk 6 is next. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; real SOL → Terra → SOL handoff ran in one persistent task. `/caveman full`. Status + backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
+> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunk 1 `e04b15c` ✅ · Chunk 2 `306445d` ✅ · Chunk 3 `c68f27d` ✅ · Chunk 4 `21405e9` ✅ · urgent UX-R1 regression repair `b6d702e` ✅ · Chunk 5 `d5ef1f4` ✅ · Chunk 6A implementation QA-ready (commit/SOL adjudication pending) · 6B-9 pending. C6A delivers exact blank defaults, complete setup-bottom four-bar layout, tire summary, Load Session ride height, two-size Style UI, and plain tuning-priority help. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; real SOL → Terra → SOL handoff ran in one persistent task. `/caveman full`. Status + backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:
@@ -119,6 +119,18 @@ QA is consolidated per chunk: each chunk ends with one test pass covering everyt
 - Empty states render with CTAs on a profile with a car but nothing else â€” **RUNTIME**.
 
 ---
+
+## OWNER REVISION — 2026-07-13 (CURRENT AUTHORITY)
+
+Original seven-chunk plan below remains implementation history. Current remaining order:
+
+1. **Chunk 6A — setup/measurement refinement.** Blank setup defaults: 500 lb each corner, 17 in Ride Height C-to-C, 10 PSI, LF/RF caster 3, LF camber 4, RF camber -4. Move complete four-bar block to setup bottom. LR and RR each show Top Bar and Bottom Bar with Frame Hole → Length → Birdcage Hole and Ride Height Angle → Full Droop Angle. Tires show last pressure, cycles, estimated laps. User-facing Shock Session becomes Load Session; new load sessions accept optional Ride Height C-to-C. Keep existing graph mapping when visual QA confirms decreasing physical height moves lower on screen. Style exposes only Default (existing 1.15) and Large (existing 1.45), without scale captions. Tuning Guide explains High/Medium/Low in plain racer language and removes AFCO/chassis-specific user wording.
+2. **Chunk 6B — setup history lifecycle.** Starting weekend creates immutable Baseline plus editable Weekend Setup. All event changes write Weekend Setup and its change log. Finish Weekend button is always visible at page bottom and has no run/race gate. Finish creates immutable Final snapshot, marks weekend finished, clears active-weekend selection, and creates/selects an editable Current Setup copy from Final. Existing weekends/setups migrate through optional fields and safe defaults.
+3. **Chunk 7 — expanded Quick Adjust.** Spring rate ±25 lb; spring rounds ±0.5; rounds mark corner Ride Height C-to-C for review until user updates it; shock note or bound Load graph; J-Bar frame/pinion ±0.25 in; manual gear. Other changes remain free text. Structured and free-text entries append to Weekend Setup change log and current run adjustments.
+4. **Chunk 8 — Trackers/Maintenance.** Former Chunk 6 plus Service→Maintenance Logs, plain explanation of interval tracking, idempotent Main Checklist task injection at ≥90% interval, and assignment/edit after creation for manual/template/automatic tasks.
+5. **Chunk 9 — export/help/final regression.** Former Chunk 7 after all new screens stabilize.
+
+Dependency: 6A → 6B → 7; 6B → 8; 7+8 → 9. Feature builds stay serial. Test once per coherent slice, then consolidated Android/preview regression per completed chunk.
 
 ### CHUNK 5 â€” Setups: corner cards, four-bar quick-adjust, tires, diff
 **Goal:** Setups become thumb-operable at the track, with the four-bar/birdcage â€” the owner's most-common trackside adjustment â€” promoted to a first-class, â‰¤1-tap quick-adjust surface (reversed #18).

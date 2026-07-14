@@ -389,6 +389,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
   const [formSpring, setFormSpring] = useState('');
   const [formShock, setFormShock] = useState('');
   const [formLabel, setFormLabel] = useState('');
+  const [formRideHeightCtoC, setFormRideHeightCtoC] = useState('');
 
   // New data point entry
   const [entryHeight, setEntryHeight] = useState('');
@@ -443,6 +444,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
       corner: formCorner,
       springRate: formSpring,
       shock: formShock,
+      rideHeightCtoC: formRideHeightCtoC.trim(),
       date: new Date().toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }),
       points: [],
       carId: activeCarId,
@@ -454,6 +456,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
     setFormLabel('');
     setFormSpring('');
     setFormShock('');
+    setFormRideHeightCtoC('');
     setFormCorner('LF');
   };
 
@@ -486,7 +489,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
   // ── Delete session ────────────────────────────────────────────────────────
 
   const handleDeleteSession = (id: string) => {
-    if (!window.confirm('Delete this shock session and all its data points?')) return;
+    if (!window.confirm('Delete this load session and all its data points?')) return;
     const next = sessions.filter(s => s.id !== id);
     persist(next);
     setActiveSessionId(next[0]?.id ?? null);
@@ -537,7 +540,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
             </h2>
             <p className="font-mono text-xs text-on-surface-variant mt-1 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-              Shock height vs. load — per corner
+              Height vs. load — per corner
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -558,7 +561,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
               className="h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 flex-shrink-0 hover:opacity-90"
             >
               <span className="material-symbols-outlined text-[15px]">{activeCarId ? 'add' : 'directions_car'}</span>
-              {activeCarId ? 'New Session' : 'Go to Garage'}
+              {activeCarId ? 'New Load Session' : 'Go to Garage'}
             </button>
           </div>
         </div>
@@ -708,15 +711,15 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
       {activeCarId && !compareMode && displayedSessions.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
           <span className="material-symbols-outlined text-5xl text-on-surface-variant/30">show_chart</span>
-          <p className="text-on-surface-variant text-sm font-mono uppercase">No shock sessions yet</p>
+          <p className="text-on-surface-variant text-sm font-mono uppercase">No load sessions yet</p>
           <p className="text-on-surface-variant/60 text-xs max-w-[260px]">
-            Create a session for a corner, enter your height & load measurements, and a line graph will be generated automatically.
+            Create a load session for a corner, enter height and load measurements, and the graph builds automatically.
           </p>
           <button
             onClick={() => setShowNewForm(true)}
             className="mt-2 px-4 py-2 bg-primary text-on-primary font-mono text-xs font-bold uppercase rounded hover:opacity-90"
           >
-            + Create First Session
+            + Create First Load Session
           </button>
         </div>
       )}
@@ -737,7 +740,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
               <button
                 onClick={() => handleDeleteSession(activeSession.id)}
                 className="p-1 text-on-surface-variant/50 hover:text-error transition-colors"
-                title="Delete session"
+                title="Delete load session"
               >
                 <span className="material-symbols-outlined text-[16px]">delete</span>
               </button>
@@ -745,7 +748,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
 
             <div className="grid grid-cols-1 gap-2">
               <div>
-                <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Session Label</label>
+                <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Load Session Label</label>
                 <input
                   type="text"
                   value={activeSession.label}
@@ -783,7 +786,18 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
                   type="text"
                   value={activeSession.shock}
                   onChange={e => updateMeta('shock', e.target.value)}
-                  placeholder="e.g. Afco 26-1"
+                  placeholder="e.g. 26-1"
+                  className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Ride Height C-to-C (in)</label>
+                <input
+                  type="text"
+                  value={activeSession.rideHeightCtoC ?? ''}
+                  onChange={e => updateMeta('rideHeightCtoC', e.target.value)}
+                  placeholder="Optional"
+                  inputMode="decimal"
                   className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded"
                 />
               </div>
@@ -970,7 +984,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
 
             <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-2">
               <span className="material-symbols-outlined text-primary">show_chart</span>
-              <h3 className="font-display text-base font-bold uppercase tracking-wide">New Shock Session</h3>
+              <h3 className="font-display text-base font-bold uppercase tracking-wide">New Load Session</h3>
             </div>
 
             <form onSubmit={handleCreateSession} className="space-y-3">
@@ -996,13 +1010,13 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
               </div>
 
               <div>
-                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Session Label / Notes</label>
+                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Load Session Label / Notes</label>
                 <input
                   type="text"
                   placeholder="e.g. Knoxville Practice"
                   value={formLabel}
                   onChange={e => setFormLabel(e.target.value)}
-                  className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+                  className="w-full bg-surface text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
                 />
               </div>
 
@@ -1014,19 +1028,31 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
                     placeholder="e.g. 175"
                     value={formSpring}
                     onChange={e => setFormSpring(e.target.value)}
-                    className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+                    className="w-full bg-surface text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Shock</label>
                   <input
                     type="text"
-                    placeholder="e.g. Afco 26-1"
+                    placeholder="e.g. 26-1"
                     value={formShock}
                     onChange={e => setFormShock(e.target.value)}
-                    className="w-full bg-[#141414] text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+                    className="w-full bg-surface text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Ride Height C-to-C (in) <span className="normal-case opacity-60">optional</span></label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="e.g. 17"
+                  value={formRideHeightCtoC}
+                  onChange={e => setFormRideHeightCtoC(e.target.value)}
+                  className="w-full bg-surface text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+                />
               </div>
 
               <div className="flex gap-2 pt-1 justify-end font-mono text-xs">
@@ -1041,7 +1067,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
                   type="submit"
                   className="px-4 py-2 bg-primary text-on-primary font-bold uppercase rounded hover:opacity-90"
                 >
-                  Create Session
+                  Create Load Session
                 </button>
               </div>
             </form>

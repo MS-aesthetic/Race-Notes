@@ -6,7 +6,7 @@ type TrackCondition = 'all' | 'slick' | 'rubber' | 'wet' | 'tacky';
 type CarBehavior = 'select' | 'loose-entry' | 'loose-center' | 'loose-exit'
                  | 'tight-entry' | 'tight-center' | 'tight-exit' | 'need-drive';
 type AdjPriority = 'high' | 'medium' | 'low';
-type AdjustmentApplication = 'Dirt Late Model' | 'Modified' | 'Class/chassis-specific';
+type AdjustmentApplication = 'Dirt Late Model' | 'Modified' | 'Package-dependent';
 
 interface Adjustment {
   component: string;
@@ -18,9 +18,9 @@ interface Adjustment {
 }
 
 function adjustmentApplicability(adjustment: Adjustment): string {
-  if (adjustment.application === 'Dirt Late Model') return 'Dirt Late Model only — verify the applicable AFCO sheet';
-  if (adjustment.application === 'Modified') return 'Modified only — verify the applicable AFCO sheet';
-  return 'Class/chassis-specific — use the applicable AFCO sheet; change one item';
+  if (adjustment.application === 'Dirt Late Model') return 'Dirt Late Model only — make sure your car has this part';
+  if (adjustment.application === 'Modified') return 'Modified only — make sure your car has this part';
+  return 'Basic direction — change one thing, then test it';
 }
 
 interface ConditionGroup {
@@ -71,10 +71,10 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
     conditionAdjustments: {
       slick: [
         { component: 'Shocks', location: 'Both Fronts', action: 'Stiffen compression; verify LR rebound separately', priority: 'high',
-          effect: 'For a loose-entry condition, do not reverse the LR-rebound direction in the same recommendation. Use the applicable AFCO Modified or Dirt Late Model shock sheet, make one measured change, and record the result.' },
+          effect: 'For a loose-entry condition, do not reverse the LR-rebound direction in the same recommendation. Check your shock builder notes, make one measured change, and record the result.' },
         { component: 'J-Bar', location: 'Both Ends', action: 'Lower both equally (to center of pinion or below)', priority: 'high',
           effect: 'On dry-slick, lower the J-bar on both ends to lower the rear roll center. This makes the chassis roll slowly and progressively rather than abruptly, preventing the rear from snapping loose on a low-grip surface.' },
-        { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'medium',
+        { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and hot readings', priority: 'medium',
           effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules. No universal cold-pressure number is safe for every package.' },
       ],
       rubber: [
@@ -130,7 +130,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       slick: [
         { component: 'Shocks', location: 'Both Fronts', action: 'Decrease compression + Soften LR rebound', priority: 'high',
           effect: 'On dry-slick, lower J-bar both ends AND soften LR rebound. Do NOT over-soften front compression as it can make the front wash out. The J-bar and LR rebound combo keeps the rear compliant without sacrificing front stability.' },
-        { component: 'Tires', location: 'Right Front', action: 'Verify pressure with tire maker and chassis builder', priority: 'medium',
+        { component: 'Tires', location: 'Right Front', action: 'Verify pressure with tire maker and hot readings', priority: 'medium',
           effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules; do not copy a universal numeric setting.' },
       ],
       rubber: [
@@ -157,8 +157,8 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
     subtitle: 'Loose-Middle / Oversteer at Apex',
     type: 'tighten',
     baseAdjustments: [
-      { component: 'Shocks', location: 'Right Front', action: 'Verify RF rebound direction for class/chassis', priority: 'high',
-        effect: 'RF rebound direction differs by class and chassis package. Use only the applicable AFCO Modified or Dirt Late Model sheet, make one measured change, and record the result.' },
+      { component: 'Shocks', location: 'Right Front', action: 'Check which RF rebound direction fits your car', priority: 'high',
+        effect: 'RF rebound direction can differ between cars. Check your shock builder notes, make one measured change, and record the result.' },
       { component: 'Shocks', location: 'Left Rear', action: 'Less Compression (Decrease)', priority: 'high',
         effect: 'Decreasing LR compression allows the left rear to compress more freely. This lets the chassis settle smoothly onto the rear tires without the abrupt "bounce" that can cause the rear to step out at the apex.' },
       { component: 'Shocks', location: 'Right Rear', action: 'More Compression (Increase)', priority: 'high',
@@ -186,7 +186,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       slick: [
         { component: 'Shocks', location: 'Right Rear', action: 'Soften compression + Stiffen LR compression', priority: 'high',
           effect: 'The ultimate dry-slick mid-corner tightening combo: soften RR compression to maximize the RR tire footprint on the outside tire, while stiffening LR compression keeps the LR chassis from collapsing too quickly, maintaining rear steer geometry.' },
-        { component: 'Tires', location: 'Right Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'high',
+        { component: 'Tires', location: 'Right Rear', action: 'Verify pressure with tire maker and hot readings', priority: 'high',
           effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules; do not copy a universal numeric setting.' },
       ],
       rubber: [
@@ -285,7 +285,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
         effect: 'More LR rebound slows the LR chassis hike-up speed on throttle. Delayed rear steer onset keeps the car planted longer before rear steer begins — extends the drive window.' },
       { component: 'Shocks', location: 'Right Rear', action: 'More Rebound (increase)', priority: 'medium',
         effect: 'More RR rebound resists the RR shock from extending as the car flattens out. This keeps RR side bite pinned longer through the exit phase.' },
-      { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'high',
+      { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and hot readings', priority: 'high',
         effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules. Do not treat a copied numeric setting as a universal safety limit.' },
       { component: 'Tire Spacing', location: 'Left Rear', action: 'Add ½" Wheel Spacer', priority: 'medium',
         effect: 'A LR spacer widens the left-side track, keeping the LR tire flatter and more loaded under acceleration — increases forward traction and tightens corner exit.' },
@@ -302,8 +302,8 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
           effect: 'A dry-slick track demands the slowest, most progressive torque delivery possible. Maximum pull bar compliance prevents the slightest tire spin on a surface with virtually no grip.' },
         { component: 'Shocks', location: 'Right Rear', action: 'Double-spring RR combination', priority: 'high',
           effect: 'On dry-slick, run a double spring RR combination (e.g., 10"×100 lb inner + 12"×150 lb barrel outer spring). This provides the same entry roll rate as a single spring but delivers a softer, highly compliant exit rate for ultimate traction.' },
-        { component: 'Shocks', location: '5th Coil', action: 'Verify gas-pressure change on applicable AFCO sheet', priority: 'medium', application: 'Dirt Late Model',
-          effect: 'For a Dirt Late Model with a fifth-coil package, verify the specified gas-pressure direction on the applicable AFCO sheet. Make only that measured change before evaluating drive.' },
+        { component: 'Shocks', location: '5th Coil', action: 'Check gas-pressure direction before changing it', priority: 'medium', application: 'Dirt Late Model',
+          effect: 'For a Dirt Late Model with a fifth coil, check your shock builder notes first. Make one measured change before evaluating drive.' },
       ],
       rubber: [
         { component: 'Pull Bar', location: 'Spring', action: 'Can stiffen slightly vs. slick', priority: 'low',
@@ -347,7 +347,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
         effect: 'Moving the pull bar to the right loosens the corner exit by shifting the torque loading away from the LR tire. This reduces the mechanical clamping force that is causing the push.' },
       { component: 'Shocks', location: 'Right Rear', action: 'Less Rebound (Decrease)', priority: 'medium',
         effect: 'Less RR rebound allows the RR shock to extend easily on exit, releasing side bite quickly so the car can square up and rotate off the corner.' },
-      { component: 'Tires', location: 'Right Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'medium',
+      { component: 'Tires', location: 'Right Rear', action: 'Verify pressure with tire maker and hot readings', priority: 'medium',
         effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules. Do not treat a copied numeric setting as a universal safety limit.' },
       { component: 'Springs', location: 'Left Rear', action: 'Softer Rate', priority: 'medium',
         effect: 'A softer LR spring promotes deeper chassis hike and suspension separation on throttle. More hike = more rear steer = more rotation to escape the tight-exit push.' },
@@ -364,16 +364,16 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       rubber: [
         { component: 'Pull Bar', location: 'Spring', action: 'Stiffen aggressively', priority: 'high',
           effect: 'The rubber groove hooks the rear very hard. A stiff pull bar delivers an aggressive torque spike to break the rear loose and create rotation — necessary when the groove is holding the car in a push.' },
-        { component: 'Tires', location: 'Right Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'high',
-          effect: 'Rubbered-track pressure remains tire- and chassis-specific. Use measured hot pressure and track rules instead of a copied universal number.' },
+        { component: 'Tires', location: 'Right Rear', action: 'Verify pressure with tire maker and hot readings', priority: 'high',
+          effect: 'Rubbered-track pressure depends on the tire and car. Use measured hot pressure and track rules instead of a copied universal number.' },
       ],
       wet: [
         { component: 'Stagger', location: 'Rear Axle', action: 'Add stagger', priority: 'medium',
           effect: 'A wet/heavy track with mud in the cushion often pushes on exit. More stagger provides natural rotation to exit the corner properly in heavy conditions.' },
       ],
       tacky: [
-        { component: 'Shocks', location: 'Right Front', action: 'Verify RF rebound direction for class/chassis', priority: 'high',
-          effect: 'RF rebound direction differs by class and chassis package on high-grip tracks. Use the applicable AFCO sheet and make one measured change before evaluating exit balance.' },
+        { component: 'Shocks', location: 'Right Front', action: 'Check which RF rebound direction fits your car', priority: 'high',
+          effect: 'RF rebound direction can differ between cars on high-grip tracks. Check your shock builder notes and make one measured change before evaluating exit balance.' },
         { component: 'Pull Bar', location: 'Spring', action: 'Stiffer', priority: 'medium',
           effect: 'On tacky track the rear hooks hard. A stiffer pull bar helps rotate the car off the corner by delivering a more aggressive torque spike.' },
       ],
@@ -393,7 +393,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
         effect: 'Lowering the pinion side steepens the J-bar angle under power, converting lateral forces into vertical downward pressure on the LR. Maximum mechanical forward traction.' },
       { component: '4-Link', location: 'LR Top Bar (Drive Bar)', action: 'Steepen (Raise chassis / Lower birdcage)', priority: 'high',
         effect: 'Maximum vertical clamping force on the LR tire under acceleration. The LR footprint is compressed firmly into the dirt for maximum forward traction. This is the most direct 4-link tool for forward bite.' },
-      { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'high',
+      { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and hot readings', priority: 'high',
         effect: 'Use measured hot pressure, tire construction, chassis guidance, and track rules. Do not treat a copied numeric setting as a universal safety limit.' },
       { component: 'Shocks', location: 'Left Rear', action: 'Less Compression (Decrease)', priority: 'high',
         effect: 'Decreasing LR compression allows the left rear to squat smoothly under acceleration. Smooth, progressive squat = smooth weight transfer = tire stays in contact = more drive. Abrupt LR compression resistance causes the tire to bounce off the track.' },
@@ -403,8 +403,8 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
         effect: 'Softening RR compression allows weight to transfer rapidly and smoothly to the outside tire. The soft cushion absorbs the power without causing the RR to bounce or break traction.' },
       { component: 'Shocks', location: 'Left Rear', action: 'More Rebound (Increase)', priority: 'medium',
         effect: 'More LR rebound slows the LR chassis hike-up on throttle. Slower hike means the tire stays loaded and driving longer before rear steer begins — more sustained forward bite.' },
-      { component: 'Shocks', location: '5th Coil', action: 'Verify gas-pressure change on applicable AFCO sheet', priority: 'medium', application: 'Dirt Late Model',
-        effect: 'For a Dirt Late Model with a fifth-coil package, verify the specified gas-pressure direction on the applicable AFCO sheet. Make only that measured change before evaluating forward drive.' },
+      { component: 'Shocks', location: '5th Coil', action: 'Check gas-pressure direction before changing it', priority: 'medium', application: 'Dirt Late Model',
+        effect: 'For a Dirt Late Model with a fifth coil, check your shock builder notes first. Make one measured change before evaluating forward drive.' },
       { component: '4-Link', location: 'LR Lower Rod', action: 'Lower on chassis (flatten)', priority: 'medium',
         effect: 'Lowering the LR bottom rod on the chassis holds the spring load longer during chassis hike-up under acceleration, maximizing the duration of LR tire loading and sustained forward bite.' },
       { component: 'Tire Spacing', location: 'Left Rear', action: 'Add ½" spacer on LR', priority: 'medium',
@@ -416,7 +416,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
     ],
     conditionAdjustments: {
       slick: [
-        { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and chassis builder', priority: 'high',
+        { component: 'Tires', location: 'Left Rear', action: 'Verify pressure with tire maker and hot readings', priority: 'high',
           effect: 'There is no universal minimum-safe pressure. Use measured hot pressure, tire construction, chassis guidance, and track rules.' },
         { component: 'Springs', location: 'Rear', action: 'Soften both rear springs', priority: 'medium',
           effect: 'Softer rear springs (such as 100 lb or 175 lb RR) allow the suspension to work with the slick surface rather than skipping over it, maintaining consistent tire contact for drive.' },
@@ -433,7 +433,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
         { component: 'Driver Technique', location: 'Line Choice', action: 'Go wide — use the cushion', priority: 'high',
           effect: 'On wet/heavy, the biggest drive comes from using the cushion. Hit the cushion on exit to slingshot down the straight. This is more valuable than any mechanical change in heavy conditions.' },
         { component: 'Tires', location: 'Left Rear', action: 'Recheck pressure against tire and track guidance', priority: 'medium',
-          effect: 'Wet-track pressure is package-specific. Use tire-maker, chassis-builder, measured hot-pressure, and track-rule guidance.' },
+          effect: 'Wet-track pressure depends on the tire and conditions. Use tire-maker guidance, measured hot pressure, and track rules.' },
       ],
       tacky: [
         { component: 'Pull Bar', location: 'Spring', action: 'Medium-stiff spring', priority: 'medium',
@@ -463,7 +463,7 @@ const TRACK_CONDITION_INFO: Record<Exclude<TrackCondition, 'all'>, { label: stri
   wet: {
     label: 'Wet / Heavy',
     icon: 'water_drop',
-    description: 'Fresh moisture or rained on. Soft, heavy, wide track. High grip initially — can change rapidly. Wide cushion line is fastest. Increase compression overall. Run grooved tires. Recheck pressure with tire maker, chassis builder, measured hot pressure, and track rules; wet/heavy direction is package-specific.',
+    description: 'Fresh moisture or rained on. Soft, heavy, wide track. High grip initially and can change fast. Wide cushion line is often fastest. Increase compression overall. Run grooved tires. Recheck pressure with tire-maker guidance, measured hot pressure, and track rules.',
     colorClass: 'text-blue-400',
   },
   tacky: {
@@ -579,7 +579,7 @@ export default function QuickReferenceView() {
               Pit-Side Adjustment Finder
             </h2>
             <p className="text-[10px] font-mono text-on-surface-variant">
-              AFCO baseline reference — Modified and Dirt Late Model
+              Basic dirt-oval direction — Modified and Dirt Late Model
             </p>
           </div>
         </div>
@@ -587,9 +587,14 @@ export default function QuickReferenceView() {
         <div className="p-4 space-y-3">
           <div className="rounded border border-outline-variant bg-surface-container-high p-3 text-xs text-on-surface-variant leading-relaxed">
             <p className="font-mono font-bold uppercase text-on-surface">Applicability</p>
-            <p><strong className="text-on-surface">Modified:</strong> use only the AFCO Modified direction for your chassis. <strong className="text-on-surface">Dirt Late Model:</strong> use only the AFCO Dirt Late Model direction. Four-link, birdcage, and pull-bar availability is chassis-specific; fifth-coil rows below are Dirt Late Model only.</p>
-            <p className="mt-1">Baseline diagnostic guidance only. Chassis builder, shock builder, tire manufacturer, measured hot pressures, and track rules control.</p>
-            <p className="mt-1 font-mono">Source: official AFCO Modified and Dirt Late Model setup guidance.</p>
+            <p>This guide gives a starting direction. Only use an adjustment when your car has that part. Fifth-coil items are Dirt Late Model only.</p>
+            <p className="mt-1">Your shock builder, tire maker, measured hot pressures, and track rules still control.</p>
+          </div>
+          <div className="rounded border-2 border-primary/50 bg-primary/10 p-3 text-xs leading-relaxed text-on-surface">
+            <p className="font-mono font-bold uppercase text-primary">What High / Medium / Low means</p>
+            <p className="mt-1"><strong>High:</strong> Try this first. Biggest likely help.</p>
+            <p><strong>Medium:</strong> Try this next if the first change did not fix the problem.</p>
+            <p><strong>Low:</strong> Fine-tuning. Check the bigger items first.</p>
           </div>
           <div>
             <label className="block text-[10px] font-mono uppercase font-bold text-on-surface-variant mb-1.5 tracking-wider">
@@ -776,7 +781,7 @@ export default function QuickReferenceView() {
               <li><strong>Cross-weight (wedge)</strong>: ½ to 1 turn on RF or LR perch = noticeable change. Always start small.</li>
               <li><strong>Pull bar rate</strong>: spinning tires → soften. Not spinning but not driving → stiffen.</li>
               <li><strong>J-bar frame side</strong> → controls corner entry. <strong>Pinion side</strong> → controls corner exit.</li>
-              <li><strong>HIGH priority</strong> first. Make one change, go back on track, evaluate and record result before next change; revert if behavior worsens.</li>
+              <li><strong>High:</strong> try first. <strong>Medium:</strong> try next. <strong>Low:</strong> fine-tuning after bigger items are checked.</li>
               <li><strong>Tuning order</strong>: 1) Corner Entry → 2) Middle → 3) Exit. Always fix entry before middle.</li>
             </ul>
           </div>
@@ -935,13 +940,13 @@ export default function QuickReferenceView() {
 
             {/* ── ADJUSTMENT REFERENCE: Tire Pressure, Springs & Weight ── */}
             <div className="space-y-3">
-              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Quick Adjustment Reference — class-specific AFCO baseline</p>
+              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Quick Adjustment Reference — basic starting direction</p>
               <p className="text-[9px] text-on-surface-variant font-mono">Modified and Dirt Late Model directions are not interchangeable. Change <strong className="text-on-surface-variant">one thing at a time</strong>, record result, then re-scale and re-check.</p>
 
               {/* Tire Pressure */}
               <div className="bg-surface-container border border-outline-variant/40 rounded p-3 space-y-2">
                 <p className="text-[10px] uppercase font-bold text-on-surface tracking-wider">Tire Pressure per Corner</p>
-                <p className="text-[9px] text-on-surface-variant">Use tire-manufacturer, chassis-builder, measured hot-pressure, and track-rule guidance. No fixed pressure is a universal minimum or safe setting.</p>
+                <p className="text-[9px] text-on-surface-variant">Use tire-manufacturer guidance, measured hot pressure, and track rules. No fixed pressure is a universal minimum or safe setting.</p>
                 <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
                   <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">RF ↑</span><p className="text-on-surface-variant">Frees car through middle (helps <strong className="text-on-surface">tight</strong>)</p></div>
                   <div className="bg-surface-container-high rounded p-2"><span className="text-primary font-bold">RF ↓</span><p className="text-on-surface-variant">Adds front grip (helps <strong className="text-on-surface">push/tight-in</strong>)</p></div>
@@ -990,8 +995,8 @@ export default function QuickReferenceView() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-xl">linear_scale</span>
             <div className="text-left">
-              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Chassis-Specific 4-Link Adjustments</h3>
-              <p className="text-[10px] font-mono text-on-surface-variant">Use only when this geometry applies; verify the applicable AFCO/chassis sheet</p>
+              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Basic 4-Link Adjustments</h3>
+              <p className="text-[10px] font-mono text-on-surface-variant">Use only if your car has this rear-suspension layout. Change one item, then test it.</p>
             </div>
           </div>
           <span className="material-symbols-outlined text-on-surface-variant">{fourLinkOpen ? 'expand_less' : 'expand_more'}</span>
@@ -1151,8 +1156,8 @@ export default function QuickReferenceView() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-xl">straighten</span>
             <div className="text-left">
-              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Chassis-Specific J-Bar / Panhard Reference</h3>
-              <p className="text-[10px] font-mono text-on-surface-variant">Verify this geometry and direction against the applicable AFCO/chassis sheet</p>
+              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">J-Bar / Panhard Reference</h3>
+              <p className="text-[10px] font-mono text-on-surface-variant">Use only if this matches your car. Make one small change, then test it.</p>
             </div>
           </div>
           <span className="material-symbols-outlined text-on-surface-variant">{jBarOpen ? 'expand_less' : 'expand_more'}</span>

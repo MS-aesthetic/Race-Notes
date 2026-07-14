@@ -103,11 +103,12 @@ export function getRecentPressureHistory(
   tires: TireInventoryItem[],
   activeCarId: string | null | undefined,
   limit = 5,
+  tireIdsByCorner?: Partial<Record<TireCorner, string>>,
 ): PressureHistory {
   const result: PressureHistory = { lf: [], rf: [], lr: [], rr: [] };
   if (!activeCarId) return result;
   const tireIds = new Set(tires.filter(t => t.carId === activeCarId).map(t => t.id));
-  const rows: Array<PressureHistoryRow & { weekendIndex: number; sessionIndex: number; time: number }> = [];
+  const rows: Array<PressureHistoryRow & { weekendIndex: number; sessionIndex: number; time: number; idTime: number }> = [];
   weekends.forEach((weekend, weekendIndex) => {
     const setupMatches = setups.find(s => s.id === weekend.setupId)?.carId === activeCarId;
     weekend.sessions.forEach((session, sessionIndex) => {
@@ -118,21 +119,30 @@ export function getRecentPressureHistory(
       });
       if (!setupMatches && !uniqueNamedSetupMatches && !tireMatches) return;
       for (const corner of CORNERS) {
+        const expectedTireId = tireIdsByCorner?.[corner];
+        if (expectedTireId && session.tires?.[corner]?.tireId !== expectedTireId) continue;
         const pressure = session.pressures?.[corner] || session.tires?.[corner]?.airPressure || '';
         if (!pressure) continue;
+        const idTimestamp = Number(session.id.match(/\d{12,}/)?.[0]);
+        const datedTime = Date.parse(`${weekend.date} ${session.time || ''}`.trim());
         const parsedDate = Date.parse(weekend.date);
         rows.push({
           corner, pressure, date: weekend.date, sessionName: session.name,
           track: session.track || weekend.track, weekendIndex, sessionIndex,
-          time: Number.isFinite(parsedDate) ? parsedDate : Number.NEGATIVE_INFINITY,
+          time: Number.isFinite(datedTime)
+            ? datedTime
+            : Number.isFinite(parsedDate)
+              ? parsedDate
+              : Number.isFinite(idTimestamp) && idTimestamp > 0 ? idTimestamp : Number.NEGATIVE_INFINITY,
+          idTime: Number.isFinite(idTimestamp) && idTimestamp > 0 ? idTimestamp : Number.NEGATIVE_INFINITY,
         });
       }
     });
   });
-  rows.sort((a, b) => b.time - a.time || a.weekendIndex - b.weekendIndex || a.sessionIndex - b.sessionIndex);
+  rows.sort((a, b) => b.time - a.time || b.idTime - a.idTime || a.weekendIndex - b.weekendIndex || a.sessionIndex - b.sessionIndex);
   for (const row of rows) {
     if (result[row.corner].length < limit) {
-      const { weekendIndex, sessionIndex, time, ...value } = row;
+      const { weekendIndex, sessionIndex, time, idTime, ...value } = row;
       result[row.corner].push(value);
     }
   }

@@ -109,7 +109,7 @@ Before marking any workstream complete, verify ALL of the following:
 2. **`npm run build`** succeeds on Windows.
 3. **Deployed to a Netlify preview URL** and visually verified (hard-refresh / incognito to beat the PWA service-worker cache).
 4. **Works offline** (local-first dual-write) and, when logged in, syncs to Supabase.
-5. **Respects light and dark themes** and the font-scale zoom (standard/large/xlarge).
+5. **Respects light and dark themes** and both visible font choices (Default/Large).
 6. **Car scoping intact** — setups, tires, shock sessions scoped via `byActiveCar()`; weekends, todos, accounting, shopping are global.
 7. **No data loss** — dual-write everywhere; deletions call `delete*FromCloud(id)` in addition to the upsert push.
 8. **Existing data migrates** with sane defaults (new optional fields default to empty/null).
@@ -171,7 +171,7 @@ keep diffs small and extract logic into `src/lib/*` or `src/components/*`.
 | `race_notes_active_car` | active car ID string — **device-local, never synced to Supabase** |
 | `race_notes_accounting` | `AccountingEntry[]` array |
 | `race_notes_shopping` | retired Shopping data retained for rollback; no visible UI |
-| `race_notes_theme` | `AppTheme` object (`fontSize: 'standard' \| 'large' \| 'xlarge' \| 'xxlarge'`, drives CSS `--ui-zoom`) |
+| `race_notes_theme` | `AppTheme` object (legacy-compatible four-value enum; UI exposes Default=`large` and Large=`xlarge`, drives CSS `--ui-zoom`) |
 | `race_notes_registered_user` | durable "device has logged in before" flag powering offline-resilient auth gate (see Architecture above) |
 
 ---

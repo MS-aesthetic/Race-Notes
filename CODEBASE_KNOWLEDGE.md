@@ -1,10 +1,10 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 5 — trackside setups, four-bar, Tires, model handoffs)
-> Branch at time of writing: `master` (all features merged — car-profiles, session-v2, weekend-v2, session-8 features below)
+> Last updated: 2026-07-13 (UX Chunk 6A — setup/measurement refinement)
+> Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
-> ⚠️ **2026-07-13:** A UX overhaul is in progress on branch **`preview-v3`** (7 chunks; 1-5 done plus UX-R1). It adds `src/components/ui/*` primitives, `src/lib/{undo,backStack,saveStatus,sessionSequence,serviceLog,setupSteps}.ts`, `ContextStrip`, a 5-tab nav, moves weekend/session modals into `RaceWeekendView`, turns Dashboard into a race-day launchpad, and rebuilds Setups for trackside four-bar/Tires work. For current UX state see `HANDOFF.md`, `docs/IMPLEMENTATION_PLAN_2026-07-12.md`, and `ralph/STATE.md`.
+> ⚠️ **2026-07-13:** A UX overhaul is in progress on branch **`preview-v3`** (revised chunks 1-9; 1-5 complete plus UX-R1, 6A QA-ready). It adds `src/components/ui/*` primitives, `src/lib/{undo,backStack,saveStatus,sessionSequence,serviceLog,setupSteps}.ts`, `ContextStrip`, a 5-tab nav, race-day Dashboard, trackside Setups/Tires/Load Sessions, and the C6A refinements in §25. For current state see `HANDOFF.md`, `docs/IMPLEMENTATION_PLAN_2026-07-12.md`, and `ralph/STATE.md`.
 
 ## 2026-07-12 UX Chunk 4 override
 
@@ -36,8 +36,9 @@ Newer than older sections below; this block wins conflicts:
 
 - Rear scale weight canonical key: `CornerSetup.loadWeight`; legacy `load` remains
   readable/preserved through `src/lib/setupCompat.ts`.
-- LR/RR four-bar UI exposes top/bottom length, frame hole, birdcage hole, and
-  angle. RR angles measured at Ride Height; LR at Full Droop.
+- C6A supersedes the older asymmetric four-bar rule: LR and RR each expose Top
+  and Bottom bars with frame hole, length, birdcage hole, Ride Height angle, and
+  Full Droop angle. See §25.
 - Weekend creation exists on Dashboard, activates weekend, and does not open a
   session. Session creation requires device-local `race_notes_active_weekend`.
 - Sessions with zero weekends show only Create Weekend content action. Sessions
@@ -56,7 +57,7 @@ Everything below this point that isn't already reflected elsewhere in this doc w
 2. **Mandatory auth gate** — the app now requires a login before any tab is usable, but stays usable **offline** on a device that has logged in at least once. See §7b.
 3. **Tire usage history** — derived (no new DB table) tracking of which session/track/corner/session-type each tire was used in, with lap estimates, CSV export, and a printable report. See §20.
 4. **Shock load compare/overlay** — compare multiple `ShockSession` graphs on one chart plus an interpolated table, with CSV export. See §21.
-5. **3-tier zoom-based UI sizing** (Standard / Large / X-Large) replacing the old 2-tier font-size system, for parity between the installed PWA and the APK. See §22.
+5. **Zoom-based UI sizing.** C6A exposes only Default (1.15) and Large (1.45), while preserving legacy stored enum values. See §22 and §25.
 6. **Android API 36 / AGP 8.9.1 / Gradle 8.11.1** readiness bump for the Aug 31, 2026 Google Play requirement. See §13.
 7. **Bug fix:** "Clear All Data" now actually clears todos/accounting/shopping (previously left them stale). See §15.
 8. **Build/deploy tooling note:** real builds, git pushes, and Netlify/Android deploys for this repo should be done via **Windows-MCP PowerShell** (acts on the real Windows machine) — the Cowork Linux sandbox (`mcp__workspace__bash`) cannot push to git (no credential helper) and has had spurious EPERM/tsc artifacts on this repo's cross-platform mount. Use the sandbox for read-only inspection only.
@@ -90,21 +91,23 @@ Everything below this point that isn't already reflected elsewhere in this doc w
 | PWA | `vite-plugin-pwa` + Workbox |
 | Deployment | Netlify CLI — `netlify deploy --prod --dir=dist` (production) or `netlify deploy --dir=dist` (preview/draft, prints a `Draft URL`) |
 
-### UI scaling — 3-tier `zoom` system (session 8, replaces old font-size approach)
+### UI scaling — 2-choice `zoom` system (C6A, legacy enum compatible)
 The old approach (`document.documentElement.style.fontSize = theme.fontSize === 'large' ? '19px' : '16px'`) is **gone**. Root font size is now a constant `16px`. Scaling is done with the CSS `zoom` property instead, applied to the app shell:
 
 ```ts
 // App.tsx theme effect
 root.style.fontSize = '16px'; // constant now
-const ZOOM: Record<AppTheme['fontSize'], number> = { standard: 1, large: 1.15, xlarge: 1.32 };
-root.style.setProperty('--ui-zoom', String(ZOOM[theme.fontSize] ?? 1));
+const zoomMap: Record<AppTheme['fontSize'], number> = {
+  standard: 1.15, large: 1.15, xlarge: 1.45, xxlarge: 1.45,
+};
+root.style.setProperty('--ui-zoom', String(zoomMap[theme.fontSize] ?? 1.15));
 ```
 ```css
 /* src/index.css */
 #applet-main-body, #applet-auth-gate { zoom: var(--ui-zoom, 1); }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 ```
-`AppTheme.fontSize` is now `'standard' | 'large' | 'xlarge'` (3 options, was 2). `zoom` was chosen over scaling root `font-size` because: (1) it scales fixed-`px` Tailwind classes too, not just `rem`-based ones, and (2) it's Chromium-specific but supported identically by Android WebView and mobile Chrome, which is what fixed the "installed PWA looks smaller than the APK" bug — both render through Chromium's `zoom` implementation the same way. `text-size-adjust: 100%` prevents Chrome's automatic text-inflation from double-scaling things on top of `zoom`. See `SettingsView.tsx` Style tab for the 3-option picker (`grid-cols-3`: Standard 1x / Large 1.15x / X-Large 1.32x).
+`AppTheme.fontSize` retains `'standard' | 'large' | 'xlarge' | 'xxlarge'` so old storage hydrates safely. The UI exposes only `large` as **Default** and `xlarge` as **Large**. Hydration normalizes `standard`→`large` and `xxlarge`→`xlarge`. `zoom` scales fixed-pixel Tailwind classes as well as rem text; `text-size-adjust: 100%` prevents Chromium text inflation from double-scaling.
 
 ### TailwindCSS custom tokens (defined in `src/index.css` `@theme` block)
 Key custom color tokens (set dynamically by theme system in `App.tsx`):
@@ -330,7 +333,7 @@ interface ShoppingItem {
 interface AppTheme {
   mode: 'dark' | 'light';
   accent: string;           // hex e.g. "#ffb3ac"
-  fontSize: 'standard' | 'large' | 'xlarge'; // session 8: 3 tiers, drives --ui-zoom (1 / 1.15 / 1.32), see §2
+  fontSize: 'standard' | 'large' | 'xlarge' | 'xxlarge'; // legacy-compatible; UI exposes Default/Large only
 }
 ```
 
@@ -827,7 +830,7 @@ git push
 | Session `type` vs `name` fields | Both set to the same display string. Legacy type union `'H1' | 'Q1' | ...` preserved for backward compat | Don't rely on the `type` field for new logic |
 | "Clear All Data" left todos/accounting/shopping visible | `handleClearAllData` never reset those three React state arrays, and never deleted cloud `todos` rows | **Fixed session 8** — see §9 SettingsView |
 | `byActiveCar<T>()` generic collapses to `{carId?: string}` on bare calls | TypeScript infers the constraint type instead of the array's element type when no explicit type argument is given | **Fixed session 8** at all known call sites — always pass the type explicitly, e.g. `byActiveCar<Setup>(...)` |
-| PWA (Add to Home Screen) rendered noticeably smaller than the APK | No cross-platform UI-scale normalization; root font-size approach didn't fully account for Chrome's own text-inflation behavior | **Fixed session 8** — `zoom`-based 3-tier sizing, see §2 and §22 |
+| PWA (Add to Home Screen) rendered noticeably smaller than the APK | No cross-platform UI-scale normalization; root font-size approach didn't fully account for Chrome's own text-inflation behavior | **Fixed session 8; simplified C6A** — `zoom` with Default/Large choices, see §2 and §22 |
 | `android/app/build.gradle` versionCode/versionName reverting unexpectedly; once a new source file was found staged for deletion | **Unresolved** — suspected concurrent process/other AI session touching the same working copy; not caused by this assistant | **Open** — re-verify current values before trusting them; watch for unexplained working-tree changes (see §0) |
 | Sandbox (`mcp__workspace__bash`) can't push to git; occasional spurious `tsc`/build errors there | No git credential helper in the Linux sandbox; cross-platform mount quirks | **Known limitation** — use Windows-MCP PowerShell for real builds/pushes on this repo |
 
@@ -1044,15 +1047,15 @@ downloadComparisonCsv(sessions: ShockSession[]): void
 
 ---
 
-## 22. 3-Tier Zoom-Based UI Sizing (session 8)
+## 22. Two-Choice Zoom-Based UI Sizing (C6A override)
 
-See §2 "UI scaling — 3-tier `zoom` system" for the full mechanism (constant `16px` root font-size + CSS `zoom` on the app shell driven by `--ui-zoom`).
+See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant `16px` root font-size + CSS `zoom` on the app shell driven by `--ui-zoom`).
 
 **Why this was needed:** the user reported the PWA (installed via Chrome "Add to Home Screen") rendered noticeably smaller than the same app packaged as an APK, and that even the APK could stand to be a bit larger for pit-side use on small phones in bright sunlight. Root `font-size` scaling alone didn't fully solve either problem — some UI used fixed-`px` Tailwind classes that don't scale with `rem`, and Chrome's own text-inflation behavior interacted unpredictably with a root font-size change.
 
-**Fix:** switch to CSS `zoom` on the two possible app-shell roots (`#applet-main-body` for the normal app, `#applet-auth-gate` for the pre-login screen — see §7b), add a 3rd sizing tier (Standard 1x / Large 1.15x / X-Large 1.32x, X-Large being new), and normalize Chrome's text-inflation with `text-size-adjust: 100%`. Because `zoom` is a Chromium-specific property implemented identically by both Android WebView (APK) and mobile Chrome (PWA), this also fixed the cross-platform inconsistency — both now scale through the exact same rendering path.
+**Current behavior:** CSS `zoom` applies to `#applet-main-body` and `#applet-auth-gate`. Default is 1.15 and Large is 1.45. Legacy Standard and XX-Large normalize to those two current choices. Chromium text inflation stays normalized with `text-size-adjust: 100%`.
 
-**`SettingsView.tsx` Style tab:** the font-size picker grid changed from `grid-cols-2` to `grid-cols-3` to fit the new third option.
+**`SettingsView.tsx` Style tab:** two buttons only—Default and Large. Numeric scale values are intentionally hidden from users.
 
 ---
 
@@ -1062,10 +1065,11 @@ See §2 "UI scaling — 3-tier `zoom` system" for the full mechanism (constant `
 - `src/lib/colorContrast.ts` derives a readable light-mode accent against the
   darkest real light surface without mutating the stored theme accent.
 - Explicit Tailwind `text-[8px]` through `text-[11px]` utilities render at a 12px
-  minimum. Chromium `zoom` remains the app-shell scaling path for all four sizes.
+  minimum. Chromium `zoom` remains the app-shell scaling path; C6A reduces the UI
+  to Default/Large while preserving legacy stored values.
 - The persistent header exposes a named **Tuning Guide** while the bottom shell
-  stays at five tabs. Guide rows use explicit AFCO Modified/Dirt Late Model or
-  chassis-specific applicability and avoid universal fixed-pressure claims.
+  stays at five tabs. C6A supersedes R1's AFCO/package wording with basic dirt-oval
+  direction and direct High/Medium/Low explanations.
 - `src/lib/checklists.ts` fingerprints exact untouched starter semantics.
   Reconciliation waits for signed-in pull settlement, seeds only missing starters,
   removes only exact duplicates, pushes only seeded rows, and cloud-deletes only
@@ -1114,10 +1118,9 @@ See §2 "UI scaling — 3-tier `zoom` system" for the full mechanism (constant `
 ### UI surfaces
 
 - Setups retains four controls: Setups, Loads, Tires, Compare.
-- `FourBarQuickAdjust.tsx` is controlled, always visible before setup creation and
-  cards, and presents LR Full Droop + RR Ride Height top/bottom length, frame hole,
-  birdcage hole, and angle fields. Ordinary rear corner forms no longer duplicate
-  those controls.
+- `FourBarQuickAdjust.tsx` is controlled and shared. In Setups it lives inside the
+  expanded setup after all four corner forms. LR and RR each show full Top and
+  Bottom bar measurements and both Ride Height/Full Droop angles.
 - Corner forms render physical order LF/RF then LR/RR. Numeric fields use
   `NumberStepper`; tire size remains free text so values such as `86 1/2` work.
 - New setup defaults to copying the newest same-car setup; Start Blank remains.
@@ -1125,8 +1128,9 @@ See §2 "UI scaling — 3-tier `zoom` system" for the full mechanism (constant `
   the selected setup and immediate same-car prior setup.
 - Quick-log `FOUR-BAR QUICK-ADJUST` uses the same setup object/component contract.
   Each field has one stable `SetupAdjustment` ID, so repeated taps update one row.
-- `TiresSubView.tsx` shows current linked set, stagger, last-five pressure history,
-  active-car inventory CRUD, sorting/filtering, CSV/report, lifecycle and usage.
+- `TiresSubView.tsx` shows current linked set, stagger, latest linked-tire pressure,
+  cycles, estimated laps, active-car inventory CRUD, sorting/filtering, CSV/report,
+  lifecycle and usage.
 
 ### Verification and rollout
 
@@ -1141,3 +1145,39 @@ See §2 "UI scaling — 3-tier `zoom` system" for the full mechanism (constant `
 - Final Netlify draft:
   `https://6a5509763fc2865568212af7--crew-chief-race-notes.netlify.app`.
   Production, `master`, root release APK, and remote branch were not changed.
+
+---
+
+## 25. UX Chunk 6A — Setup / Measurement Refinement (2026-07-13)
+
+- `makeBlankSetup()` alone owns new-blank defaults: 500 lb, 17 in Ride Height
+  C-to-C, 10 PSI, front caster 3, LF camber 4, RF camber -4. `INITIAL_SETUP`,
+  normalization, copy-last, and existing records remain non-destructive.
+- `CornerSetup` adds optional bottom-bar Ride Height and Full Droop angles.
+  Legacy `bottomBarAngle` remains display-only when its measurement position is
+  unknown. Setups now place complete LR then RR Top/Bottom bars after corners.
+- Tire cards show the linked tire's last logged pressure, heat cycles, and
+  estimated laps. Pressure history sorts race date/time before ID timestamp and
+  can filter by linked tire per corner, preventing swap mismatches.
+- `ShockSession` adds optional `rideHeightCtoC`. Visible terminology is Load
+  Session. `sync.ts` explicitly maps `ride_height_ctoc`; deletion now removes the
+  cloud row as well as local state. Migration
+  `20260714010630_add_load_session_ride_height.sql` was applied and verified on
+  Supabase project `swblfeayxoprodhwxqak`.
+- Height/load graph math was already correct for the requested display: lower
+  physical height renders lower on screen. Runtime fixture: 12 in/100 lb `cy=18`,
+  10 in/200 lb `cy=176`; single/compare harness equations agree.
+- Style UI exposes only Default (internal `large`, 1.15) and Large (internal
+  `xlarge`, 1.45); scale values are hidden. Legacy `standard` normalizes to
+  Default and `xxlarge` to Large without changing the storage key/type union.
+- Tuning Guide uses basic dirt-oval language, no AFCO/package-specific claims,
+  and explains High/Medium/Low in direct try-first/try-next/fine-tune terms.
+- Verification: three focused harnesses PASS; cavecrew second review has zero
+  blockers; lint remains exactly three known baseline errors; Vite build PASS.
+  Local mobile runtime at 390×844 passed light/dark contrast, setup defaults,
+  four-bar order, Load Session create/edit/reload, and graph direction.
+- Netlify draft: `https://6a558ea45dc5716d3bed026a--crew-chief-race-notes.netlify.app`.
+  Production remains unchanged.
+- C6B is intentionally separate: immutable Baseline → editable Weekend Setup →
+  immutable Final → editable Current Setup. Finish Weekend will always be
+  available at the page bottom, including test days with zero sessions.

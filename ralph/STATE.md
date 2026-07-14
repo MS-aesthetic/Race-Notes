@@ -83,8 +83,11 @@ Separate track from WS-N…Z. Source: `docs/UX_ANALYSIS_2026-07-12.md` (historic
 | 4 | Dashboard: launchpad + "+LOG RUN" hero + first-run card + sorting + ⋯/Undo + scoped quick-service/Accounting | ✅ complete | 21405e9 |
 | R1 | **URGENT pre-Chunk-5 regression repair:** Dashboard-first team banner, WCAG light accent/type floor, named AFCO-scoped Tuning Guide, deterministic exact starter-template convergence | ✅ complete — CODE_PASS + RUNTIME_PASS; Android 4.0 (15); SOL→Terra→SOL metadata verified | b6d702e |
 | 5 | Setups: corner cards + steppers, **four-bar quick-adjust (fast, not hidden)**, tires sub-view, copy-last-setup, diff entry, propagation toast | ✅ complete — CODE_PASS + RUNTIME_PASS | d5ef1f4 |
-| 6 | Trackers: hybrid Main Checklist (core-reset + ad-hoc), merge Templates, service-from-dashboard + auto-accounting, accounting defaults | ⬜ pending | — |
-| 7 | Export share (Web Share), contextual help "?", racing-language copy audit, font-zoom sweep | ⬜ pending | — |
+| 6A | Setup/measurement refinement: blank defaults, complete LR/RR top+bottom four-bar rows, tire summary, Load Session naming/ride height, two font choices, plain priority help | 🟩 BUILD COMPLETE — CODE_PASS + local RUNTIME_PASS + Netlify draft; SOL QA next | pending |
+| 6B | Setup history lifecycle: immutable baseline, editable Weekend Setup, always-available Finish Weekend, immutable final snapshot, editable Current Setup copy | ⬜ pending | — |
+| 7 | Quick Adjust expansion: spring rate/rounds, ride-height review flag, shock note/load graph, J-bar, gear, active-setup change log | ⬜ pending | — |
+| 8 | Trackers: hybrid Main Checklist, merged Templates, Maintenance Logs, 90%-interval task injection, after-create assignment, accounting defaults | ⬜ pending | — |
+| 9 | Export share, contextual help, racing-language copy audit, final two-size/font/glove regression | ⬜ pending | — |
 
 ### UX chunk grade log
 - 2026-07-12 · UX-C1 · Fable QA · PASS-WITH-NOTES · primitives safe (undo state-machine no early-fire/leak; applied pagehide-commit + stepper keyboard). lint 3-baseline, build green, isolated (App.tsx untouched).
@@ -93,6 +96,7 @@ Separate track from WS-N…Z. Source: `docs/UX_ANALYSIS_2026-07-12.md` (historic
 - 2026-07-12 · UX-C4 · current Codex + cavecrew review · PASS-WITH-NOTES · exact named GPT 5.6 routes unavailable/disclosed. Initial review found 3 critical issues (cross-car service, immediate session delete, fresh-flow continuation); fixed. lint exact 3 baseline; build/Gradle green; Android fresh flow/service-accounting Undo/session Undo pass; draft auth gate clean. Commit `21405e9`; draft `6a5458d75d0c165c44d0ef9f`.
 - 2026-07-13 · UX-R1 · SOL/Terra/SOL runtime-verified · PASS · five-tab named Tuning Guide; AFCO class/chassis scoping; light accent + 12px floor; deterministic starter convergence; offline local icons/PWA precache; 320×800 theme × four-font matrix; cold offline Android pass. `turn_context.model` is authoritative; earlier generic self-reports of model unavailability were incorrect.
 - 2026-07-13 · UX-C5 · SOL/Terra/SOL + cavecrew · PASS · canonical active-car setup writer; same-car copy/blank/diff; numeric adapters/2×2 corners; always-visible shared four-bar; Tires summary/inventory/history; pressure provenance and blank-import preservation. Both harnesses PASS; lint exact 3 baseline; build 539 modules; Android 4.1 (16) 320 CSS px/XX-Large quick-log and cold-cache persistence pass; final draft `6a5509763fc2865568212af7`. Commit `d5ef1f4`.
+- 2026-07-13 · Owner revision · Finish Weekend has no session/race lockout (test days are valid). Setup flow uses immutable Baseline → editable Weekend Setup → immutable Final + editable Current copy. Four-bar requires LR/RR top and bottom rows with frame hole, length, birdcage hole, ride-height angle, full-droop angle. Priority labels get plain-language in-app explanations. Font choices collapse to Default (existing 1.15) and Large (existing 1.45); numeric scale text is hidden.
 
 ### UX backlog (non-blocking)
 - C2: dashboard needs 2 back-presses to exit; wire `reportSave('synced')` into `sync.ts` push helpers; prune dead `'quickref'` in the `activeTab` union. UX-R1 added generation/user guards so stale or failed pulls cannot mark readiness for the wrong auth state.
