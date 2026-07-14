@@ -1,6 +1,6 @@
 # Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** IN PROGRESS — C6B SOL QA FAIL 2; TERRA REPAIR 2 REQUIRED; C7 LOCKED
+**Status:** IN PROGRESS — C6B TERRA REPAIR 2 CODE_PASS; AWAITING SOL QA ATTEMPT 3; C7 LOCKED
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -145,6 +145,32 @@ three-error lint baseline, 540-module build, live migration/schema/RLS, and draf
 shell pass. Live `setups`/`race_weekends` contain zero rows, so no authenticated data
 round trip was available. Advisors show no setup/weekend security finding; existing
 performance-policy warnings predate this column-only migration. C7 remains locked.
+
+### C6B Terra repair 2 — CODE_PASS, awaiting SOL QA attempt 3 (2026-07-13)
+
+- Feature repair commit `7b58b30` removes generic selected-car fallback whenever an
+  active weekend exists. RaceWeekend receives its valid owned Weekend Setup or `null`;
+  New Session/run editor and quick adjustments stay guarded with plain recovery copy,
+  while Finish Weekend remains available.
+- No-link legacy Finish now receives a newly constructed exact blank setup only. It may
+  carry selected car identity for future Current ownership, but never copies selected
+  setup values. Valid legacy `setupId` upgrade and dangling-link rejection remain intact.
+- Deterministic Final/Current rows are reused only for a true partial Finish whose
+  matching Weekend snapshot is already locked. An unlocked Weekend rebuilds both rows
+  from its latest bytes and replaces/dedupes stale deterministic IDs.
+- `isSetupLocked(setup, weekends)` adds relational protection: a Weekend-role Setup
+  linked to a finished weekend is immutable at App mutation/deletion boundaries and
+  in Setup UI even when `lockedAt` is missing. Clone remains enabled.
+- Expanded harness covers Car A event/Car B selector isolation, missing event-owned UI
+  resolution, blank no-link Finish, unlocked gear 7 versus stale gear 6 recovery,
+  deterministic uniqueness, and relationship locking. PASS. Cavecrew review: no issues.
+- Exact three-error lint baseline; build PASS (540 modules, 16 Workbox entries);
+  `git diff --check` PASS. Draft
+  `https://6a55a43a8cc5f6b9da612c69--crew-chief-race-notes.netlify.app` boots at
+  390×844 with zero console errors. Unique origin has no remembered account, so deep
+  lifecycle UI remains harness/local evidence. Migration and live schema unchanged.
+- Production, remote branch, `master`, and release APK unchanged. C7 remains locked
+  until independent SOL QA attempt 3 passes.
 
 ## Chunk 7 — expanded Quick Adjust
 

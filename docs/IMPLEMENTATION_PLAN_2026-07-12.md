@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunks 1–5 ✅ · Chunk 6A `ae9395b` ✅ SOL QA PASS · Chunk 6B feature `2a941d3` + repair `874fecc` 🔴 SOL QA FAIL 2; Terra repair 2 required · 7–9 pending/locked by dependencies. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
+> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunks 1–5 ✅ · Chunk 6A `ae9395b` ✅ SOL QA PASS · Chunk 6B feature `2a941d3` + repairs `874fecc`/`7b58b30` 🟡 Terra CODE_PASS; SOL QA attempt 3 next · 7–9 pending/locked by dependencies. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:
@@ -140,7 +140,13 @@ Original seven-chunk plan below remains implementation history. Current remainin
    missing event Setup falls back to selected car in RaceWeekend UI; no-link legacy
    Finish borrows selected-car data; stale Final/Current recovery rows can replace an
    unlocked Weekend Setup; and finished-weekend relationship does not lock an unlocked
-   partial-cloud Weekend snapshot. Terra repair 2 required. C7 remains unstarted until
+   partial-cloud Weekend snapshot. Terra repair 2 `7b58b30` now passes only valid
+   event-owned Setup (or null) to RaceWeekend, guards run/quick-adjust UI, uses an
+   exact blank for no-link legacy Finish, rebuilds stale Final/Current rows whenever
+   Weekend remains unlocked, and adds finished-weekend relationship locks at App/UI
+   boundaries while preserving Clone. Expanded harness, cavecrew, exact lint baseline,
+   540-module build, `git diff --check`, and draft `6a55a43a8cc5f6b9da612c69`
+   shell/console pass. No SQL change. SOL QA attempt 3 next; C7 remains unstarted until
    the C6B gate closes.
 3. **Chunk 7 — expanded Quick Adjust.** Spring rate ±25 lb; spring rounds ±0.5; rounds mark corner Ride Height C-to-C for review until user updates it; shock note or bound Load graph; J-Bar frame/pinion ±0.25 in; manual gear. Other changes remain free text. Structured and free-text entries append to Weekend Setup change log and current run adjustments.
 4. **Chunk 8 — Trackers/Maintenance.** Former Chunk 6 plus Service→Maintenance Logs, plain explanation of interval tracking, idempotent Main Checklist task injection at ≥90% interval, and assignment/edit after creation for manual/template/automatic tasks.

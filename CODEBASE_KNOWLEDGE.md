@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 6B — SOL QA attempt 2)
+> Last updated: 2026-07-13 (UX Chunk 6B — Terra repair 2)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1233,3 +1233,24 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   gear `7.00` reused stale Final gear `6.00`. Repair 2 must add event-only UI resolution,
   blank/proven legacy fallback, locked-only recovery reuse, and relational finished-
   weekend locking. Existing harness/build/schema gates remain green; C7 stays locked.
+- Terra repair 2 commit `7b58b30` makes event UI resolution explicit: with an active
+  weekend, RaceWeekend receives its validated Weekend Setup or `null`, never the car
+  selector's generic setup. Missing ownership disables run/quick-adjust editing with
+  direct recovery copy while Finish Weekend remains available.
+- No-link legacy Finish now gets a fresh `makeBlankSetup()` fallback. Selected car
+  identity may stamp the future Current row, but selected setup bytes are never copied.
+  Valid linked legacy upgrade and dangling explicit-link rejection are unchanged.
+- Deterministic Final/Current recovery rows are reused only when the matching Weekend
+  snapshot is already locked. An unlocked Weekend rebuilds both from current bytes and
+  replaces/dedupes stale IDs. `isSetupLocked(setup, weekends)` also locks a Weekend-role
+  Setup linked to a finished weekend even if partial cloud data omitted `lockedAt`.
+  App mutation/deletion boundaries and Setup UI both use that relationship; Clone stays
+  enabled and produces an editable Current copy.
+- Repair-2 harness adds Car A event/Car B selector isolation, missing event-setup UI
+  selection, exact-blank no-link Finish, unlocked gear 7 versus stale gear 6 recovery,
+  deterministic uniqueness, and relationship-lock fixtures. Harness PASS; cavecrew no
+  issues; exact three-error lint baseline; build PASS (540 modules, 16 Workbox entries);
+  `git diff --check` PASS. Draft
+  `https://6a55a43a8cc5f6b9da612c69--crew-chief-race-notes.netlify.app` boots at
+  390×844 with zero console errors. No migration/live schema change. C7 remains locked
+  pending SOL QA attempt 3.
