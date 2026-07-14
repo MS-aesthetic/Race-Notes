@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunks 1–6B ✅ SOL QA PASS · Chunk 7 Terra repair `030122c` CODE_PASS, awaiting SOL QA 2 · 8–9 locked by dependencies. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
+> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunks 1–7 ✅ SOL QA PASS · Chunk 8 unlocked for Terra · 9 locked by dependencies. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:
@@ -163,6 +163,8 @@ Original seven-chunk plan below remains implementation history. Current remainin
    Setup for raw invalid/finished weekend selection, and gates run UI on unfinished
    event plus current session-record membership. Expanded focused gates pass; awaiting
    SOL QA attempt 2.
+   SOL QA attempt 2 PASS: expanded harness, repair diff, exact lint baseline, and
+   cavecrew review pass. C7 closed; C8 unlocked. Full coherent gate remains after C8.
 4. **Chunk 8 — Trackers/Maintenance.** Former Chunk 6 plus Service→Maintenance Logs, plain explanation of interval tracking, idempotent Main Checklist task injection at ≥90% interval, and assignment/edit after creation for manual/template/automatic tasks.
 5. **Chunk 9 — export/help/final regression.** Former Chunk 7 after all new screens stabilize.
 

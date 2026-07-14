@@ -267,6 +267,18 @@ performance-policy warnings predate this column-only migration. C7 remains locke
   cavecrew repair review `No issues.` No SQL/build/cloud/mobile/draft change. C8 stays
   locked until independent SOL QA attempt 2.
 
+### C7 SOL QA attempt 2 — PASS; C7 closed
+
+- Independently inspected feature `58e4522` and repair `030122c`. Off-grid spring and
+  J-Bar values receive exact relative deltas; manual normalization preserves numeric
+  value while removing units/trailing zeroes; invalid values remain guarded.
+- Raw invalid/missing/finished weekend IDs cannot fall back to selected-car Setup.
+  Run UI requires unfinished event, exact event-owned Weekend Setup, matching run IDs,
+  and current weekend session-record membership.
+- Full C7 harness PASS; `git diff --check bb8e4c9..8b18eda` PASS; lint exact three
+  baseline errors; independent cavecrew review `No issues.` No SQL migration and no
+  full runtime gate by approved consolidation. C7 closed; C8 unlocked for Terra.
+
 ## Chunk 8 — Trackers and Maintenance Logs
 
 - Rename visible Service wording/tab to Maintenance Logs; identifiers/storage stay stable.

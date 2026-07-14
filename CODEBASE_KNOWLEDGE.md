@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 7 — Terra repair 1 CODE_PASS)
+> Last updated: 2026-07-13 (UX Chunk 7 — SOL QA attempt 2 PASS)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1308,3 +1308,8 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   owned Weekend Setup, matching run IDs, and session-record membership. Expanded
   off-grid/selection/deleted-run fixtures pass; lint remains exact baseline; cavecrew
   found no issues. Await SOL QA attempt 2; C8 remains locked.
+- SOL QA attempt 2 PASS. Independent inspection verified exact relative numeric
+  behavior, raw weekend ownership, present-run UI membership, atomic one-to-one logs,
+  marker lifecycle, load filtering, lifecycle locks, and mapper parity. Expanded C7
+  harness and repair-range diff check pass; lint remains exact baseline; cavecrew found
+  no issues. C7 closed; C8 unlocked. Combined full runtime gate remains due after C8.
