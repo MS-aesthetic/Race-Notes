@@ -1,6 +1,6 @@
 # Current Task — UXF-2 Quick Adjust Net-Outcome Coalescing
 
-**Status:** CODE_PASS — SOL fixer attempt 2; awaiting independent SOL QA
+**Status:** COMPLETE — SOL QA attempt 2 PASS
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-1 closed by SOL QA at `44be917`
@@ -74,3 +74,7 @@ Terra owns one initial build pass. Commit feature and durable handoff evidence, 
 - `npm run lint`: exact three known baseline errors only. `npm run build`: PASS, 554 modules/18 PWA entries. `git diff --check`: PASS.
 - Cavecrew reviewer: no issues; failure precedes returned mutation, inputs stay byte-identical, locks and valid coalescing unchanged.
 - No schema, mapper, lifecycle, stepper, package, native, deploy, push, merge, or APK change.
+
+## QA attempt 2 verdict
+
+**PASS — 96.** Missing run history now fails before mutation with byte-identical inputs. Normal net coalescing, newest exact-key selection, IDs/order/original-before/latest values, load binding, reversal, distinct boundaries, updated timestamps, local/cloud persistence, lock bytes, renderers, scope, full harness, exact lint baseline, 554-module/18-entry build, diff, clean tree, and cavecrew review pass. UXF-2 closed.
