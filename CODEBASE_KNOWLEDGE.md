@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 7 — Terra CODE_PASS, awaiting SOL QA)
+> Last updated: 2026-07-13 (UX Chunk 7 — SOL QA attempt 1 FAIL)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1294,3 +1294,10 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   lifecycle lock rejection. Harness and diff check pass; lint remains exact three
   known baseline errors. Cavecrew review findings were fixed; re-review found no issues.
   Full build/cloud/mobile/Netlify gate is intentionally consolidated after C8.
+- SOL QA attempt 1 failed three edges. Numeric step helpers use grid-snapping format:
+  `510 lb +25` incorrectly becomes `525`, and `9.10 in +0.25` becomes `9.25`; exact
+  deltas must preserve off-grid bases. Raw `activeWeekendId` targeting a finished
+  weekend makes App fall back to selected-car Setup for RaceWeekend UI. Finally,
+  `RaceWeekendView.hasActiveSession` omits unfinished status and current session-record
+  membership, so stale/deleted runs can render Quick Adjust despite App write rejection.
+  Repair belongs to Terra; C8 stays locked until SOL QA attempt 2 passes.

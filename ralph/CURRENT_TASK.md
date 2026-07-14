@@ -232,6 +232,25 @@ performance-policy warnings predate this column-only migration. C7 remains locke
   re-review returned `No issues.` Full build/cloud/mobile/draft gate stays consolidated
   after C8 per owner direction. C8 remains locked pending SOL C7 verdict.
 
+### C7 SOL QA attempt 1 — FAIL; return to Terra
+
+- `stepSpringRate()` snaps to a global 25 lb grid after adding the delta. Off-grid
+  legacy `510 lb` therefore becomes `525`, but a deliberate +25 change must become
+  `535`. `stepQuarterInch()` has the same error: `9.10 + 0.25` becomes `9.25`, not
+  `9.35`. Preserve parsed base, add exact delta, then format decimals; normalization
+  means removing legacy units, not changing the requested increment.
+- App derives `activeWeekend = null` when raw `activeWeekendId` points to a finished
+  weekend, then `selectRaceWeekendSetup()` falls back to selected-car Setup. Pass
+  `null` to RaceWeekend whenever any raw weekend selection exists but is not a valid
+  unfinished owned event, so unsafe generic Setup never reaches event UI.
+- `RaceWeekendView.hasActiveSession` checks only matching IDs. It must also require
+  unfinished `currentWeekend` and a matching run still present in
+  `currentWeekend.sessions`; stale/cloud-deleted runs must not render editor/Quick
+  Adjust even though App commit boundary already rejects them.
+- Add off-grid spring/J-Bar fixtures plus finished-weekend and deleted-run UI resolver
+  fixtures. Re-run focused harness, exact lint baseline, diff check, cavecrew review.
+  No SQL change. C8 stays locked until repair passes SOL QA attempt 2.
+
 ## Chunk 8 — Trackers and Maintenance Logs
 
 - Rename visible Service wording/tab to Maintenance Logs; identifiers/storage stay stable.
