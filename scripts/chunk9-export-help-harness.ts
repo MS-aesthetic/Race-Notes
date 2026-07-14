@@ -204,7 +204,7 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(renderedEffectCorpus, /(?:allows|resists|keeps|on) The car/);
 assert.doesNotMatch(renderedEffectCorpus, /(?:^|[.!?]\s+)[a-z]/m);
-assert.doesNotMatch(renderedEffectCorpus, /allowing controlled car roll and allowing|cushions the rear against the rear snapping loose|highly free-moving|under the power|while at the same time/i);
+assert.doesNotMatch(renderedEffectCorpus, /allowing controlled car roll and allowing|cushions the rear against the rear snapping loose|highly free-moving|under the power|while at the same time|resists the chassis from rolling|keeping rear tire loading|cushioning the tire contact|maximum mechanical forward traction|allows weight to transfer/i);
 assert.equal(
   plainRacerEffect('Lowering the frame-side J-bar lowers the rear roll center, promoting progressive body roll and allowing the car to turn in more easily. The rear transfers weight more gradually.'),
   'Lowering the frame-side J-bar lowers the rear roll location, allowing controlled car roll and helping the car to turn in more easily. The rear shifts load more gradually.',
@@ -216,6 +216,30 @@ assert.equal(
 assert.match(
   plainRacerEffect('This provides the same entry roll rate as a single spring but delivers a softer, highly compliant exit rate for ultimate traction.'),
   /softer, more controlled exit response/,
+);
+assert.equal(
+  plainRacerEffect('Increasing RF compression resists the chassis from rolling rapidly onto the RF tire.'),
+  'Increasing RF compression slows how quickly the car rolls onto the RF tire.',
+);
+assert.equal(
+  plainRacerEffect('A stiffer RR spring resists the chassis from rolling too far onto the RR.'),
+  'A stiffer RR spring keeps the car from rolling too far onto the RR.',
+);
+assert.equal(
+  plainRacerEffect('The chassis stays level longer, preserving rear tire loading.'),
+  'The chassis stays level longer, keeping load on the rear tires.',
+);
+assert.equal(
+  plainRacerEffect('Decreasing RR compression allows the chassis to roll smoothly onto the RR tire, cushioning the tire contact patch and maximizing side bite.'),
+  'Decreasing RR compression allows the chassis to roll smoothly onto the RR tire, building RR side bite smoothly.',
+);
+assert.equal(
+  plainRacerEffect('Maximum mechanical forward traction.'),
+  'This adds maximum forward bite.',
+);
+assert.equal(
+  plainRacerEffect('Softening RR compression allows weight to transfer rapidly and smoothly to the outside tire.'),
+  'Softening RR compression lets load build quickly and smoothly on the outside tire.',
 );
 const shopCopy = plainRacerEffect('The rear roll center changes forward weight transfer and rear steer geometry at the apex. This preserves the tire contact patch during braking transitions.');
 assert.equal(shopCopy, 'The rear roll location changes forward load shift and bar angles and rear steer at mid-corner. This keeps the tire contact during braking.');

@@ -26,6 +26,12 @@ function adjustmentApplicability(adjustment: Adjustment): string {
 /** Keep the researched direction intact while translating academic terms. */
 export function plainRacerEffect(value: string): string {
   const replacements: Array<[RegExp, string]> = [
+    [/resists the chassis from rolling rapidly onto the RF tire/gi, 'slows how quickly the car rolls onto the RF tire'],
+    [/resists the chassis from rolling too far onto the RR/gi, 'keeps the car from rolling too far onto the RR'],
+    [/preserving rear tire loading/gi, 'keeping load on the rear tires'],
+    [/cushioning the tire contact patch and maximizing side bite/gi, 'building RR side bite smoothly'],
+    [/Maximum mechanical forward traction\./g, 'This adds maximum forward bite.'],
+    [/allows weight to transfer rapidly and smoothly to the outside tire/gi, 'lets load build quickly and smoothly on the outside tire'],
     [/promoting progressive body roll and allowing/gi, 'allowing controlled car roll and helping'],
     [/The controlled weight transfer cushions the rear against snap oversteer/gi, 'The controlled load shift reduces sudden rear breakaway'],
     [/softer, highly compliant exit rate/gi, 'softer, more controlled exit response'],
