@@ -1,6 +1,6 @@
 # Current Task — UXF-1 Duplicate Other + Shared Active Checklist Projection
 
-**Status:** IN_PROGRESS — Terra initial build attempt 1
+**Status:** CODE_PASS — Terra initial build attempt 1; awaiting independent SOL QA
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-8 closed by SOL QA attempt 3 at `780e4dd`
@@ -48,3 +48,14 @@ Fix duplicate Maintenance category and make Dashboard/Main Checklist use one act
 ## Routing
 
 Terra owns this one initial build pass. Commit feature and durable handoff evidence, then return to SOL High for independent QA. Any QA failure transfers repair to SOL fixer.
+
+## Implementation evidence
+
+- Feature commit: `94d1e79`.
+- `MAINTENANCE_CATEGORIES` remains sole source for Maintenance category options; `Other` appears once. No equivalent duplicate select exists.
+- `activeChecklistItems` is pure, preserves item order/object references, and is shared by ToDo and Dashboard projections.
+- Harness covers removed unfinished core items, open/done counts, JSON round trip, shared-selector source wiring, and single `Other`; PASS.
+- `npm run lint`: exact three known baseline errors only.
+- `npm run build`: PASS, 554 modules and 18 PWA precache entries.
+- `git diff --check`: PASS. Cavecrew investigator found no additional duplicate; reviewer: `No issues.`
+- No schema, storage shape, package, native, deploy, push, merge, or APK change.
