@@ -1,6 +1,6 @@
 # Current Task — UXF-4 Load Graph Travel Axis
 
-**Status:** IN_PROGRESS — Terra initial build attempt 1
+**Status:** CODE_PASS — Terra initial build attempt 1 complete at `0c2c827`; independent SOL QA required
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-3 closed by SOL QA at `04f1351`; feature `72ea4f8`
@@ -66,3 +66,15 @@ Make load curves rise as spring/shock compression and load increase. Chart Y-axi
 ## Routing
 
 Terra owns one initial build pass. Primary owns cross-file implementation; cavecrew handles bounded trace/review. Commit feature and durable handoff, then return to SOL High QA. Any QA failure transfers repair to SOL fixer; Terra is not re-invoked.
+
+## Terra attempt 1 evidence — 2026-07-14
+
+- Feature commit: `0c2c827`.
+- Exported pure `toTravel` and `travelToSvgY` helpers drive both SVG paths. Single chart zero uses its tallest point; comparison zero uses tallest point across all selected series. Maximum travel maps to top; zero maps to floor, including equal-height fallback.
+- Both Y axes now show travel. Single chart keeps compact raw-height labels in SVG so PNG serialization retains measurements. Single and comparison points expose Travel + Height by hover, tap, keyboard, and accessible name.
+- Stored points/session shapes, sync, localStorage, raw-height table/CSV, and `src/lib/shockCompare.ts` are byte-unchanged. Comparison-row interpolation regression passes.
+- `npx tsx scripts/chunk6a-refinement-harness.ts`: PASS.
+- `npm run lint`: exact three known baseline errors only; no new errors.
+- `npm run build`: PASS, 554 modules and 18 PWA entries.
+- `git diff --check`: PASS. Cavecrew found one harness coverage gap; repaired exact two-chart assertion; re-review returned `No issues.`
+- Local server/auth shell passed at 390px. Localhost had no remembered account, so no authenticated seeded-chart or downloaded-PNG runtime claim is made. SVG-native height labels and unchanged PNG serializer are verified by code/harness/build; final interactive visual gate remains for SOL/UXF-9.
