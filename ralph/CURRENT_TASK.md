@@ -1,6 +1,6 @@
 # Current Task — UXF-4 Load Graph Travel Axis
 
-**Status:** CODE_PASS — Terra initial build attempt 1 complete at `0c2c827`; independent SOL QA required
+**Status:** QA FAIL attempt 1 (88) — SOL fixer attempt 2 required; Terra retired for UXF-4
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-3 closed by SOL QA at `04f1351`; feature `72ea4f8`
@@ -78,3 +78,12 @@ Terra owns one initial build pass. Primary owns cross-file implementation; cavec
 - `npm run build`: PASS, 554 modules and 18 PWA entries.
 - `git diff --check`: PASS. Cavecrew found one harness coverage gap; repaired exact two-chart assertion; re-review returned `No issues.`
 - Local server/auth shell passed at 390px. Localhost had no remembered account, so no authenticated seeded-chart or downloaded-PNG runtime claim is made. SVG-native height labels and unchanged PNG serializer are verified by code/harness/build; final interactive visual gate remains for SOL/UXF-9.
+
+## SOL QA attempt 1 — FAIL (88) — 2026-07-14
+
+Passing: travel/common-zero/equal-height math; upward seeded SVG render; axis/fill/load behavior; raw Height + Travel content; static PNG height text path; unchanged storage/sync/CSV/types/`shockCompare.ts`; chunk6a harness; exact lint baseline; 554-module build; diff/clean tree. Cavecrew found one interaction blocker:
+
+1. `src/components/SmasherLoadsView.tsx`: point controls remove visible keyboard focus, and comparison point's touch target is only the visible 8px circle. Add a visible SVG focus ring and a larger transparent hit target to both single and comparison points while preserving visible point size and chart data/layout.
+2. Extend chunk6a harness to require both chart paths to include the larger hit target and visible focus handling/ring. Regress every passing assertion.
+
+Routing: first QA failure transfers implementation to SOL High fixer. Terra is not re-invoked.
