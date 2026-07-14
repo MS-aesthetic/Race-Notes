@@ -1,6 +1,6 @@
 # Current Task — UXF-5 Copy Tone and Guide Separation
 
-**Status:** AWAITING OWNER TONE REVIEW — SOL High technical QA PASS attempt 2
+**Status:** COMPLETE — SOL High technical QA PASS attempt 2; owner tone approved
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-4 closed by SOL QA at `bbaab34`; feature `0c2c827`, repair `12d932f`
@@ -98,4 +98,10 @@ Terra owns one initial build pass. Primary owns this cross-file change; cavecrew
 - Attempt 1 found one medium copy blocker: five translated effects still produced awkward or academic output (`resists the chassis from rolling`, `keeping rear tire loading`, `cushioning the tire contact`, `Maximum mechanical forward traction`, and `allows weight to transfer`). Routing correctly transferred repair to SOL; Terra was not re-invoked.
 - SOL fixer commit `83e652f` adds ordered phrase-specific render translations and exact harness guards. `BEHAVIOR_DATA` remains byte-equal to plan commit `aeaa62f` after line-ending normalization.
 - QA attempt 2 PASS. Chunk8 and expanded chunk9 harnesses PASS; lint remains exact three-error baseline; production build PASS with 555 modules and 18 PWA entries; diff and clean-tree checks PASS; cavecrew re-review reports no issues.
-- Technical acceptance is complete. UXF-5 remains open until Maxx reviews guide tone locally or on a future draft and accepts or requests copy changes. UXF-6 stays locked.
+- After technical QA, UXF-5 remained open until Maxx reviewed guide tone on the draft. UXF-6 stayed locked during that review.
+
+## Owner acceptance — 2026-07-14
+
+- Netlify draft `https://6a5682d667a1ecb5c117bf39--crew-chief-race-notes.netlify.app/` deployed from closure commit `f12fb49` and verified HTTP 200.
+- Maxx approved UXF-5 tone after reviewing the draft.
+- UXF-5 is complete. UXF-6 is unlocked for SOL planning; no production deploy occurred.
