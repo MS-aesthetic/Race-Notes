@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunk 1 `e04b15c` ✅ · Chunk 2 `306445d` ✅ · Chunk 3 `c68f27d` ✅ · Chunk 4 `21405e9` ✅ · urgent UX-R1 `b6d702e` ✅ · Chunk 5 `d5ef1f4` ✅ · Chunk 6A `ae9395b` ✅ SOL QA PASS · Chunk 6B Terra build `2a941d3` CODE_PASS/local-RUNTIME_PASS, awaiting SOL QA · 7–9 pending. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; real SOL → Terra → SOL handoff runs in one persistent task. `/caveman full`. Status + backlog: `HANDOFF.md` + `ralph/STATE.md`.
+> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunks 1–5 ✅ · Chunk 6A `ae9395b` ✅ SOL QA PASS · Chunk 6B feature `2a941d3` 🔴 SOL QA FAIL 1 (cross-car source, legacy Finish, partial-Finish recovery/dedupe); Terra repair next · 7–9 pending/locked by dependencies. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:
@@ -130,7 +130,9 @@ Original seven-chunk plan below remains implementation history. Current remainin
    **Terra build result (`2a941d3`):** implemented and cavecrew-reviewed. Pure harness,
    exact lint baseline, build, live additive migration `20260714020037`, local 390 px
    zero-run lifecycle, dark/light, and draft `6a5599e37111d0563ffaf5f3` pass. Awaiting
-   independent SOL QA; C7 remains unstarted until that gate closes.
+   independent SOL QA attempt 1 found three blockers: cross-car new-weekend fallback,
+   missing legacy-Finish upgrade, and non-retry-safe partial Finish with duplicate IDs.
+   Terra repair required; C7 remains unstarted until the C6B gate closes.
 3. **Chunk 7 — expanded Quick Adjust.** Spring rate ±25 lb; spring rounds ±0.5; rounds mark corner Ride Height C-to-C for review until user updates it; shock note or bound Load graph; J-Bar frame/pinion ±0.25 in; manual gear. Other changes remain free text. Structured and free-text entries append to Weekend Setup change log and current run adjustments.
 4. **Chunk 8 — Trackers/Maintenance.** Former Chunk 6 plus Service→Maintenance Logs, plain explanation of interval tracking, idempotent Main Checklist task injection at ≥90% interval, and assignment/edit after creation for manual/template/automatic tasks.
 5. **Chunk 9 — export/help/final regression.** Former Chunk 7 after all new screens stabilize.

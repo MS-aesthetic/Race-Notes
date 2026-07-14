@@ -1,6 +1,6 @@
 # Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** IN PROGRESS — C6B TERRA BUILD COMPLETE (`2a941d3`); SOL QA NEXT
+**Status:** IN PROGRESS — C6B SOL QA FAIL 1; TERRA REPAIR REQUIRED; C7 LOCKED
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -83,6 +83,22 @@
   cleanly. Its unique origin had no remembered account, so authenticated draft data
   entry was not performed; SOL must adjudicate cloud evidence independently.
 - Production, `master`, remote branch, and release APK unchanged. C7 not started.
+
+### C6B SOL QA attempt 1 — FAIL (2026-07-13)
+
+- `src/App.tsx`: after Car A owns the active weekend, switching to Car B and
+  starting another weekend can fall back to Car A's Weekend Setup. Source fallback
+  must stay same-car: explicit selected setup → current/latest active-car setup → blank.
+- `src/lib/setupLifecycle.ts`: pre-C6B weekends have no `activeSetupId`; Finish must
+  upgrade/fallback from legacy `setupId` into a dedicated Weekend snapshot without
+  locking or mutating the original source.
+- `src/lib/setupLifecycle.ts`: Finish is not recovery-safe. A crash after setup
+  localStorage but before weekend localStorage leaves a locked Weekend Setup and
+  blocks retry; preexisting deterministic Final/Current IDs can duplicate. Retry
+  must complete the matching partial lifecycle and replace/dedupe deterministic IDs.
+- Required repair harnesses: cross-car new-weekend source, zero-session legacy Finish,
+  partial-finish retry, and unique lifecycle IDs. Existing harness/lint/build/live
+  schema/migration/RLS/draft shell all pass. C7 remains blocked.
 
 ## Chunk 7 — expanded Quick Adjust
 

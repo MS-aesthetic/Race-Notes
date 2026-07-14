@@ -15,7 +15,7 @@
 > A dedicated UX/UI overhaul is in progress on a NEW worktree **`.worktrees/v3` (branch `preview-v3`, created from `master` `3ea6648`)**. `master` is untouched; the overhaul lands on `preview-v3` and merges to `master` only on owner approval.
 > - **Source of the work:** [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md) (Fable expert UX audit — 37 recs, cost/benefit) → [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md) (spec-driven, 7 build chunks).
 > - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High owns implementation; QA failures 1–2 return to Terra and failure 3 transfers build+final QA to SOL. Codex model overrides and rollout metadata are now verified: SOL → Terra → SOL works in one persistent task. Generic prose self-identification is not model evidence. **`/caveman full`** stays on. One consolidated QA pass per chunk + standing `tsc --noEmit` (3-error baseline) and `vite build` gates.
-> - **Chunk status:** ✅ **1–5** through Trackside Setups (`d5ef1f4`) and ✅ **6A** (`ae9395b`, SOL QA PASS). **6B** Terra build `2a941d3` is CODE_PASS/local-RUNTIME_PASS and awaits SOL QA. **7** expanded Quick Adjust follows; Trackers is **8**; export/help/final sweep is **9**.
+> - **Chunk status:** ✅ **1–5** and ✅ **6A**. **6B** feature `2a941d3` failed SOL QA attempt 1: wrong-car source on second weekend, legacy Finish unsupported, partial Finish not retry-safe. Terra repair required; **7** remains locked. Trackers is **8**; export/help/final sweep is **9**.
 > - **New reusable code (chunks 1-4):** `src/components/ui/` (`NumberStepper`, `UndoToast`+`InfoToast`, `EmptyState`, `CollapsibleSection`, `SegmentedGrid`, `BottomSheet`, `HelpSheet`, `LapTimeKeypad`); `src/lib/undo.ts`; `src/lib/backStack.ts`; `src/lib/saveStatus.ts`; `src/lib/sessionSequence.ts`; `src/lib/serviceLog.ts`; `src/lib/scope.ts` (`pickAutoWeekend`, `parseWeekendDate`, `sortWeekends`); `src/components/ContextStrip.tsx`; `src/components/GetRaceReadyCard.tsx`. CSS: `.tap-target`, `.sticky-action-bar`, `.status-chip` + light-theme contrast bump.
 > - **Owner UX answers baked into the plan:** (1) app used during the week + at the track after each run; (2) 95% single-user → assignment/concurrency deferred; (3) most teams 1 car (some 2-3) → car UI hidden at ≤1 car; (4) **four-bar changed VERY often trackside → make it FAST, not hidden** (reverses the "fold behind expander" rec — chunk 5); (5) dusk→night racing → sunlight/light-theme tuned; (6) Main Checklist = hybrid core-reset + ad-hoc (chunk 6).
 > - **Testing:** v3 APKs use the build-from-main bridge: run lint then build in v3; mirror v3 `dist` to main; run raw `npx cap sync android` (not main `npm run android:sync`, which rebuilds master); run `assembleDebug`. Current Chunk 4 APK is versionCode 14/versionName 3.9 at the standard debug output. Android emulator QA passed fresh-profile hero→weekend→new-session, quick-service cost→Accounting→Undo, and session ⋯ delete→Undo. Emulator native `screencap` showed white because WebView tile-memory/compositor warnings; direct WebView capture and DOM verified rendered UI.
@@ -36,12 +36,13 @@
 > - **C6A draft:** https://6a558ea45dc5716d3bed026a--crew-chief-race-notes.netlify.app. Production unchanged.
 
 > ### 🧬 UX-C6B Setup Lifecycle — Terra build complete 2026-07-13
-> - Feature commit `2a941d3`; SOL plan commit `21c6aca`. Awaiting independent SOL High adjudication before C7.
+> - Feature commit `2a941d3`; SOL plan commit `21c6aca`. SOL QA attempt 1 failed; Terra repair required before C7.
 > - Starting a weekend creates dedicated immutable Baseline and editable Weekend Setup. Every normal setup edit is enforced at the App boundary and appended to Weekend Setup history. Runs resolve the weekend's `activeSetupId`, never a generic current-car setup.
 > - Finish Weekend is page-bottom and works with zero runs. It locks Weekend Setup, creates immutable Final, marks event finished, clears active event/run, then selects an editable Current copy. Finished events remain history and cannot auto-activate.
 > - `src/lib/setupLifecycle.ts` owns pure start/finish/lock/diff/timestamp-merge behavior. `sync.ts` explicitly maps lifecycle fields and previously omitted toe/J-bar scalars. Active runs now carry `updatedAt` so stale cloud state cannot revive a finished event.
 > - Live migration `20260714020037_setup_weekend_lifecycle.sql` applied/verified on project `swblfeayxoprodhwxqak`. Draft: https://6a5599e37111d0563ffaf5f3--crew-chief-race-notes.netlify.app.
 > - Evidence: lifecycle harness PASS; exact three-error lint baseline; build PASS; cavecrew PASS; local 390 px zero-run lifecycle and dark/light PASS. Unique draft origin lacked remembered auth, so SOL should independently verify authenticated sync evidence.
+> - SOL QA blockers: keep new-weekend fallback same-car after car switching; upgrade legacy `setupId` weekends into a finishable Weekend snapshot; make partial Finish retry-safe and dedupe deterministic Weekend/Final/Current IDs. Live schema, migration history, RLS, build, and draft shell independently passed.
 
 > ### 🧭 Owner revision — 2026-07-13
 > - Finish Weekend is always available at page bottom. No race/session gate; test days may be finished normally.
@@ -89,7 +90,7 @@ Git worktrees in play:
 | Path | Branch | Role |
 |---|---|---|
 | `C:\Users\maxx\antigravity\Race-Notes` | `master` | **Main/release tree.** Owns complete Android platform and gitignored Gradle/SDK/Firebase files. Preserve existing dirty host/generated files. |
-| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–5 + UX-R1 complete; C6A SOL-QA complete; C6B Terra build `2a941d3` awaits SOL QA. Web build works here. Local gitignored debug-only Gradle scaffolding may exist from C5 QA; it is not committed release configuration. |
+| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–5 + UX-R1 complete; C6A SOL-QA complete; C6B `2a941d3` failed SOL QA attempt 1 and awaits Terra repair. Web build works here. Local gitignored debug-only Gradle scaffolding may exist from C5 QA; it is not committed release configuration. |
 
 Audited 2026-07-13: `preview-v3` includes UX-C5 `d5ef1f4`; `master` remains
 release/stable. Git refs do not indicate Netlify deployment state. Main-tree

@@ -1207,4 +1207,7 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
 - Terra feature commit `2a941d3`. Harness, cavecrew, exact lint baseline, build, 390 px
   zero-run runtime, dark/light, and draft shell passed. Draft:
   `https://6a5599e37111d0563ffaf5f3--crew-chief-race-notes.netlify.app`.
-  Awaiting SOL High independent QA before C7.
+  SOL QA attempt 1 failed: new-weekend fallback can cross cars after a car switch;
+  legacy weekends without `activeSetupId` cannot finish; interrupted local Finish
+  cannot recover and may duplicate deterministic snapshot IDs. Terra repair is required
+  before C7. Live schema/RLS/migration history remained valid.
