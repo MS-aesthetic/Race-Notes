@@ -1387,7 +1387,8 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
 
 ## 30. UXF-5 — Tuning Guide and App Guide Separation (2026-07-14)
 
-- Feature `e2f0553` is CODE_PASS and awaits SOL technical QA plus owner tone review.
+- Feature `e2f0553` plus SOL display repair `83e652f` passed technical QA at 96 and
+  awaits owner tone review. UXF-5 remains open; UXF-6 is locked.
 - Sectionless `helpSection` opens Tuning Guide. The pure `isAppGuideSection()` boundary
   recognizes `setup`, `four-bar`, `loads`, and `setup-diff`; those requests render an
   embedded `GuideView` under an App Guide title. The section value remains the source of
@@ -1408,3 +1409,8 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   available and is not claimed; sequential embedded Guide topics are covered by SSR fixtures.
 - No checklist redesign, maintenance interval change, lifecycle, schema/migration, sync/type,
   package, native config, preview/production deploy, remote push, merge, or APK change.
+- SOL technical QA attempt 1 found five awkward translated phrases that escaped the corpus
+  guard. SOL fixer added ordered exact replacements and focused assertions; Terra was not
+  re-invoked. Attempt 2 passed both harnesses, exact lint baseline, 555-module/18-entry build,
+  diff, clean tree, and cavecrew re-review. Raw `BEHAVIOR_DATA` remains byte-equal to the
+  planning base after line-ending normalization. Product tone remains an owner decision.

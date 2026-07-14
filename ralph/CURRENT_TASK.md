@@ -1,6 +1,6 @@
 # Current Task — UXF-5 Copy Tone and Guide Separation
 
-**Status:** CODE_PASS — awaiting SOL High technical QA; owner tone review remains final gate
+**Status:** AWAITING OWNER TONE REVIEW — SOL High technical QA PASS attempt 2
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-4 closed by SOL QA at `bbaab34`; feature `0c2c827`, repair `12d932f`
@@ -92,3 +92,10 @@ Terra owns one initial build pass. Primary owns this cross-file change; cavecrew
 - `scripts/chunk8-trackers-harness.ts` PASS; `scripts/chunk9-export-help-harness.ts` PASS; lint reports only the exact three known errors; production build PASS with 555 modules and 18 PWA entries; `git diff --check` PASS; cavecrew final review found no issues.
 - Local signed-out auth shell opened with zero console errors. Authenticated contextual clicks were unavailable on that origin, so no such runtime claim is made. Sequential topic changes and embedded/normal Guide rendering are covered by focused SSR fixtures; existing BottomSheet close and Android Back handling remain source-verified.
 - No checklist redesign, interval behavior, lifecycle, schema, migration, sync shape, type, package, native config, deploy, push, merge, or APK change.
+
+## SOL technical QA — 2026-07-14
+
+- Attempt 1 found one medium copy blocker: five translated effects still produced awkward or academic output (`resists the chassis from rolling`, `keeping rear tire loading`, `cushioning the tire contact`, `Maximum mechanical forward traction`, and `allows weight to transfer`). Routing correctly transferred repair to SOL; Terra was not re-invoked.
+- SOL fixer commit `83e652f` adds ordered phrase-specific render translations and exact harness guards. `BEHAVIOR_DATA` remains byte-equal to plan commit `aeaa62f` after line-ending normalization.
+- QA attempt 2 PASS. Chunk8 and expanded chunk9 harnesses PASS; lint remains exact three-error baseline; production build PASS with 555 modules and 18 PWA entries; diff and clean-tree checks PASS; cavecrew re-review reports no issues.
+- Technical acceptance is complete. UXF-5 remains open until Maxx reviews guide tone locally or on a future draft and accepts or requests copy changes. UXF-6 stays locked.
