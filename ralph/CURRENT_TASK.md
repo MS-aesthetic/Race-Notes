@@ -1,6 +1,6 @@
 # Current Task — UXF-8 Docs and Loop-State Hygiene
 
-**Status:** QA FAIL — SOL QA attempt 2; route one remaining repair to SOL fixer attempt 3
+**Status:** CODE_PASS — SOL fixer attempt 3; awaiting independent SOL QA
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Next workstream after independent PASS:** UXF-1
@@ -67,5 +67,8 @@ Attempt 2 evidence: repair diff touches only four `.github/agents` roles, `plan-
 ## QA attempt 2 finding
 
 1. **Native Codex fixer metadata still contradicts first-failure routing.** `.codex/agents/ws-fixer.toml:2` says SOL takes over “after three failed QA reviews,” while its body and every active GitHub role correctly use first-failure takeover. Change the description to first-failure takeover. Re-grep all active `.codex/agents/*.toml` and `.github/agents/*.agent.md` routing text, then return to independent SOL QA. No other finding remains.
+   **FIXED attempt 3:** description now says SOL takes over after first failed QA review. Full active native/GitHub agent grep finds no `plan-v2`, `preview-v2`, third/three-failure routing, or delayed SOL takeover.
 
 Passing evidence retained: the four `.github` roles, archived handoff path, PROJECT conflict authority, HANDOFF live row, archive preservation, current links, applied migration state, UXF table, no-source-change scope, diff check, and clean worktree all pass. Cavecrew QA attempt 2 review found only the native fixer metadata mismatch above.
+
+Attempt 3 evidence: repair changes one metadata description plus durable task/state notes. Current Markdown links resolve; archive moves remain preserved; no application, harness, schema, package, or native delta exists; `git diff --check` passes. Cavecrew reviewer: `No issues. Routing consistent; scope clean.` Documentation-only repair requires no lint/build.

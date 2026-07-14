@@ -101,7 +101,7 @@ Separate track from WS-N…Z. Chunks 1–9 are historical and archived under `do
 | UXF-5 | Copy tone + Tuning Guide/App Guide separation | pending | 0 | — | — | Owner tone review required to close. |
 | UXF-6 | Races/Days maintenance intervals + starting usage | pending | 0 | — | — | No current test-data compatibility burden. |
 | UXF-7 | Main Checklist redesign proposal | pending | 0 | — | — | Spec-only; Maxx design session gates follow-on build. |
-| UXF-8 | Docs and loop-state hygiene | in_progress | 3 | 88 | 2c94361 | SOL QA attempt 2 FAIL: `.codex/agents/ws-fixer.toml` description still says takeover after three failures. Route single metadata repair to SOL fixer attempt 3; all other gates pass. |
+| UXF-8 | Docs and loop-state hygiene | in_progress | 3 | 88 | 2c94361 | SOL fixer attempt 3 CODE_PASS: native fixer description now agrees with first-failure takeover; active routing grep and cavecrew review clean. Awaiting independent QA attempt 3. |
 | UXF-9 | Batch regression, draft, and owner acceptance | pending | 0 | — | — | Last; absorbs remaining WS-Z runtime checks. |
 
 ### UX chunk grade log
