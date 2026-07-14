@@ -12,6 +12,7 @@ import FourBarQuickAdjust from './FourBarQuickAdjust';
 import TiresSubView from './TiresSubView';
 import { cloneSetup, makeBlankSetup, pickImmediatePriorSetupForCar, pickLatestSetupForCar } from '../lib/setupCompat';
 import { calculateTireStagger, NumericCornerField, SETUP_STEPS, formatStoredNumber, legacyValueNote, parseStoredNumber } from '../lib/setupSteps';
+import { isSetupLocked } from '../lib/setupLifecycle';
 
 interface SetupViewProps {
   savedSetups: Setup[];
@@ -282,6 +283,13 @@ export default function SetupView({
       carType: activeCar?.carType ?? source?.carType ?? '',
       carId: activeCarId ?? undefined,
       screenshots: [],
+      versionLabel: source ? `${source.versionLabel || source.chassis} Copy` : 'Current Setup',
+      lifecycleRole: 'current',
+      sourceSetupId: source?.id,
+      weekendId: undefined,
+      lockedAt: undefined,
+      changeLog: [],
+      updatedAt: new Date().toISOString(),
     };
     const newSetup = source ? cloneSetup(source, overrides) : makeBlankSetup(overrides);
     if (source) {
@@ -321,6 +329,13 @@ export default function SetupView({
       date: today,
       carId: activeCarId ?? target.carId,
       screenshots: [], // clear stale photos on clone
+      versionLabel: `${target.versionLabel || target.chassis} Copy`,
+      lifecycleRole: 'current',
+      sourceSetupId: target.id,
+      weekendId: undefined,
+      lockedAt: undefined,
+      changeLog: [],
+      updatedAt: new Date().toISOString(),
     });
     setExpandedId(cloned.id);
     updateAndSaveSetups([cloned, ...setups], activeId);
@@ -358,6 +373,7 @@ export default function SetupView({
 
   // Filter at display time only — never mutate the master arrays.
   const displayedSetups = activeCarId ? byActiveCar<Setup>(setups, activeCarId) : [];
+  const activeEventSetupId = weekends?.find(weekend => weekend.status !== 'finished' && weekend.activeSetupId === activeSetupId)?.activeSetupId;
   const displayedTires = activeCarId ? byActiveCar<TireInventoryItem>(tireInventory, activeCarId) : [];
   const noCar = !activeCarId;
   const activeSetup = displayedSetups.find(s => s.id === activeId) ?? pickLatestSetupForCar(setups, activeCarId);
@@ -436,6 +452,7 @@ export default function SetupView({
             {displayedSetups.map((setupItem) => {
               const isExpanded = expandedId === setupItem.id;
               const isActive = activeId === setupItem.id;
+              const isReadOnly = isSetupLocked(setupItem) || (!!activeEventSetupId && setupItem.id !== activeEventSetupId);
               return (
                 <div key={setupItem.id}
                   className={`bg-surface-container border rounded-lg overflow-hidden transition-all duration-200 ${isActive ? 'border-primary shadow-[0_0_12px_rgba(211,47,47,0.1)]' : 'border-outline-variant/60'}`}
@@ -454,7 +471,9 @@ export default function SetupView({
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="min-w-0 break-words font-display text-base font-bold text-on-surface uppercase tracking-wide">{setupItem.chassis}</h3>
                           {isActive && <span className="bg-primary/15 text-primary border border-primary/30 text-[9px] uppercase font-bold px-1.5 py-0.5 rounded tracking-wide">Active trackside</span>}
+                          {isReadOnly && <span className="border border-outline-variant text-on-surface-variant text-[9px] uppercase font-bold px-1.5 py-0.5 rounded tracking-wide">View only</span>}
                         </div>
+                        {setupItem.versionLabel && <p className="font-mono text-[11px] font-bold text-primary mt-1">{setupItem.versionLabel}</p>}
                         <div className="text-xs text-on-surface-variant font-mono mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
                           <span>Track: <strong>{setupItem.track || 'Not Specified'}</strong></span>
                           <span>Class: <strong>{setupItem.carType || 'Dirt Late Model'}</strong></span>
@@ -463,7 +482,7 @@ export default function SetupView({
                       </div>
                     </div>
                     <div className="w-full min-w-0 flex flex-wrap items-center justify-end gap-2 self-stretch sm:self-auto sm:w-auto">
-                      {!isActive && isExpanded && (
+                      {!isActive && isExpanded && !isReadOnly && (
                         <button type="button" onClick={(e) => { e.stopPropagation(); setActiveId(setupItem.id); updateAndSaveSetups(setups, setupItem.id); }}
                           className="min-w-0 px-3 py-1 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded hover:opacity-90 transition-all shadow">
                           Use Setup
@@ -488,7 +507,7 @@ export default function SetupView({
                           className={`p-1.5 rounded ${priorSetup(setupItem) ? 'text-on-surface-variant hover:text-primary' : 'text-on-surface-variant/30 cursor-not-allowed'}`}>
                           <span className="material-symbols-outlined text-[18px]">compare_arrows</span>
                         </button>
-                        <button type="button" title="Delete setup permanently" onClick={(e) => { e.stopPropagation(); handleDeleteSetup(setupItem.id); }}
+                        <button type="button" title="Delete setup permanently" disabled={isReadOnly} onClick={(e) => { e.stopPropagation(); handleDeleteSetup(setupItem.id); }}
                           className="p-1.5 text-on-surface-variant hover:text-red-400 transition-colors rounded">
                           <span className="material-symbols-outlined text-[18px]">delete</span>
                         </button>
@@ -498,7 +517,13 @@ export default function SetupView({
 
                   {/* Collapsible content */}
                   {isExpanded && (
-                    <div className="min-w-0 p-2 sm:p-4 border-t border-outline-variant/50 bg-[#0a0a0a] space-y-6">
+                    <div className="min-w-0 p-2 sm:p-4 border-t border-outline-variant/50 bg-surface-container-low">
+                      {isReadOnly && (
+                        <div className="mb-4 rounded-lg border border-outline-variant bg-surface-container p-3 font-mono text-xs text-on-surface-variant">
+                          Baseline and Final snapshots stay unchanged. Clone this setup to make a new editable Current Setup.
+                        </div>
+                      )}
+                      <fieldset disabled={isReadOnly} className="min-w-0 space-y-6 disabled:opacity-75">
 
                       {/* Metadata grid */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -663,6 +688,24 @@ export default function SetupView({
                         onFieldChange={(corner, field, value) => handleCornerChange(setupItem.id, corner, field, value)}
                       />
 
+                      {(setupItem.changeLog?.length || 0) > 0 && (
+                        <section className="rounded-lg border border-outline-variant/60 bg-surface-container/50 p-4">
+                          <h4 className="font-display text-xs font-bold uppercase text-on-surface">Weekend Changes</h4>
+                          <p className="font-mono text-[10px] text-on-surface-variant mt-1">Saved in order so Baseline and Final can always be compared.</p>
+                          <div className="mt-3 space-y-2">
+                            {[...(setupItem.changeLog || [])].reverse().map(change => (
+                              <div key={change.id} className="rounded border border-outline-variant/40 bg-surface p-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="font-mono text-xs font-bold text-on-surface">{change.label}</span>
+                                  <time className="font-mono text-[9px] text-on-surface-variant">{new Date(change.timestamp).toLocaleString()}</time>
+                                </div>
+                                {(change.before || change.after) && <p className="font-mono text-[10px] text-on-surface-variant mt-1">{change.before || '—'} → <span className="text-primary">{change.after || '—'}</span></p>}
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      )}
+
                       {/* Attachments */}
                       <div className="bg-surface-container/50 border border-outline-variant/60 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-3">
@@ -702,6 +745,7 @@ export default function SetupView({
                           <p className="text-[10px] text-on-surface-variant/30 font-mono italic">No attachments yet. Add photos, data sheets, or time slips.</p>
                         ) : null}
                       </div>
+                      </fieldset>
                     </div>
                   )}
                 </div>

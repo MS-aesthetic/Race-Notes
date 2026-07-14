@@ -97,6 +97,22 @@ export interface ShockSession {
   carId?: string;
 }
 
+export type SetupLifecycleRole = 'current' | 'baseline' | 'weekend' | 'final';
+
+/** Append-only setup history. Session adjustments remain a separate trackside summary. */
+export interface SetupChange {
+  id: string;
+  timestamp: string;
+  label: string;
+  corner?: 'lf' | 'rf' | 'lr' | 'rr';
+  field?: string;
+  before?: string;
+  after?: string;
+  note?: string;
+  sessionId?: string;
+  loadSessionId?: string;
+}
+
 export interface Setup {
   id: string;
   chassis: string;
@@ -122,6 +138,17 @@ export interface Setup {
   notes?: string;
   /** Supabase Storage public URLs for attached photos/files */
   screenshots?: string[];
+  /** User-facing version name. Never overload chassis with lifecycle naming. */
+  versionLabel?: string;
+  /** Missing on legacy records means editable Current Setup. */
+  lifecycleRole?: SetupLifecycleRole;
+  sourceSetupId?: string;
+  weekendId?: string;
+  /** Present when this snapshot must not be edited. */
+  lockedAt?: string;
+  changeLog?: SetupChange[];
+  /** ISO timestamp used for local/cloud conflict resolution. */
+  updatedAt?: string;
 }
 
 export interface TireInventoryItem {
@@ -267,6 +294,15 @@ export interface RaceWeekend {
   weatherHistory?: WeatherHistoryDay[];
   /** Weather forecast for race day + a few days out */
   weatherForecast?: WeatherHistoryDay[];
+  /** Missing on legacy records means active. */
+  status?: 'active' | 'finished';
+  finishedAt?: string;
+  sourceSetupId?: string;
+  baselineSetupId?: string;
+  activeSetupId?: string;
+  finalSetupId?: string;
+  /** ISO timestamp used for local/cloud conflict resolution. */
+  updatedAt?: string;
 }
 
 export interface SetupAdjustment {
@@ -325,6 +361,8 @@ export interface ActiveSession {
   screenshots?: string[];
   /** Shock dyno graph images (base64) */
   dynoPhotos?: string[];
+  /** ISO timestamp used to keep an offline finish from reviving a stale active run. */
+  updatedAt?: string;
 }
 
 export interface TodoItem {

@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { Setup, RaceWeekend, ActiveSession, SessionRecord, Todo, TireInventoryItem, Car, ShockSession, WeatherHistoryDay, WeatherSnapshot, MaintenanceComponent, MaintenanceLog, ChecklistTemplate, WeekendChecklist, SavedTrip } from '../types';
 import { normalizeSetup } from './setupCompat';
+import { mergeTimestampedRecords } from './setupLifecycle';
 
 // ---------------------------------------------------------------------------
 // Local-First Sync Engine
@@ -20,37 +21,126 @@ type SyncCallback = (message: string) => void;
 
 const pushDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+export const setupToCloudRow = (raw: Setup, userId: string): Record<string, unknown> => {
+  const s = normalizeSetup(raw);
+  return {
+    id: s.id,
+    user_id: userId,
+    chassis: s.chassis,
+    track: s.track,
+    date: s.date,
+    car_type: s.carType,
+    gear: s.gear || '',
+    toe: s.toe || '',
+    jbar: s.jbar || '',
+    jbar_frame_height: s.jbarFrameHeight || '',
+    jbar_pinion_height: s.jbarPinionHeight || '',
+    front_stagger: s.frontStagger || '',
+    rear_stagger: s.rearStagger || '',
+    pull_bar_frame_hole: s.pullBarFrameHole || '',
+    pull_bar_rear_hole: s.pullBarRearHole || '',
+    pull_bar_angle: s.pullBarAngle || '',
+    notes: s.notes || '',
+    screenshots: s.screenshots || [],
+    car_id: s.carId ?? null,
+    version_label: s.versionLabel || '',
+    lifecycle_role: s.lifecycleRole ?? null,
+    source_setup_id: s.sourceSetupId ?? null,
+    weekend_id: s.weekendId ?? null,
+    locked_at: s.lockedAt ?? null,
+    change_log: s.changeLog || [],
+    lf: s.lf,
+    rf: s.rf,
+    lr: s.lr,
+    rr: s.rr,
+    updated_at: s.updatedAt || new Date().toISOString(),
+  };
+};
+
+export const setupFromCloudRow = (r: Record<string, unknown>): Setup => normalizeSetup({
+  id: r.id as string,
+  chassis: (r.chassis as string) || '',
+  track: (r.track as string) || '',
+  date: (r.date as string) || '',
+  carType: (r.car_type as string) || '',
+  gear: (r.gear as string) || '',
+  toe: (r.toe as string) || '',
+  jbar: (r.jbar as string) || '',
+  jbarFrameHeight: (r.jbar_frame_height as string) || '',
+  jbarPinionHeight: (r.jbar_pinion_height as string) || '',
+  frontStagger: (r.front_stagger as string) || '',
+  rearStagger: (r.rear_stagger as string) || '',
+  pullBarFrameHole: (r.pull_bar_frame_hole as string) || '',
+  pullBarRearHole: (r.pull_bar_rear_hole as string) || '',
+  pullBarAngle: (r.pull_bar_angle as string) || '',
+  notes: (r.notes as string) || '',
+  screenshots: (r.screenshots as string[]) || [],
+  carId: (r.car_id as string) ?? undefined,
+  versionLabel: (r.version_label as string) || undefined,
+  lifecycleRole: (r.lifecycle_role as Setup['lifecycleRole']) || undefined,
+  sourceSetupId: (r.source_setup_id as string) || undefined,
+  weekendId: (r.weekend_id as string) || undefined,
+  lockedAt: (r.locked_at as string) || undefined,
+  changeLog: (r.change_log as Setup['changeLog']) || [],
+  updatedAt: (r.updated_at as string) || undefined,
+  lf: (r.lf as Setup['lf']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
+  rf: (r.rf as Setup['rf']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
+  lr: (r.lr as Setup['lr']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
+  rr: (r.rr as Setup['rr']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
+});
+
+export const weekendToCloudRow = (w: RaceWeekend, userId: string): Record<string, unknown> => ({
+  id: w.id,
+  user_id: userId,
+  name: w.name,
+  track: w.track,
+  date: w.date,
+  sessions: w.sessions,
+  notes: w.notes || '',
+  weather: w.weather || null,
+  location: w.location || '',
+  setup_id: w.setupId || null,
+  setup_name: w.setupName || '',
+  weather_history: w.weatherHistory || null,
+  weather_forecast: w.weatherForecast || null,
+  status: w.status || 'active',
+  finished_at: w.finishedAt ?? null,
+  source_setup_id: w.sourceSetupId ?? null,
+  baseline_setup_id: w.baselineSetupId ?? null,
+  active_setup_id: w.activeSetupId ?? null,
+  final_setup_id: w.finalSetupId ?? null,
+  updated_at: w.updatedAt || new Date().toISOString(),
+});
+
+export const weekendFromCloudRow = (r: Record<string, unknown>): RaceWeekend => ({
+  id: r.id as string,
+  name: (r.name as string) || '',
+  track: (r.track as string) || '',
+  date: (r.date as string) || '',
+  sessions: (r.sessions as SessionRecord[]) || [],
+  notes: (r.notes as string) || undefined,
+  weather: (r.weather as WeatherSnapshot) || undefined,
+  location: (r.location as string) || undefined,
+  setupId: (r.setup_id as string) || undefined,
+  setupName: (r.setup_name as string) || undefined,
+  weatherHistory: (r.weather_history as WeatherHistoryDay[]) || undefined,
+  weatherForecast: (r.weather_forecast as WeatherHistoryDay[]) || undefined,
+  status: (r.status as RaceWeekend['status']) || undefined,
+  finishedAt: (r.finished_at as string) || undefined,
+  sourceSetupId: (r.source_setup_id as string) || undefined,
+  baselineSetupId: (r.baseline_setup_id as string) || undefined,
+  activeSetupId: (r.active_setup_id as string) || undefined,
+  finalSetupId: (r.final_setup_id as string) || undefined,
+  updatedAt: (r.updated_at as string) || undefined,
+});
+
 /** Push saved setups to Supabase (debounced 500ms) */
 export function pushSetups(setups: Setup[], userId: string, onStatus?: SyncCallback) {
   const key = 'setups';
   if (pushDebounceTimers.has(key)) clearTimeout(pushDebounceTimers.get(key)!);
   pushDebounceTimers.set(key, setTimeout(async () => {
     try {
-      const rows = setups.map(raw => {
-        const s = normalizeSetup(raw);
-        return ({
-        id: s.id,
-        user_id: userId,
-        chassis: s.chassis,
-        track: s.track,
-        date: s.date,
-        car_type: s.carType,
-        gear: s.gear || '',
-        front_stagger: s.frontStagger || '',
-        rear_stagger: s.rearStagger || '',
-        pull_bar_frame_hole: s.pullBarFrameHole || '',
-        pull_bar_rear_hole: s.pullBarRearHole || '',
-        pull_bar_angle: s.pullBarAngle || '',
-        notes: s.notes || '',
-        screenshots: s.screenshots || [],
-        car_id: s.carId ?? null,
-        lf: s.lf,
-        rf: s.rf,
-        lr: s.lr,
-        rr: s.rr,
-        updated_at: new Date().toISOString(),
-        });
-      });
+      const rows = setups.map(raw => setupToCloudRow(raw, userId));
       const { error } = await supabase.from('setups').upsert(rows, { onConflict: 'id' });
       if (error) console.warn('Sync: pushSetups error:', error.message);
       else onStatus?.('Setups synced to cloud');
@@ -64,22 +154,7 @@ export function pushWeekends(weekends: RaceWeekend[], userId: string, onStatus?:
   if (pushDebounceTimers.has(key)) clearTimeout(pushDebounceTimers.get(key)!);
   pushDebounceTimers.set(key, setTimeout(async () => {
     try {
-      const rows = weekends.map(w => ({
-        id: w.id,
-        user_id: userId,
-        name: w.name,
-        track: w.track,
-        date: w.date,
-        sessions: w.sessions,
-        notes: w.notes || '',
-        weather: w.weather || null,
-        location: w.location || '',
-        setup_id: w.setupId || null,
-        setup_name: w.setupName || '',
-        weather_history: w.weatherHistory || null,
-        weather_forecast: w.weatherForecast || null,
-        updated_at: new Date().toISOString(),
-      }));
+      const rows = weekends.map(w => weekendToCloudRow(w, userId));
       const { error } = await supabase.from('race_weekends').upsert(rows, { onConflict: 'id' });
       if (error) console.warn('Sync: pushWeekends error:', error.message);
       else onStatus?.('Weekends synced to cloud');
@@ -97,7 +172,7 @@ export function pushActiveSession(session: ActiveSession, userId: string, onStat
         id: `active-${userId}`,
         user_id: userId,
         data: session,
-        updated_at: new Date().toISOString(),
+        updated_at: session.updatedAt || new Date().toISOString(),
       }, { onConflict: 'user_id' });
       if (error) console.warn('Sync: pushActiveSession error:', error.message);
     } catch (e) { console.warn('Sync: pushActiveSession failed', e); }
@@ -130,26 +205,7 @@ export async function pullAllData(
       .select('*')
       .order('updated_at', { ascending: false });
     if (cloudSetups) {
-      results.setups = cloudSetups.map((r: Record<string, unknown>) => normalizeSetup({
-        id: r.id as string,
-        chassis: (r.chassis as string) || '',
-        track: (r.track as string) || '',
-        date: (r.date as string) || '',
-        carType: (r.car_type as string) || '',
-        gear: (r.gear as string) || '',
-        frontStagger: (r.front_stagger as string) || '',
-        rearStagger: (r.rear_stagger as string) || '',
-        pullBarFrameHole: (r.pull_bar_frame_hole as string) || '',
-        pullBarRearHole: (r.pull_bar_rear_hole as string) || '',
-        pullBarAngle: (r.pull_bar_angle as string) || '',
-        notes: (r.notes as string) || '',
-        screenshots: (r.screenshots as string[]) || [],
-        carId: (r.car_id as string) ?? undefined,
-        lf: (r.lf as Setup['lf']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
-        rf: (r.rf as Setup['rf']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
-        lr: (r.lr as Setup['lr']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
-        rr: (r.rr as Setup['rr']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
-      }));
+      results.setups = cloudSetups.map((r: Record<string, unknown>) => setupFromCloudRow(r));
     }
     onStatus?.(`Pulled ${results.setups.length} setups from cloud`);
 
@@ -159,20 +215,7 @@ export async function pullAllData(
       .select('*')
       .order('updated_at', { ascending: false });
     if (cloudWeekends) {
-      results.weekends = cloudWeekends.map((r: Record<string, unknown>) => ({
-        id: r.id as string,
-        name: (r.name as string) || '',
-        track: (r.track as string) || '',
-        date: (r.date as string) || '',
-        sessions: (r.sessions as SessionRecord[]) || [],
-        notes: (r.notes as string) || undefined,
-        weather: (r.weather as WeatherSnapshot) || undefined,
-        location: (r.location as string) || undefined,
-        setupId: (r.setup_id as string) || undefined,
-        setupName: (r.setup_name as string) || undefined,
-        weatherHistory: (r.weather_history as WeatherHistoryDay[]) || undefined,
-        weatherForecast: (r.weather_forecast as WeatherHistoryDay[]) || undefined,
-      }));
+      results.weekends = cloudWeekends.map((r: Record<string, unknown>) => weekendFromCloudRow(r));
     }
     onStatus?.(`Pulled ${results.weekends.length} weekends from cloud`);
 
@@ -182,7 +225,10 @@ export async function pullAllData(
       .select('*')
       .maybeSingle();
     if (cloudActive?.data) {
-      results.activeSession = cloudActive.data as ActiveSession;
+      results.activeSession = {
+        ...(cloudActive.data as ActiveSession),
+        updatedAt: (cloudActive.updated_at as string) || (cloudActive.data as ActiveSession).updatedAt,
+      };
     }
   } catch (e) {
     console.warn('Sync: pullAllData failed', e);
@@ -220,26 +266,7 @@ export async function pullSharedData(userId: string): Promise<{
         .in('id', setupIds);
 
       if (cloudSetups) {
-        results.sharedSetups = cloudSetups.map((r: Record<string, unknown>) => normalizeSetup({
-          id: r.id as string,
-          chassis: (r.chassis as string) || '',
-          track: (r.track as string) || '',
-          date: (r.date as string) || '',
-          carType: (r.car_type as string) || '',
-          gear: (r.gear as string) || '',
-          frontStagger: (r.front_stagger as string) || '',
-          rearStagger: (r.rear_stagger as string) || '',
-          pullBarFrameHole: (r.pull_bar_frame_hole as string) || '',
-          pullBarRearHole: (r.pull_bar_rear_hole as string) || '',
-          pullBarAngle: (r.pull_bar_angle as string) || '',
-          notes: (r.notes as string) || '',
-          screenshots: (r.screenshots as string[]) || [],
-          carId: (r.car_id as string) ?? undefined,
-          lf: (r.lf as Setup['lf']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
-          rf: (r.rf as Setup['rf']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
-          lr: (r.lr as Setup['lr']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
-          rr: (r.rr as Setup['rr']) || { spring: '', shock: '', tireComp: '', tireSize: '', tirePress: '' },
-        }));
+        results.sharedSetups = cloudSetups.map((r: Record<string, unknown>) => setupFromCloudRow(r));
       }
     }
 
@@ -257,13 +284,7 @@ export async function pullSharedData(userId: string): Promise<{
         .in('id', weekendIds);
 
       if (cloudWeekends) {
-        results.sharedWeekends = cloudWeekends.map((r: Record<string, unknown>) => ({
-          id: r.id as string,
-          name: (r.name as string) || '',
-          track: (r.track as string) || '',
-          date: (r.date as string) || '',
-          sessions: (r.sessions as SessionRecord[]) || [],
-        }));
+        results.sharedWeekends = cloudWeekends.map((r: Record<string, unknown>) => weekendFromCloudRow(r));
       }
     }
   } catch (e) {
@@ -290,23 +311,18 @@ export function mergeIntoLocalStorage(
       localStorage.setItem(existingLocalKey, JSON.stringify(cloudData));
       return true;
     }
-    // Cloud wins for active session
-    localStorage.setItem(existingLocalKey, JSON.stringify(cloudData));
+    const local = JSON.parse(localRaw) as ActiveSession;
+    const merged = (cloudData.updatedAt || '') >= (local.updatedAt || '') ? cloudData : local;
+    localStorage.setItem(existingLocalKey, JSON.stringify(merged));
     return true;
   }
 
   if (Array.isArray(cloudData) && cloudData.length > 0) {
     const localRaw = localStorage.getItem(existingLocalKey);
-    const localArr: Array<{ id: string }> = localRaw ? JSON.parse(localRaw) : [];
-    const cloudMap = new Map<string, Setup | RaceWeekend>(cloudData.map((item: Setup | RaceWeekend) => [item.id, item] as [string, Setup | RaceWeekend]));
-    const localMap = new Map<string, Setup | RaceWeekend>(localArr.map(item => [item.id, item as Setup | RaceWeekend] as [string, Setup | RaceWeekend]));
-
-    // Cloud items overwrite local (cloud is source of truth when logged in)
-    for (const [id, item] of cloudMap) {
-      localMap.set(id as string, item);
-    }
-
-    const merged = Array.from(localMap.values());
+    const localArr: Array<Setup | RaceWeekend> = localRaw ? JSON.parse(localRaw) : [];
+    const merged = type === 'setups'
+      ? mergeTimestampedRecords(localArr as Setup[], cloudData as Setup[])
+      : mergeTimestampedRecords(localArr as RaceWeekend[], cloudData as RaceWeekend[]);
     localStorage.setItem(existingLocalKey, JSON.stringify(merged));
     return true;
   }

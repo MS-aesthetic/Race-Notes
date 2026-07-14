@@ -53,6 +53,7 @@ export const pickAutoWeekend = (
   let bestUpcoming: { w: RaceWeekend; diff: number } | null = null;
   let bestPast: { w: RaceWeekend; diff: number } | null = null;
   for (const w of weekends) {
+    if (w.status === 'finished') continue;
     const d = parseWeekendDate(w.date);
     if (!d) continue;
     const diff = Math.round(

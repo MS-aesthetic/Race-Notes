@@ -15,6 +15,7 @@ import FourBarQuickAdjust from './FourBarQuickAdjust';
 import SetupDiffView from './SetupDiffView';
 import { NumericCornerField, formatPsiValue, fourBarAdjustmentId, fourBarAdjustmentLabel, mergeImportedSetupPressure } from '../lib/setupSteps';
 import { pickImmediatePriorSetupForCar, setupUsedUniquelyMatchesCar } from '../lib/setupCompat';
+import { isWeekendFinished, lifecycleSetupId } from '../lib/setupLifecycle';
 
 // ── Data passed up to App's create handlers ([15]) ───────────────────────────
 
@@ -54,6 +55,7 @@ interface RaceWeekendViewProps {
   onActivateWeekend: (weekendId: string) => void;
   onCreateWeekend: (data: NewWeekendData) => void;
   onCreateSession: (data: NewSessionData) => void;
+  onFinishWeekend: (weekendId: string) => void;
   activeSetup?: Setup | null;
   onUpdateActiveSetup?: (setup: Setup) => void;
   /** [15] One-shot: open a creation modal as soon as the tab mounts. */
@@ -122,7 +124,7 @@ export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
   onUpdateSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
   activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
-  activeSetup = null, onUpdateActiveSetup, initialAction, onInitialActionConsumed,
+  activeSetup = null, onUpdateActiveSetup, onFinishWeekend, initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
   const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
@@ -188,7 +190,7 @@ export default function RaceWeekendView({
   const scopedSetups = activeCarId ? savedSetups.filter(setup => setup.carId === activeCarId) : [];
   const getSessionDiffPair = (record: SessionRecord, weekendId: string): { a: string; b: string } | null => {
     const weekend = weekends.find(item => item.id === weekendId);
-    const byWeekend = scopedSetups.find(setup => setup.id === weekend?.setupId);
+    const byWeekend = scopedSetups.find(setup => setup.id === lifecycleSetupId(weekend));
     const bySetupUsed = setupUsedUniquelyMatchesCar(record.setupUsed, savedSetups, activeCarId)
       ? scopedSetups.find(setup => setup.chassis.trim().toLowerCase() === record.setupUsed?.trim().toLowerCase()) ?? null
       : null;
@@ -423,7 +425,8 @@ export default function RaceWeekendView({
     setWkName(editing?.name ?? '');
     setWkTrack(editing?.track ?? '');
     setWkDate(editing?.date ?? new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }));
-    setWkSetupId(scopedSetups.some(setup => setup.id === editing?.setupId) ? editing?.setupId ?? '' : '');
+    const requestedSetupId = editing?.sourceSetupId || editing?.setupId || activeSetup?.id || '';
+    setWkSetupId(scopedSetups.some(setup => setup.id === requestedSetupId) ? requestedSetupId : '');
     setWkFormOpen(true);
   };
 
@@ -433,14 +436,11 @@ export default function RaceWeekendView({
     if (wkEditingId) {
       const wk = weekends.find(w => w.id === wkEditingId);
       if (wk) {
-        const boundSetup = scopedSetups.find(s => s.id === wkSetupId) || null;
         onUpdateWeekend({
           ...wk,
           name: wkName,
           track: wkTrack,
           date: wkDate || wk.date,
-          setupId: boundSetup?.id,
-          setupName: boundSetup?.chassis,
         });
       }
     } else {
@@ -648,10 +648,10 @@ export default function RaceWeekendView({
             />
           </div>
 
-          {scopedSetups.length > 0 && (
+          {!wkEditingId && scopedSetups.length > 0 && (
             <div>
               <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
-                Bind a Setup (optional)
+                Starting Setup (optional)
               </label>
               <div className="relative">
                 <select
@@ -661,8 +661,8 @@ export default function RaceWeekendView({
                 >
                   <option value="">-- No setup selected --</option>
                   {/* Decision 3: filter to active car's setups */}
-                  {scopedSetups.map(s => (
-                    <option key={s.id} value={s.id}>{s.chassis}{s.carType ? ` (${s.carType})` : ''}</option>
+                  {scopedSetups.filter(setup => !setup.lockedAt).map(s => (
+                    <option key={s.id} value={s.id}>{s.versionLabel || s.chassis}{s.carType ? ` (${s.carType})` : ''}</option>
                   ))}
                 </select>
                 <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[14px]">expand_more</span>
@@ -900,16 +900,43 @@ export default function RaceWeekendView({
   }
 
   if (!currentWeekend) {
+    const available = sortedWeekends.filter(weekend => !isWeekendFinished(weekend));
+    const history = sortedWeekends.filter(weekend => isWeekendFinished(weekend));
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
-        <p className="font-mono text-sm text-on-surface-variant">Select an active weekend.</p>
-        <div className="flex flex-wrap justify-center gap-2">
-          {sortedWeekends.map(weekend => (
+      <div className="space-y-5 pb-4">
+        <section className="rounded-xl border border-outline-variant bg-surface-container p-4 text-center space-y-3">
+          <p className="font-display text-base font-bold uppercase text-on-surface">No active weekend</p>
+          <p className="font-mono text-xs text-on-surface-variant">Start a race night or test day. Finished weekends stay below as history.</p>
+          <button type="button" onClick={() => openWeekendForm()} className="min-h-12 px-4 rounded-xl bg-primary text-on-primary font-display font-bold uppercase">
+            + New weekend
+          </button>
+        </section>
+        {available.length > 0 && <section className="space-y-2">
+          <h2 className="font-display text-sm font-bold uppercase text-on-surface">Open weekends</h2>
+          <div className="flex flex-wrap gap-2">
+          {available.map(weekend => (
             <button key={weekend.id} onClick={() => onActivateWeekend(weekend.id)} className="px-3 py-2 border border-primary/50 rounded text-primary font-mono text-xs font-bold uppercase">
               {weekend.name}
             </button>
           ))}
-        </div>
+          </div>
+        </section>}
+        {history.length > 0 && <section className="space-y-3">
+          <h2 className="font-display text-sm font-bold uppercase text-on-surface">Weekend history</h2>
+          {history.map(weekend => (
+            <article key={weekend.id} className="rounded-xl border border-outline-variant bg-surface-container p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-display font-bold uppercase text-on-surface">{weekend.name}</h3>
+                  <p className="font-mono text-xs text-on-surface-variant">{weekend.track} · {weekend.date}</p>
+                </div>
+                <span className="rounded-full border border-outline-variant px-2 py-1 font-mono text-[10px] font-bold uppercase text-on-surface-variant">Finished</span>
+              </div>
+              <p className="mt-2 font-mono text-xs text-on-surface-variant">{weekend.sessions.length} run{weekend.sessions.length === 1 ? '' : 's'} · {weekend.setupName || 'Baseline saved'}</p>
+              {weekend.finalSetupId && <p className="mt-1 font-mono text-[10px] text-primary">Final Setup saved</p>}
+            </article>
+          ))}
+        </section>}
         {weekendFormModal}
         {sessionFormModal}
         {undoToastEl}
@@ -932,10 +959,10 @@ export default function RaceWeekendView({
             <div className="flex-1 min-w-0">
               <h2 className="font-display font-bold uppercase text-base text-on-surface tracking-wide leading-tight">{currentWeekend.name}</h2>
               <p className="font-mono text-xs text-on-surface-variant mt-0.5">{currentWeekend.track} · {currentWeekend.date}</p>
-              {currentWeekend.setupName && (
+              {(activeSetup?.versionLabel || currentWeekend.setupName) && (
                 <p className="font-mono text-[10px] text-on-surface-variant/70 mt-0.5 flex items-center gap-1">
                   <span className="material-symbols-outlined text-[12px]">settings_input_component</span>
-                  {currentWeekend.setupName}
+                  {activeSetup?.versionLabel || currentWeekend.setupName}
                 </p>
               )}
               <p className="font-mono text-[10px] text-primary uppercase tracking-wider mt-1">
@@ -1363,13 +1390,14 @@ export default function RaceWeekendView({
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-bold text-on-surface">{wk.name}</span>
                         {isActiveWk && <span className="font-mono text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-bold">Active</span>}
+                        {isWeekendFinished(wk) && <span className="font-mono text-[9px] border border-outline-variant text-on-surface-variant px-1.5 py-0.5 rounded uppercase font-bold">Finished</span>}
                       </div>
                       <span className="font-mono text-[10px] text-on-surface-variant">
                         {wk.track}{wk.date ? ` · ${wk.date}` : ''} · {wkSessions.length} session{wkSessions.length !== 1 ? 's' : ''}
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
-                      {!isActiveWk && (
+                      {!isActiveWk && !isWeekendFinished(wk) && (
                         <span
                           role="button"
                           tabIndex={0}
@@ -1402,8 +1430,8 @@ export default function RaceWeekendView({
                         <EmptyState
                           icon="timer"
                           title="No runs logged yet"
-                          body="Log a run after your first laps."
-                          cta={isActiveWk ? { label: '+ Log run', onClick: openNewSession } : { label: 'Make weekend active', onClick: () => onActivateWeekend(wk.id) }}
+                          body={isWeekendFinished(wk) ? 'Test day finished with no logged runs.' : 'Log a run after your first laps.'}
+                          cta={isWeekendFinished(wk) ? undefined : (isActiveWk ? { label: '+ Log run', onClick: openNewSession } : { label: 'Make weekend active', onClick: () => onActivateWeekend(wk.id) })}
                         />
                       )}
                       {wkSessions.map(sx => {
@@ -1431,13 +1459,13 @@ export default function RaceWeekendView({
                                 <div className="flex justify-between items-center mb-2">
                                   <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Session Details</span>
                                   <div className="flex items-center gap-2">
-                                    <button
+                                    {!isWeekendFinished(wk) && <button
                                       onClick={(e) => { e.stopPropagation(); onSelectSession(sx, wk.id); }}
                                       className="flex items-center gap-1.5 px-3 py-1 bg-surface-bright hover:bg-surface-container-high border border-outline-variant rounded transition-colors text-[10px] font-bold uppercase font-mono text-on-surface cursor-pointer"
                                     >
                                       <span className="material-symbols-outlined text-[14px] text-primary">edit</span>
                                       Load
-                                    </button>
+                                    </button>}
                                     <button
                                       aria-label={`Actions for ${sx.name}`}
                                       onClick={(e) => { e.stopPropagation(); setMenuSession({ weekendId: wk.id, session: sx }); }}
@@ -1469,6 +1497,26 @@ export default function RaceWeekendView({
               );
             })}
           </div>
+        </section>
+      )}
+
+      {currentWeekend && !isWeekendFinished(currentWeekend) && (
+        <section className="rounded-xl border border-primary/40 bg-primary/5 p-4 space-y-3">
+          <div>
+            <h2 className="font-display font-bold uppercase text-on-surface">Finish Weekend</h2>
+            <p className="font-mono text-xs text-on-surface-variant mt-1">Saves Final Setup, closes this race night or test day, and makes that setup your new Current Setup.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm(`Finish ${currentWeekend.name}? Final Setup will be saved and this weekend will move to history.`)) {
+                onFinishWeekend(currentWeekend.id);
+              }
+            }}
+            className="w-full min-h-12 rounded-xl border-2 border-primary bg-primary text-on-primary font-display font-bold uppercase tracking-wide"
+          >
+            Finish Weekend
+          </button>
         </section>
       )}
 

@@ -50,10 +50,15 @@ export function setupUsedUniquelyMatchesCar(
   return matches.length === 1 && matches[0].carId === activeCarId;
 }
 
-/** Latest setup for one car. Array order is deliberate fallback for legacy dates. */
+/** Latest editable setup for one car; immutable history never becomes the edit target. */
 export function pickLatestSetupForCar(setups: Setup[], carId: string | null | undefined): Setup | null {
   if (!carId) return null;
-  const candidates = setups
+  const scoped = setups.filter(setup => setup.carId === carId);
+  const editable = scoped.filter(setup => setup.lifecycleRole !== 'baseline'
+    && setup.lifecycleRole !== 'final'
+    && !setup.lockedAt);
+  const pool = editable.length > 0 ? editable : scoped;
+  const candidates = pool
     .map((setup, index) => ({ setup, index, time: Date.parse(setup.date) }))
     .filter(({ setup }) => setup.carId === carId);
   if (candidates.length === 0) return null;

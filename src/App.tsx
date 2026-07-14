@@ -15,10 +15,11 @@ import {
 
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, AppUser } from './lib/supabase';
 import AuthView from './components/AuthView';
-import { pushSetups, pushWeekends, pushActiveSession, pullAllData, mergeIntoLocalStorage, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, deleteShockSessionFromCloud, pushMaintenanceComponents, pullMaintenanceComponents, deleteMaintenanceComponentFromCloud, pushMaintenanceLogs, pullMaintenanceLogs, deleteMaintenanceLogFromCloud, pushChecklistTemplates, pullChecklistTemplates, deleteChecklistTemplateFromCloud, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, deleteShockSessionFromCloud, pushMaintenanceComponents, pullMaintenanceComponents, deleteMaintenanceComponentFromCloud, pushMaintenanceLogs, pullMaintenanceLogs, deleteMaintenanceLogFromCloud, pushChecklistTemplates, pullChecklistTemplates, deleteChecklistTemplateFromCloud, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
 import { registerForPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
-import { normalizeSetup, normalizeSetups, pickLatestSetupForCar } from './lib/setupCompat';
+import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar } from './lib/setupCompat';
+import { finishWeekendLifecycle, isSetupLocked, isWeekendFinished, mergeTimestampedRecords, startWeekendLifecycle, withSetupDiffLog } from './lib/setupLifecycle';
 import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
 import { materializeMainChecklist } from './lib/mainChecklist';
 import { reconcileStarterTemplates } from './lib/checklists';
@@ -60,31 +61,36 @@ const applyActiveSessionToWeekends = (
   updatedSession: ActiveSession,
 ): RaceWeekend[] => source.map((weekend) => {
   if (updatedSession.weekendId && weekend.id !== updatedSession.weekendId) return weekend;
+  let changed = false;
+  const sessions = weekend.sessions.map((session) => {
+    const matches = (updatedSession.id && session.id === updatedSession.id)
+      || (!updatedSession.id
+        && session.name.toUpperCase() === updatedSession.name.toUpperCase()
+        && session.track.toLowerCase() === updatedSession.track.toLowerCase());
+    if (!matches) return session;
+    changed = true;
+    return {
+      ...session,
+      bestLap: `${updatedSession.bestLap}s`,
+      avgLap: updatedSession.avgLap,
+      finishPos: updatedSession.finishPos,
+      gap: updatedSession.gap,
+      maxRpm: updatedSession.maxRpm,
+      leaderLap: updatedSession.leaderLap,
+      leaderGap: updatedSession.leaderGap,
+      diagnostics: { ...updatedSession.diagnostics },
+      adjustments: [...updatedSession.adjustments],
+      tires: updatedSession.tires ? { ...updatedSession.tires } : undefined,
+      pressures: { ...updatedSession.pressures },
+      pressureSourceNote: updatedSession.pressureSourceNote,
+      competitionNotes: updatedSession.competitionNotes,
+    };
+  });
+  if (!changed) return weekend;
   return {
     ...weekend,
-    sessions: weekend.sessions.map((session) => {
-      const matches = (updatedSession.id && session.id === updatedSession.id)
-        || (!updatedSession.id
-          && session.name.toUpperCase() === updatedSession.name.toUpperCase()
-          && session.track.toLowerCase() === updatedSession.track.toLowerCase());
-      if (!matches) return session;
-      return {
-        ...session,
-        bestLap: `${updatedSession.bestLap}s`,
-        avgLap: updatedSession.avgLap,
-        finishPos: updatedSession.finishPos,
-        gap: updatedSession.gap,
-        maxRpm: updatedSession.maxRpm,
-        leaderLap: updatedSession.leaderLap,
-        leaderGap: updatedSession.leaderGap,
-        diagnostics: { ...updatedSession.diagnostics },
-        adjustments: [...updatedSession.adjustments],
-        tires: updatedSession.tires ? { ...updatedSession.tires } : undefined,
-        pressures: { ...updatedSession.pressures },
-        pressureSourceNote: updatedSession.pressureSourceNote,
-        competitionNotes: updatedSession.competitionNotes,
-      };
-    }),
+    sessions,
+    updatedAt: new Date().toISOString(),
   };
 });
 
@@ -96,12 +102,15 @@ export default function App() {
   const [activeWeekendId, setActiveWeekendId] = useState<string | null>(() =>
     localStorage.getItem(ACTIVE_WEEKEND_KEY)
   );
+  const skipWeekendRecoveryRef = useRef(false);
   const [activeSession, setActiveSession] = useState<ActiveSession>(INITIAL_ACTIVE_SESSION);
   const activeSessionRef = useRef(activeSession);
   const weekendsRef = useRef(weekends);
+  const savedSetupsRef = useRef(savedSetups);
   const sessionCloudQueueRef = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => { activeSessionRef.current = activeSession; }, [activeSession]);
   useEffect(() => { weekendsRef.current = weekends; }, [weekends]);
+  useEffect(() => { savedSetupsRef.current = savedSetups; }, [savedSetups]);
   const [todos, setTodos] = useState<Todo[]>(() => {
     const saved = localStorage.getItem('race_notes_todos');
     if (!saved) return [];
@@ -167,8 +176,21 @@ export default function App() {
   });
 
   const activeCar = cars.find(c => c.id === activeCarId) ?? null;
+  const activeWeekend = weekends.find(item => item.id === activeWeekendId && !isWeekendFinished(item)) ?? null;
+  const resolveWeekendSetup = (weekend: RaceWeekend | null | undefined): Setup | null => {
+    if (!weekend) return null;
+    const setupId = weekend.activeSetupId || weekend.setupId;
+    const candidate = setupId ? savedSetupsRef.current.find(item => item.id === setupId) ?? null : null;
+    if (!weekend.activeSetupId) return candidate;
+    if (!candidate
+      || isSetupLocked(candidate)
+      || candidate.lifecycleRole !== 'weekend'
+      || candidate.weekendId !== weekend.id) return null;
+    return candidate;
+  };
+  const activeWeekendSetup = resolveWeekendSetup(activeWeekend);
   const savedActiveSetup = setup.carId === activeCarId ? savedSetups.find(item => item.id === setup.id) ?? null : null;
-  const activeCarSetup = savedActiveSetup ?? pickLatestSetupForCar(savedSetups, activeCarId);
+  const activeCarSetup = activeWeekendSetup ?? savedActiveSetup ?? pickLatestSetupForCar(savedSetups, activeCarId);
 
   // ── [27] Help sheet, [37]/[5] info toast, [33] online status ──────────────
   const [helpOpen, setHelpOpen] = useState(false);
@@ -374,6 +396,15 @@ export default function App() {
   const [hasLocalAcct, setHasLocalAcct] = useState<boolean>(() => hasLocalAccount());
   const [syncStatus, setSyncStatus] = useState('');
   const [pullDone, setPullDone] = useState(false); // initial cloud pull resolved — gates [4]
+  const wasOnlineRef = useRef(isOnline);
+  useEffect(() => {
+    const reconnected = !wasOnlineRef.current && isOnline;
+    wasOnlineRef.current = isOnline;
+    if (!reconnected || !user || !pullDone) return;
+    pushSetups(savedSetupsRef.current, user.id, setSyncStatus);
+    pushWeekends(weekendsRef.current, user.id, setSyncStatus);
+    pushActiveSession(activeSessionRef.current, user.id, setSyncStatus);
+  }, [isOnline, user, pullDone]);
   const pullGenerationRef = useRef(0);
 
   // Wait for auth restoration and, when signed in, the settled cloud merge.
@@ -474,15 +505,21 @@ export default function App() {
 
   // Active weekend is device-local. Recover stale IDs and migrate legacy session selection.
   useEffect(() => {
-    if (weekends.length === 0) {
+    if (skipWeekendRecoveryRef.current && !activeWeekendId) {
+      skipWeekendRecoveryRef.current = false;
+      localStorage.removeItem(ACTIVE_WEEKEND_KEY);
+      return;
+    }
+    const activeWeekends = weekends.filter(weekend => !isWeekendFinished(weekend));
+    if (activeWeekends.length === 0) {
       if (activeWeekendId) setActiveWeekendId(null);
       localStorage.removeItem(ACTIVE_WEEKEND_KEY);
       return;
     }
-    if (activeWeekendId && weekends.some(w => w.id === activeWeekendId)) return;
-    const nextId = activeSession.weekendId && weekends.some(w => w.id === activeSession.weekendId)
+    if (activeWeekendId && activeWeekends.some(w => w.id === activeWeekendId)) return;
+    const nextId = activeSession.weekendId && activeWeekends.some(w => w.id === activeSession.weekendId)
       ? activeSession.weekendId
-      : weekends[0].id;
+      : activeWeekends[0].id;
     setActiveWeekendId(nextId);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, nextId);
   }, [weekends, activeWeekendId, activeSession.weekendId]);
@@ -638,35 +675,46 @@ export default function App() {
       if (!isCurrentPull()) return;
 
       if (data.setups.length > 0) {
-        mergeIntoLocalStorage('setups', data.setups, 'race_notes_saved_setups');
         setSavedSetups(prev => {
-          const merged = [...prev];
-          for (const cloud of data.setups) {
-            const idx = merged.findIndex(s => s.id === cloud.id);
-            if (idx >= 0) merged[idx] = cloud;
-            else merged.push(cloud);
+          const cloudById = new Map(data.setups.map(item => [item.id, item]));
+          const hasNewerLocal = prev.some(local => {
+            const cloud = cloudById.get(local.id);
+            return !cloud || (local.updatedAt || '') > (cloud.updatedAt || '');
+          });
+          const merged = mergeTimestampedRecords(prev, data.setups);
+          localStorage.setItem('race_notes_saved_setups', JSON.stringify(merged));
+          if (hasNewerLocal) {
+            pushSetups(merged, pullUserId, setSyncStatus);
           }
           return merged;
         });
-      }
+      } else if (savedSetupsRef.current.length > 0) pushSetups(savedSetupsRef.current, pullUserId, setSyncStatus);
 
       if (data.weekends.length > 0) {
-        mergeIntoLocalStorage('weekends', data.weekends, 'race_notes_weekends');
         setWeekends(prev => {
-          const merged = [...prev];
-          for (const cloud of data.weekends) {
-            const idx = merged.findIndex(w => w.id === cloud.id);
-            if (idx >= 0) merged[idx] = cloud;
-            else merged.push(cloud);
+          const cloudById = new Map(data.weekends.map(item => [item.id, item]));
+          const hasNewerLocal = prev.some(local => {
+            const cloud = cloudById.get(local.id);
+            return !cloud || (local.updatedAt || '') > (cloud.updatedAt || '');
+          });
+          const merged = mergeTimestampedRecords(prev, data.weekends);
+          localStorage.setItem('race_notes_weekends', JSON.stringify(merged));
+          if (hasNewerLocal) {
+            pushWeekends(merged, pullUserId, setSyncStatus);
           }
           return merged;
         });
-      }
+      } else if (weekendsRef.current.length > 0) pushWeekends(weekendsRef.current, pullUserId, setSyncStatus);
 
       if (data.activeSession) {
-        mergeIntoLocalStorage('activeSession', data.activeSession, 'race_notes_active_session');
-        setActiveSession(data.activeSession);
-      }
+        const local = activeSessionRef.current;
+        const cloudWins = (data.activeSession.updatedAt || '') >= (local.updatedAt || '');
+        const merged = cloudWins ? data.activeSession : local;
+        activeSessionRef.current = merged;
+        setActiveSession(merged);
+        localStorage.setItem('race_notes_active_session', JSON.stringify(merged));
+        if (!cloudWins) pushActiveSession(merged, pullUserId, setSyncStatus);
+      } else if (activeSessionRef.current.updatedAt) pushActiveSession(activeSessionRef.current, pullUserId, setSyncStatus);
 
       const cloudTodos = await pullTodos(setSyncStatus);
       if (!isCurrentPull()) return;
@@ -859,16 +907,53 @@ export default function App() {
   }, [authReady, user, pullDone, cars, savedSetups, tireInventory, shockSessions]);
 
   const handleSaveSetups = (updatedSetups: Setup[], activeId?: string, preserveInfoToast = false) => {
-    setSavedSetups(updatedSetups);
-    localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
+    const priorSetups = savedSetupsRef.current;
+    const priorById = new Map<string, Setup>(priorSetups.map(item => [item.id, item] as const));
+    const contextWeekend = weekendsRef.current.find(item => item.id === activeWeekendId && !isWeekendFinished(item));
+    const eventSetupId = contextWeekend?.activeSetupId;
+    const now = new Date().toISOString();
+    let blockedMutation = false;
+    const comparable = (value: Setup) => {
+      const { updatedAt: _updatedAt, ...rest } = value;
+      return JSON.stringify(rest);
+    };
+    const safeSetups = updatedSetups.flatMap<Setup>(candidate => {
+      const prior = priorById.get(candidate.id);
+      const canEdit = !prior || (!isSetupLocked(prior) && (!eventSetupId || prior.id === eventSetupId));
+      if (!canEdit) {
+        if (prior && comparable(prior) !== comparable(candidate)) blockedMutation = true;
+        return prior ? [prior] : [];
+      }
+      const logged = prior?.lifecycleRole === 'weekend'
+        ? withSetupDiffLog(prior, candidate, now)
+        : candidate;
+      return [{ ...logged, updatedAt: !prior || comparable(prior) !== comparable(logged) ? now : candidate.updatedAt }];
+    });
+    for (const prior of priorSetups) {
+      if (!safeSetups.some(item => item.id === prior.id) && (isSetupLocked(prior) || eventSetupId)) {
+        safeSetups.push(prior);
+        blockedMutation = true;
+      }
+    }
+    if (blockedMutation) setInfoToast('Historical setups are view-only. Finish the weekend before editing Current Setup.');
 
-    const nextActive = activeId ? updatedSetups.find(item => item.id === activeId) : null;
-    if (activeId === '') {
+    const requestedActiveId = eventSetupId || activeId;
+    const requested = requestedActiveId ? safeSetups.find(item => item.id === requestedActiveId) : null;
+    const nextActiveId = requested && !isSetupLocked(requested)
+      ? requested.id
+      : pickLatestSetupForCar(safeSetups, activeCarId)?.id;
+
+    savedSetupsRef.current = safeSetups;
+    setSavedSetups(safeSetups);
+    localStorage.setItem('race_notes_saved_setups', JSON.stringify(safeSetups));
+
+    const nextActive = nextActiveId ? safeSetups.find(item => item.id === nextActiveId) : null;
+    if (activeId === '' && !eventSetupId) {
       setSetup(INITIAL_SETUP);
       localStorage.removeItem('race_notes_setup');
     }
     if (nextActive) {
-      const prior = savedSetups.find(item => item.id === nextActive.id);
+      const prior = priorById.get(nextActive.id);
       const activated = setup.id !== nextActive.id;
       const pressuresChanged = !prior || (['lf', 'rf', 'lr', 'rr'] as const).some(corner => prior[corner].tirePress !== nextActive[corner].tirePress);
       setSetup(nextActive);
@@ -876,7 +961,7 @@ export default function App() {
       if (activated || pressuresChanged) {
         const pressures = setupPressureBlock(nextActive);
         const hasPressureSource = pressureBlockHasValue(pressures);
-        const sourceNote = `Pressures carried from ${nextActive.chassis}`;
+        const sourceNote = `Pressures carried from ${nextActive.versionLabel || nextActive.chassis}`;
         handleUpdateSession(current => {
           const tireDetails = {
             lf: { ...current.tires?.lf, compound: nextActive.lf.tireComp || current.tires?.lf.compound || '', size: nextActive.lf.tireSize || current.tires?.lf.size || '', airPressure: pressures.lf },
@@ -891,11 +976,19 @@ export default function App() {
         else if (!preserveInfoToast) setInfoToast(null);
       }
     }
-    if (user) pushSetups(updatedSetups, user.id, setSyncStatus);
+    if (user) pushSetups(safeSetups, user.id, setSyncStatus);
   };
 
   const handleUpdateSession = (update: ActiveSession | ((current: ActiveSession) => ActiveSession)) => {
-    const updatedSession = typeof update === 'function' ? update(activeSessionRef.current) : update;
+    const candidate = typeof update === 'function' ? update(activeSessionRef.current) : update;
+    const updatedSession: ActiveSession = { ...candidate, updatedAt: new Date().toISOString() };
+    const targetWeekend = updatedSession.weekendId
+      ? weekendsRef.current.find(item => item.id === updatedSession.weekendId)
+      : null;
+    if (isWeekendFinished(targetWeekend)) {
+      setInfoToast('Finished weekends are view-only.');
+      return;
+    }
     const updatedWeekends = applyActiveSessionToWeekends(weekendsRef.current, updatedSession);
 
     // Refs serialize rapid updates before React renders; every external write happens once here.
@@ -923,9 +1016,17 @@ export default function App() {
 
   const handleActivateWeekend = (weekendId: string) => {
     const target = weekends.find(w => w.id === weekendId);
-    if (!target) return;
+    if (!target || isWeekendFinished(target)) {
+      setInfoToast('Finished weekends stay in history and cannot be made active.');
+      return;
+    }
     setActiveWeekendId(target.id);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, target.id);
+    const weekendSetup = resolveWeekendSetup(target);
+    if (weekendSetup) {
+      setSetup(weekendSetup);
+      localStorage.setItem('race_notes_setup', JSON.stringify(weekendSetup));
+    }
   };
 
   const handleDeleteMaintenanceComponent = (componentId: string) => {
@@ -954,31 +1055,60 @@ export default function App() {
 
   const handleCreateNewWeekend = (data: NewWeekendData) => {
     if (!data.name.trim() || !data.track.trim()) return;
+    if (!activeCarId) {
+      setInfoToast('Choose a car before starting a weekend.');
+      return;
+    }
 
-    const boundSetup = activeCarId
-      ? savedSetups.find(s => s.id === data.setupId && s.carId === activeCarId) || null
-      : null;
-
-    const newWknd: RaceWeekend = {
-      id: `wknd-${Date.now()}`,
+    const now = new Date().toISOString();
+    const weekendId = `wknd-${Date.now()}`;
+    const date = data.date || new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    const savedSource = savedSetupsRef.current.find(s => s.id === data.setupId && s.carId === activeCarId)
+      || activeCarSetup;
+    const sourceSetup = savedSource || makeBlankSetup({
+      id: `setup-current-source-${weekendId}`,
+      chassis: activeCar?.chassis || activeCar?.name || 'My Car',
+      track: data.track,
+      date,
+      carType: activeCar?.carType || '',
+      carId: activeCarId,
+      lifecycleRole: 'current',
+      versionLabel: 'Current Setup',
+      changeLog: [],
+      updatedAt: now,
+    });
+    const baseWeekend: RaceWeekend = {
+      id: weekendId,
       name: data.name,
       track: data.track,
-      date: data.date || new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
+      date,
       sessions: [],
-      setupId: boundSetup?.id,
-      setupName: boundSetup?.chassis,
     };
+    const lifecycle = startWeekendLifecycle(baseWeekend, sourceSetup, now);
+    const updatedSetups = [
+      lifecycle.weekendSetup,
+      lifecycle.baseline,
+      ...(!savedSource ? [sourceSetup] : []),
+      ...savedSetupsRef.current,
+    ];
+    const updatedWeekends = [lifecycle.weekend, ...weekendsRef.current];
 
-    setWeekends((prev) => {
-      const updated = [newWknd, ...prev];
-      localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
-      if (user) pushWeekends(updated, user.id);
-      return updated;
-    });
+    savedSetupsRef.current = updatedSetups;
+    weekendsRef.current = updatedWeekends;
+    setSavedSetups(updatedSetups);
+    setWeekends(updatedWeekends);
+    setSetup(lifecycle.weekendSetup);
+    localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
+    localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
+    localStorage.setItem('race_notes_setup', JSON.stringify(lifecycle.weekendSetup));
+    if (user) {
+      pushSetups(updatedSetups, user.id, setSyncStatus);
+      pushWeekends(updatedWeekends, user.id, setSyncStatus);
+    }
 
-    setActiveWeekendId(newWknd.id);
-    localStorage.setItem(ACTIVE_WEEKEND_KEY, newWknd.id);
-    setInfoToast(`Active: ${newWknd.name}`);
+    setActiveWeekendId(lifecycle.weekend.id);
+    localStorage.setItem(ACTIVE_WEEKEND_KEY, lifecycle.weekend.id);
+    setInfoToast(`Active: ${lifecycle.weekend.name} · ${lifecycle.weekendSetup.versionLabel}`);
     if (continueToRunAfterWeekendRef.current) {
       continueToRunAfterWeekendRef.current = false;
       setRwInitialAction('new-session');
@@ -991,10 +1121,14 @@ export default function App() {
     if (!activeWeekendId || data.weekendId !== activeWeekendId) return;
 
     const targetWeekend = weekends.find(w => w.id === activeWeekendId);
-    if (!targetWeekend) return;
+    if (!targetWeekend || isWeekendFinished(targetWeekend)) return;
 
-    // Never use a setup from another active car as a run baseline.
-    const sessionSetup = activeCarSetup;
+    // The weekend's setup owns every run, even if the garage car selector changes.
+    const sessionSetup = resolveWeekendSetup(targetWeekend);
+    if (targetWeekend.activeSetupId && !sessionSetup) {
+      setInfoToast('Weekend Setup is missing or locked. Restore it before logging a run.');
+      return;
+    }
 
     // Load setup baseline pressures as initial psi values for convenience
     const defaultPressures = setupPressureBlock(sessionSetup);
@@ -1069,7 +1203,8 @@ export default function App() {
       pressures: initialPressures,
       pressureSourceNote,
       competitionNotes: '',
-      screenshots: []
+      screenshots: [],
+      updatedAt: new Date().toISOString(),
     };
 
     const newRecord: SessionRecord = {
@@ -1110,22 +1245,21 @@ export default function App() {
     nextSession.id = newRecord.id;
     nextSession.weekendId = data.weekendId;
 
-    setWeekends((prev) => {
-      const updated = prev.map(w => w.id === targetWeekend.id ? {
-        ...w,
-        sessions: [newRecord, ...w.sessions]
-      } : w);
-      localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
-      if (user) pushWeekends(updated, user.id);
-      
-      // Sync tire lifecycle (heat cycles, usage dates) from updated weekend data
-      const lifecycled = syncTireLifecycle(tireInventory, updated);
-      setTireInventory(lifecycled);
-      localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
-      if (user) pushTires(lifecycled, user.id);
-      
-      return updated;
-    });
+    const updatedWeekends = weekendsRef.current.map(w => w.id === targetWeekend.id ? {
+      ...w,
+      sessions: [newRecord, ...w.sessions],
+      updatedAt: new Date().toISOString(),
+    } : w);
+    weekendsRef.current = updatedWeekends;
+    setWeekends(updatedWeekends);
+    localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
+    if (user) pushWeekends(updatedWeekends, user.id);
+
+    // Sync tire lifecycle (heat cycles, usage dates) from updated weekend data
+    const lifecycled = syncTireLifecycle(tireInventory, updatedWeekends);
+    setTireInventory(lifecycled);
+    localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
+    if (user) pushTires(lifecycled, user.id);
 
     setActiveSession(nextSession);
     localStorage.setItem('race_notes_active_session', JSON.stringify(nextSession));
@@ -1144,13 +1278,13 @@ export default function App() {
     deleteWeekendFromCloud(weekendId);
     if (user) pushWeekends(updated, user.id);
     if (activeWeekendId === weekendId) {
-      const nextId = updated[0]?.id ?? null;
+      const nextId = updated.find(item => !isWeekendFinished(item))?.id ?? null;
       setActiveWeekendId(nextId);
       if (nextId) localStorage.setItem(ACTIVE_WEEKEND_KEY, nextId);
       else localStorage.removeItem(ACTIVE_WEEKEND_KEY);
     }
     if (activeSession.weekendId === weekendId) {
-      const cleared: ActiveSession = { ...INITIAL_ACTIVE_SESSION, weekendId: undefined };
+      const cleared: ActiveSession = { ...INITIAL_ACTIVE_SESSION, weekendId: undefined, updatedAt: new Date().toISOString() };
       setActiveSession(cleared);
       localStorage.setItem('race_notes_active_session', JSON.stringify(cleared));
     }
@@ -1231,7 +1365,22 @@ export default function App() {
   };
 
   const handleUpdateWeekend = (updated: RaceWeekend) => {
-    const updatedList = weekends.map(w => w.id === updated.id ? updated : w);
+    const prior = weekendsRef.current.find(item => item.id === updated.id);
+    if (!prior) return;
+    const stamped: RaceWeekend = {
+      ...updated,
+      status: prior.status,
+      finishedAt: prior.finishedAt,
+      sourceSetupId: prior.sourceSetupId,
+      baselineSetupId: prior.baselineSetupId,
+      activeSetupId: prior.activeSetupId,
+      finalSetupId: prior.finalSetupId,
+      setupId: prior.setupId,
+      setupName: prior.setupName,
+      updatedAt: new Date().toISOString(),
+    };
+    const updatedList = weekendsRef.current.map(w => w.id === stamped.id ? stamped : w);
+    weekendsRef.current = updatedList;
     setWeekends(updatedList);
     localStorage.setItem('race_notes_weekends', JSON.stringify(updatedList));
     if (user) pushWeekends(updatedList, user.id);
@@ -1243,9 +1392,53 @@ export default function App() {
     if (user) pushTires(lifecycled, user.id);
   };
 
+  const handleFinishWeekend = (weekendId: string) => {
+    const target = weekendsRef.current.find(item => item.id === weekendId);
+    if (!target || isWeekendFinished(target)) return;
+    const now = new Date().toISOString();
+    const result = finishWeekendLifecycle(target, savedSetupsRef.current, now);
+    if (!result) {
+      setInfoToast('Weekend Setup is missing. Restore it before finishing this weekend.');
+      return;
+    }
+    const updatedWeekends = weekendsRef.current.map(item => item.id === target.id ? result.weekend : item);
+    const clearedSession: ActiveSession = { ...INITIAL_ACTIVE_SESSION, weekendId: undefined, updatedAt: now };
+
+    savedSetupsRef.current = result.setups;
+    weekendsRef.current = updatedWeekends;
+    activeSessionRef.current = clearedSession;
+    skipWeekendRecoveryRef.current = true;
+    setSavedSetups(result.setups);
+    setWeekends(updatedWeekends);
+    setSetup(result.currentSetup);
+    setActiveSession(clearedSession);
+    setActiveWeekendId(null);
+    localStorage.setItem('race_notes_saved_setups', JSON.stringify(result.setups));
+    localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
+    localStorage.setItem('race_notes_setup', JSON.stringify(result.currentSetup));
+    localStorage.setItem('race_notes_active_session', JSON.stringify(clearedSession));
+    localStorage.removeItem(ACTIVE_WEEKEND_KEY);
+
+    if (user) {
+      pushSetups(result.setups, user.id, setSyncStatus);
+      pushWeekends(updatedWeekends, user.id, setSyncStatus);
+      pushActiveSession(clearedSession, user.id, setSyncStatus);
+    }
+    setInfoToast(`${target.name} finished. Final saved; Current Setup is ready.`);
+  };
+
   const handleSelectRecentSession = (rec: SessionRecord, weekendId: string) => {
+    if (isWeekendFinished(weekendsRef.current.find(item => item.id === weekendId))) {
+      setInfoToast('Finished runs stay in history and cannot be loaded for editing.');
+      return;
+    }
     handleActivateWeekend(weekendId);
-    const currentCarSetup = activeCarSetup;
+    const targetWeekend = weekendsRef.current.find(item => item.id === weekendId);
+    const currentCarSetup = resolveWeekendSetup(targetWeekend);
+    if (targetWeekend?.activeSetupId && !currentCarSetup) {
+      setInfoToast('Weekend Setup is missing or locked. Restore it before loading this run.');
+      return;
+    }
     const restoredPressures = resolveSessionPressureBlock(rec.pressures, rec.tires);
     const restoredTires = mirrorPressureBlockToTires(rec.tires || {
       lf: { compound: currentCarSetup?.lf.tireComp || '', size: currentCarSetup?.lf.tireSize || '', airPressure: '' },
@@ -1285,6 +1478,7 @@ export default function App() {
       competitionNotes: rec.competitionNotes || 'Enter comments here...',
       screenshots: rec.screenshots || [],
       dynoPhotos: rec.dynoPhotos || [],
+      updatedAt: new Date().toISOString(),
     };
     activeSessionRef.current = restoredSession;
     setActiveSession(restoredSession);
@@ -1388,7 +1582,7 @@ export default function App() {
           <ContextStrip
             cars={cars}
             activeCarId={activeCarId}
-            weekends={weekends}
+            weekends={weekends.filter(item => !isWeekendFinished(item))}
             activeWeekendId={activeWeekendId}
             onSelectCar={handleSelectCar}
             onSelectWeekend={handleActivateWeekend}
@@ -1484,7 +1678,7 @@ export default function App() {
               {activeTab === 'setups' && (
                 <SetupView
                   savedSetups={savedSetups}
-                  activeSetupId={setup.id}
+                  activeSetupId={activeCarSetup?.id ?? setup.id}
                   user={user}
                   tireInventory={tireInventory}
                   onSaveTires={handleSaveTires}
@@ -1518,7 +1712,8 @@ export default function App() {
                   onCreateWeekend={handleCreateNewWeekend}
                   onCreateSession={handleCreateNewSession}
                   activeSetup={activeCarSetup}
-                  onUpdateActiveSetup={(updated) => handleSaveSetups(savedSetups.map(item => item.id === updated.id ? updated : item), updated.id)}
+                  onUpdateActiveSetup={(updated) => handleSaveSetups(savedSetupsRef.current.map(item => item.id === updated.id ? updated : item), updated.id)}
+                  onFinishWeekend={handleFinishWeekend}
                   initialAction={rwInitialAction ?? undefined}
                   onInitialActionConsumed={() => setRwInitialAction(null)}
                 />
