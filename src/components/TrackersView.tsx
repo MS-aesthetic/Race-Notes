@@ -497,11 +497,6 @@ function ServiceTab({
   const renderRow = (c: MaintenanceComponent) => {
     const status = getComponentStatus(c, weekends, savedSetups);
     const remaining = Math.max(0, status.limit - status.used);
-    const reason = status.pct >= 1
-      ? `Past the ${status.limit} ${unitLabel(c)} limit. This job stays on Main Checklist until it is handled.`
-      : status.pct >= 0.9
-        ? 'At least 90% of the limit is used, so this job is on Main Checklist.'
-        : 'Below 90% of the limit, so it is not added to Main Checklist yet.';
     const barColor = status.state === 'overdue' ? 'bg-red-500' : status.state === 'due' ? 'bg-amber-400' : 'bg-green-500';
     const chipCls = {
       ok:      'bg-green-500/15 text-green-400 border-green-500/30',
@@ -529,7 +524,6 @@ function ServiceTab({
           <p className="font-mono text-[10px] text-on-surface-variant mt-1">
             Used {status.used} · Limit {status.limit} · Remaining {remaining} {unitLabel(c)}
           </p>
-          <p className="font-mono text-[10px] text-on-surface-variant/70 mt-0.5">{reason}</p>
         </div>
         <button
           onClick={() => openLogModal(c)}
@@ -548,11 +542,6 @@ function ServiceTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="bg-primary/5 border border-primary/25 rounded-lg p-3">
-        <p className="font-mono text-xs text-on-surface leading-relaxed">
-          Each item shows how much has been used, the limit you set, and how much is left. At 90% of the limit, Crew Chief puts the job on Main Checklist so it does not get missed.
-        </p>
-      </div>
       {/* Header actions */}
       <div className="flex items-center gap-2 flex-wrap">
         <button

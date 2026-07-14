@@ -41,6 +41,13 @@ Every setup, tire, and load graph is scoped to the **active car**.
 - Use the **Tire from Inventory** picker per corner — auto-fills size, compound, backspacing. (Pickers are sorted by size.)
 - Enter all four scale weights → app auto-calculates Nose %, Left %, Cross %, LR split, total.
 - Stagger is auto-calculated from tire sizes.
+- Record the setup that is physically on the active car so later changes and comparisons have the right starting point.
+
+## Recording four-bar measurements
+- Open a setup and find **Four-Bar** at the bottom of the setup sheet.
+- For LR and RR top and bottom bars, record Frame Hole, Bar Length, and Birdcage Hole.
+- Record each bar angle at Ride Height and Full Droop using the same measuring method every time.
+- Four-bar measurements save with the setup and appear in setup comparisons.
 
 ## Creating a weekend
 A weekend is the event container holding sessions.
@@ -71,9 +78,16 @@ A weekend is the event container holding sessions.
 ## Adding load sessions
 - Right car active → Setups tab → Load Graphs → New Load Session.
 - Pick corner, enter spring rate + shock ID, and optionally record Ride Height C-to-C.
-- Add height/load data points (plain number fields).
+- Add measured height/load points. The chart derives travel from height: compression plots upward, increasing load plots to the right, and raw measured height remains available.
 - Attach a dyno graph photo (auto-compressed).
 - Overlay multiple graphs to compare. Bind a graph to a setup corner.
+- Ride Height C-to-C and the setup-corner binding keep later comparisons tied to how the car was run.
+
+## Comparing setups
+- **Setups** → **Compare Setups**.
+- **Before** is the older or starting setup. **After** is the setup being compared against it.
+- Highlighted rows changed; unchanged rows stay out of the way.
+- The comparison reports the difference. It does not rate the change as better or worse.
 
 ## Using Main Checklist
 - **Trackers** → **Checklist** always opens one Main Checklist.
@@ -99,3 +113,4 @@ A weekend is the event container holding sessions.
 - Add car or rig components with lap/session/race/day intervals.
 - Log maintenance, replacement, or inspection work.
 - Optional maintenance cost creates an Accounting expense.
+- At 90% of its configured limit, an unfinished maintenance job is added to Main Checklist automatically. Servicing the item clears the unfinished automatic job once usage drops below that point.

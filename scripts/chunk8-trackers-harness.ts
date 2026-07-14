@@ -74,7 +74,7 @@ let due = reconcileMaintenanceChecklist([main], [component(900)], [], [], 'due')
 const automatic = due[0].items.find(item => item.sourceType === 'maintenance');
 assert.ok(automatic);
 assert.equal(automatic?.sourceId, 'maintenance:engine-oil');
-assert.match(automatic?.desc || '', /900.*1000.*100.*90%/);
+assert.equal(automatic?.desc, '900/1000 races');
 assert.deepEqual(reconcileMaintenanceChecklist(due, [component(900)], [], [], 'again'), due);
 
 due = reconcileMaintenanceChecklist(due, [component(100)], [], [], 'below');
@@ -114,5 +114,7 @@ assert.match(todoSource, /Edit List/);
 assert.match(todoSource, /activeChecklistItems\(activeTodo\)/);
 assert.match(dashboardSource, /activeChecklistItems\(mainChecklist\)/);
 assert.match(dashboardSource, /Maintenance Due/);
+assert.doesNotMatch(trackersSource, /Below 90%|At least 90% of the limit|Each item shows how much has been used/);
+assert.match(trackersSource, /Used \{status\.used\} · Limit \{status\.limit\} · Remaining \{remaining\}/);
 
 console.log('Chunk 8 Trackers harness PASS');

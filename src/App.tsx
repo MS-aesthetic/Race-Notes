@@ -34,6 +34,7 @@ import type { NewSessionData, NewWeekendData } from './components/RaceWeekendVie
 import { buildSessionNameFrom } from './lib/sessionSequence';
 import SettingsView from './components/SettingsView';
 import QuickReferenceView from './components/QuickReferenceView';
+import GuideView from './components/GuideView';
 import TrackersView from './components/TrackersView';
 import ContextStrip from './components/ContextStrip';
 import HelpSheet from './components/ui/HelpSheet';
@@ -42,6 +43,7 @@ import { pickAutoWeekend, sortWeekends } from './lib/scope';
 import { buildQuickServiceRecords, type QuickServiceOutcome, type QuickServiceRequest } from './lib/serviceLog';
 import { useOnlineStatus } from './lib/saveStatus';
 import { hasOpenSheets, isPopSuppressed } from './lib/backStack';
+import { isAppGuideSection } from './lib/helpRouting';
 import { Todo } from './types';
 
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
@@ -208,6 +210,7 @@ export default function App() {
     setHelpSection(section);
     setHelpOpen(true);
   };
+  const appGuideHelp = isAppGuideSection(helpSection);
   const [infoToast, setInfoToast] = useState<string | null>(null);
   useEffect(() => {
     if (!infoToast) return;
@@ -1985,8 +1988,13 @@ export default function App() {
       </div>
 
       {/* [27] Help & Reference sheet — replaces the Quick Reference tab */}
-      <HelpSheet open={helpOpen} onClose={() => setHelpOpen(false)} section={helpSection}>
-        <QuickReferenceView />
+      <HelpSheet
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        section={helpSection}
+        title={appGuideHelp ? 'App Guide' : 'Tuning Guide'}
+      >
+        {appGuideHelp ? <GuideView activeSection={helpSection} embedded /> : <QuickReferenceView />}
       </HelpSheet>
 
       {/* [37]/[5] Car-switch & auto-weekend info toast */}

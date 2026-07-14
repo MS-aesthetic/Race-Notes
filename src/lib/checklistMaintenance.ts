@@ -109,13 +109,12 @@ function cycleId(component: MaintenanceComponent): string {
 }
 
 function automaticTask(component: MaintenanceComponent, used: number, limit: number): TodoItem {
-  const remaining = Math.max(0, limit - used);
   const sourceId = `maintenance:${component.id}`;
   const sourceCycle = cycleId(component);
   return {
     id: `todo-maintenance-${encodeURIComponent(sourceCycle)}`,
     text: `Maintenance: ${component.name}`,
-    desc: `${used} ${component.intervalType} used out of ${limit}. ${remaining} remaining. Added because this item has reached at least 90% of its limit.`,
+    desc: `${used}/${limit} ${component.intervalType}`,
     done: false,
     kind: 'core',
     sourceType: 'maintenance',

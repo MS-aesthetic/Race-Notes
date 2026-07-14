@@ -18,15 +18,18 @@ interface Adjustment {
 }
 
 function adjustmentApplicability(adjustment: Adjustment): string {
-  if (adjustment.application === 'Dirt Late Model') return 'Dirt Late Model only — make sure your car has this part';
-  if (adjustment.application === 'Modified') return 'Modified only — make sure your car has this part';
-  return 'Basic direction — change one thing, then test it';
+  if (adjustment.application === 'Dirt Late Model') return 'Dirt Late Model only';
+  if (adjustment.application === 'Modified') return 'Modified only';
+  return 'General dirt-oval direction';
 }
 
 /** Keep the researched direction intact while translating academic terms. */
 export function plainRacerEffect(value: string): string {
   const replacements: Array<[RegExp, string]> = [
-    [/This preserves the trailing arm design angles and maintains proper rear steer geometry through turn-in/gi, 'This keeps rear bar angles where they should be through turn-in'],
+    [/promoting progressive body roll and allowing/gi, 'allowing controlled car roll and helping'],
+    [/The controlled weight transfer cushions the rear against snap oversteer/gi, 'The controlled load shift reduces sudden rear breakaway'],
+    [/softer, highly compliant exit rate/gi, 'softer, more controlled exit response'],
+    [/This preserves the trailing arm design angles and maintains proper rear steer geometry through turn-in/gi, 'This maintains rear bar angles and rear-steer timing through turn-in'],
     [/maximizes dynamic mechanical clamping force on the LR tire footprint under acceleration/gi, 'loads the LR tire hardest into the track under power'],
     [/Maximum vertical clamping force on the LR tire under acceleration\. The LR footprint is compressed firmly into the dirt/gi, 'Loads the LR tire hardest into the track under power. The LR tire is pressed firmly into the dirt'],
     [/Widening the LR footprint/g, 'Moving the LR outward'],
@@ -36,13 +39,13 @@ export function plainRacerEffect(value: string): string {
     [/onto the RR tire patch/gi, 'onto the RR tire'],
     [/over the RR tire patch/gi, 'over the RR tire'],
     [/inducing "roll steer" to the left/gi, 'adding rear steer to the left'],
-    [/during forward weight transfer/gi, 'while weight moves to the front'],
-    [/frees up weight transfer off the LF to the rear tires/gi, 'lets weight move off the LF to the rear tires'],
-    [/forces more immediate, direct weight transfer/gi, 'moves weight more directly'],
-    [/slowing all weight transfer rates/gi, 'slowing how fast weight moves'],
-    [/controlled weight transfer/gi, 'controlled way weight moves'],
-    [/faster rearward weight transfer/gi, 'Weight moves to the rear faster'],
-    [/smooth weight transfer/gi, 'weight moving smoothly'],
+    [/during forward weight transfer/gi, 'during forward load shift'],
+    [/frees up weight transfer off the LF to the rear tires/gi, 'releases load from the LF toward the rear tires'],
+    [/forces more immediate, direct weight transfer/gi, 'produces a quicker, more direct load shift'],
+    [/slowing all weight transfer rates/gi, 'slowing overall load-shift rate'],
+    [/controlled weight transfer/gi, 'controlled load shift'],
+    [/faster rearward weight transfer/gi, 'Faster rearward load shift'],
+    [/smooth weight transfer/gi, 'smooth load shift'],
     [/smoothly and progressively/gi, 'smoothly and steadily'],
     [/slowly and progressively/gi, 'slowly and smoothly'],
     [/Smooth,\s*progressive/g, 'Smooth, steady'],
@@ -50,30 +53,32 @@ export function plainRacerEffect(value: string): string {
     [/slowest, most progressive/gi, 'slowest, smoothest'],
     [/more gentle and progressive/gi, 'gentler and smoother'],
     [/applying engine torque progressively/gi, 'feeding engine torque in smoothly'],
-    [/progressively loading/gi, 'loading smoothly'],
-    [/deep,\s*compliant body roll/gi, 'the car to lean deeply and smoothly'],
-    [/promoting progressive body roll/gi, 'letting the car lean smoothly'],
-    [/dynamically under body roll/gi, 'as the car leans'],
-    [/progressive body roll/gi, 'the car leaning smoothly'],
-    [/under body roll/gi, 'as the car leans'],
-    [/full (?:range|depth) of body roll/gi, 'full amount the car leans'],
-    [/excessive body roll/gi, 'the car leaning too far'],
-    [/reduces body roll/gi, 'makes the car lean less'],
-    [/rear roll center/gi, 'rear roll point'],
-    [/roll center/gi, 'roll point'],
-    [/weight transfer rates?/gi, 'how fast weight moves'],
-    [/forward weight transfer/gi, 'weight moving to the front'],
-    [/rearward weight transfer/gi, 'weight moving to the rear'],
-    [/weight transfers/gi, 'weight moves'],
-    [/transferring weight/gi, 'moving weight'],
-    [/transfers weight/gi, 'moves weight'],
-    [/weight transfer/gi, 'weight moving'],
-    [/rate at which forward pitch occurs/gi, 'how fast the nose dives'],
-    [/rate at which side bite builds/gi, 'how fast side bite builds'],
+    [/progressively loading the rear/gi, 'building rear load at a controlled rate'],
+    [/progressively loading/gi, 'building load at a controlled rate'],
+    [/deep,\s*compliant body roll/gi, 'deep, controlled car roll'],
+    [/promoting progressive body roll/gi, 'allowing controlled car roll'],
+    [/dynamically under body roll/gi, 'as the car rolls under load'],
+    [/progressive body roll/gi, 'controlled car roll'],
+    [/under body roll/gi, 'as the car rolls'],
+    [/full (?:range|depth) of body roll/gi, 'full roll travel'],
+    [/excessive body roll/gi, 'excessive car roll'],
+    [/reduces body roll/gi, 'reduces car roll'],
+    [/chassis(?= (?:rolls?|rolling)\b)/gi, 'car'],
+    [/rear roll center/gi, 'rear roll location'],
+    [/roll center/gi, 'roll location'],
+    [/weight transfer rates?/gi, 'load-shift rate'],
+    [/forward weight transfer/gi, 'forward load shift'],
+    [/rearward weight transfer/gi, 'rearward load shift'],
+    [/weight transfers/gi, 'load shifts'],
+    [/transferring weight/gi, 'shifting load'],
+    [/transfers weight/gi, 'shifts load'],
+    [/weight transfer/gi, 'load shift'],
+    [/rate at which forward pitch occurs/gi, 'nose-dive rate'],
+    [/rate at which side bite builds/gi, 'side-bite buildup rate'],
     [/braking transitions?/gi, 'braking'],
-    [/during throttle transitions?/gi, 'while getting back on the gas'],
-    [/under throttle transitions?/gi, 'while getting back on the gas'],
-    [/throttle transitions?/gi, 'getting back on the gas'],
+    [/during throttle transitions?/gi, 'during throttle pickup'],
+    [/under throttle transitions?/gi, 'during throttle pickup'],
+    [/throttle transitions?/gi, 'throttle pickup'],
     [/trailing arm design angles?/gi, 'bar angles'],
     [/trailing arm design height/gi, 'rear bar height'],
     [/rear steer geometry/gi, 'bar angles and rear steer'],
@@ -83,9 +88,9 @@ export function plainRacerEffect(value: string): string {
     [/creates more hike-up and roll steer to the right/gi, 'creates more hike-up and steers the rear to the right'],
     [/entry roll steer/gi, 'rear steer on entry'],
     [/dynamic roll steer/gi, 'rear steer'],
-    [/"roll steer"/gi, 'rear steer from the car leaning'],
+    [/"roll steer"/gi, 'rear steer from car roll'],
     [/roll steer/gi, 'rear steer from bar angles'],
-    [/rear steer onset/gi, 'rear steer starts'],
+    [/rear steer onset/gi, 'rear-steer timing'],
     [/increase anti-squat/gi, 'load the rear tires harder under power'],
     [/anti-squat/gi, 'rear-tire loading under power'],
     [/lateral cornering forces/gi, 'side load in the corner'],
@@ -95,44 +100,41 @@ export function plainRacerEffect(value: string): string {
     [/understeer push/gi, 'push'],
     [/understeer/gi, 'push'],
     [/oversteer/gi, 'loose condition'],
-    [/at the apex/gi, 'in the middle'],
-    [/through the apex/gi, 'through the middle'],
-    [/apex/gi, 'middle'],
-    [/dynamically/gi, 'while the car is moving'],
-    [/progressively/gi, 'smoothly'],
-    [/progressive/gi, 'smooth'],
-    [/compliant/gi, 'soft'],
-    [/dynamic mechanical clamping force/gi, 'force planting the tire while the car is moving'],
-    [/mechanical clamping force/gi, 'force planting the tire'],
-    [/maximum vertical clamping force on the LR tire/gi, 'force loading the LR tire hardest into the track'],
+    [/at the apex/gi, 'at mid-corner'],
+    [/through the apex/gi, 'through mid-corner'],
+    [/apex/gi, 'mid-corner'],
+    [/dynamically/gi, 'under load'],
+    [/progressively/gi, 'at a controlled rate'],
+    [/progressive/gi, 'controlled'],
+    [/compliant/gi, 'free-moving'],
+    [/dynamic mechanical clamping force/gi, 'tire load under motion'],
+    [/mechanical clamping force/gi, 'tire load'],
+    [/maximum vertical clamping force on the LR tire/gi, 'maximum LR tire load'],
     [/The LR footprint is compressed firmly into the dirt/g, 'The LR tire is pressed firmly into the dirt'],
     [/the LR footprint is compressed firmly into the dirt/g, 'the LR tire is pressed firmly into the dirt'],
     [/onto the RF footprint/gi, 'onto the RF tire'],
     [/collapses the footprint/gi, 'folds the tire over'],
-    [/RR tire footprint on the outside tire/gi, 'part of the RR tire on the track'],
-    [/tire contact patch/gi, 'part of the tire touching the track'],
-    [/tire footprint/gi, 'part of the tire on the track'],
-    [/tire patch/gi, 'part of the tire on the track'],
-    [/footprint/gi, 'part of the tire on the track'],
-    [/body roll/gi, 'the car leaning'],
-    [/chassis posture/gi, 'how the car sits'],
+    [/RR tire footprint on the outside tire/gi, 'RR tire contact'],
+    [/tire contact patch/gi, 'tire contact'],
+    [/tire footprint/gi, 'tire contact'],
+    [/tire patch/gi, 'tire contact'],
+    [/footprint/gi, 'tire contact'],
+    [/body roll/gi, 'car roll'],
+    [/chassis posture/gi, 'car attitude'],
     [/left rear chassis corner/gi, 'left rear corner'],
     [/left rear chassis/gi, 'left rear corner'],
     [/LR chassis/gi, 'LR corner'],
-    [/The chassis/g, 'The car'],
-    [/the chassis/g, 'the car'],
-    [/chassis/gi, 'car'],
     [/pivot/gi, 'turn'],
-    [/under deceleration/gi, 'while slowing down'],
-    [/deceleration/gi, 'slowing down'],
+    [/under deceleration/gi, 'under braking'],
+    [/deceleration/gi, 'braking'],
     [/under hard acceleration/gi, 'under hard throttle'],
-    [/under acceleration/gi, 'on throttle'],
+    [/under acceleration/gi, 'under throttle'],
     [/for acceleration/gi, 'for drive'],
-    [/acceleration/gi, 'getting on the gas'],
+    [/acceleration/gi, 'throttle'],
     [/cornering loads/gi, 'load in the corner'],
-    [/vertical downward pressure/gi, 'downward force'],
-    [/leverage arc/gi, 'range of movement'],
-    [/pull bar compliance/gi, 'soft pull-bar movement'],
+    [/vertical downward pressure/gi, 'vertical load'],
+    [/leverage arc/gi, 'leverage through travel'],
+    [/pull bar compliance/gi, 'pull-bar movement'],
     [/duration of LR tire loading/gi, 'time the LR tire stays loaded'],
     [/mechanical forward bite/gi, 'forward bite from the setup'],
     [/mechanical cure/gi, 'setup fix'],
@@ -141,15 +143,15 @@ export function plainRacerEffect(value: string): string {
     [/Mechanical change/g, 'Setup change'],
     [/mechanical change/g, 'setup change'],
     [/steer mechanically/gi, 'turn from the setup'],
-    [/tire contact area/gi, 'tire on the dirt'],
+    [/tire contact area/gi, 'tire contact'],
+    [/while simultaneously/gi, 'while'],
     [/Simultaneously/g, 'At the same time'],
     [/simultaneously/g, 'at the same time'],
     [/car to transition/gi, 'car to take a set'],
     [/torque transition/gi, 'torque hit'],
-    [/every package/gi, 'every car and tire'],
-    [/induces?/gi, 'adds'],
-    [/promotes?/gi, 'adds'],
-    [/geometry/gi, 'bar angles'],
+    [/every package/gi, 'every car and tire combination'],
+    [/under the power/gi, 'under throttle'],
+    [/loads more weight directly onto the RR tire/gi, 'puts more static load onto the RR tire'],
     [/preserving/gi, 'keeping'],
     [/preserves/gi, 'keeps'],
     [/preserve/gi, 'keep'],
@@ -707,25 +709,6 @@ export default function QuickReferenceView() {
   return (
     <div className="space-y-4 text-on-surface pb-8" id="quick-reference-page">
 
-      <section className="grid gap-3">
-        <div data-help-anchor="setup" className="scroll-mt-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
-          <h2 className="font-display font-bold uppercase text-on-surface">Setup Sheet</h2>
-          <p className="mt-1 font-mono text-xs text-on-surface-variant">Record what is on the car now. Change one item at a time when you can, then log what the driver felt. Ride height, pressure, spring, shock, gear, and bar numbers only help when they match the car that made the run.</p>
-        </div>
-        <div data-help-anchor="four-bar" className="scroll-mt-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
-          <h2 className="font-display font-bold uppercase text-on-surface">Four-Bar</h2>
-          <p className="mt-1 font-mono text-xs text-on-surface-variant">Frame hole, bar length, and birdcage hole show where each bar is mounted. Measure bar angle at ride height and full droop the same way every time. Small hole or angle changes can make a big difference, so write down the change before the next run.</p>
-        </div>
-        <div data-help-anchor="loads" className="scroll-mt-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
-          <h2 className="font-display font-bold uppercase text-on-surface">Load Sessions</h2>
-          <p className="mt-1 font-mono text-xs text-on-surface-variant">A Load Session saves shock or smasher load against height for one corner. Lower height appears farther down the graph. Save ride height C-to-C when known so later graphs can be compared to the car as it sat that day.</p>
-        </div>
-        <div data-help-anchor="setup-diff" className="scroll-mt-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
-          <h2 className="font-display font-bold uppercase text-on-surface">Compare Setups</h2>
-          <p className="mt-1 font-mono text-xs text-on-surface-variant">Before is the older setup. After is the newer setup. Highlighted rows changed. Use the list to see exactly what moved between race nights; it does not tell you whether the change was good or bad.</p>
-        </div>
-      </section>
-
       {/* ── MAIN SELECTOR CARD ─────────────────────────────────────────── */}
       <section className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b border-outline-variant/60 flex items-center gap-2">
@@ -735,22 +718,17 @@ export default function QuickReferenceView() {
               Pit-Side Adjustment Finder
             </h2>
             <p className="text-[10px] font-mono text-on-surface-variant">
-              Basic dirt-oval direction — Modified and Dirt Late Model
+              Dirt-oval reference — Modified and Dirt Late Model
             </p>
           </div>
         </div>
 
         <div className="p-4 space-y-3">
-          <div className="rounded border border-outline-variant bg-surface-container-high p-3 text-xs text-on-surface-variant leading-relaxed">
-            <p className="font-mono font-bold uppercase text-on-surface">Before You Change Anything</p>
-            <p>This guide gives a starting direction. Only try a change when your car has that part. Fifth-coil items are for Dirt Late Models.</p>
-            <p className="mt-1">Follow your shock builder, tire maker, hot-pressure notes, and track rules.</p>
-          </div>
           <div className="rounded border-2 border-primary/50 bg-primary/10 p-3 text-xs leading-relaxed text-on-surface">
-            <p className="font-mono font-bold uppercase text-primary">What High / Medium / Low means</p>
-            <p className="mt-1"><strong>High:</strong> Try this first. Biggest likely help.</p>
+            <p className="font-mono font-bold uppercase text-primary">Adjustment Priority</p>
+            <p className="mt-1"><strong>High:</strong> Try first.</p>
             <p><strong>Medium:</strong> Try this next if the first change did not fix the problem.</p>
-            <p><strong>Low:</strong> Fine-tuning. Check the bigger items first.</p>
+            <p><strong>Low:</strong> Fine-tuning after the bigger items are checked.</p>
           </div>
           <div>
             <label className="block text-[10px] font-mono uppercase font-bold text-on-surface-variant mb-1.5 tracking-wider">
@@ -912,7 +890,7 @@ export default function QuickReferenceView() {
                         </div>
                       </div>
                       <div className="md:w-3/5 text-[11px] text-on-surface leading-relaxed border-t md:border-t-0 border-outline-variant/30 pt-2 md:pt-0">
-                        <span className="text-[9px] text-on-surface-variant font-mono uppercase font-semibold block mb-0.5">Why it works</span>
+                        <span className="text-[9px] text-on-surface-variant font-mono uppercase font-semibold block mb-0.5">Effect</span>
                         {plainRacerEffect(adj.effect)}
                       </div>
                     </div>
@@ -931,13 +909,12 @@ export default function QuickReferenceView() {
             <ul className="text-[11px] text-on-surface-variant list-disc pl-4 space-y-1 leading-relaxed">
               <li><strong>LOOSE</strong> = rear tires sliding (oversteer). Goal: tighten by planting the rear.</li>
               <li><strong>TIGHT / PUSH</strong> = front plowing, won't steer (understeer). Goal: add rotation.</li>
-              <li><strong>Shocks control how fast weight moves.</strong> Springs control how much the car settles and leans.</li>
+              <li><strong>Shocks control load-shift rate.</strong> Springs control how much the car settles and rolls.</li>
               <li><strong>Front Compression</strong> → affects Entry &amp; Middle. <strong>Front Rebound</strong> → Middle &amp; Exit.</li>
               <li><strong>Rear Compression</strong> → Middle &amp; Exit. <strong>Rear Rebound</strong> → Entry &amp; Middle.</li>
               <li><strong>Cross-weight (wedge)</strong>: ½ to 1 turn on RF or LR perch = noticeable change. Always start small.</li>
               <li><strong>Pull bar rate</strong>: spinning tires → soften. Not spinning but not driving → stiffen.</li>
               <li><strong>J-bar frame side</strong> → controls corner entry. <strong>Pinion side</strong> → controls corner exit.</li>
-              <li><strong>High:</strong> try first. <strong>Medium:</strong> try next. <strong>Low:</strong> fine-tuning after bigger items are checked.</li>
               <li><strong>Tuning order</strong>: 1) Corner Entry → 2) Middle → 3) Exit. Always fix entry before middle.</li>
             </ul>
           </div>
@@ -1022,12 +999,12 @@ export default function QuickReferenceView() {
                   {
                     corner: 'LF — Left Front',
                     comp: { stiffen: 'Slows nose dive on entry → tighter entry, more stable', soften: 'Faster nose dive → looser entry, more rotation at turn-in' },
-                    reb: { stiffen: 'Holds LF corner down longer → keeps weight on LF → tighter middle', soften: 'Lets weight move off LF and toward rear tires on throttle → frees a middle push' },
+                    reb: { stiffen: 'Holds LF corner down longer → keeps load on LF → tighter middle', soften: 'Shifts load off LF toward rear tires on throttle → frees a middle push' },
                   },
                   {
                     corner: 'RF — Right Front',
-                    comp: { stiffen: 'Slows how fast car leans onto RF → steadier entry → tighter entry', soften: 'Lets car lean onto RF faster → quicker response → loosens entry' },
-                    reb: { stiffen: 'Holds nose down under throttle → prevents early front-end lift → tightens middle & exit', soften: 'Lets nose rise faster → moves weight to rear quickly → loosens middle & exit' },
+                    comp: { stiffen: 'Slows car roll onto RF → steadier entry → tighter entry', soften: 'Speeds car roll onto RF → quicker response → loosens entry' },
+                    reb: { stiffen: 'Holds nose down under throttle → prevents early front-end lift → tightens middle & exit', soften: 'Lets nose rise faster → shifts load rearward quickly → loosens middle & exit' },
                   },
                   {
                     corner: 'LR — Left Rear',
@@ -1036,7 +1013,7 @@ export default function QuickReferenceView() {
                   },
                   {
                     corner: 'RR — Right Rear',
-                    comp: { stiffen: 'Slows weight moving onto RR → tightens middle', soften: 'Lets RR take the throttle hit more smoothly → calms a loose snap on exit' },
+                    comp: { stiffen: 'Slows load shift onto RR → tightens middle', soften: 'Lets RR take the throttle hit more smoothly → calms a loose snap on exit' },
                     reb: { stiffen: 'Holds RR side bite longer → car stays planted in groove → tighter through exit', soften: 'Releases RR side bite faster → car can rotate off corner → loosens exit' },
                   },
                 ].map(({ corner, comp, reb }) => (
@@ -1074,12 +1051,12 @@ export default function QuickReferenceView() {
                   <tbody className="text-on-surface">
                     {[
                       ['LF', 'Comp', 'Tighter entry — slows nose dive on turn-in', 'Looser entry — faster nose dive, more rotation'],
-                      ['LF', 'Reb', 'Tighter middle — keeps LF loaded through the middle', 'Looser middle/exit — frees LF, moves weight toward rear tires on throttle'],
-                      ['RF', 'Comp', 'Tighter entry — slows how fast car leans onto RF', 'Looser entry — car leans onto RF faster for quicker turn-in'],
-                      ['RF', 'Reb', 'Tighter middle & exit — holds nose down, prevents early lift', 'Looser middle & exit — nose rises faster, weight moves to rear quickly'],
+                      ['LF', 'Reb', 'Tighter middle — keeps LF loaded through the middle', 'Looser middle/exit — releases LF load toward rear tires on throttle'],
+                      ['RF', 'Comp', 'Tighter entry — slows RF load buildup', 'Looser entry — builds RF load faster for quicker turn-in'],
+                      ['RF', 'Reb', 'Tighter middle & exit — holds nose down, prevents early lift', 'Looser middle & exit — nose rises faster, shifts load rearward quickly'],
                       ['LR', 'Comp', 'Tighter middle & exit — keeps rear bar angles working under throttle', 'Looser exit / more drive — smooth, steady squat with more forward bite'],
                       ['LR', 'Reb', 'Tighter entry — "ties down" LR under braking, rear stays planted', 'Looser entry — LR extends freely, reduces rear snap on turn-in'],
-                      ['RR', 'Comp', 'Tighter middle — slows weight moving onto RR', 'Calmer exit — RR takes the throttle hit more smoothly'],
+                      ['RR', 'Comp', 'Tighter middle — slows load shift onto RR', 'Calmer exit — RR takes the throttle hit more smoothly'],
                       ['RR', 'Reb', 'Tighter exit — holds RR side bite, car stays planted in groove', 'Looser exit — releases RR side bite faster, car can rotate off corner'],
                     ].map(([corner, adj, stiffen, soften]) => (
                       <tr key={`${corner}-${adj}`} className="border-b border-outline-variant/20">
@@ -1096,7 +1073,7 @@ export default function QuickReferenceView() {
 
             {/* ── ADJUSTMENT REFERENCE: Tire Pressure, Springs & Weight ── */}
             <div className="space-y-3">
-              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Quick Adjustment Reference — basic starting direction</p>
+              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest">Quick Adjustment Reference — starting direction</p>
               <p className="text-[9px] text-on-surface-variant font-mono">Modified and Dirt Late Model directions are not interchangeable. Change <strong className="text-on-surface-variant">one thing at a time</strong>, record result, then re-scale and re-check.</p>
 
               {/* Tire Pressure */}
@@ -1151,8 +1128,8 @@ export default function QuickReferenceView() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-xl">linear_scale</span>
             <div className="text-left">
-              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Basic 4-Link Adjustments</h3>
-              <p className="text-[10px] font-mono text-on-surface-variant">Use only if your car has this rear-suspension layout. Change one item, then test it.</p>
+              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Dirt Oval 4-Link Reference</h3>
+              <p className="text-[10px] font-mono text-on-surface-variant">LR/RR top and bottom bar direction.</p>
             </div>
           </div>
           <span className="material-symbols-outlined text-on-surface-variant">{fourLinkOpen ? 'expand_less' : 'expand_more'}</span>
@@ -1313,7 +1290,7 @@ export default function QuickReferenceView() {
             <span className="material-symbols-outlined text-primary text-xl">straighten</span>
             <div className="text-left">
               <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">J-Bar / Panhard Reference</h3>
-              <p className="text-[10px] font-mono text-on-surface-variant">Use only if this matches your car. Make one small change, then test it.</p>
+              <p className="text-[10px] font-mono text-on-surface-variant">Entry, mid-corner, and exit direction from J-bar height and split.</p>
             </div>
           </div>
           <span className="material-symbols-outlined text-on-surface-variant">{jBarOpen ? 'expand_less' : 'expand_more'}</span>
@@ -1328,18 +1305,18 @@ export default function QuickReferenceView() {
                 <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
                   <p className="text-error font-bold text-[10px] uppercase">Raise Frame Mount</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
-                    <li>Raises the rear roll point</li>
-                    <li>Moves weight to the outside rear faster on entry</li>
-                    <li>Car leans less — rear plants more immediately</li>
+                    <li>Raises the rear roll location</li>
+                    <li>Shifts load to the outside rear faster on entry</li>
+                    <li>Reduces car roll — rear takes a set sooner</li>
                     <li><strong className="text-on-surface">Tightens corner entry</strong> — use for loose-on-entry</li>
                   </ul>
                 </div>
                 <div className="bg-surface-container border border-primary/30 rounded p-2.5 space-y-1">
                   <p className="text-primary font-bold text-[10px] uppercase">Lower Frame Mount</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
-                    <li>Lowers the rear roll point</li>
-                    <li>Weight moves to the outside rear more slowly on entry</li>
-                    <li>Car leans more — rear steps out more easily</li>
+                    <li>Lowers the rear roll location</li>
+                    <li>Slows load shift to the outside rear on entry</li>
+                    <li>Increases car roll — rear steps out more easily</li>
                     <li><strong className="text-on-surface">Loosens corner entry</strong> — use for tight-on-entry</li>
                   </ul>
                 </div>
@@ -1379,8 +1356,8 @@ export default function QuickReferenceView() {
                 <div className="bg-surface-container border border-red-900/30 rounded p-2.5 space-y-1">
                   <p className="text-error font-bold text-[10px] uppercase">Raise Both Ends</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
-                    <li>Raises the rear roll point at both ends</li>
-                    <li>Weight moves quicker and more abruptly</li>
+                    <li>Raises the rear roll location at both ends</li>
+                    <li>Quicker, more abrupt load shift</li>
                     <li>More stable, more planted — suited for tacky/high-grip</li>
                     <li>Run 3–4" split on tacky conditions</li>
                   </ul>
@@ -1388,8 +1365,8 @@ export default function QuickReferenceView() {
                 <div className="bg-surface-container border border-primary/30 rounded p-2.5 space-y-1">
                   <p className="text-primary font-bold text-[10px] uppercase">Lower Both Ends</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
-                    <li>Lowers the rear roll point — car takes a set more slowly and smoothly</li>
-                    <li>Car leans and rotates more overall</li>
+                    <li>Lowers the rear roll location — car takes a set more slowly</li>
+                    <li>More car roll and overall rotation</li>
                     <li>Tightens mid-corner as car takes a set more smoothly</li>
                     <li>Preferred on dry-slick, prevents abrupt snap</li>
                   </ul>
@@ -1406,7 +1383,7 @@ export default function QuickReferenceView() {
                 <div><p className="text-on-surface font-bold">Late Model</p><p>6½" split · 1" below pinion</p></div>
               </div>
               <p className="text-on-surface-variant text-[10px] leading-relaxed border-t border-outline-variant/30 pt-2">
-                <strong className="text-on-surface">More split</strong> = higher rear roll point at frame side = car holds its line better on high-grip. &nbsp;
+                <strong className="text-on-surface">More split</strong> = higher rear roll location at frame side = car holds its line better on high-grip. &nbsp;
                 <strong className="text-on-surface">Less split</strong> = lower, flatter bar = more rotation on slick.
               </p>
             </div>

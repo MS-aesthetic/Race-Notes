@@ -4,8 +4,8 @@ import BottomSheet from './BottomSheet';
 export interface HelpSheetProps {
   open: boolean;
   onClose: () => void;
-  /** Section anchor hint — wiring to QuickReferenceView anchors is a chunk-7 follow-up. */
   section?: string;
+  title?: string;
   children?: ReactNode;
 }
 
@@ -13,7 +13,7 @@ export interface HelpSheetProps {
  * Thin help host. Callers pass their own content (e.g. <QuickReferenceView />)
  * as children to avoid coupling this primitive to screen components.
  */
-export default function HelpSheet({ open, onClose, section, children }: HelpSheetProps) {
+export default function HelpSheet({ open, onClose, section, title = 'Tuning Guide', children }: HelpSheetProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open || !section) return;
@@ -23,12 +23,8 @@ export default function HelpSheet({ open, onClose, section, children }: HelpShee
     return () => window.cancelAnimationFrame(frame);
   }, [open, section]);
   return (
-    <BottomSheet open={open} onClose={onClose} title="Tuning Guide">
+    <BottomSheet open={open} onClose={onClose} title={title}>
       <div ref={contentRef} data-help-section={section} className="space-y-3">
-        <div className="rounded-lg border border-primary/50 bg-primary/10 p-3">
-          <p className="font-display text-base font-bold uppercase text-on-surface">Tuning Guide</p>
-          <p className="mt-1 font-mono text-xs text-on-surface-variant">Basic dirt-oval setup direction. Change one thing, test it, and follow your tire and track rules.</p>
-        </div>
         {children ?? (
           <p className="py-4 text-sm text-on-surface-variant">
             Help content coming soon.

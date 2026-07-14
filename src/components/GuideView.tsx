@@ -75,14 +75,26 @@ const SECTIONS: GuideSection[] = [
     title: 'Creating a setup',
     summary: 'Record a full car setup sheet — four corners, bars, gear, and notes.',
     steps: [
-      { text: 'Make sure the right car is active, then open the Setups tab.' },
-      { text: 'Start a New Setup and give it a chassis name, track, and date.' },
+      { text: 'Select the correct car, then open the Setups tab.' },
+      { text: 'Start a New Setup and enter the chassis, track, and date. Record the setup that is physically on the active car.' },
       { text: 'Fill in each corner (LF, RF, LR, RR): spring, shock, tire, and measurements. Rear corners have extra fields for bars, droop, and preload.' },
       { lead: 'Tires:', text: 'Use the "Tire from Inventory" picker on each corner to pull a tire in — it auto-fills size, compound, and backspacing so you do not retype them.' },
       { text: 'Enter scale weights on all four corners and the app auto-calculates Nose %, Left %, Cross %, LR split, and total weight.' },
       { text: 'Add gear, J-bar, pull bar, stagger, notes, and photos as needed, then save.' },
     ],
-    tip: 'Stagger is calculated for you from the tire sizes — no need to do the math.',
+    tip: 'Stagger calculates from the saved tire sizes.',
+  },
+  {
+    id: 'four-bar',
+    icon: 'conversion_path',
+    title: 'Recording four-bar measurements',
+    summary: 'Keep both rear top and bottom bar locations with the setup.',
+    steps: [
+      { text: 'Open a setup and find Four-Bar at the bottom of the setup sheet.' },
+      { text: 'For LR and RR top and bottom bars, record Frame Hole, Bar Length, and Birdcage Hole.' },
+      { text: 'Record each bar angle at Ride Height and at Full Droop using the same measuring method every time.' },
+      { text: 'Save the setup. Four-bar measurements stay with that setup and appear in setup comparisons.' },
+    ],
   },
   {
     id: 'weekend',
@@ -129,18 +141,30 @@ const SECTIONS: GuideSection[] = [
     tip: 'Sort and filter the inventory list by newest, oldest, size, or compound to find a tire fast.',
   },
   {
-    id: 'smasher',
+    id: 'loads',
     icon: 'show_chart',
     title: 'Adding load sessions',
     summary: 'Log height and load data, plus photos of the graph.',
     steps: [
       { text: 'With the right car active, open Setups and then Load Graphs.' },
       { text: 'Tap New Load Session. Pick the corner, enter spring rate and shock ID, and optionally record Ride Height C-to-C.' },
-      { text: 'Add height/load data points — plain number fields, no fiddly steppers.' },
+      { text: 'Add measured height and load points. The chart derives travel from height: compression plots upward, increasing load plots to the right, and measured height stays available at each point.' },
       { text: 'Attach a photo of the dyno graph if you have one; it is compressed automatically.' },
       { text: 'Save. You can later overlay multiple graphs to compare them.' },
     ],
-    tip: 'Bind a load graph to a setup corner so the crew can see exactly which curve was run.',
+    tip: 'Record Ride Height C-to-C when available and bind the session to a setup corner so later comparisons match the car as it was run.',
+  },
+  {
+    id: 'setup-diff',
+    icon: 'difference',
+    title: 'Comparing setups',
+    summary: 'See exactly what changed between two saved setups.',
+    steps: [
+      { text: 'Open Setups and choose Compare Setups.' },
+      { text: 'Before is the older or starting setup. After is the setup you want to compare against it.' },
+      { text: 'Highlighted rows changed. Unchanged rows stay out of the way.' },
+      { text: 'The comparison reports the difference; it does not rate the change as better or worse.' },
+    ],
   },
   {
     id: 'checklist',
@@ -188,40 +212,42 @@ const SECTIONS: GuideSection[] = [
       { text: 'Add defaults or create a component with its interval.' },
       { text: 'Log maintenance, replacement, or inspection work when completed.' },
       { text: 'An optional maintenance cost automatically creates an Accounting expense.' },
+      { text: 'At 90% of its configured limit, an unfinished maintenance job is added to Main Checklist automatically. Servicing the item clears the unfinished automatic job once usage drops below that point.' },
     ],
   },
 ];
 
-const GuideAccordionItem: React.FC<{ section: GuideSection }> = ({ section }) => {
+const GuideAccordionItem: React.FC<{ section: GuideSection; active: boolean }> = ({ section, active }) => {
   const [open, setOpen] = useState(false);
+  const shownOpen = active || open;
   const panelId = `guide-panel-${section.id}`;
   const btnId = `guide-header-${section.id}`;
   return (
-    <div className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
+    <div data-help-anchor={section.id} className="scroll-mt-3 bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
       <button
         id={btnId}
         type="button"
-        aria-expanded={open}
+        aria-expanded={shownOpen}
         aria-controls={panelId}
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-3 px-4 py-4 text-left min-h-[56px] hover:bg-surface-container-high transition-colors"
       >
         <span
           className="material-symbols-outlined text-primary text-xl shrink-0"
-          style={{ fontVariationSettings: open ? "'FILL' 1" : "'FILL' 0" }}
+          style={{ fontVariationSettings: shownOpen ? "'FILL' 1" : "'FILL' 0" }}
         >
           {section.icon}
         </span>
         <span className="flex-1 min-w-0">
           <span className="block font-display font-bold text-sm text-on-surface uppercase tracking-wide">{section.title}</span>
-          {!open && <span className="block text-[11px] font-mono text-on-surface-variant/70 mt-0.5">{section.summary}</span>}
+          {!shownOpen && <span className="block text-[11px] font-mono text-on-surface-variant/70 mt-0.5">{section.summary}</span>}
         </span>
-        <span className="material-symbols-outlined text-on-surface-variant text-lg shrink-0 transition-transform" style={{ transform: open ? 'rotate(180deg)' : 'none' }}>
+        <span className="material-symbols-outlined text-on-surface-variant text-lg shrink-0 transition-transform" style={{ transform: shownOpen ? 'rotate(180deg)' : 'none' }}>
           expand_more
         </span>
       </button>
 
-      {open && (
+      {shownOpen && (
         <div id={panelId} role="region" aria-labelledby={btnId} className="px-4 pb-4 pt-1 space-y-3 border-t border-outline-variant/40">
           <ol className="space-y-2.5">
             {section.steps.map((step, i) => (
@@ -248,19 +274,24 @@ const GuideAccordionItem: React.FC<{ section: GuideSection }> = ({ section }) =>
   );
 };
 
-export default function GuideView() {
+export interface GuideViewProps {
+  activeSection?: string;
+  embedded?: boolean;
+}
+
+export default function GuideView({ activeSection, embedded = false }: GuideViewProps) {
   return (
     <div className="flex flex-col gap-3 pb-8">
-      <div className="bg-surface-container border border-outline-variant rounded-lg p-4">
+      {!embedded && <div className="bg-surface-container border border-outline-variant rounded-lg p-4">
         <div className="flex items-center gap-2 mb-1">
           <span className="material-symbols-outlined text-primary text-lg">menu_book</span>
           <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">How to use CREW CHIEF</h3>
         </div>
         <p className="text-[11px] text-on-surface-variant font-mono">Tap any topic to expand step-by-step instructions.</p>
-      </div>
+      </div>}
 
       {SECTIONS.map(section => (
-        <GuideAccordionItem key={section.id} section={section} />
+        <GuideAccordionItem key={section.id} section={section} active={section.id === activeSection} />
       ))}
     </div>
   );

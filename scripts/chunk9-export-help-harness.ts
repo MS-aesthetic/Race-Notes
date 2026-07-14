@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { INITIAL_ACTIVE_SESSION, INITIAL_SETUP } from '../src/data';
 import type { RaceWeekend, Setup } from '../src/types';
 import {
@@ -15,6 +17,8 @@ import {
 } from '../src/lib/exportPdf';
 import { shareOrDownloadReport, type ReportShareAdapter } from '../src/lib/reportShare';
 import { plainRacerEffect } from '../src/components/QuickReferenceView';
+import GuideView from '../src/components/GuideView';
+import { isAppGuideSection } from '../src/lib/helpRouting';
 
 const setup: Setup = {
   ...structuredClone(INITIAL_SETUP),
@@ -100,19 +104,65 @@ assert.equal((await shareOrDownloadReport(file, 'Weekend', adapter({ download: (
 const source = (relative: string) => readFileSync(join(process.cwd(), relative), 'utf8');
 const quickRef = source('src/components/QuickReferenceView.tsx');
 const helpSheet = source('src/components/ui/HelpSheet.tsx');
+const bottomSheet = source('src/components/ui/BottomSheet.tsx');
+const guideView = source('src/components/GuideView.tsx');
+const appSource = source('src/App.tsx');
+const userGuide = source('docs/USER_GUIDE.md');
 const setupView = source('src/components/SetupView.tsx');
+const fourBarView = source('src/components/FourBarQuickAdjust.tsx');
 const weekendView = source('src/components/RaceWeekendView.tsx');
 const loadsView = source('src/components/SmasherLoadsView.tsx');
 const diffView = source('src/components/SetupDiffView.tsx');
 const pdfSource = source('src/lib/exportPdf.ts');
 
-for (const anchor of ['setup', 'four-bar', 'loads', 'setup-diff']) assert.match(quickRef, new RegExp(`data-help-anchor="${anchor}"`));
+for (const anchor of ['setup', 'four-bar', 'loads', 'setup-diff']) {
+  assert.doesNotMatch(quickRef, new RegExp(`data-help-anchor="${anchor}"`));
+  assert.match(guideView, new RegExp(`id: '${anchor}'`));
+}
+assert.doesNotMatch(quickRef, /Before You Change Anything|Setup Sheet<\/h2>|Load Sessions<\/h2>|Compare Setups<\/h2>/);
+assert.ok(quickRef.indexOf('Pit-Side Adjustment Finder') < quickRef.indexOf('What Shock Changes Do'));
+assert.equal(isAppGuideSection(undefined), false);
+assert.equal(isAppGuideSection('setup'), true);
+assert.equal(isAppGuideSection('four-bar'), true);
+assert.equal(isAppGuideSection('loads'), true);
+assert.equal(isAppGuideSection('setup-diff'), true);
+assert.equal(isAppGuideSection('other'), false);
 assert.match(helpSheet, /scrollIntoView/);
+assert.match(helpSheet, /title = 'Tuning Guide'/);
+assert.doesNotMatch(helpSheet, /Basic dirt-oval setup direction/);
+assert.match(appSource, /isAppGuideSection\(helpSection\)/);
+assert.match(appSource, /appGuideHelp \? <GuideView activeSection=\{helpSection\} embedded \/> : <QuickReferenceView \/>/);
+assert.match(guideView, /const shownOpen = active \|\| open/);
+assert.match(guideView, /data-help-anchor=\{section\.id\}/);
+const setupGuideMarkup = renderToStaticMarkup(createElement(GuideView, { activeSection: 'setup', embedded: true }));
+const loadsGuideMarkup = renderToStaticMarkup(createElement(GuideView, { activeSection: 'loads', embedded: true }));
+const guideSectionMarkup = (markup: string, id: string) => {
+  const start = markup.indexOf(`data-help-anchor="${id}"`);
+  const end = markup.indexOf('data-help-anchor="', start + 20);
+  assert.notEqual(start, -1);
+  return markup.slice(start, end === -1 ? undefined : end);
+};
+assert.match(guideSectionMarkup(setupGuideMarkup, 'setup'), /aria-expanded="true"[\s\S]*guide-panel-setup/);
+assert.match(guideSectionMarkup(setupGuideMarkup, 'loads'), /aria-expanded="false"/);
+assert.match(guideSectionMarkup(loadsGuideMarkup, 'setup'), /aria-expanded="false"/);
+assert.match(guideSectionMarkup(loadsGuideMarkup, 'loads'), /aria-expanded="true"[\s\S]*guide-panel-loads/);
+assert.doesNotMatch(setupGuideMarkup, /How to use CREW CHIEF/);
+assert.match(renderToStaticMarkup(createElement(GuideView)), /How to use CREW CHIEF/);
+assert.match(bottomSheet, /useBackClosable\(open, onClose\)/);
+assert.match(bottomSheet, /sheet-scrim.*onClick=\{onClose\}/);
+for (const heading of ['Creating a setup', 'Recording four-bar measurements', 'Adding load sessions', 'Comparing setups']) {
+  assert.match(userGuide, new RegExp(`## ${heading}`, 'i'));
+}
+assert.match(userGuide, /At 90% of its configured limit/);
 assert.match(setupView, /onHelp\('setup'\)/);
+assert.match(fourBarView, /onHelp\('four-bar'\)/);
 assert.match(setupView, /buildSetupReport\(target\)/);
 assert.doesNotMatch(setupView, /buildSetupReport\(target, activeSession\)/);
 assert.match(loadsView, /onHelp\('loads'\)/);
 assert.match(diffView, /onHelp\('setup-diff'\)/);
+assert.match(quickRef, /<strong>High:<\/strong> Try first\./);
+assert.match(quickRef, /<strong>Medium:<\/strong> Try this next if the first change did not fix the problem\./);
+assert.match(quickRef, /<strong>Low:<\/strong> Fine-tuning after the bigger items are checked\./);
 assert.match(weekendView, /Share weekend PDF/);
 assert.doesNotMatch(pdfSource, /from ['"]react['"]/);
 assert.doesNotMatch([quickRef, setupView, weekendView].join('\n'), /AFCO|chassis-specific|package-specific|Package-dependent|Share with Team|Start New Logger Session|Shock Adjustment Handling Impacts|Adjustment Matrix/i);
@@ -148,11 +198,28 @@ assert.doesNotMatch(
   renderedEffectCorpus,
   /\b([a-z]{3,})[\s,]+\1\b|under the car leaning|during weight moving|all how fast weight moves|promoting the car leaning|direct weight moving|weight moving (?:cushions|off)|part of the (?:RR )?tire on the track on|smoothly and smoothly|the car to lean the car leaning|under getting on the gas/i,
 );
+assert.doesNotMatch(
+  `${renderedEffectCorpus}\n${directQuickReferenceCopy}`,
+  /part of the (?:RR )?tire (?:touching|on) the track|\bweight moving\b|\bcar leaning\b|how the car sits|controls the how|rear steer starts|loading smoothly the rear/i,
+);
 assert.doesNotMatch(renderedEffectCorpus, /(?:allows|resists|keeps|on) The car/);
 assert.doesNotMatch(renderedEffectCorpus, /(?:^|[.!?]\s+)[a-z]/m);
-const shopCopy = plainRacerEffect('The rear roll center changes forward weight transfer and rear steer geometry at the apex. This preserves the tire contact patch during braking transitions. Make one small change and check the next run.');
-assert.equal(shopCopy, 'The rear roll point changes weight moving to the front and bar angles and rear steer in the middle. This keeps the part of the tire touching the track during braking. Make one small change and check the next run.');
+assert.doesNotMatch(renderedEffectCorpus, /allowing controlled car roll and allowing|cushions the rear against the rear snapping loose|highly free-moving|under the power|while at the same time/i);
+assert.equal(
+  plainRacerEffect('Lowering the frame-side J-bar lowers the rear roll center, promoting progressive body roll and allowing the car to turn in more easily. The rear transfers weight more gradually.'),
+  'Lowering the frame-side J-bar lowers the rear roll location, allowing controlled car roll and helping the car to turn in more easily. The rear shifts load more gradually.',
+);
+assert.equal(
+  plainRacerEffect('Increasing RR compression controls the rate at which side bite builds on the RR tire. The controlled weight transfer cushions the rear against snap oversteer at the apex.'),
+  'Increasing RR compression controls the side-bite buildup rate on the RR tire. The controlled load shift reduces sudden rear breakaway at mid-corner.',
+);
+assert.match(
+  plainRacerEffect('This provides the same entry roll rate as a single spring but delivers a softer, highly compliant exit rate for ultimate traction.'),
+  /softer, more controlled exit response/,
+);
+const shopCopy = plainRacerEffect('The rear roll center changes forward weight transfer and rear steer geometry at the apex. This preserves the tire contact patch during braking transitions.');
+assert.equal(shopCopy, 'The rear roll location changes forward load shift and bar angles and rear steer at mid-corner. This keeps the tire contact during braking.');
 assert.doesNotMatch(shopCopy, /roll center|weight transfer|geometry|apex|contact patch|transition/i);
-assert.match(shopCopy, /Make one small change/);
+assert.match(shopCopy, /rear roll location|forward load shift|tire contact/);
 
 console.log('Chunk 9 export/help/share harness PASS');
