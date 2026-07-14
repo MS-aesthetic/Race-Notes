@@ -1,6 +1,6 @@
 # Current Task — UXF-10 Approved Main Checklist Redesign
 
-**Status:** CODE_PASS — AWAITING SOL HIGH INDEPENDENT QA
+**Status:** SOL FIXER — QA ATTEMPT 1 FAILED
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md` → UXF-10
 **Approved design:** `docs/MAIN_CHECKLIST_REDESIGN_PROPOSAL.md`
@@ -176,6 +176,18 @@ Expand `scripts/chunk8-trackers-harness.ts` before broad runtime work. Required 
 - Draft: `https://6a56c2018589bea4d591667d--crew-chief-race-notes.netlify.app/`.
   Signed-out shell is clean at 390px with no overflow or console warnings. Unique preview origin
   had no remembered authentication; authenticated preview cloud data is not claimed.
+
+## SOL QA attempt 1 findings — 2026-07-14
+
+1. Reset selects the first open recurrence even when it is a hidden tombstone. With legacy
+   duplicate source rows ordered hidden-first, reset can reactivate stale assignment/note bytes
+   and hide the newer visible occurrence. Reset must prefer a non-tombstoned open row and hide
+   every other duplicate.
+2. Active row `onKeyDown` handles bubbled Enter/Space from its nested overflow button (and other
+   controls). Keyboard-opening task actions can complete the task. Row completion must run only
+   when the row itself owns the keyboard event.
+
+Per current routing, SOL owns repair and repeat QA. Terra is not re-invoked.
 
 ## Out of scope
 
