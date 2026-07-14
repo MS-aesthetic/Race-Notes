@@ -1,6 +1,6 @@
 # Current Task — UXF-2 Quick Adjust Net-Outcome Coalescing
 
-**Status:** CODE_PASS — Terra initial build attempt 1; awaiting independent SOL QA
+**Status:** QA FAIL — SOL QA attempt 1; route repair to SOL fixer attempt 2
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-1 closed by SOL QA at `44be917`
@@ -61,3 +61,7 @@ Terra owns one initial build pass. Commit feature and durable handoff evidence, 
 - `npm run lint`: exact three known baseline errors only.
 - `npm run build`: PASS, 554 modules and 18 PWA entries. `git diff --check`: PASS. Cavecrew review: `No issues.`
 - No lifecycle label, schema, mapper, stepper, package, native, deploy, push, merge, or APK change.
+
+## QA attempt 1 finding
+
+1. **Missing matching run row reports false success and splits histories.** `src/lib/quickAdjust.ts:276-306` finds a matching Setup change, synthesizes a returned adjustment when `${baseId}-run` is absent, but leaves `session.adjustments` unchanged while returning success and bumping both timestamps. Setup and run histories diverge. Because coalescing must not append, fail explicitly before returning any mutated result when matching run row is absent. Add a harness fixture proving `ok === false` and both input objects remain byte-identical. All other coalescing, persistence, lock, renderer, scope, harness, lint, build, and diff gates pass.
