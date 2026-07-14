@@ -6,6 +6,7 @@ import {
   isWeekendFinished,
   lifecycleSetupId,
   mergeTimestampedRecords,
+  selectRaceWeekendSetup,
   startWeekendLifecycle,
   withSetupDiffLog,
 } from '../src/lib/setupLifecycle';
@@ -79,6 +80,7 @@ const carB = makeBlankSetup({
   id: 'setup-car-b',
   carId: 'car-2',
   chassis: 'Car B',
+  gear: '6.00',
   updatedAt: '2026-07-13T19:00:00.000Z',
 });
 assert.equal(
@@ -87,6 +89,12 @@ assert.equal(
   'new Car B weekend must not inherit active Car A weekend setup',
 );
 assert.equal(pickWeekendSourceSetup([started.weekendSetup], 'car-2', '', started.weekendSetup.id), null);
+assert.equal(
+  selectRaceWeekendSetup(started.weekend, null, carB),
+  null,
+  'active event with a missing owned Setup must not receive the selected car setup',
+);
+assert.equal(selectRaceWeekendSetup(null, null, carB)?.id, carB.id);
 
 const legacyWeekend: RaceWeekend = {
   id: 'wknd-legacy',
@@ -126,6 +134,42 @@ assert.equal(partialRetry.finalSetup.updatedAt, finished.finalSetup.updatedAt);
 assert.equal(partialRetry.currentSetup.updatedAt, finished.currentSetup.updatedAt);
 assert.deepEqual(partialRetry.finalSetup.changeLog, finished.finalSetup.changeLog);
 
+const unlockedGearSeven = {
+  ...started.weekendSetup,
+  gear: '7.00',
+  updatedAt: '2026-07-14T01:00:00.000Z',
+};
+const staleFinal = {
+  ...finished.finalSetup,
+  gear: '6.00',
+  updatedAt: '2026-07-13T23:30:00.000Z',
+};
+const staleCurrent = {
+  ...finished.currentSetup,
+  gear: '6.00',
+  updatedAt: '2026-07-13T23:30:00.000Z',
+};
+const staleRecovery = finishWeekendLifecycle(
+  started.weekend,
+  [source, started.baseline, unlockedGearSeven, staleFinal, staleCurrent],
+  '2026-07-14T02:00:00.000Z',
+);
+assert.ok(staleRecovery);
+assert.equal(staleRecovery.finalSetup.gear, '7.00', 'unlocked Weekend bytes must replace stale Final');
+assert.equal(staleRecovery.currentSetup.gear, '7.00', 'unlocked Weekend bytes must replace stale Current');
+assert.equal(new Set(staleRecovery.setups.map(item => item.id)).size, staleRecovery.setups.length);
+
+const relationshipUnlocked = {
+  ...finished.setups.find(item => item.id === started.weekendSetup.id)!,
+  lockedAt: undefined,
+};
+assert.equal(
+  isSetupLocked(relationshipUnlocked, [finished.weekend]),
+  true,
+  'Weekend Setup linked to a finished weekend stays immutable when lockedAt is missing',
+);
+assert.equal(isSetupLocked(relationshipUnlocked, [started.weekend]), false);
+
 const danglingLegacyWeekend: RaceWeekend = {
   ...legacyWeekend,
   id: 'wknd-dangling-legacy',
@@ -156,6 +200,8 @@ const noSetupFinished = finishWeekendLifecycle(noSetupLegacy, [], finishedAt, bl
 assert.ok(noSetupFinished);
 assert.equal(noSetupFinished.weekend.setupId, blankFallback.id);
 assert.equal(noSetupFinished.setups.some(item => item.id === blankFallback.id), true);
+assert.equal(noSetupFinished.finalSetup.gear, '', 'no-link legacy Finish must use exact blank values');
+assert.notEqual(noSetupFinished.finalSetup.gear, carB.gear, 'no-link legacy Finish must not borrow selected-car bytes');
 const noSetupPartialRetry = finishWeekendLifecycle(
   noSetupLegacy,
   noSetupFinished.setups,

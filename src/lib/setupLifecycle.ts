@@ -5,10 +5,23 @@ const cloneSetup = (setup: Setup): Setup => JSON.parse(JSON.stringify(setup)) as
 export const isWeekendFinished = (weekend: RaceWeekend | null | undefined): boolean =>
   weekend?.status === 'finished';
 
-export const isSetupLocked = (setup: Setup | null | undefined): boolean =>
+export const isSetupLocked = (
+  setup: Setup | null | undefined,
+  weekends: readonly RaceWeekend[] = [],
+): boolean =>
   !!setup && (setup.lifecycleRole === 'baseline'
     || setup.lifecycleRole === 'final'
-    || !!setup.lockedAt);
+    || !!setup.lockedAt
+    || (setup.lifecycleRole === 'weekend'
+      && !!setup.weekendId
+      && weekends.some(weekend => weekend.id === setup.weekendId && isWeekendFinished(weekend))));
+
+/** An active event may only receive its owned Weekend Setup, never the car selector's setup. */
+export const selectRaceWeekendSetup = (
+  activeWeekend: RaceWeekend | null | undefined,
+  eventSetup: Setup | null,
+  activeCarSetup: Setup | null,
+): Setup | null => activeWeekend ? eventSetup : activeCarSetup;
 
 export const lifecycleSetupId = (weekend: RaceWeekend | null | undefined): string | undefined =>
   weekend?.finalSetupId || weekend?.activeSetupId || weekend?.baselineSetupId || weekend?.setupId;
@@ -177,16 +190,20 @@ export function finishWeekendLifecycle(
     return null;
   }
 
-  const existingFinal = setups.find(item => item.id === finalSetupId
-    && item.lifecycleRole === 'final'
-    && item.weekendId === weekend.id
-    && item.sourceSetupId === active.id
-    && !!item.lockedAt) ?? null;
-  const existingCurrent = setups.find(item => item.id === currentSetupId
-    && item.lifecycleRole === 'current'
-    && item.sourceSetupId === finalSetupId
-    && !item.lockedAt) ?? null;
   const recoveringPartialFinish = !!active.lockedAt;
+  const existingFinal = recoveringPartialFinish
+    ? setups.find(item => item.id === finalSetupId
+      && item.lifecycleRole === 'final'
+      && item.weekendId === weekend.id
+      && item.sourceSetupId === active.id
+      && !!item.lockedAt) ?? null
+    : null;
+  const existingCurrent = recoveringPartialFinish
+    ? setups.find(item => item.id === currentSetupId
+      && item.lifecycleRole === 'current'
+      && item.sourceSetupId === finalSetupId
+      && !item.lockedAt) ?? null
+    : null;
   const lockedWeekendSetup: Setup = {
     ...cloneSetup(active),
     id: active.id,

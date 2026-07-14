@@ -58,6 +58,7 @@ interface RaceWeekendViewProps {
   onFinishWeekend: (weekendId: string) => void;
   activeSetup?: Setup | null;
   onUpdateActiveSetup?: (setup: Setup) => void;
+  onInfo?: (message: string) => void;
   /** [15] One-shot: open a creation modal as soon as the tab mounts. */
   initialAction?: 'new-session' | 'new-weekend';
   onInitialActionConsumed?: () => void;
@@ -124,7 +125,7 @@ export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
   onUpdateSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
   activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
-  activeSetup = null, onUpdateActiveSetup, onFinishWeekend, initialAction, onInitialActionConsumed,
+  activeSetup = null, onUpdateActiveSetup, onInfo, onFinishWeekend, initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
   const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
@@ -182,7 +183,8 @@ export default function RaceWeekendView({
 
   const currentWeekend = visibleWeekends.find(w => w.id === activeWeekendId);
   const menuWeekend = visibleWeekends.find(w => w.id === menuWeekendId) ?? null;
-  const hasActiveSession = !!session.id && session.weekendId === activeWeekendId;
+  const activeWeekendMissingSetup = !!currentWeekend && !activeSetup;
+  const hasActiveSession = !!session.id && session.weekendId === activeWeekendId && !activeWeekendMissingSetup;
 
   // [10] Canonical ordering shared with ContextStrip/Dashboard.
   const sortedWeekends = sortWeekends(visibleWeekends, activeWeekendId);
@@ -454,6 +456,10 @@ export default function RaceWeekendView({
 
   const openNewSession = () => {
     if (!currentWeekend) { openWeekendForm(); return; }
+    if (activeWeekendMissingSetup) {
+      onInfo?.('Weekend Setup is missing. Restore it before logging or adjusting a run.');
+      return;
+    }
     const activeTireIds = new Set(scopedTireInventory.map(tire => tire.id));
     const weekendSetupMatches = scopedSetups.some(setup => setup.id === currentWeekend.setupId);
     const compatibleSessions = filterCompatibleSessions(
@@ -1068,11 +1074,19 @@ export default function RaceWeekendView({
 
       <button
         onClick={openNewSession}
-        className="w-full flex items-center justify-center gap-2 py-3 min-h-12 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 transition-all active:scale-[0.98] text-primary font-display font-bold uppercase tracking-wider text-sm"
+        disabled={activeWeekendMissingSetup}
+        className={`w-full flex items-center justify-center gap-2 py-3 min-h-12 rounded-xl border-2 border-dashed transition-all font-display font-bold uppercase tracking-wider text-sm ${activeWeekendMissingSetup
+          ? 'border-outline-variant/50 text-on-surface-variant/50 cursor-not-allowed'
+          : 'border-primary/50 hover:border-primary hover:bg-primary/10 active:scale-[0.98] text-primary'}`}
       >
         <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
         New Session
       </button>
+      {activeWeekendMissingSetup && (
+        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-center font-mono text-xs text-on-surface">
+          Weekend Setup is missing. Restore it before logging or adjusting a run. You can still finish this weekend.
+        </p>
+      )}
 
       {/* ── Active Session Editor — [14] top-to-bottom quick-log ──────────── */}
       {hasActiveSession && (

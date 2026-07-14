@@ -307,6 +307,11 @@ export default function SetupView({
   };
 
   const handleDeleteSetup = (setupId: string) => {
+    const target = setups.find((setupItem) => setupItem.id === setupId);
+    if (isSetupLocked(target, weekends)) {
+      onInfo?.('Historical setups are view-only. Clone this setup to make an editable copy.');
+      return;
+    }
     if (setups.length <= 1) { alert('You must keep at least one setup configuration.'); return; }
     if (!window.confirm('Are you sure you want to delete this setup?')) return;
     const filtered = setups.filter((s) => s.id !== setupId);
@@ -452,7 +457,7 @@ export default function SetupView({
             {displayedSetups.map((setupItem) => {
               const isExpanded = expandedId === setupItem.id;
               const isActive = activeId === setupItem.id;
-              const isReadOnly = isSetupLocked(setupItem) || (!!activeEventSetupId && setupItem.id !== activeEventSetupId);
+              const isReadOnly = isSetupLocked(setupItem, weekends) || (!!activeEventSetupId && setupItem.id !== activeEventSetupId);
               return (
                 <div key={setupItem.id}
                   className={`bg-surface-container border rounded-lg overflow-hidden transition-all duration-200 ${isActive ? 'border-primary shadow-[0_0_12px_rgba(211,47,47,0.1)]' : 'border-outline-variant/60'}`}
