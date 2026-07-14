@@ -48,6 +48,14 @@ assert.doesNotMatch(loads, />HEIGHT \(in\)</);
 assert.equal((loads.match(/<title>\{`Travel \$\{travel\.toFixed\(2\)\} in · Height \$\{p\.y\.toFixed\(2\)\} in`\}<\/title>/g) || []).length, 2);
 assert.match(loads, /\{`H \$\{p\.y\.toFixed\(2\)\} in`\}/);
 assert.match(loads, /const heightMin = Math\.min\(\.\.\.allY\), heightMax = Math\.max\(\.\.\.allY\)/);
+const singleChartSource = loads.slice(loads.indexOf('function ShockLineChart'), loads.indexOf('// ─── Compare / Overlay Chart'));
+const compareChartSource = loads.slice(loads.indexOf('function ShockCompareChart'), loads.indexOf('// ─── CSV Export'));
+for (const chartSource of [singleChartSource, compareChartSource]) {
+  assert.match(chartSource, /r=\{12\} fill="transparent" pointerEvents="all"/);
+  assert.match(chartSource, /r=\{7\} fill="none" stroke="#fff" strokeWidth="1\.5" pointerEvents="none"/);
+  assert.match(chartSource, /onFocus=\{/);
+  assert.match(chartSource, /onBlur=\{/);
+}
 
 const comparisonSessions = [
   { id: 'a', points: [{ height: '10', load: '100' }, { height: '9', load: '200' }] },

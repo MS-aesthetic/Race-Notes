@@ -74,6 +74,7 @@ export function travelToSvgY(travel: number, maxTravel: number, top: number, inn
 
 function ShockLineChart({ session, svgRef }: ChartProps) {
   const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
+  const [focusedPoint, setFocusedPoint] = useState<number | null>(null);
   const W = 340, H = 220;
   const PAD = { top: 18, right: 20, bottom: 44, left: 54 };
 
@@ -194,6 +195,8 @@ function ShockLineChart({ session, svgRef }: ChartProps) {
             tabIndex={0}
             aria-label={`Travel ${travel.toFixed(2)} in, height ${p.y.toFixed(2)} in`}
             onClick={() => setSelectedPoint(i)}
+            onFocus={() => setFocusedPoint(i)}
+            onBlur={() => setFocusedPoint(null)}
             onKeyDown={event => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
@@ -203,6 +206,8 @@ function ShockLineChart({ session, svgRef }: ChartProps) {
             className="cursor-pointer outline-none"
           >
             <title>{`Travel ${travel.toFixed(2)} in · Height ${p.y.toFixed(2)} in`}</title>
+            <circle cx={sx} cy={sy} r={12} fill="transparent" pointerEvents="all" />
+            {focusedPoint === i && <circle cx={sx} cy={sy} r={7} fill="none" stroke="#fff" strokeWidth="1.5" pointerEvents="none" />}
             <circle cx={sx} cy={sy} r={4} fill={col.line} />
             <circle cx={sx} cy={sy} r={2} fill="#111" />
             <text
@@ -273,6 +278,7 @@ interface CompareChartProps {
 
 function ShockCompareChart({ sessions }: CompareChartProps) {
   const [selectedPoint, setSelectedPoint] = useState<{ sessionId: string; index: number } | null>(null);
+  const [focusedPoint, setFocusedPoint] = useState<{ sessionId: string; index: number } | null>(null);
   const W = 340, H = 240;
   const PAD = { top: 18, right: 20, bottom: 44, left: 54 };
   const innerW = W - PAD.left - PAD.right;
@@ -350,17 +356,16 @@ function ShockCompareChart({ sessions }: CompareChartProps) {
             {s.points.map((p, i) => {
               const { sx, sy } = toSvg(p.x, p.y);
               const travel = toTravel(p.y, heightMax);
+              const isFocused = focusedPoint?.sessionId === s.session.id && focusedPoint.index === i;
               return (
-                <circle
+                <g
                   key={i}
-                  cx={sx}
-                  cy={sy}
-                  r={4}
-                  fill={s.color}
                   role="button"
                   tabIndex={0}
                   aria-label={`${s.session.label || s.session.corner}: Travel ${travel.toFixed(2)} in, height ${p.y.toFixed(2)} in`}
                   onClick={() => setSelectedPoint({ sessionId: s.session.id, index: i })}
+                  onFocus={() => setFocusedPoint({ sessionId: s.session.id, index: i })}
+                  onBlur={() => setFocusedPoint(null)}
                   onKeyDown={event => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
@@ -370,7 +375,10 @@ function ShockCompareChart({ sessions }: CompareChartProps) {
                   className="cursor-pointer outline-none"
                 >
                   <title>{`Travel ${travel.toFixed(2)} in · Height ${p.y.toFixed(2)} in`}</title>
-                </circle>
+                  <circle cx={sx} cy={sy} r={12} fill="transparent" pointerEvents="all" />
+                  {isFocused && <circle cx={sx} cy={sy} r={7} fill="none" stroke="#fff" strokeWidth="1.5" pointerEvents="none" />}
+                  <circle cx={sx} cy={sy} r={4} fill={s.color} />
+                </g>
               );
             })}
           </g>
