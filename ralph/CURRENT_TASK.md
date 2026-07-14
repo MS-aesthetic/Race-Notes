@@ -1,6 +1,6 @@
-# Current Task — UX Chunks 6B–9 Completion Run
+# Current Task — UX Chunks 6B–9 Completion Run (Complete)
 
-**Status:** IN PROGRESS — C9 TERRA REPAIR 1 CODE_PASS; AWAITING SOL QA 2
+**Status:** COMPLETE — C9 SOL QA ATTEMPT 2 PASS; CHUNKS 6B–9 CLOSED
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -406,6 +406,20 @@ performance-policy warnings predate this column-only migration. C7 remains locke
 - Copy-only repair changes no PDF/share/help routing, lifecycle, sync, schema, package,
   native config, Android artifact, or deploy. Prior final draft/Android evidence remains
   applicable. Await independent SOL C9 QA attempt 2 and final Chunks 6B–9 closure.
+
+### C9 SOL QA attempt 2 — PASS; completion run closed
+
+- Independently inspected repair `254d928` and handoff `9776b66`. Every real effect
+  literal is decoded, rendered through `plainRacerEffect`, and audited; direct copy and
+  grammar guards are separate. Adjustment direction and cautions remain intact.
+- C5/C6A/C6B/C7/C8/C9 plus UX-R1 harnesses PASS. Lint remains exactly the three known
+  baseline errors. Production build PASS: 554 modules/18 PWA entries. Repair-range diff
+  check and independent cavecrew review PASS with no issues.
+- Original C9 final draft and Android runtime gate remain accepted: repair changes only
+  display strings and its pure harness, while final production build proves integration.
+  No second draft or Android rebuild was needed. No authenticated draft-data claim added.
+- Chunks 6B–9 and this completion run are closed. Production deploy, remote push,
+  `master` merge, release APK, Supabase schema, packages, and native config remain unchanged.
 
 ## Execution / QA consolidation
 

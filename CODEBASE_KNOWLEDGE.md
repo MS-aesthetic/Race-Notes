@@ -1379,3 +1379,8 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   translator, audits the full rendered corpus, and audits direct component copy separately.
   Focused harness, exact lint baseline, 554-module/18-entry build, diff check, and cavecrew
   review pass. Await SOL QA attempt 2; no other subsystem changed.
+- SOL C9 QA attempt 2 PASS closes C9 and Chunks 6B–9. Independent run passed C5–C9 plus
+  UX-R1 harnesses, exact three-error lint baseline, 554-module/18-entry build, repair-range
+  diff, and cavecrew review. Harness confirms all 134 effect literals are translated and
+  audited, with separate direct-copy and grammar checks. Prior final draft/Android evidence
+  remains accepted for this display-only repair. No production/release/cloud/native change.

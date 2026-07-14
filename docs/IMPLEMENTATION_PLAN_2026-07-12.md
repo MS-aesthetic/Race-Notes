@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-14) — branch `preview-v3`:** Chunks 1–8 ✅ SOL QA PASS · Chunk 9 Terra repair 1 CODE_PASS at `254d928`, awaiting SOL QA 2/final closure. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
+> **PROGRESS (2026-07-14) — branch `preview-v3`:** Chunks 1–9 ✅ complete. C9 SOL QA attempt 2 PASS at `c8c4a21` + `254d928`; Chunks 6B–9 completion run closed. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:
@@ -197,6 +197,11 @@ Original seven-chunk plan below remains implementation history. Current remainin
    checks direct copy separately, and guards broken grammar. Focused harness, exact lint
    baseline, 554-module/18-entry build, diff check, and cavecrew review pass. Await SOL
    QA attempt 2; no other subsystem or deployment changed.
+
+   **SOL QA attempt 2 PASS:** all 134 real effects translate/audit cleanly; direct copy,
+   grammar, direction, and cautions pass. Full focused C5–C9 + UX-R1 suite, exact lint
+   baseline, 554-module/18-entry build, repair diff, and cavecrew review pass. Prior final
+   draft/Android evidence accepted for copy-only repair. C9 and Chunks 6B–9 are closed.
 
 Dependency: 6A → 6B → 7; 6B → 8; 7+8 → 9. Feature builds stay serial. Test once per coherent slice, then consolidated Android/preview regression per completed chunk.
 
