@@ -510,12 +510,13 @@ migration (not needed — test data is being wiped).
 
 **Human prerequisites:** none — resolved above (Q5).
 
-**Implementation status (2026-07-14):** Terra CODE_PASS at `6cae6cf`; independent SOL QA
-pending. Races/Days-only UI, distinct Feature-weekend math, starting usage, service reset,
-pure cloud mapping, exact defaults, and migration `20260714215528` are implemented. Focused
-harness, exact lint baseline, 556-module build, diff, cavecrew, live schema/RLS verification,
-and draft `6a56b1449f3477512a85c566` signed-out 320/390 shell pass. Authenticated draft data was
-unavailable and is not claimed. UXF-7 remains locked until QA PASS.
+**Implementation status (2026-07-14): COMPLETE.** Feature `6cae6cf` plus SOL calendar repair
+`9d0fb26` passed independent QA attempt 2 at 96. Races/Days-only UI, distinct Feature-weekend
+math, ISO/local and DST-safe calendar boundaries, local service defaults, starting usage,
+service reset, pure cloud mapping, exact defaults, and migration `20260714215528` are done.
+Focused harness, exact lint baseline, 556-module build, diff, clean tree, cavecrew, live
+schema/RLS/grant verification, and draft `6a56b1449f3477512a85c566` signed-out 320/390 shell
+pass. Authenticated draft data was unavailable and is not claimed. UXF-7 proposal unlocked.
 
 ---
 

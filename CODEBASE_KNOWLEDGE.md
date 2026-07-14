@@ -1420,7 +1420,7 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
 
 ## 31. UXF-6 — Races/Days Maintenance and Starting Usage (2026-07-14)
 
-- Terra feature `6cae6cf` is CODE_PASS and awaits independent SOL QA. Visible maintenance
+- Terra feature `6cae6cf` plus SOL repair `9d0fb26` passed independent QA at 96. Visible maintenance
   intervals are exactly Races and Days for both car and rig scopes.
 - `getComponentStatus()` counts a qualifying Feature weekend once, even with multiple
   Feature sessions. Car items retain setup-to-car resolution; rig items count across cars.
@@ -1442,3 +1442,8 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   and cavecrew review pass. Draft `6a56b1449f3477512a85c566` has a clean 320/390 signed-out
   shell. The unique origin had no remembered login, so authenticated application round-trip
   and signed-in theme/size runtime are not claimed.
+- QA attempt 1 found date-boundary defects. Repair uses local calendar-day ordinals for both
+  Races and Days, locally parses ISO date-only values, survives spring/fall DST, and uses
+  `localDateValue()` when normal or quick service opens. Fixtures pass in Eastern, Pacific,
+  and UTC. Final cavecrew review found no issues; UXF-6 is closed and UXF-7 proposal analysis
+  is unlocked.

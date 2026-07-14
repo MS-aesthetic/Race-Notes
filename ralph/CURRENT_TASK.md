@@ -1,6 +1,6 @@
 # Current Task — UXF-6 Maintenance Intervals and Starting Usage
 
-**Status:** CODE_PASS — Terra feature `6cae6cf`; awaiting independent SOL High QA
+**Status:** COMPLETE — SOL High QA attempt 2 PASS; feature `6cae6cf`, repair `9d0fb26`
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-5 closed by owner approval at `40fcc5f`
@@ -127,3 +127,11 @@ Terra High owns one initial cross-file build pass. Cavecrew handles bounded trac
 - Focused chunk8 harness PASS; lint is the exact three-error baseline; production build PASS (`556` modules, `18` PWA entries); diff check PASS; cavecrew re-review found no issues.
 - Draft: `https://6a56b1449f3477512a85c566--crew-chief-race-notes.netlify.app`. Signed-out shell at 320/390 px has no horizontal overflow or console warnings. The unique draft origin had no remembered login, so authenticated component push/pull/delete and signed-in light/dark Default/Large runtime are not claimed; pure mapper, live schema, build, and focused fixtures cover those paths pending SOL adjudication.
 - No production deploy, remote push, merge, package/native configuration, or APK change. UXF-7 remains locked until SOL PASS.
+
+## SOL QA result — 2026-07-14
+
+- Attempt 1 found two calendar bugs: ISO date-only weekend values shifted backward west of UTC, and Days used elapsed 24-hour blocks instead of calendar days. Follow-up review also found Dashboard Quick Service reopening restored a UTC date default.
+- SOL repair `9d0fb26` compares local calendar-day ordinals, parses ISO date-only weekend/service values locally, makes Days DST-safe, and uses `localDateValue()` for normal and quick service defaults.
+- Expanded fixtures pass in America/New_York, America/Los_Angeles, and UTC: ISO same-day/next-day race boundaries, calendar same/next day, spring/fall DST, and local date reset source guards.
+- Independent QA attempt 2 PASS. Chunk8 harness PASS; lint remains exact three-error baseline; production build PASS (`556` modules, `18` PWA entries); full diff and clean tree PASS; final cavecrew review found no issues. Live migration/schema/RLS/grants remain verified and unchanged by repair.
+- UXF-6 closed. UXF-7 proposal analysis is next; no checklist application code may start before Maxx approves/redlines that proposal.
