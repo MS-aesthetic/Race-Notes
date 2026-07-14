@@ -58,7 +58,9 @@ export default function NumberStepper({
   const applyStep = (dir: 1 | -1, s: number) => {
     const cur = valueRef.current;
     const base = typeof cur === 'number' ? cur : (min ?? 0);
-    onChangeRef.current(clampRound(base + dir * s));
+    const next = clampRound(base + dir * s);
+    valueRef.current = next;
+    onChangeRef.current(next);
   };
 
   const stopPress = () => {
@@ -114,12 +116,15 @@ export default function NumberStepper({
     }
     const t = draft.trim().replace(',', '.');
     if (t === '') {
-      onChange('');
+      valueRef.current = '';
+      onChangeRef.current('');
       return;
     }
     const n = Number(t);
     if (Number.isNaN(n)) return; // keep previous value on garbage input
-    onChange(clampRound(n));
+    const next = clampRound(n);
+    valueRef.current = next;
+    onChangeRef.current(next);
   };
 
   const atMin = typeof value === 'number' && min !== undefined && value <= min;

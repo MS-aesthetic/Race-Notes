@@ -13,6 +13,7 @@ import TiresSubView from './TiresSubView';
 import { cloneSetup, makeBlankSetup, pickImmediatePriorSetupForCar, pickLatestSetupForCar } from '../lib/setupCompat';
 import { calculateTireStagger, NumericCornerField, SETUP_STEPS, formatStoredNumber, legacyValueNote, parseStoredNumber } from '../lib/setupSteps';
 import { isSetupLocked } from '../lib/setupLifecycle';
+import { applyExplicitCornerField } from '../lib/quickAdjust';
 
 interface SetupViewProps {
   savedSetups: Setup[];
@@ -63,6 +64,7 @@ interface CornerFormProps {
   isRear: boolean;
   tireInventory: TireInventoryItem[];
   usedTireIds?: string[];
+  loadSessions: ShockSession[];
   onFieldChange: (field: keyof CornerSetup, value: string) => void;
   onBatchChange: (updates: Partial<CornerSetup>) => void;
 }
@@ -78,7 +80,9 @@ function NumericCornerFieldInput({ label, field, data, onFieldChange }: {
   const legacy = legacyValueNote(raw);
   return (
     <div className="min-w-0 [&_[role=group]]:flex-wrap [&_[role=group]]:overflow-visible [&_[role=group]>button]:basis-full [&_[role=group]>button]:w-full [&_[role=group]>div]:basis-full [&_[role=group]>div]:border-x-0 [&_[role=group]>div]:border-y">
-      <label className={LBL}>{label}</label>
+      <label className={LBL}>
+        {label}{field === 'loadCtoC' && data.rideHeightNeedsReview ? ' *' : ''}
+      </label>
       <NumberStepper
         value={parseStoredNumber(raw)}
         onChange={value => onFieldChange(field, formatStoredNumber(value, spec))}
@@ -89,11 +93,14 @@ function NumericCornerFieldInput({ label, field, data, onFieldChange }: {
         ariaLabel={label}
       />
       {legacy && <p className="mt-1 font-mono text-xs text-on-surface-variant">Legacy: {legacy}</p>}
+      {field === 'loadCtoC' && data.rideHeightNeedsReview && (
+        <p className="mt-1 font-mono text-xs font-bold text-on-surface">* Spring rounds changed. Recheck and update this measurement.</p>
+      )}
     </div>
   );
 }
 
-function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTireIds = [], onFieldChange, onBatchChange }: CornerFormProps) {
+function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTireIds = [], loadSessions, onFieldChange, onBatchChange }: CornerFormProps) {
   return (
     <div className="min-w-0 bg-surface-container border border-outline-variant flex flex-col rounded overflow-hidden">
       <div className="min-w-0 border-b border-outline-variant px-1.5 sm:px-4 py-2 flex flex-wrap items-center gap-1 sm:gap-2 bg-surface-container-low">
@@ -133,7 +140,12 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
           <select value={data.boundGraphId || ''} onChange={(e) => onFieldChange('boundGraphId', e.target.value)}
             className="w-full min-w-0 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded">
             <option value="">-- None --</option>
-            <option value="graph-demo">Sample Dyno Run</option>
+            {data.boundGraphId && !loadSessions.some(session => session.id === data.boundGraphId) && (
+              <option value={data.boundGraphId}>Saved Load Session (unavailable)</option>
+            )}
+            {loadSessions.map(session => (
+              <option key={session.id} value={session.id}>{session.label || session.shock} · {session.date}</option>
+            ))}
           </select>
         </div>
 
@@ -152,6 +164,10 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         <div>
           <label className={LBL}>Shock</label>
           <input type="text" value={data.shock || ''} onChange={e => onFieldChange('shock', e.target.value)} className={INP} />
+        </div>
+        <div>
+          <label className={LBL}>Shock Note</label>
+          <input type="text" value={data.shockNote || ''} onChange={e => onFieldChange('shockNote', e.target.value)} className={INP} />
         </div>
 
         {/* Front-specific fields */}
@@ -224,8 +240,7 @@ export default function SetupView({
     const updated = setups.map((s) => {
       if (s.id !== setupId) return s;
       const updatedCorner = {
-        ...s[corner],
-        [field]: value,
+        ...applyExplicitCornerField(s[corner], field, value),
         ...(field === 'tirePress' ? { pressureSourceNote: value.trim() ? 'Adjusted in Setups' : undefined } : {}),
       };
       let updatedSetup: Setup = { ...s, [corner]: updatedCorner };
@@ -248,6 +263,7 @@ export default function SetupView({
       const updatedCorner = {
         ...s[corner],
         ...updates,
+        ...('loadCtoC' in updates ? { rideHeightNeedsReview: false } : {}),
         ...(pressureChanged
           ? { pressureSourceNote: updates.tirePress?.trim() ? 'Loaded from tire inventory' : undefined }
           : {}),
@@ -680,6 +696,7 @@ export default function SetupView({
                               isRear={corner === 'lr' || corner === 'rr'}
                               tireInventory={displayedTires}
                               usedTireIds={usedTireIds}
+                              loadSessions={shockSessions.filter(session => session.carId === setupItem.carId && session.corner === corner.toUpperCase())}
                               onFieldChange={(f, v) => handleCornerChange(setupItem.id, corner, f, v)}
                               onBatchChange={(u) => handleCornerBatchChange(setupItem.id, corner, u)}
                             />

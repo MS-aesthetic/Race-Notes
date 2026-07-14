@@ -57,7 +57,7 @@ export function withSetupDiffLog(prior: Setup, next: Setup, now: string): Setup 
       ...Object.keys(next[corner]),
     ] as Array<keyof CornerSetup>);
     fields.forEach(field => {
-      if (field === 'pressureSourceNote') return;
+      if (field === 'pressureSourceNote' || field === 'rideHeightNeedsReview') return;
       if (JSON.stringify(prior[corner][field]) === JSON.stringify(next[corner][field])) return;
       const fieldLabel = String(field).replace(/([A-Z])/g, ' $1');
       changes.push({

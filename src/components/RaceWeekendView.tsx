@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS } from '../types';
+import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS, ShockSession } from '../types';
 import { sortBySize } from '../lib/tireSize';
 import { sortWeekends } from '../lib/scope';
 import { useBackClosable } from '../lib/backStack';
@@ -13,7 +13,9 @@ import UndoToast from './ui/UndoToast';
 import BottomSheet from './ui/BottomSheet';
 import FourBarQuickAdjust from './FourBarQuickAdjust';
 import SetupDiffView from './SetupDiffView';
-import { NumericCornerField, formatPsiValue, fourBarAdjustmentId, fourBarAdjustmentLabel, mergeImportedSetupPressure } from '../lib/setupSteps';
+import QuickAdjustPanel from './QuickAdjustPanel';
+import { NumericCornerField, formatPsiValue, mergeImportedSetupPressure } from '../lib/setupSteps';
+import type { QuickAdjustCommand } from '../lib/quickAdjust';
 import { pickImmediatePriorSetupForCar, setupUsedUniquelyMatchesCar } from '../lib/setupCompat';
 import { isWeekendFinished, lifecycleSetupId } from '../lib/setupLifecycle';
 
@@ -57,7 +59,8 @@ interface RaceWeekendViewProps {
   onCreateSession: (data: NewSessionData) => void;
   onFinishWeekend: (weekendId: string) => void;
   activeSetup?: Setup | null;
-  onUpdateActiveSetup?: (setup: Setup) => void;
+  shockSessions?: ShockSession[];
+  onCommitQuickAdjust?: (command: QuickAdjustCommand) => { ok: boolean; error?: string };
   onInfo?: (message: string) => void;
   /** [15] One-shot: open a creation modal as soon as the tab mounts. */
   initialAction?: 'new-session' | 'new-weekend';
@@ -125,9 +128,8 @@ export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
   onUpdateSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
   activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
-  activeSetup = null, onUpdateActiveSetup, onInfo, onFinishWeekend, initialAction, onInitialActionConsumed,
+  activeSetup = null, shockSessions = [], onCommitQuickAdjust, onInfo, onFinishWeekend, initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
-  const [newAdjInput, setNewAdjInput] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState('');
@@ -212,29 +214,6 @@ export default function RaceWeekendView({
     onUpdateSession({ ...session, diagnostics: { ...session.diagnostics, [phase]: value } });
   };
 
-  const handleAddAdjustment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAdjInput.trim()) return;
-    let icon = 'build';
-    const text = newAdjInput.toLowerCase();
-    if (text.includes('pressure') || text.includes('tire') || text.includes('psi')) icon = 'air';
-    else if (text.includes('bar') || text.includes('height')) icon = 'height';
-    else if (text.includes('shock') || text.includes('click')) icon = 'settings_input_component';
-    let label = newAdjInput;
-    let value = '';
-    const match = newAdjInput.match(/([+-]?\d+(?:\.\d+)?\s*\w+["']?|up\s*\d+\/\d+"?|down\s*\d+\/\d+"?)\s+(.+)/i);
-    if (match) { value = match[1]; label = match[2].toUpperCase(); }
-    else {
-      const parts = newAdjInput.split(/(?=[+-]\d)|\s(?=\d)/);
-      if (parts.length > 1) { label = parts[0].trim().toUpperCase(); value = parts.slice(1).join(' ').trim(); }
-    }
-    onUpdateSession({
-      ...session,
-      adjustments: [{ id: `adj-${Date.now()}`, icon, label: label.substring(0, 30), value: value || '+1 Adj' }, ...(session.adjustments || [])],
-    });
-    setNewAdjInput('');
-  };
-
   const handleTireChange = (corner: 'lf' | 'rf' | 'lr' | 'rr', field: keyof TireDetails, val: string) => {
     const currentTires = session.tires || {
       lf: { compound: '', size: '', airPressure: session.pressures?.lf || '' },
@@ -317,19 +296,9 @@ export default function RaceWeekendView({
   };
 
   const handleQuickFourBarChange = (corner: 'lr' | 'rr', field: NumericCornerField, value: string, previous: string) => {
-    if (!activeSetup || !onUpdateActiveSetup) return;
-    const nextSetup: Setup = { ...activeSetup, [corner]: { ...activeSetup[corner], [field]: value } };
-    onUpdateActiveSetup(nextSetup);
-    const id = fourBarAdjustmentId(corner, field);
-    const adjustment = {
-      id,
-      icon: 'height',
-      label: fourBarAdjustmentLabel(corner, field),
-      value: `${previous || '—'} → ${value || '—'}`,
-    };
-    const existing = session.adjustments || [];
-    const adjustments = [adjustment, ...existing.filter(item => item.id !== id)];
-    onUpdateSession({ ...session, adjustments });
+    if (!activeSetup || !onCommitQuickAdjust || previous === value) return;
+    const result = onCommitQuickAdjust({ kind: 'four-bar', corner, field, value });
+    if (!result.ok) onInfo?.(result.error || 'Four-bar change could not be saved.');
   };
 
   // ── Photo helpers ────────────────────────────────────────────────────────────
@@ -1304,10 +1273,6 @@ export default function RaceWeekendView({
         {/* 6 ── Changes made */}
         <div className="pt-4 border-t border-outline-variant/60 mb-6">
           <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Changes Made</h3>
-          <form onSubmit={handleAddAdjustment} className="flex gap-2 mb-3">
-            <input type="text" className="flex-1 bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm font-mono" placeholder="e.g. +1/2 inch track bar" value={newAdjInput} onChange={e => setNewAdjInput(e.target.value)} />
-            <button type="submit" className="bg-primary text-on-primary font-bold px-4 rounded">+</button>
-          </form>
           <div className="flex flex-col gap-1 mb-3">
             {session.adjustments?.map(adj => (
               <div key={adj.id} className="flex justify-between bg-surface p-2 rounded text-xs font-mono">
@@ -1316,15 +1281,14 @@ export default function RaceWeekendView({
               </div>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => setFourBarOpen(true)}
-            disabled={!activeSetup || !onUpdateActiveSetup}
-            className={`w-full flex items-center justify-center gap-2 min-h-12 rounded-xl border font-mono text-[11px] font-bold uppercase tracking-wider ${activeSetup && onUpdateActiveSetup ? 'border-primary/60 bg-primary/10 text-primary hover:bg-primary/15' : 'border-dashed border-outline-variant text-on-surface-variant/50 cursor-not-allowed'}`}
-          >
-            <span className="material-symbols-outlined text-[16px]">tune</span>
-            Four-bar quick-adjust
-          </button>
+          {activeSetup && onCommitQuickAdjust && (
+            <QuickAdjustPanel
+              setup={activeSetup}
+              loadSessions={shockSessions}
+              onCommit={onCommitQuickAdjust}
+              onOpenFourBar={() => setFourBarOpen(true)}
+            />
+          )}
         </div>
 
         {/* 7 ── Notes & attachments */}

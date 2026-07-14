@@ -21,6 +21,7 @@ import { syncTireLifecycle } from './lib/tireHistory';
 import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
 import { finishWeekendLifecycle, isSetupLocked, isWeekendFinished, mergeTimestampedRecords, selectRaceWeekendSetup, startWeekendLifecycle, withSetupDiffLog } from './lib/setupLifecycle';
 import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
+import { applyQuickAdjust, resolveQuickAdjustTarget, type QuickAdjustCommand } from './lib/quickAdjust';
 import { materializeMainChecklist } from './lib/mainChecklist';
 import { reconcileStarterTemplates } from './lib/checklists';
 import { deriveReadableLightAccent, readableOnColor } from './lib/colorContrast';
@@ -108,6 +109,7 @@ export default function App() {
   const weekendsRef = useRef(weekends);
   const savedSetupsRef = useRef(savedSetups);
   const sessionCloudQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const quickAdjustSequenceRef = useRef(0);
   useEffect(() => { activeSessionRef.current = activeSession; }, [activeSession]);
   useEffect(() => { weekendsRef.current = weekends; }, [weekends]);
   useEffect(() => { savedSetupsRef.current = savedSetups; }, [savedSetups]);
@@ -1012,6 +1014,55 @@ export default function App() {
     }
   };
 
+  const handleCommitQuickAdjust = (command: QuickAdjustCommand): { ok: boolean; error?: string } => {
+    const target = resolveQuickAdjustTarget(
+      activeWeekendId,
+      weekendsRef.current,
+      savedSetupsRef.current,
+      activeSessionRef.current,
+    );
+    if (target.ok === false) {
+      setInfoToast(target.error);
+      return target;
+    }
+    quickAdjustSequenceRef.current += 1;
+    const now = new Date().toISOString();
+    const commandId = `quick-adjust-${Date.now()}-${quickAdjustSequenceRef.current}`;
+    const result = applyQuickAdjust(target.setup, target.session, command, weekendsRef.current, now, commandId);
+    if (result.ok === false) {
+      setInfoToast(result.error);
+      return result;
+    }
+
+    const updatedSetups = savedSetupsRef.current.map(item => item.id === result.setup.id ? result.setup : item);
+    const updatedWeekends = applyActiveSessionToWeekends(weekendsRef.current, result.session);
+    savedSetupsRef.current = updatedSetups;
+    weekendsRef.current = updatedWeekends;
+    activeSessionRef.current = result.session;
+    setSavedSetups(updatedSetups);
+    setWeekends(updatedWeekends);
+    setActiveSession(result.session);
+    setSetup(result.setup);
+    localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
+    localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
+    localStorage.setItem('race_notes_active_session', JSON.stringify(result.session));
+    localStorage.setItem('race_notes_setup', JSON.stringify(result.setup));
+
+    if (user) {
+      const userId = user.id;
+      sessionCloudQueueRef.current = sessionCloudQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          await Promise.all([
+            pushSetups(updatedSetups, userId, setSyncStatus),
+            pushWeekends(updatedWeekends, userId),
+            pushActiveSession(result.session, userId),
+          ]);
+        });
+    }
+    return { ok: true };
+  };
+
   // Session weather helpers moved into RaceWeekendView ([15]).
 
   const handleActivateWeekend = (weekendId: string) => {
@@ -1265,6 +1316,7 @@ export default function App() {
     localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
     if (user) pushTires(lifecycled, user.id);
 
+    activeSessionRef.current = nextSession;
     setActiveSession(nextSession);
     localStorage.setItem('race_notes_active_session', JSON.stringify(nextSession));
     if (pressureSourceNote) setInfoToast(pressureSourceNote);
@@ -1730,7 +1782,8 @@ export default function App() {
                   onCreateWeekend={handleCreateNewWeekend}
                   onCreateSession={handleCreateNewSession}
                   activeSetup={raceWeekendSetup}
-                  onUpdateActiveSetup={(updated) => handleSaveSetups(savedSetupsRef.current.map(item => item.id === updated.id ? updated : item), updated.id)}
+                  shockSessions={shockSessions}
+                  onCommitQuickAdjust={handleCommitQuickAdjust}
                   onInfo={setInfoToast}
                   onFinishWeekend={handleFinishWeekend}
                   initialAction={rwInitialAction ?? undefined}

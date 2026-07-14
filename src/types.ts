@@ -52,6 +52,12 @@ export interface CornerSetup {
   droopUnit?: string;
   preload?: string;
   preloadUnit?: string;
+  /** Cumulative spring turns recorded during the active race weekend. */
+  springRounds?: string;
+  /** Spring-round changes require this corner's measured ride height to be checked. */
+  rideHeightNeedsReview?: boolean;
+  /** Trackside shock note; independent from the selected load-session graph. */
+  shockNote?: string;
   boundGraphId?: string;
 }
 
@@ -110,6 +116,8 @@ export interface SetupChange {
   after?: string;
   note?: string;
   sessionId?: string;
+  /** User-facing "run" provenance. Mirrors sessionId for current data. */
+  runId?: string;
   loadSessionId?: string;
 }
 
@@ -310,6 +318,14 @@ export interface SetupAdjustment {
   icon: string;
   label: string;
   value: string;
+  timestamp?: string;
+  corner?: 'lf' | 'rf' | 'lr' | 'rr';
+  field?: string;
+  before?: string;
+  after?: string;
+  sessionId?: string;
+  runId?: string;
+  loadSessionId?: string;
 }
 
 export interface ActiveSession {
