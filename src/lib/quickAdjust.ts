@@ -245,6 +245,72 @@ export function applyQuickAdjust(
     return { ok: false, error: 'No change to save.' };
   }
   const runId = session.id;
+  const changeLog = setup.changeLog || [];
+  const adjustments = session.adjustments || [];
+  let matchingChangeIndex = -1;
+  if (command.kind !== 'other') {
+    for (let index = changeLog.length - 1; index >= 0; index -= 1) {
+      const entry = changeLog[index];
+      if (entry.runId === runId && entry.corner === details.corner && entry.field === details.field) {
+        matchingChangeIndex = index;
+        break;
+      }
+    }
+  }
+
+  if (matchingChangeIndex >= 0) {
+    const existingChange = changeLog[matchingChangeIndex];
+    const originalBefore = existingChange.before ?? details.before;
+    const change: SetupChange = {
+      ...existingChange,
+      timestamp: now,
+      before: originalBefore,
+      after: details.after,
+      note: details.note,
+      loadSessionId: details.loadSessionId,
+    };
+    const baseId = existingChange.id.endsWith('-setup')
+      ? existingChange.id.slice(0, -'-setup'.length)
+      : existingChange.id;
+    const adjustmentId = `${baseId}-run`;
+    const matchingAdjustmentIndex = adjustments.findIndex(entry => entry.id === adjustmentId);
+    const existingAdjustment = matchingAdjustmentIndex >= 0 ? adjustments[matchingAdjustmentIndex] : undefined;
+    const adjustment: SetupAdjustment = {
+      ...(existingAdjustment || {
+        id: adjustmentId,
+        icon: details.icon,
+        label: existingChange.label,
+        value: '',
+        corner: existingChange.corner,
+        field: existingChange.field,
+        sessionId: runId,
+        runId,
+      }),
+      timestamp: now,
+      before: originalBefore,
+      after: details.after,
+      value: `${originalBefore} to ${details.after}`,
+      loadSessionId: details.loadSessionId,
+    };
+    return {
+      ok: true,
+      setup: {
+        ...details.setup,
+        changeLog: changeLog.map((entry, index) => index === matchingChangeIndex ? change : entry),
+        updatedAt: now,
+      },
+      session: {
+        ...session,
+        adjustments: matchingAdjustmentIndex >= 0
+          ? adjustments.map((entry, index) => index === matchingAdjustmentIndex ? adjustment : entry)
+          : adjustments,
+        updatedAt: now,
+      },
+      change,
+      adjustment,
+    };
+  }
+
   const change: SetupChange = {
     id: `${commandId}-setup`, timestamp: now, label: details.label,
     corner: details.corner, field: details.field, before: details.before, after: details.after,
@@ -258,8 +324,8 @@ export function applyQuickAdjust(
   };
   return {
     ok: true,
-    setup: { ...details.setup, changeLog: [...(setup.changeLog || []), change], updatedAt: now },
-    session: { ...session, adjustments: [adjustment, ...(session.adjustments || [])], updatedAt: now },
+    setup: { ...details.setup, changeLog: [...changeLog, change], updatedAt: now },
+    session: { ...session, adjustments: [adjustment, ...adjustments], updatedAt: now },
     change,
     adjustment,
   };

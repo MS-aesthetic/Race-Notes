@@ -112,15 +112,77 @@ assert.equal(binding.session.adjustments.length, 4);
 let rapidSetup = binding.setup;
 let rapidSession = binding.session;
 for (let index = 0; index < 8; index += 1) {
-  const result = expectSuccess(applyQuickAdjust(rapidSetup, rapidSession, { kind: 'spring-rounds', corner: 'rr', delta: 0.5 }, [weekend], now, `rapid-${index}`));
+  const rapidNow = new Date(Date.parse(now) + index * 1000).toISOString();
+  const result = expectSuccess(applyQuickAdjust(rapidSetup, rapidSession, { kind: 'spring-rounds', corner: 'rr', delta: 0.5 }, [weekend], rapidNow, `rapid-${index}`));
   rapidSetup = result.setup;
   rapidSession = result.session;
 }
 assert.equal(rapidSetup.rr.springRounds, '4.0');
-assert.equal(rapidSetup.changeLog?.length, 12);
-assert.equal(rapidSession.adjustments.length, 12);
-assert.equal(new Set(rapidSetup.changeLog?.map(change => change.id)).size, 12);
-assert.equal(new Set(rapidSession.adjustments.map(change => change.id)).size, 12);
+assert.equal(rapidSetup.changeLog?.length, 5);
+assert.equal(rapidSession.adjustments.length, 5);
+assert.equal(new Set(rapidSetup.changeLog?.map(change => change.id)).size, 5);
+assert.equal(new Set(rapidSession.adjustments.map(change => change.id)).size, 5);
+const rapidChange = rapidSetup.changeLog?.find(change => change.id === 'rapid-0-setup');
+const rapidAdjustment = rapidSession.adjustments.find(change => change.id === 'rapid-0-run');
+assert.ok(rapidChange);
+assert.ok(rapidAdjustment);
+assert.equal(rapidChange?.before, '0.0');
+assert.equal(rapidChange?.after, '4.0');
+assert.equal(rapidChange?.timestamp, '2026-07-14T03:00:07.000Z');
+assert.equal(rapidAdjustment?.before, '0.0');
+assert.equal(rapidAdjustment?.after, '4.0');
+assert.equal(rapidAdjustment?.value, '0.0 to 4.0');
+assert.equal(rapidSetup.changeLog?.at(-1)?.id, 'rapid-0-setup');
+assert.equal(rapidSession.adjustments.at(0)?.id, 'rapid-0-run');
+assert.equal(rapidSetup.updatedAt, '2026-07-14T03:00:07.000Z');
+assert.equal(rapidSession.updatedAt, '2026-07-14T03:00:07.000Z');
+const persistedRapidSession = JSON.parse(JSON.stringify(rapidSession)) as ActiveSession;
+assert.equal(persistedRapidSession.adjustments.length, 5);
+assert.equal(persistedRapidSession.adjustments[0].id, 'rapid-0-run');
+assert.equal(persistedRapidSession.adjustments[0].value, '0.0 to 4.0');
+
+const distinctFieldBase = makeBlankSetup({
+  id: 'distinct-fields', chassis: 'Test Car', track: '', date: '', carType: 'Dirt Late Model',
+  carId: 'car-a', lifecycleRole: 'weekend', weekendId: 'w1', changeLog: [],
+});
+const distinctFieldSession = { ...session, adjustments: [] };
+const distinctGear = expectSuccess(applyQuickAdjust(distinctFieldBase, distinctFieldSession, { kind: 'gear', value: '6.20' }, [weekend], now, 'distinct-gear'));
+const distinctRounds = expectSuccess(applyQuickAdjust(distinctGear.setup, distinctGear.session, { kind: 'spring-rounds', corner: 'lf', delta: 0.5 }, [weekend], now, 'distinct-rounds'));
+assert.equal(distinctRounds.setup.changeLog?.length, 2);
+assert.equal(distinctRounds.session.adjustments.length, 2);
+
+const runOne = expectSuccess(applyQuickAdjust(distinctFieldBase, distinctFieldSession, { kind: 'gear', value: '6.20' }, [weekend], now, 'run-one'));
+const runTwoSession = { ...runOne.session, id: 'run-2', adjustments: [] };
+const runTwoWeekend = { ...weekend, sessions: [...weekend.sessions, { id: 'run-2' } as RaceWeekend['sessions'][number]] };
+const runTwo = expectSuccess(applyQuickAdjust(runOne.setup, runTwoSession, { kind: 'gear', value: '6.30' }, [runTwoWeekend], now, 'run-two'));
+assert.equal(runTwo.setup.changeLog?.length, 2);
+assert.deepEqual(runTwo.setup.changeLog?.map(change => change.runId), ['run-1', 'run-2']);
+
+const otherOne = expectSuccess(applyQuickAdjust(distinctFieldBase, distinctFieldSession, { kind: 'other', value: 'Moved battery' }, [weekend], now, 'other-one'));
+const otherTwo = expectSuccess(applyQuickAdjust(otherOne.setup, otherOne.session, { kind: 'other', value: 'Changed fuel load' }, [weekend], now, 'other-two'));
+assert.equal(otherTwo.setup.changeLog?.length, 2);
+assert.equal(otherTwo.session.adjustments.length, 2);
+
+const reversalUp = expectSuccess(applyQuickAdjust(distinctFieldBase, distinctFieldSession, { kind: 'spring-rounds', corner: 'rr', delta: 0.5 }, [weekend], now, 'reversal-up'));
+const reversalDown = expectSuccess(applyQuickAdjust(reversalUp.setup, reversalUp.session, { kind: 'spring-rounds', corner: 'rr', delta: -0.5 }, [weekend], now, 'reversal-down'));
+assert.equal(reversalDown.setup.changeLog?.length, 1);
+assert.equal(reversalDown.session.adjustments.length, 1);
+assert.equal(reversalDown.setup.changeLog?.[0].before, '0.0');
+assert.equal(reversalDown.setup.changeLog?.[0].after, '0.0');
+assert.equal(reversalDown.session.adjustments[0].value, '0.0 to 0.0');
+
+const firstLoad = expectSuccess(applyQuickAdjust(distinctFieldBase, distinctFieldSession, { kind: 'shock-load', corner: 'lf', loadSessionId: 'load-one', loadSessionLabel: 'Load One' }, [weekend], now, 'load-one'));
+const secondLoad = expectSuccess(applyQuickAdjust(firstLoad.setup, firstLoad.session, { kind: 'shock-load', corner: 'lf', loadSessionId: 'load-two', loadSessionLabel: 'Load Two' }, [weekend], '2026-07-14T03:01:00.000Z', 'load-two'));
+assert.equal(secondLoad.setup.changeLog?.length, 1);
+assert.equal(secondLoad.session.adjustments.length, 1);
+assert.equal(secondLoad.change.id, 'load-one-setup');
+assert.equal(secondLoad.change.before, '—');
+assert.equal(secondLoad.change.after, 'Load Two');
+assert.equal(secondLoad.change.note, 'Load Two');
+assert.equal(secondLoad.change.loadSessionId, 'load-two');
+assert.equal(secondLoad.adjustment.id, 'load-one-run');
+assert.equal(secondLoad.adjustment.loadSessionId, 'load-two');
+assert.equal(secondLoad.setup.lf.boundGraphId, 'load-two');
 
 const row = setupToCloudRow(rapidSetup, 'user-1');
 const pulled = setupFromCloudRow(row);
@@ -129,6 +191,10 @@ assert.equal(pulled.rr.rideHeightNeedsReview, true);
 assert.equal(pulled.lf.shockNote, 'Two clicks out');
 assert.equal(pulled.lf.boundGraphId, 'a-lf');
 assert.equal(pulled.changeLog?.at(-1)?.runId, 'run-1');
+assert.equal(pulled.changeLog?.length, 5);
+assert.equal(pulled.changeLog?.at(-1)?.id, 'rapid-0-setup');
+assert.equal(pulled.changeLog?.at(-1)?.before, '0.0');
+assert.equal(pulled.changeLog?.at(-1)?.after, '4.0');
 
 const locked = { ...rapidSetup, lockedAt: now };
 assert.equal(applyQuickAdjust(locked, rapidSession, { kind: 'gear', value: '6.20' }, [weekend], now, 'locked').ok, false);
