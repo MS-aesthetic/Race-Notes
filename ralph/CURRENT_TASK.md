@@ -1,6 +1,6 @@
 # Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** IN PROGRESS — C9 TERRA CODE_PASS; AWAITING SOL FINAL QA
+**Status:** IN PROGRESS — C9 SOL QA ATTEMPT 1 FAIL; RETURN TO TERRA
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -373,6 +373,23 @@ performance-policy warnings predate this column-only migration. C7 remains locke
   not claimed; Android supplied authenticated/local runtime evidence.
 - Production, remote branch, `master`, release APK, and Supabase schema remain untouched.
   C9 awaits SOL High independent final QA across Chunks 6B–9.
+
+### C9 SOL QA attempt 1 — FAIL
+
+- PDF generation/share, selected-record isolation, cancel/error behavior, help routing,
+  C6B lifecycle, C7 Quick Adjust, and C8 Trackers regressions pass.
+- One blocker remains: display-only racer-language audit is incomplete. Hard-coded Shock,
+  J-Bar, and Four-bar guide tables bypass `plainRacerEffect` and still render academic
+  phrases including “trailing arm geometry,” “rear roll center,” “chassis roll,”
+  “through apex,” and “weight transfer” (`QuickReferenceView.tsx` around lines 841,
+  932–987, 1190, 1238–1299). Raw researched effect strings may stay internal when the
+  renderer translates them; direct visible rows must use plain shop language.
+- All nine focused harnesses PASS. Lint remains exact three-error baseline. Build PASS:
+  554 modules/18 PWA entries. Feature-range diff and independent cavecrew review PASS.
+  Final draft matches current bundle and passes 320/390 signed-out shell with no overflow
+  or console errors. Android cold-launches authenticated light/Large data with empty crash
+  buffer. These passing gates need only focused regression after copy repair.
+- C9 remains open. Repair returns to Terra High; no SQL/package/native/deploy change needed.
 
 ## Execution / QA consolidation
 

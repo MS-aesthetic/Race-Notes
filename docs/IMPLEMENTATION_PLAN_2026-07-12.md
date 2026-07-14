@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunks 1–8 ✅ SOL QA PASS · Chunk 9 Terra CODE_PASS at `c8c4a21`, awaiting SOL final QA. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
+> **PROGRESS (2026-07-14) — branch `preview-v3`:** Chunks 1–8 ✅ SOL QA PASS · Chunk 9 SOL QA attempt 1 FAIL after `c8c4a21`; Terra owns display-copy-only repair. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:
@@ -186,6 +186,11 @@ Original seven-chunk plan below remains implementation history. Current remainin
    buffer pass. Final draft `6a55bd0dfd16f2bd74bf6c1a` passes 320/390 auth shell with
    no overflow or console errors. No migration, package, production, push, master, or
    release change. Await independent SOL C9/final Chunks 6B–9 QA.
+
+   **SOL QA attempt 1 FAIL:** all PDF/share/help and accumulated regression gates pass,
+   but direct Shock/J-Bar/Four-bar rows still render academic phrases because they bypass
+   `plainRacerEffect`. Terra repair is limited to plain visible copy plus focused source
+   fixtures; no SQL, package, native, or deploy work is needed.
 
 Dependency: 6A → 6B → 7; 6B → 8; 7+8 → 9. Feature builds stay serial. Test once per coherent slice, then consolidated Android/preview regression per completed chunk.
 

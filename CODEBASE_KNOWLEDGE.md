@@ -1367,3 +1367,9 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   file chooser/cancel/back/help/theme/size/offline smoke passed. Final Netlify draft
   `6a55bd0dfd16f2bd74bf6c1a` passes 320/390 signed-out shell with no overflow or console
   errors. No SQL, package, production deploy, remote push, master merge, or release APK.
+- SOL C9 QA attempt 1 FAIL is limited to visible copy. Direct Shock/J-Bar/Four-bar table
+  strings in `QuickReferenceView.tsx` bypass `plainRacerEffect` and still expose academic
+  terms such as trailing-arm geometry, rear roll center, chassis roll, apex, and weight
+  transfer. Raw research strings are safe only when rendered through the translator.
+  Terra should repair displayed rows and extend source fixtures; no PDF/share/lifecycle,
+  sync, schema, package, native, or deploy repair is indicated.
