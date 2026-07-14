@@ -101,10 +101,11 @@ Separate track from WS-N…Z. Chunks 1–9 are historical and archived under `do
 | UXF-5 | Copy tone + Tuning Guide/App Guide separation | pending | 0 | — | — | Owner tone review required to close. |
 | UXF-6 | Races/Days maintenance intervals + starting usage | pending | 0 | — | — | No current test-data compatibility burden. |
 | UXF-7 | Main Checklist redesign proposal | pending | 0 | — | — | Spec-only; Maxx design session gates follow-on build. |
-| UXF-8 | Docs and loop-state hygiene | in_progress | 1 | — | — | CODE_PASS; current links and diff check pass. Awaiting independent SOL QA. |
+| UXF-8 | Docs and loop-state hygiene | in_progress | 1 | 82 | fe59cf0 | QA attempt 1 FAIL: active GitHub roles still point to plan-v2/preview-v2; fixer says third failure; active plan path, cold-start conflict rule, and live handoff row are stale. Route to SOL fixer. |
 | UXF-9 | Batch regression, draft, and owner acceptance | pending | 0 | — | — | Last; absorbs remaining WS-Z runtime checks. |
 
 ### UX chunk grade log
+- 2026-07-14 · UXF-8 · SOL High QA attempt 1 · FAIL · 82 · Archive moves, current Markdown links, migration state, UXF table, diff check, and no-source-change gate pass. Active `.github/agents` role files still route to retired `plan-v2.md`/`preview-v2`; fixer description still says third failure; active plan source path, PROJECT conflict rule, and live HANDOFF status are stale. First-failure policy routes repair to SOL fixer.
 - 2026-07-12 · UX-C1 · Fable QA · PASS-WITH-NOTES · primitives safe (undo state-machine no early-fire/leak; applied pagehide-commit + stepper keyboard). lint 3-baseline, build green, isolated (App.tsx untouched).
 - 2026-07-12 · UX-C2 · Fable QA · PASS (no blockers) · back-handling no trap/double-handle; one-shot guards (auto-car/weekend) correct; `byActiveCar` byte-identical; dual-writes intact. Backlog: dashboard 2-press exit; auto-car dup if signed-in pull errors→[]; reportSave(synced) TODO; prune `'quickref'` union.
 - 2026-07-12 · UX-C3 · Fable QA · PASS (no blockers) · move-out faithful (weather/image/guards/tire-lifecycle/dual-writes preserved via line-diff); undo delete lazy; diagnostics round-trip; keypad string. Pure fns harness PASS. Backlog: deleting weekend still shows in ContextStrip/Dashboard during undo window.
