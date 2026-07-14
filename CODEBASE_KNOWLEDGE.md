@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 7 — SOL QA attempt 2 PASS)
+> Last updated: 2026-07-13 (UX Chunk 8 — Terra CODE_PASS, SOL QA pending)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1313,3 +1313,35 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   marker lifecycle, load filtering, lifecycle locks, and mapper parity. Expanded C7
   harness and repair-range diff check pass; lint remains exact baseline; cavecrew found
   no issues. C7 closed; C8 unlocked. Combined full runtime gate remains due after C8.
+
+## 28. UX Chunk 8 — Trackers and Maintenance Logs (2026-07-13)
+
+- Terra feature `2f60420` is CODE_PASS; C9 is locked pending independent SOL QA.
+- Visible UI uses **Maintenance Logs**. Internal `SubTab='service'`, `MaintenanceLog`
+  values, localStorage keys, and Supabase table/column names are deliberately unchanged.
+- `TodoItem.kind` is optional `core|adhoc`; missing means core. Optional `sourceType`,
+  `sourceId`, `sourceCycle`, and `removedUntilReset` live inside existing `todos.items`
+  JSONB. `src/lib/checklistMaintenance.ts` is reset/reconciliation authority.
+- Manual tasks are ad-hoc. Imported and maintenance tasks are core. Reset clears core
+  and kept ad-hoc completion state, drops ad-hoc when preference is off, restores hidden
+  core definitions, and follows later template item edits/additions/deletions using
+  stable template source IDs and hidden tombstones.
+- Automatic jobs use stable `maintenance:<componentId>` source plus service-cycle key.
+  `pct >= 0.90` creates one current job; repeated reconciliation is idempotent. Below
+  90% removes unfinished current jobs only. Completed history remains, and a new/current
+  due job can coexist when reset or a later service cycle requires it.
+- App gates reconciliation until initial cloud pull completes, then saves Todo changes
+  through one React/localStorage/cloud handler. New Weekend reads remembered
+  `race_notes_keep_added_items` and resets Main Checklist local-first.
+- Checklist rows are whole-row 56px toggle targets. Task edit retains source/completion
+  metadata and supports text, notes, and assignment for every origin. Stale/offline
+  assignees remain unless the user explicitly chooses Unassigned.
+- Templates are removed from the visible top-level tab bar and mounted under Checklist
+  → Edit List. Legacy internal `'templates'` navigation opens that nested manager.
+- `AccountingEntry.category` is optional and local-only. `accountingDefaults.ts` derives
+  local-today date, last-entered category (`Other` for legacy), and five newest distinct
+  description/category repeats; chips do not alter amount/date.
+- No schema migration. Harness `scripts/chunk8-trackers-harness.ts` plus C6A/C6B/C7
+  harnesses pass. Lint exact baseline; build 545 modules/16 PWA entries; cavecrew clean.
+  Android debug dark mobile smoke confirms current naming and due-job injection. Draft:
+  `https://6a55b29bbc2a11f748b406a3--crew-chief-race-notes.netlify.app`.

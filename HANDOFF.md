@@ -8,14 +8,14 @@
 > - **`master` == `origin/master` == `98bb2e0`+cleanup.** The `preview` (v1) and `preview-v2` branches were retired/removed after consolidation; `master` is the single source of truth. Deploys still default to Netlify preview; production only on Maxx's explicit say-so.
 > - **Migration 014 IS applied to live Supabase** (`20260711151905`, applied 2026-07-11). Ignore older "014 not applied" notes.
 > - **Current APK provenance:** root `race_notes.apk` remains UX-R1 versionCode 15/versionName 4.0. Chunk 5 was runtime-tested from `.worktrees\v3\android\app\build\outputs\apk\debug\app-debug.apk`, versionCode 16/versionName 4.1; it was not copied to the root release artifact. Production remains unchanged.
-> - **Current Netlify draft:** `https://6a55a43a8cc5f6b9da612c69--crew-chief-race-notes.netlify.app` (UX-C6B Terra repair 2). Production remains untouched.
+> - **Current Netlify draft:** `https://6a55b29bbc2a11f748b406a3--crew-chief-race-notes.netlify.app` (UX-C8 Terra CODE_PASS). Production remains untouched.
 > - **Repo hygiene pass done:** removed dead PWABuilder/TWA leftovers (root gradle files, `pwabuilder-adv-sw.js`, `metadata.json`, `build_apk.bat`, `PWA_INSTRUCTIONS.md`), retired v1 `plan.md`, untracked `.idea/` + root `local.properties`, and added `android/app/google-services.json` to `.gitignore`.
 
 > ### 🎨 UX OVERHAUL track — `preview-v3` (active dev line as of 2026-07-12)
 > A dedicated UX/UI overhaul is in progress on a NEW worktree **`.worktrees/v3` (branch `preview-v3`, created from `master` `3ea6648`)**. `master` is untouched; the overhaul lands on `preview-v3` and merges to `master` only on owner approval.
 > - **Source of the work:** [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md) (Fable expert UX audit — 37 recs, cost/benefit) → [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md) (spec-driven, 7 build chunks).
 > - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High owns implementation; QA failures 1–2 return to Terra and failure 3 transfers build+final QA to SOL. Codex model overrides and rollout metadata are now verified: SOL → Terra → SOL works in one persistent task. Generic prose self-identification is not model evidence. **`/caveman full`** stays on. One consolidated QA pass per chunk + standing `tsc --noEmit` (3-error baseline) and `vite build` gates.
-> - **Chunk status:** ✅ **1–7**. SOL QA attempt 2 closed C7 after feature `58e4522` and repair `030122c`. C8 is unlocked for Terra. Export/help/final sweep is **9**.
+> - **Chunk status:** ✅ **1–7**. C8 Terra CODE_PASS at `2f60420`, awaiting SOL QA. Export/help/final sweep C9 stays locked until PASS.
 > - **New reusable code (chunks 1-4):** `src/components/ui/` (`NumberStepper`, `UndoToast`+`InfoToast`, `EmptyState`, `CollapsibleSection`, `SegmentedGrid`, `BottomSheet`, `HelpSheet`, `LapTimeKeypad`); `src/lib/undo.ts`; `src/lib/backStack.ts`; `src/lib/saveStatus.ts`; `src/lib/sessionSequence.ts`; `src/lib/serviceLog.ts`; `src/lib/scope.ts` (`pickAutoWeekend`, `parseWeekendDate`, `sortWeekends`); `src/components/ContextStrip.tsx`; `src/components/GetRaceReadyCard.tsx`. CSS: `.tap-target`, `.sticky-action-bar`, `.status-chip` + light-theme contrast bump.
 > - **Owner UX answers baked into the plan:** (1) app used during the week + at the track after each run; (2) 95% single-user → assignment/concurrency deferred; (3) most teams 1 car (some 2-3) → car UI hidden at ≤1 car; (4) **four-bar changed VERY often trackside → make it FAST, not hidden** (reverses the "fold behind expander" rec — chunk 5); (5) dusk→night racing → sunlight/light-theme tuned; (6) Main Checklist = hybrid core-reset + ad-hoc (chunk 6).
 > - **Testing:** v3 APKs use the build-from-main bridge: run lint then build in v3; mirror v3 `dist` to main; run raw `npx cap sync android` (not main `npm run android:sync`, which rebuilds master); run `assembleDebug`. Current Chunk 4 APK is versionCode 14/versionName 3.9 at the standard debug output. Android emulator QA passed fresh-profile hero→weekend→new-session, quick-service cost→Accounting→Undo, and session ⋯ delete→Undo. Emulator native `screencap` showed white because WebView tile-memory/compositor warnings; direct WebView capture and DOM verified rendered UI.
@@ -70,6 +70,25 @@
 > - SOL QA attempt 2 PASS: expanded harness, repair-range diff check, exact lint
 >   baseline, independent code inspection, and cavecrew review all pass. C7 closed;
 >   C8 unlocked. Combined build/cloud/mobile/Netlify gate remains due after C8.
+
+> ### 🧰 UX-C8 Trackers/Maintenance — Terra CODE_PASS 2026-07-13
+> - Feature `2f60420`; independent SOL QA pending. C9 remains locked.
+> - Visible Service copy is now Maintenance Logs across Trackers, Dashboard, Guide,
+>   and user guide. Internal `service` values, storage keys, and DB tables stay stable.
+> - `src/lib/checklistMaintenance.ts` owns optional `core|adhoc` compatibility,
+>   remembered reset behavior, template-source re-materialization/tombstones, and
+>   idempotent 90% automatic maintenance jobs. Completed history is retained while a
+>   still-due current-cycle job reopens. Todo JSON sync needs no migration.
+> - Main Checklist whole rows toggle at 56px minimum. Edit-after-create handles text,
+>   notes, and assignee without losing manual/template/maintenance provenance. Templates
+>   now live under Checklist → Edit List; existing CRUD/starter convergence remains.
+> - Accounting defaults date to today/category to last-entered and offers five distinct
+>   description/category repeat chips that never touch amount/date.
+> - Evidence: focused C8 and accumulated C6–C8 harnesses PASS; exact three-error lint
+>   baseline; 545-module/16-entry build; diff check and cavecrew re-review clean.
+>   Android debug current bundle shows dark mobile Maintenance naming and automatic
+>   checklist injection with no crash. Draft `6a55b29bbc2a11f748b406a3` boots at 320px
+>   with zero console errors; unique origin has no remembered auth. No SQL/production.
 
 > ### 🧭 Owner revision — 2026-07-13
 > - Finish Weekend is always available at page bottom. No race/session gate; test days may be finished normally.

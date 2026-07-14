@@ -1,6 +1,6 @@
 # Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** IN PROGRESS — C6B SOL QA ATTEMPT 3 PASS; C7 READY FOR TERRA BUILD
+**Status:** IN PROGRESS — C8 TERRA CODE_PASS; AWAITING SOL QA; C9 LOCKED
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -296,6 +296,31 @@ performance-policy warnings predate this column-only migration. C7 remains locke
   only unfinished automatic job; preserve completed history.
 - Accounting new entry defaults date today and category last used; five recent distinct
   description/category chips fill repeat details but not amount.
+
+### C8 Terra CODE_PASS — awaiting SOL QA
+
+- Feature commit `2f60420`. Visible Trackers/Dashboard/Guide copy now says
+  Maintenance Logs while internal `service` identifiers, keys, and DB shapes stay stable.
+- `checklistMaintenance.ts` owns legacy-core reads, remembered reset policy, template
+  definition re-materialization/tombstones, due-job cycles, and 90% reconciliation.
+  Completed maintenance history stays intact while a still-due current job reopens.
+- Main Checklist rows are 56px whole-row targets. After-create edit preserves task,
+  notes, assignment, and source metadata for manual, template, and automatic jobs.
+  Templates moved under Checklist → Edit List without changing CRUD/cloud convergence.
+- Maintenance reconciliation is local-first, idempotent, pull-gated, car/rig scoped,
+  and stored in existing Todo `items` JSON. Accounting category is optional/local-safe;
+  no Supabase migration is required.
+- Focused C8 harness PASS, plus C6A/C6B/C7 harnesses PASS. Lint remains exactly the
+  three known errors. Build PASS (545 modules, 16 PWA entries), diff check PASS, and
+  cavecrew final re-review `No issues.`
+- Android debug installed on emulator. Current bundle cold-reloaded and confirmed dark
+  mobile Dashboard naming plus automatic maintenance → Main Checklist injection; zero
+  crash-buffer entries. WebView exposes no child nodes to adb, so safe scripted deep
+  tap-through was unavailable. Netlify draft auth shell passes 320px with zero console
+  errors: `https://6a55b29bbc2a11f748b406a3--crew-chief-race-notes.netlify.app`.
+  Unique origin lacks remembered auth; authenticated cloud round trip remains unavailable.
+- Production, remote branch, `master`, release APK, and Supabase schema unchanged.
+  C9 stays locked until independent SOL C8 + combined-gate verdict.
 
 ## Chunk 9 — export, help, copy, final regression
 
