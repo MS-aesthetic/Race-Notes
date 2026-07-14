@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 6B — Terra repair 2)
+> Last updated: 2026-07-13 (UX Chunk 6B — SOL QA attempt 3 PASS)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1252,5 +1252,13 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   issues; exact three-error lint baseline; build PASS (540 modules, 16 Workbox entries);
   `git diff --check` PASS. Draft
   `https://6a55a43a8cc5f6b9da612c69--crew-chief-race-notes.netlify.app` boots at
-  390×844 with zero console errors. No migration/live schema change. C7 remains locked
-  pending SOL QA attempt 3.
+  390×844 with zero console errors. No migration/live schema change.
+- SOL QA attempt 3 PASS. Independent code inspection plus two cavecrew reviews found
+  no issues. Harness, exact lint baseline, 540-module/16-entry build, diff check, and
+  clean-tree checks passed. Live project `swblfeayxoprodhwxqak` has migration
+  `20260714020037`, all 23 rechecked mapped lifecycle/scalar columns, RLS enabled, and
+  authenticated CRUD grants on both lifecycle tables. Tables contain zero rows, so no
+  authenticated lifecycle round-trip fixture exists. Security advisor has no relevant
+  setup/weekend finding; existing RLS performance warnings predate C6B. Current
+  Supabase new-table grant change does not affect this existing-table column migration.
+  C6B closed; C7 unlocked.

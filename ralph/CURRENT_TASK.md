@@ -1,6 +1,6 @@
 # Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** IN PROGRESS — C6B TERRA REPAIR 2 CODE_PASS; AWAITING SOL QA ATTEMPT 3; C7 LOCKED
+**Status:** IN PROGRESS — C6B SOL QA ATTEMPT 3 PASS; C7 READY FOR TERRA BUILD
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -171,6 +171,29 @@ performance-policy warnings predate this column-only migration. C7 remains locke
   lifecycle UI remains harness/local evidence. Migration and live schema unchanged.
 - Production, remote branch, `master`, and release APK unchanged. C7 remains locked
   until independent SOL QA attempt 3 passes.
+
+### C6B SOL QA attempt 3 — PASS (2026-07-13)
+
+- Independent inspection and two cavecrew reviews found no issues across event-owned
+  setup resolution, missing-setup guards, no-link legacy Finish, stale-row recovery,
+  partial-Finish chronology, relationship locks, App mutation/deletion enforcement,
+  clone behavior, local-first persistence, sync mappings, and finished-event exclusion.
+- Expanded lifecycle harness PASS. `npm run lint` remains exactly the three known
+  baseline errors. Vite build PASS: 540 modules and 16 Workbox entries.
+  `git diff --check 19a2989..e0e8343` PASS; worktree clean before QA docs.
+- Supabase project `swblfeayxoprodhwxqak`: migration `20260714020037` present;
+  all 23 explicitly checked mapped lifecycle/scalar columns present; RLS enabled and
+  authenticated CRUD granted on `setups`/`race_weekends`. Both tables contain zero
+  rows, so no authenticated lifecycle data round trip was available. Security advisor
+  has zero setup/weekend findings; pre-existing RLS performance warnings remain.
+- Current Supabase grant-default breaking change affects newly created tables, not
+  this additive-column migration on existing exposed tables.
+- Draft `https://6a55a43a8cc5f6b9da612c69--crew-chief-race-notes.netlify.app`
+  boots at 390×844 with zero console errors. Draft and localhost origins both lacked
+  a remembered account; deep lifecycle runtime remains prior local evidence plus pure
+  fixtures. No production deploy, remote push, master merge, or release APK.
+- C6B closed. C7 unlocked for Terra High implementation; C7+C8 keep planned combined
+  coherent gate after focused per-chunk harnesses.
 
 ## Chunk 7 — expanded Quick Adjust
 
