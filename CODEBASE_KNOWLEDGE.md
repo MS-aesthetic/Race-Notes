@@ -1351,3 +1351,19 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   no migration is needed. Authenticated live Todo rows were unavailable and are not
   claimed. The draft predates only the final hidden-template tombstone correction;
   source inspection and the focused fixture cover that edge.
+
+## 29. UX Chunk 9 — PDF Share, Context Help, Racer Copy (2026-07-13)
+
+- Terra feature `c8c4a21` is CODE_PASS and awaits independent SOL final QA.
+- `src/lib/exportPdf.ts` owns pure printable report documents plus dependency-free PDF
+  file bytes. `src/lib/reportShare.ts` owns native Filesystem/Share, browser Web Share,
+  desktop download, quiet cancellation, and honest failure results. ExportView retains
+  its existing browser print flow.
+- Setup and weekend cards share only the selected record. App-owned `helpSection` routes
+  HelpSheet directly to Setup, four-bar, Load Sessions, and setup-difference anchors.
+  Racer-language edits are display-only; persisted identifiers and DB/service names stay.
+- Gate evidence: C5–C9 and UX-R1 harnesses PASS; lint exact three-error baseline; build
+  554 modules/18 PWA entries; diff and cavecrew final review PASS. Android debug actual
+  file chooser/cancel/back/help/theme/size/offline smoke passed. Final Netlify draft
+  `6a55bd0dfd16f2bd74bf6c1a` passes 320/390 signed-out shell with no overflow or console
+  errors. No SQL, package, production deploy, remote push, master merge, or release APK.

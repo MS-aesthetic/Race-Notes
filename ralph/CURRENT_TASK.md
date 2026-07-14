@@ -1,6 +1,6 @@
 # Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** IN PROGRESS — C8 SOL QA PASS; C9 UNLOCKED FOR TERRA
+**Status:** IN PROGRESS — C9 TERRA CODE_PASS; AWAITING SOL FINAL QA
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -349,6 +349,30 @@ performance-policy warnings predate this column-only migration. C7 remains locke
   PDF share/download, Android back, auth shell, car scoping, deletion sync.
 - Final exact lint baseline, build, harness suite, cavecrew review, Supabase verification,
   Android runtime, and one final Netlify draft. Production/master remain unchanged.
+
+### C9 Terra CODE_PASS — implementation result
+
+- Feature commit `c8c4a21`. Existing Export report builders now live in pure
+  `src/lib/exportPdf.ts`; Export keeps its browser-print behavior and report content.
+  Setup and weekend card Share create actual PDF files.
+- `reportShare.ts` uses Capacitor Filesystem + Share on native, browser Web Share when
+  available, and desktop download otherwise. Cancellation is quiet; failure never
+  reports success. Reports contain only the selected Setup or weekend.
+- Context help routes directly to plain Setup, four-bar, Load Sessions, or setup-diff
+  guidance. Display-only copy removes AFCO/chassis/package claims and unexplained
+  academic wording without renaming stored values, routes, identifiers, or DB fields.
+- C5–C9 plus UX-R1 harnesses PASS. Lint remains exactly the three known errors. Build
+  PASS: 554 modules and 18 PWA entries. Diff checks and cavecrew final review PASS.
+  No Supabase migration or new package was needed.
+- Android debug native Setup Share opened the chooser with
+  `crewchief-chunk5-baseline-2026-07-13.pdf`; Back cancelled cleanly. Context help/back,
+  dark Default, light Large, cold offline saved-data boot, and crash buffer passed.
+- Final draft only: `https://6a55bd0dfd16f2bd74bf6c1a--crew-chief-race-notes.netlify.app`.
+  Fresh-origin auth shell passed at 320x844 and 390x844 with no horizontal overflow or
+  console errors. Unique origin lacked remembered login, so authenticated draft data is
+  not claimed; Android supplied authenticated/local runtime evidence.
+- Production, remote branch, `master`, release APK, and Supabase schema remain untouched.
+  C9 awaits SOL High independent final QA across Chunks 6B–9.
 
 ## Execution / QA consolidation
 

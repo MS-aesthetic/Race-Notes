@@ -8,14 +8,14 @@
 > - **`master` == `origin/master` == `98bb2e0`+cleanup.** The `preview` (v1) and `preview-v2` branches were retired/removed after consolidation; `master` is the single source of truth. Deploys still default to Netlify preview; production only on Maxx's explicit say-so.
 > - **Migration 014 IS applied to live Supabase** (`20260711151905`, applied 2026-07-11). Ignore older "014 not applied" notes.
 > - **Current APK provenance:** root `race_notes.apk` remains UX-R1 versionCode 15/versionName 4.0. Chunk 5 was runtime-tested from `.worktrees\v3\android\app\build\outputs\apk\debug\app-debug.apk`, versionCode 16/versionName 4.1; it was not copied to the root release artifact. Production remains unchanged.
-> - **Current Netlify draft:** `https://6a55b29bbc2a11f748b406a3--crew-chief-race-notes.netlify.app` (UX-C8 Terra CODE_PASS). Production remains untouched.
+> - **Current Netlify draft:** `https://6a55bd0dfd16f2bd74bf6c1a--crew-chief-race-notes.netlify.app` (UX-C9 Terra CODE_PASS). Production remains untouched.
 > - **Repo hygiene pass done:** removed dead PWABuilder/TWA leftovers (root gradle files, `pwabuilder-adv-sw.js`, `metadata.json`, `build_apk.bat`, `PWA_INSTRUCTIONS.md`), retired v1 `plan.md`, untracked `.idea/` + root `local.properties`, and added `android/app/google-services.json` to `.gitignore`.
 
 > ### 🎨 UX OVERHAUL track — `preview-v3` (active dev line as of 2026-07-12)
 > A dedicated UX/UI overhaul is in progress on a NEW worktree **`.worktrees/v3` (branch `preview-v3`, created from `master` `3ea6648`)**. `master` is untouched; the overhaul lands on `preview-v3` and merges to `master` only on owner approval.
 > - **Source of the work:** [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md) (Fable expert UX audit — 37 recs, cost/benefit) → [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md) (spec-driven, 7 build chunks).
 > - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High owns implementation; QA failures 1–2 return to Terra and failure 3 transfers build+final QA to SOL. Codex model overrides and rollout metadata are now verified: SOL → Terra → SOL works in one persistent task. Generic prose self-identification is not model evidence. **`/caveman full`** stays on. One consolidated QA pass per chunk + standing `tsc --noEmit` (3-error baseline) and `vite build` gates.
-> - **Chunk status:** ✅ **1–8**. C8 SOL QA PASS at `2f60420`; export/help/final sweep C9 is unlocked for Terra High.
+> - **Chunk status:** ✅ **1–8**. C9 Terra CODE_PASS at `c8c4a21`; awaiting SOL High independent C9/final Chunks 6B–9 QA.
 > - **New reusable code (chunks 1-4):** `src/components/ui/` (`NumberStepper`, `UndoToast`+`InfoToast`, `EmptyState`, `CollapsibleSection`, `SegmentedGrid`, `BottomSheet`, `HelpSheet`, `LapTimeKeypad`); `src/lib/undo.ts`; `src/lib/backStack.ts`; `src/lib/saveStatus.ts`; `src/lib/sessionSequence.ts`; `src/lib/serviceLog.ts`; `src/lib/scope.ts` (`pickAutoWeekend`, `parseWeekendDate`, `sortWeekends`); `src/components/ContextStrip.tsx`; `src/components/GetRaceReadyCard.tsx`. CSS: `.tap-target`, `.sticky-action-bar`, `.status-chip` + light-theme contrast bump.
 > - **Owner UX answers baked into the plan:** (1) app used during the week + at the track after each run; (2) 95% single-user → assignment/concurrency deferred; (3) most teams 1 car (some 2-3) → car UI hidden at ≤1 car; (4) **four-bar changed VERY often trackside → make it FAST, not hidden** (reverses the "fold behind expander" rec — chunk 5); (5) dusk→night racing → sunlight/light-theme tuned; (6) Main Checklist = hybrid core-reset + ad-hoc (chunk 6).
 > - **Testing:** v3 APKs use the build-from-main bridge: run lint then build in v3; mirror v3 `dist` to main; run raw `npx cap sync android` (not main `npm run android:sync`, which rebuilds master); run `assembleDebug`. Current Chunk 4 APK is versionCode 14/versionName 3.9 at the standard debug output. Android emulator QA passed fresh-profile hero→weekend→new-session, quick-service cost→Accounting→Undo, and session ⋯ delete→Undo. Emulator native `screencap` showed white because WebView tile-memory/compositor warnings; direct WebView capture and DOM verified rendered UI.
@@ -94,6 +94,21 @@
 >   maintenance history/current reopen, stale assignment, 90% boundary/idempotence,
 >   and accounting repeat semantics pass. Todo additions stay in existing JSONB; no
 >   migration. Authenticated task rows were unavailable and are not claimed.
+
+> ### 📄 UX-C9 Export/Help/Final Sweep — TERRA CODE_PASS 2026-07-13
+> - Feature `c8c4a21`; independent SOL final QA remains open.
+> - `src/lib/exportPdf.ts` owns pure report/PDF generation. Setup and weekend Share
+>   create actual PDF files through native Capacitor file share, Web Share, or desktop
+>   download. Cancel is quiet; failures never report success.
+> - Setup, four-bar, Load Sessions, and setup-difference help buttons route to direct,
+>   plain racer-language sections. Visible copy no longer claims AFCO/chassis/package
+>   specificity or uses unexplained academic terms; identifiers/storage/DB stayed.
+> - C5–C9 plus UX-R1 harnesses PASS; lint exact three-error baseline; build 554 modules /
+>   18 PWA entries; diff and cavecrew final review PASS. No migration or new package.
+> - Android debug chooser received a named PDF; cancellation, help/back, dark Default,
+>   light Large, cold offline saved data, and crash buffer passed. Final draft auth shell
+>   passes 320/390 with zero overflow/console errors. Unique origin was signed out, so
+>   authenticated draft data is not claimed.
 
 > ### 🧭 Owner revision — 2026-07-13
 > - Finish Weekend is always available at page bottom. No race/session gate; test days may be finished normally.

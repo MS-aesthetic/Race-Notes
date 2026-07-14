@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunks 1–8 ✅ SOL QA PASS · Chunk 9 unlocked for Terra High. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
+> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunks 1–8 ✅ SOL QA PASS · Chunk 9 Terra CODE_PASS at `c8c4a21`, awaiting SOL final QA. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; persistent-task model handoff verified. `/caveman full`. Status: `HANDOFF.md` + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:
@@ -175,6 +175,17 @@ Original seven-chunk plan below remains implementation history. Current remainin
    pass. Android/draft evidence accepted; authenticated task rows were unavailable
    and are not claimed. C8 closed; C9 unlocked.
 5. **Chunk 9 — export/help/final regression.** Former Chunk 7 after all new screens stabilize.
+
+   **Terra CODE_PASS (`c8c4a21`):** pure PDF generation extracted to
+   `src/lib/exportPdf.ts`; actual Setup/weekend PDF file share uses Capacitor native share,
+   browser Web Share, or desktop download with correct cancel/failure handling. Direct
+   Setup/four-bar/Load/setup-diff help anchors and display-only racer-language audit are
+   complete. C5–C9 plus UX-R1 harnesses, exact three-error lint baseline, 554-module /
+   18-entry build, diff checks, and cavecrew review pass. Android debug native chooser,
+   cancellation/back/help, dark Default/light Large, offline saved-data boot, and crash
+   buffer pass. Final draft `6a55bd0dfd16f2bd74bf6c1a` passes 320/390 auth shell with
+   no overflow or console errors. No migration, package, production, push, master, or
+   release change. Await independent SOL C9/final Chunks 6B–9 QA.
 
 Dependency: 6A → 6B → 7; 6B → 8; 7+8 → 9. Feature builds stay serial. Test once per coherent slice, then consolidated Android/preview regression per completed chunk.
 
