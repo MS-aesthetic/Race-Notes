@@ -208,9 +208,9 @@ export function resetChecklistItems(
       continue;
     }
 
-    const selected = open[0]
-      ? open[0]
-      : { ...sample, id: uniqueOccurrenceId(sample.id, usedIds) };
+    const selected = open.find(item => !item.removedUntilReset)
+      ?? open[0]
+      ?? { ...sample, id: uniqueOccurrenceId(sample.id, usedIds) };
     const selectedText = templateText ?? selected.text;
     const needsReset = selected.done
       || selected.text !== selectedText
@@ -227,7 +227,9 @@ export function resetChecklistItems(
       archivedAt: undefined,
       removedUntilReset: undefined,
     } : selected);
-    currentRows.push(...open.slice(1).map(item => item.removedUntilReset ? item : { ...item, removedUntilReset: true }));
+    currentRows.push(...open
+      .filter(item => item !== selected)
+      .map(item => item.removedUntilReset ? item : { ...item, removedUntilReset: true }));
   }
 
   const reset = [...history, ...archivedCurrent, ...currentRows];

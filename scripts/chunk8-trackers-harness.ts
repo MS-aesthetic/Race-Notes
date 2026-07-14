@@ -97,6 +97,18 @@ assert.deepEqual(repeatReset, resetNoCarry);
 const resetCarry = resetChecklistItems(resetSource, true, templates, { listId: 'main', now: 'reset-time' });
 assert.equal(activeChecklistItems({ ...main, items: resetCarry }).some(item => item.id === 'adhoc-open'), true);
 
+const duplicateRecurrence: TodoItem[] = [
+  { id: 'duplicate-hidden', text: 'Stale hidden job', done: false, sourceId: 'core:main:duplicate', removedUntilReset: true, assignedTo: 'old' },
+  { id: 'duplicate-current', text: 'Current edited job', done: false, sourceId: 'core:main:duplicate', assignedTo: 'current' },
+];
+const duplicateReset = resetChecklistItems(duplicateRecurrence, true, [], { listId: 'main', now: 'duplicate-reset' });
+const duplicateActive = activeChecklistItems({ ...main, items: duplicateReset });
+assert.equal(duplicateActive.length, 1);
+assert.equal(duplicateActive[0].id, 'duplicate-current');
+assert.equal(duplicateActive[0].text, 'Current edited job');
+assert.equal(duplicateActive[0].assignedTo, 'current');
+assert.equal(duplicateReset.find(item => item.id === 'duplicate-hidden')?.removedUntilReset, true);
+
 const firstImport = importTemplateItems([], templates[0]);
 const repeatedImport = importTemplateItems(firstImport, templates[0]);
 assert.equal(repeatedImport, firstImport);
@@ -307,6 +319,7 @@ assert.match(todoSource, /activeChecklistItems\(currentMain\)/);
 assert.match(todoSource, /Completed since last reset/);
 assert.match(todoSource, /Checklist clear/);
 assert.match(todoSource, /6000/);
+assert.match(todoSource, /if \(event\.currentTarget !== event\.target\) return;/);
 assert.match(todoSource, /min-h-14/);
 assert.match(todoSource, /min-h-11 min-w-11/);
 assert.match(todoSource, /Mark open/);

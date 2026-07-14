@@ -376,6 +376,7 @@ export default function ToDoView({
               tabIndex={0}
               onClick={() => completeItem(item.id)}
               onKeyDown={event => {
+                if (event.currentTarget !== event.target) return;
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
                   completeItem(item.id);
