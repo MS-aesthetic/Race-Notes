@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { toTravel, travelToSvgY } from '../src/components/SmasherLoadsView';
+import { buildComparisonRows } from '../src/lib/shockCompare';
+import type { ShockSession } from '../src/types';
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -30,9 +33,29 @@ assert.match(sync, /ride_height_ctoc: s\.rideHeightCtoC \|\| ''/);
 assert.match(sync, /rideHeightCtoC: \(r\.ride_height_ctoc as string\) \|\| ''/);
 assert.match(migration, /ADD COLUMN IF NOT EXISTS ride_height_ctoc text DEFAULT ''/i);
 
-const svgY = (height: number, minHeight: number, maxHeight: number) =>
-  20 + (1 - (height - minHeight) / (maxHeight - minHeight)) * 200;
-assert.ok(svgY(10, 10, 12) > svgY(12, 10, 12));
-assert.equal((loads.match(/sy: PAD\.top \+ \(1 - \(y - yMin\) \/ yRange\) \* innerH/g) || []).length, 2);
+const heights = [12, 11.5, 10.75];
+const maxHeight = Math.max(...heights);
+const travels = heights.map(height => toTravel(height, maxHeight));
+assert.deepEqual(travels, [0, 0.5, 1.25]);
+const svgPositions = travels.map(travel => travelToSvgY(travel, 1.25, 20, 200));
+assert.deepEqual(svgPositions, [220, 140, 20]);
+assert.ok(svgPositions[2] < svgPositions[1] && svgPositions[1] < svgPositions[0]);
+assert.equal(travelToSvgY(0, 0, 20, 200), 220, 'equal-height data stays at the chart floor');
+
+assert.equal((loads.match(/sy: travelToSvgY\(toTravel\(height, heightMax\), maxTravel, PAD\.top, innerH\)/g) || []).length, 2);
+assert.equal((loads.match(/TRAVEL \(in\)/g) || []).length, 2);
+assert.doesNotMatch(loads, />HEIGHT \(in\)</);
+assert.equal((loads.match(/<title>\{`Travel \$\{travel\.toFixed\(2\)\} in · Height \$\{p\.y\.toFixed\(2\)\} in`\}<\/title>/g) || []).length, 2);
+assert.match(loads, /\{`H \$\{p\.y\.toFixed\(2\)\} in`\}/);
+assert.match(loads, /const heightMin = Math\.min\(\.\.\.allY\), heightMax = Math\.max\(\.\.\.allY\)/);
+
+const comparisonSessions = [
+  { id: 'a', points: [{ height: '10', load: '100' }, { height: '9', load: '200' }] },
+  { id: 'b', points: [{ height: '10', load: '150' }, { height: '8', load: '350' }] },
+] as ShockSession[];
+const comparisonRows = buildComparisonRows(comparisonSessions);
+assert.deepEqual(comparisonRows.map(row => row.height), [8, 9, 10]);
+assert.deepEqual(comparisonRows.find(row => row.height === 9)?.values, [200, 250]);
+assert.match(loads, /\['Shock Height \(in\)', 'Load \(lb\)'\]/);
 
 console.log('CHUNK6A_REFINEMENT_HARNESS PASS');

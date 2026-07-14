@@ -63,7 +63,17 @@ interface ChartProps {
   svgRef?: React.RefObject<SVGSVGElement | null>;
 }
 
+export function toTravel(height: number, maxHeight: number): number {
+  return maxHeight - height;
+}
+
+export function travelToSvgY(travel: number, maxTravel: number, top: number, innerHeight: number): number {
+  const displayRange = maxTravel > 0 ? maxTravel : 1;
+  return top + (1 - travel / displayRange) * innerHeight;
+}
+
 function ShockLineChart({ session, svgRef }: ChartProps) {
+  const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
   const W = 340, H = 220;
   const PAD = { top: 18, right: 20, bottom: 44, left: 54 };
 
@@ -95,15 +105,15 @@ function ShockLineChart({ session, svgRef }: ChartProps) {
 
   const xMin = Math.min(...parsed.map(p => p.x));
   const xMax = Math.max(...parsed.map(p => p.x));
-  const yMin = Math.min(...parsed.map(p => p.y));
-  const yMax = Math.max(...parsed.map(p => p.y));
+  const heightMin = Math.min(...parsed.map(p => p.y));
+  const heightMax = Math.max(...parsed.map(p => p.y));
 
   const xRange = xMax - xMin || 1;
-  const yRange = yMax - yMin || 1;
+  const maxTravel = toTravel(heightMin, heightMax);
 
-  const toSvg = (x: number, y: number) => ({
+  const toSvg = (x: number, height: number) => ({
     sx: PAD.left + ((x - xMin) / xRange) * innerW,
-    sy: PAD.top + (1 - (y - yMin) / yRange) * innerH,
+    sy: travelToSvgY(toTravel(height, heightMax), maxTravel, PAD.top, innerH),
   });
 
   const polyPoints = parsed.map(p => {
@@ -131,7 +141,7 @@ function ShockLineChart({ session, svgRef }: ChartProps) {
       {/* Grid lines */}
       {Array.from({ length: yTicks + 1 }).map((_, i) => {
         const y = PAD.top + (i / yTicks) * innerH;
-        const val = yMax - (i / yTicks) * yRange;
+        const val = maxTravel * (1 - i / yTicks);
         return (
           <g key={`gy-${i}`}>
             <line x1={PAD.left} y1={y} x2={PAD.left + innerW} y2={y} stroke="#222" strokeWidth="1" />
@@ -174,13 +184,52 @@ function ShockLineChart({ session, svgRef }: ChartProps) {
       {/* Points */}
       {parsed.map((p, i) => {
         const { sx, sy } = toSvg(p.x, p.y);
+        const travel = toTravel(p.y, heightMax);
+        const labelAtRight = sx > PAD.left + innerW - 42;
+        const labelAtTop = sy < PAD.top + 12;
         return (
-          <g key={i}>
+          <g
+            key={i}
+            role="button"
+            tabIndex={0}
+            aria-label={`Travel ${travel.toFixed(2)} in, height ${p.y.toFixed(2)} in`}
+            onClick={() => setSelectedPoint(i)}
+            onKeyDown={event => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setSelectedPoint(i);
+              }
+            }}
+            className="cursor-pointer outline-none"
+          >
+            <title>{`Travel ${travel.toFixed(2)} in · Height ${p.y.toFixed(2)} in`}</title>
             <circle cx={sx} cy={sy} r={4} fill={col.line} />
             <circle cx={sx} cy={sy} r={2} fill="#111" />
+            <text
+              x={labelAtRight ? sx - 5 : sx + 5}
+              y={labelAtTop ? sy + 11 : sy - 6}
+              textAnchor={labelAtRight ? 'end' : 'start'}
+              fill="#aaa"
+              fontSize="7"
+              fontFamily="monospace"
+            >
+              {`H ${p.y.toFixed(2)} in`}
+            </text>
           </g>
         );
       })}
+
+      {selectedPoint !== null && parsed[selectedPoint] && (() => {
+        const point = parsed[selectedPoint];
+        const travel = toTravel(point.y, heightMax);
+        return (
+          <g pointerEvents="none">
+            <rect x={PAD.left + 4} y={PAD.top + 4} width="136" height="28" rx="4" fill="#181818" stroke={col.line} />
+            <text x={PAD.left + 10} y={PAD.top + 15} fill="#ddd" fontSize="8" fontFamily="monospace">{`Travel ${travel.toFixed(2)} in`}</text>
+            <text x={PAD.left + 10} y={PAD.top + 26} fill="#aaa" fontSize="8" fontFamily="monospace">{`Height ${point.y.toFixed(2)} in`}</text>
+          </g>
+        );
+      })()}
 
       {/* Axis labels */}
       <text
@@ -204,7 +253,7 @@ function ShockLineChart({ session, svgRef }: ChartProps) {
         fontWeight="bold"
         transform={`rotate(-90, 12, ${PAD.top + innerH / 2})`}
       >
-        HEIGHT (in)
+        TRAVEL (in)
       </text>
     </svg>
   );
@@ -223,6 +272,7 @@ interface CompareChartProps {
 }
 
 function ShockCompareChart({ sessions }: CompareChartProps) {
+  const [selectedPoint, setSelectedPoint] = useState<{ sessionId: string; index: number } | null>(null);
   const W = 340, H = 240;
   const PAD = { top: 18, right: 20, bottom: 44, left: 54 };
   const innerW = W - PAD.left - PAD.right;
@@ -252,13 +302,13 @@ function ShockCompareChart({ sessions }: CompareChartProps) {
   const allX = series.flatMap(s => s.points.map(p => p.x));
   const allY = series.flatMap(s => s.points.map(p => p.y));
   const xMin = Math.min(...allX), xMax = Math.max(...allX);
-  const yMin = Math.min(...allY), yMax = Math.max(...allY);
+  const heightMin = Math.min(...allY), heightMax = Math.max(...allY);
   const xRange = xMax - xMin || 1;
-  const yRange = yMax - yMin || 1;
+  const maxTravel = toTravel(heightMin, heightMax);
 
-  const toSvg = (x: number, y: number) => ({
+  const toSvg = (x: number, height: number) => ({
     sx: PAD.left + ((x - xMin) / xRange) * innerW,
-    sy: PAD.top + (1 - (y - yMin) / yRange) * innerH,
+    sy: travelToSvgY(toTravel(height, heightMax), maxTravel, PAD.top, innerH),
   });
 
   const xTicks = 5, yTicks = 4;
@@ -268,7 +318,7 @@ function ShockCompareChart({ sessions }: CompareChartProps) {
       {/* Grid */}
       {Array.from({ length: yTicks + 1 }).map((_, i) => {
         const y = PAD.top + (i / yTicks) * innerH;
-        const val = yMax - (i / yTicks) * yRange;
+        const val = maxTravel * (1 - i / yTicks);
         return (
           <g key={`gy-${i}`}>
             <line x1={PAD.left} y1={y} x2={PAD.left + innerW} y2={y} stroke="#222" strokeWidth="1" />
@@ -299,15 +349,52 @@ function ShockCompareChart({ sessions }: CompareChartProps) {
             <polyline points={poly} fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
             {s.points.map((p, i) => {
               const { sx, sy } = toSvg(p.x, p.y);
-              return <circle key={i} cx={sx} cy={sy} r={3} fill={s.color} />;
+              const travel = toTravel(p.y, heightMax);
+              return (
+                <circle
+                  key={i}
+                  cx={sx}
+                  cy={sy}
+                  r={4}
+                  fill={s.color}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${s.session.label || s.session.corner}: Travel ${travel.toFixed(2)} in, height ${p.y.toFixed(2)} in`}
+                  onClick={() => setSelectedPoint({ sessionId: s.session.id, index: i })}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedPoint({ sessionId: s.session.id, index: i });
+                    }
+                  }}
+                  className="cursor-pointer outline-none"
+                >
+                  <title>{`Travel ${travel.toFixed(2)} in · Height ${p.y.toFixed(2)} in`}</title>
+                </circle>
+              );
             })}
           </g>
         );
       })}
 
+      {selectedPoint && (() => {
+        const selectedSeries = series.find(item => item.session.id === selectedPoint.sessionId);
+        const point = selectedSeries?.points[selectedPoint.index];
+        if (!selectedSeries || !point) return null;
+        const travel = toTravel(point.y, heightMax);
+        return (
+          <g pointerEvents="none">
+            <rect x={PAD.left + 4} y={PAD.top + 4} width="150" height="39" rx="4" fill="#181818" stroke={selectedSeries.color} />
+            <text x={PAD.left + 10} y={PAD.top + 15} fill={selectedSeries.color} fontSize="8" fontFamily="monospace">{selectedSeries.session.label || selectedSeries.session.corner}</text>
+            <text x={PAD.left + 10} y={PAD.top + 26} fill="#ddd" fontSize="8" fontFamily="monospace">{`Travel ${travel.toFixed(2)} in`}</text>
+            <text x={PAD.left + 10} y={PAD.top + 37} fill="#aaa" fontSize="8" fontFamily="monospace">{`Height ${point.y.toFixed(2)} in`}</text>
+          </g>
+        );
+      })()}
+
       {/* Axis labels */}
       <text x={PAD.left + innerW / 2} y={H - 4} textAnchor="middle" fill="#888" fontSize="9" fontFamily="monospace" fontWeight="bold">LOAD (lb)</text>
-      <text x={12} y={PAD.top + innerH / 2} textAnchor="middle" fill="#888" fontSize="9" fontFamily="monospace" fontWeight="bold" transform={`rotate(-90, 12, ${PAD.top + innerH / 2})`}>HEIGHT (in)</text>
+      <text x={12} y={PAD.top + innerH / 2} textAnchor="middle" fill="#888" fontSize="9" fontFamily="monospace" fontWeight="bold" transform={`rotate(-90, 12, ${PAD.top + innerH / 2})`}>TRAVEL (in)</text>
     </svg>
   );
 }
