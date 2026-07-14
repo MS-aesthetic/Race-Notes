@@ -1,77 +1,68 @@
-# Current Task — UXF-3 Setup Lifecycle Display Labels
+# Current Task — UXF-4 Load Graph Travel Axis
 
-**Status:** COMPLETE — SOL High QA attempt 1 PASS (97)
+**Status:** IN_PROGRESS — Terra initial build attempt 1
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
-**Prerequisite:** UXF-2 closed by SOL QA at `0c55e7f`
+**Prerequisite:** UXF-3 closed by SOL QA at `04f1351`; feature `72ea4f8`
 
 ## Goal
 
-Rename lifecycle presentation to Starting, Live-Trackside, Current, and evidence-based Raced/Finished without changing lifecycle data or mechanics.
+Make load curves rise as spring/shock compression and load increase. Chart Y-axis becomes derived travel while every stored and exported source measurement remains raw height.
 
 ## Scope
 
-1. Add pure lifecycle display helpers in `src/lib/setupLifecycle.ts`:
-   - `lifecycleLabel(role, weekend?)`: baseline `Starting Setup`; weekend `Live-Trackside Setup`; current `Current Setup`; final `Raced Setup` only when supplied originating weekend contains a session with `type === 'Feature'`, otherwise `Finished Setup`.
-   - `displayVersionLabel(setup)`: render-time rewrite of legacy `Baseline Setup`, `Weekend Setup`, and `Final Setup` substrings. Legacy Final defaults to `Finished Setup` because no Feature evidence is available. Never mutate input.
-2. Change version-label templates only for newly created lifecycle records and relevant name fallbacks in `setupLifecycle.ts` and `App.tsx`.
-3. Sweep user-visible old role vocabulary across SetupView, RaceWeekendView, App toasts/modals, and other `src/` sites. Use helpers for role/stored labels. Keep already-correct `Starting Setup (optional)` copy.
-4. Update chunk6b lifecycle harness label assertions and add:
-   - Feature weekend final is Raced; no-Feature/missing weekend final is Finished.
-   - Legacy stored label renders new wording while source object, JSON, and cloud row bytes remain unchanged.
-   - Lifecycle behavior/lock/finish/idempotency assertions remain intact.
-5. Update lifecycle vocabulary only in `GuideView.tsx` and `docs/USER_GUIDE.md`; tone/structure stays for UXF-5.
+1. In `src/components/SmasherLoadsView.tsx`, add/export pure display helpers:
+   - `toTravel(height, maxHeight) = maxHeight - height`.
+   - A pure travel-to-SVG-Y helper or equivalent testable function where `0` travel is chart floor and maximum travel is chart top.
+   - Do not round or mutate source points inside these helpers.
+2. Single-session chart:
+   - Parse/sort load and height exactly as today.
+   - Use that session's largest valid height as zero travel.
+   - Map travel through a shared `0..maxTravel` display domain. More travel must have smaller SVG Y and therefore plot higher.
+   - Y ticks show travel in inches, maximum at top and `0` at bottom. Rename Y-axis to `TRAVEL (in)`. X-axis/load behavior stays unchanged.
+   - Area fill remains anchored to chart floor.
+3. Comparison chart:
+   - Use the largest valid height across all selected series as the comparison dataset's common zero. Do not independently zero each series; that would hide real height differences between sessions.
+   - Plot every series against one shared `0..maxTravel` axis so sessions remain comparable.
+   - Use same top-to-bottom travel ticks and `TRAVEL (in)` label. X/load behavior stays unchanged.
+4. Raw measured height must remain available inside both charts:
+   - Every point must expose `Travel … in · Height … in` by hover/tap or an equivalent in-chart detail.
+   - Single-session SVG is the PNG source, so its exported static image must also contain the raw height values. Use compact point labels, a raw-height scale, or another SVG-native treatment that survives canvas export without relying only on browser hover.
+   - Keep copy compact; do not add explanatory paragraphs around the graph.
+5. Preserve stored `ShockDataPoint.height/load`, session JSON, localStorage, cloud sync, CSV exports, ride-height fields, tables, colors, and chart layout outside the minimum label/point-detail needs.
+6. `src/lib/shockCompare.ts` stays byte-unchanged. Its interpolation and comparison-table outputs remain raw-height based.
+7. Expand `scripts/chunk6a-refinement-harness.ts`:
+   - Import/test pure travel helpers with a descending-height, ascending-load fixture.
+   - Assert tallest height gives `0`, lower heights give increasing travel, and SVG Y moves upward as travel increases.
+   - Assert top tick/domain is maximum travel and bottom is zero through helper/source fixtures.
+   - Assert both chart paths use travel, display `TRAVEL (in)`, and expose raw Height plus Travel point detail.
+   - Remove the old raw-height direction/source assertion.
+   - Add a small `buildComparisonRows` regression fixture proving interpolation still returns the same raw-height values without editing `shockCompare.ts`.
 
 ## Files
 
 **Primary:**
-- `src/lib/setupLifecycle.ts`
+- `src/components/SmasherLoadsView.tsx`
+- `scripts/chunk6a-refinement-harness.ts`
 
-**Shared:**
-- `src/components/SetupView.tsx`
-- `src/components/RaceWeekendView.tsx`
-- `src/App.tsx` user-visible strings/new-label templates only
-- `scripts/chunk6b-lifecycle-harness.ts`
-- `src/components/GuideView.tsx` lifecycle terms only
-- `docs/USER_GUIDE.md` lifecycle terms only
+**Read-only regression boundary:**
+- `src/lib/shockCompare.ts`
 
 ## Out of scope
 
-- No lifecycle role/type, storage shape, migration, or RaceWeekend metadata change.
-- No finish transaction, lock, ownership, merge, sync, or idempotency behavior change.
-- No rewrite of historical stored labels; display mapping only.
-- No Quick Adjust coalescing, guide tone/structure, package, native, deploy, push, merge, or APK work.
+- No stored measurement rewrite, type/schema/migration/sync/localStorage change.
+- No `shockCompare.ts` edit, CSV/table semantic change, ride-height change, chart color redesign, package/native work, deploy, push, merge, or APK.
+- No UXF-5 copy/guide work or other sprint item.
 
 ## Acceptance
 
-1. No user-visible `Baseline Setup`, `Weekend Setup`, or `Final Setup` remains outside display mapping/code comments.
-2. New start persists Starting + Live-Trackside labels. Finish persists Raced only with a Feature session; otherwise Finished, plus editable Current.
-3. Legacy labels render new wording while stored/local/cloud bytes remain unchanged.
-4. All lifecycle mechanics and locks remain unchanged; enforcement messages use new vocabulary.
-5. Full chunk6b lifecycle harness passes; exact three-error lint baseline, build, and `git diff --check` pass.
-6. Cavecrew review finds no blocker.
+1. Monotonic fixture with load rising and height falling plots upward/right in single and comparison charts.
+2. Tallest valid height is `0` in a single session; tallest valid height across selected series is comparison zero. Axis bottom is `0`; top is largest displayed travel.
+3. Each plotted point exposes both travel and actual height. Single-session PNG path contains raw-height information without hover.
+4. Stored point/session JSON and raw-height CSV/comparison interpolation remain unchanged.
+5. Full chunk6a harness PASS; exact three-error lint baseline; production build PASS; `git diff --check` PASS.
+6. Focused local visual check with a seeded/real session confirms travel axis, upward curve, readable height detail, and PNG output. Cavecrew review finds no blocker.
 
 ## Routing
 
-Terra owns one initial build pass. Primary owns cross-cutting build; cavecrew handles bounded tracing/review. Commit feature and durable handoff, then return to SOL High QA. Any QA failure transfers repair to SOL fixer.
-
-## Terra attempt 1 evidence — 2026-07-14
-
-- Feature commit: `72ea4f8`.
-- Pure display helpers produce Starting, Live-Trackside, Current, and Feature-evidence Raced/otherwise Finished labels. Legacy `Feat. 1` and `A-MAIN` sessions use established session-type inference.
-- Legacy version labels, pressure-source notes, and `No setup baseline` session text translate only at render time. Harness confirms source object, JSON, and cloud-row bytes remain unchanged.
-- New lifecycle labels and visible Setup/Race Weekend/App/Guide/PDF copy use new vocabulary. Lifecycle roles, locks, finish transaction, merge, sync, and storage shapes are unchanged.
-- `npx tsx scripts/chunk6b-lifecycle-harness.ts`: PASS.
-- `npm run lint`: exact three known baseline errors only; no new errors.
-- `npm run build`: PASS, 554 modules and 18 PWA entries.
-- `git diff --check`: PASS. Old-role source sweep: only display-mapping literals/comments remain.
-- Cavecrew review required two bounded display repairs, then returned `No issues.`
-
-## SOL QA attempt 1 — PASS (97) — 2026-07-14
-
-- Independently inspected full feature and handoff range. Lifecycle mechanics, locks, ownership, finish/idempotency recovery, timestamp merge, sync mapping, and persisted role shapes remain unchanged.
-- Starting, Live-Trackside, Current, Raced, and Finished label rules pass for current and legacy Feature records (`sessionType`, `Feature`, `Feat. 1`, `A-MAIN`). Missing/no-Feature weekend safely uses Finished.
-- Legacy version labels, pressure notes, and session fallback wording map only at display/export boundaries. Object JSON and setup cloud-row parity assertions pass.
-- Old visible lifecycle phrase sweep returns no matches outside mapping literals/comments.
-- Full chunk6b harness PASS; exact three-error lint baseline; production build PASS (554 modules, 18 PWA entries); feature-range diff check and clean worktree PASS.
-- Independent cavecrew reviewer: `No issues.` No schema, migration, package, native, deploy, push, merge, or APK change.
+Terra owns one initial build pass. Primary owns cross-file implementation; cavecrew handles bounded trace/review. Commit feature and durable handoff, then return to SOL High QA. Any QA failure transfers repair to SOL fixer; Terra is not re-invoked.

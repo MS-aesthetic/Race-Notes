@@ -97,7 +97,7 @@ Separate track from WS-N…Z. Chunks 1–9 are historical and archived under `do
 | UXF-1 | Duplicate Other + shared active-checklist projection | complete | 0 | 97 | 94d1e79 | SOL QA PASS: single Other, shared pure active projection across ToDo/Dashboard, persistence-safe harness, exact lint baseline, build, diff, and cavecrew gates clean. |
 | UXF-2 | Quick Adjust net-outcome coalescing | complete | 0 | 96 | 1dd5b75 + f03a17b | SOL QA attempt 2 PASS: run-scoped net rows plus safe partial-history failure; full harness, persistence, locks, exact lint baseline, build, diff, and cavecrew gates clean. |
 | UXF-3 | Starting / Live-Trackside / Raced-or-Finished setup labels | complete | 0 | 97 | 72ea4f8 | SOL QA attempt 1 PASS: conditional Raced/Finished labels, legacy display-only mapping, storage/cloud purity, lifecycle regressions, harness, exact lint baseline, build, diff, clean tree, and cavecrew review pass. |
-| UXF-4 | Load graph travel axis + measured-height display | pending | 0 | — | — | Display-layer change; stored points unchanged. |
+| UXF-4 | Load graph travel axis + measured-height display | in_progress | 1 | — | — | Terra initial build pass active after UXF-3 closure; display layer only, stored height and comparison interpolation unchanged. |
 | UXF-5 | Copy tone + Tuning Guide/App Guide separation | pending | 0 | — | — | Owner tone review required to close. |
 | UXF-6 | Races/Days maintenance intervals + starting usage | pending | 0 | — | — | No current test-data compatibility burden. |
 | UXF-7 | Main Checklist redesign proposal | pending | 0 | — | — | Spec-only; Maxx design session gates follow-on build. |
