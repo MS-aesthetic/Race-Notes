@@ -1,6 +1,6 @@
 # Current Task — UXF-8 Docs and Loop-State Hygiene
 
-**Status:** CODE_PASS — SOL fixer attempt 3; awaiting independent SOL QA
+**Status:** COMPLETE — SOL QA attempt 3 PASS
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Next workstream after independent PASS:** UXF-1
@@ -72,3 +72,7 @@ Attempt 2 evidence: repair diff touches only four `.github/agents` roles, `plan-
 Passing evidence retained: the four `.github` roles, archived handoff path, PROJECT conflict authority, HANDOFF live row, archive preservation, current links, applied migration state, UXF table, no-source-change scope, diff check, and clean worktree all pass. Cavecrew QA attempt 2 review found only the native fixer metadata mismatch above.
 
 Attempt 3 evidence: repair changes one metadata description plus durable task/state notes. Current Markdown links resolve; archive moves remain preserved; no application, harness, schema, package, or native delta exists; `git diff --check` passes. Cavecrew reviewer: `No issues. Routing consistent; scope clean.` Documentation-only repair requires no lint/build.
+
+## QA attempt 3 verdict
+
+**PASS — 96.** Native and GitHub agent roles now agree on one Terra build pass followed by first-failure SOL takeover. Cold-start authority, archived paths/content, current links, PROJECT conflict rule, HANDOFF status, migration state, UXF table, scope, diff check, and clean worktree all pass. Cavecrew independent verdict: `PASS. No issues.` UXF-8 closed; UXF-1 is next.
