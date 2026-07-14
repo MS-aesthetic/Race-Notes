@@ -1,106 +1,83 @@
-# Current Task — UXF-4 Load Graph Travel Axis
+# Current Task — UXF-5 Copy Tone and Guide Separation
 
-**Status:** COMPLETE — SOL High QA attempt 2 PASS (96)
+**Status:** PLANNED — awaiting Terra High initial build
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
-**Prerequisite:** UXF-3 closed by SOL QA at `04f1351`; feature `72ea4f8`
+**Prerequisite:** UXF-4 closed by SOL QA at `bbaab34`; feature `0c2c827`, repair `12d932f`
 
 ## Goal
 
-Make load curves rise as spring/shock compression and load increase. Chart Y-axis becomes derived travel while every stored and exported source measurement remains raw height.
+Keep operational screens concise. The Tuning Guide is a tuning reference, while app operating instructions belong in the App Guide. Use professional dirt-racing shop language: clear without academic jargon or patronizing simplification.
 
 ## Scope
 
-1. In `src/components/SmasherLoadsView.tsx`, add/export pure display helpers:
-   - `toTravel(height, maxHeight) = maxHeight - height`.
-   - A pure travel-to-SVG-Y helper or equivalent testable function where `0` travel is chart floor and maximum travel is chart top.
-   - Do not round or mutate source points inside these helpers.
-2. Single-session chart:
-   - Parse/sort load and height exactly as today.
-   - Use that session's largest valid height as zero travel.
-   - Map travel through a shared `0..maxTravel` display domain. More travel must have smaller SVG Y and therefore plot higher.
-   - Y ticks show travel in inches, maximum at top and `0` at bottom. Rename Y-axis to `TRAVEL (in)`. X-axis/load behavior stays unchanged.
-   - Area fill remains anchored to chart floor.
-3. Comparison chart:
-   - Use the largest valid height across all selected series as the comparison dataset's common zero. Do not independently zero each series; that would hide real height differences between sessions.
-   - Plot every series against one shared `0..maxTravel` axis so sessions remain comparable.
-   - Use same top-to-bottom travel ticks and `TRAVEL (in)` label. X/load behavior stays unchanged.
-4. Raw measured height must remain available inside both charts:
-   - Every point must expose `Travel … in · Height … in` by hover/tap or an equivalent in-chart detail.
-   - Single-session SVG is the PNG source, so its exported static image must also contain the raw height values. Use compact point labels, a raw-height scale, or another SVG-native treatment that survives canvas export without relying only on browser hover.
-   - Keep copy compact; do not add explanatory paragraphs around the graph.
-5. Preserve stored `ShockDataPoint.height/load`, session JSON, localStorage, cloud sync, CSV exports, ride-height fields, tables, colors, and chart layout outside the minimum label/point-detail needs.
-6. `src/lib/shockCompare.ts` stays byte-unchanged. Its interpolation and comparison-table outputs remain raw-height based.
-7. Expand `scripts/chunk6a-refinement-harness.ts`:
-   - Import/test pure travel helpers with a descending-height, ascending-load fixture.
-   - Assert tallest height gives `0`, lower heights give increasing travel, and SVG Y moves upward as travel increases.
-   - Assert top tick/domain is maximum travel and bottom is zero through helper/source fixtures.
-   - Assert both chart paths use travel, display `TRAVEL (in)`, and expose raw Height plus Travel point detail.
-   - Remove the old raw-height direction/source assertion.
-   - Add a small `buildComparisonRows` regression fixture proving interpolation still returns the same raw-height values without editing `shockCompare.ts`.
+1. **Tuning Guide starts with tuning content.** In `src/components/QuickReferenceView.tsx`:
+   - Remove the four app-help cards/anchors: Setup Sheet, Four-Bar, Load Sessions, Compare Setups.
+   - Remove the entire `Before You Change Anything` block.
+   - The first rendered section must be the Pit-Side Adjustment Finder.
+   - Keep High / Medium / Low available in the tuning reference, compact and professional while preserving the owner-approved meaning: High = try first; Medium = try next if the first change did not fix it; Low = fine-tuning after the bigger items are checked. Do not add another how-to preamble.
+   - Do not remove tuning recommendations, direction, cautions, filters, tables, calculators, or condition content.
 
-## Files
+2. **Contextual help routes to the App Guide, not the Tuning Guide.** The existing `onHelp('setup' | 'four-bar' | 'loads' | 'setup-diff')` callers must remain useful after their Quick Reference anchors are removed.
+   - Add a small explicit section classifier/routing path in `src/App.tsx` (or an extracted pure helper) so those four section requests render App Guide content in the help sheet. A sectionless/global Help request continues to render `QuickReferenceView` as **Tuning Guide**.
+   - Extend `src/components/ui/HelpSheet.tsx` only as needed to accept an accurate title/intro for App Guide versus Tuning Guide and retain anchor scrolling. No silent fallback to the top of Tuning Guide.
+   - Extend `GuideView` with a minimal embedded/active-section API or equivalent. The requested topic must expand before it scrolls into view, and it must react on every section change/reopen rather than only initial mount. Normal Settings → Guide rendering remains unchanged.
+   - Preserve Android Back/bottom-sheet behavior and the four existing contextual-help call sites.
 
-**Primary:**
-- `src/components/SmasherLoadsView.tsx`
-- `scripts/chunk6a-refinement-harness.ts`
+3. **Relocate app operating help.** In `src/components/GuideView.tsx` and `docs/USER_GUIDE.md`:
+   - Keep/enrich Setup Sheet instructions.
+   - Add a dedicated Four-Bar topic covering the stored fields and consistent measurement.
+   - Keep/enrich Load Sessions instructions for travel/load, raw measured height, and Ride Height C-to-C.
+   - Add a dedicated Compare Setups topic explaining Before, After, and highlighted changes without judging the change.
+   - Give the in-app topics exact anchors `setup`, `four-bar`, `loads`, and `setup-diff` for contextual routing.
+   - Put the maintenance 90% automatic-checklist rule in the Maintenance Logs guide section and USER_GUIDE, not on the working screen.
 
-**Read-only regression boundary:**
-- `src/lib/shockCompare.ts`
+4. **Remove maintenance explanation clutter without changing behavior.** In `src/lib/checklistMaintenance.ts` and `src/components/TrackersView.tsx`:
+   - Automatic maintenance task `desc` becomes exactly ```${used}/${limit} ${component.intervalType}```.
+   - Remove now-unused `remaining` from the automatic-task builder only. Keep `cycleId`, `sourceId`, `sourceCycle`, generated task ID, 90% threshold, reset/reopen, assignment, and reconciliation logic unchanged.
+   - Remove the permanent 90% explanation banner above Maintenance Logs.
+   - Remove each row's verbose reason paragraph, including “Below 90%...” and “At least 90%...”. Keep the status chip, progress bar, concise Used / Limit / Remaining line, Log action, and all calculations.
+
+5. **Bounded professional-language audit.** Limit judgment-based copy edits to `QuickReferenceView.tsx`, `GuideView.tsx`, `docs/USER_GUIDE.md`, and the existing C9 translation layer in `plainRacerEffect`.
+   - Preserve all raw researched adjustment data and tuning direction. Fix ordered render-time translations only.
+   - Avoid the C9 flagged literals in rendered copy, but do not replace them with childish phrases such as “part of the tire touching the track,” “weight moving,” “the car leaning,” or “how the car sits.” Prefer established shop terms such as tire contact, load shift, car roll, bar angle/rear steer, braking, throttle, and mid-corner when technically accurate.
+   - Remove redundant coaching/commentary. Keep cautions that affect safety, applicability, tire rules, or technical direction.
+   - Fix grammar produced by chained replacements; the rendered adjustment corpus must read naturally.
+
+6. **Harnesses.** Update:
+   - `scripts/chunk8-trackers-harness.ts`: exact terse description; source/cycle/idempotence/90%-boundary/removal/completed-history behavior unchanged; assert banner and row-reason copy are absent.
+   - `scripts/chunk9-export-help-harness.ts`: Quick Reference lacks the four app-help anchors and Before block; GuideView owns all four anchors/topics; App/HelpSheet route sectioned help to App Guide and sectionless help to Tuning Guide; USER_GUIDE contains all four topics and maintenance threshold guidance; all 134 raw effect literals still pass through `plainRacerEffect`; rendered corpus/grammar/professional tone checks pass.
+7. **Focused help runtime:** locally verify global Help opens Tuning Guide; each of the four contextual actions opens its expanded App Guide topic; sequential `setup → loads → setup-diff` requests update instead of showing stale content; Settings → Guide still behaves normally; close button/scrim and Android Back close the sheet correctly.
+
+## Primary files
+
+- `src/components/QuickReferenceView.tsx`
+- `src/components/GuideView.tsx`
+- `src/components/ui/HelpSheet.tsx`
+- `src/App.tsx`
+- `src/components/TrackersView.tsx`
+- `src/lib/checklistMaintenance.ts`
+- `docs/USER_GUIDE.md`
+- `scripts/chunk8-trackers-harness.ts`
+- `scripts/chunk9-export-help-harness.ts`
 
 ## Out of scope
 
-- No stored measurement rewrite, type/schema/migration/sync/localStorage change.
-- No `shockCompare.ts` edit, CSV/table semantic change, ride-height change, chart color redesign, package/native work, deploy, push, merge, or APK.
-- No UXF-5 copy/guide work or other sprint item.
+- No Main Checklist structural redesign, creation/reset flow change, or resurrection-policy change; UXF-7 owns redesign.
+- No interval type/measurement/start-usage change; UXF-6 owns that.
+- No lifecycle vocabulary/mechanics, setup/run data, tuning recommendation/data direction, storage/sync/type/schema/migration, package, native config, deploy, push, merge, or APK.
+- No app-wide copy rewrite outside the bounded files above.
 
 ## Acceptance
 
-1. Monotonic fixture with load rising and height falling plots upward/right in single and comparison charts.
-2. Tallest valid height is `0` in a single session; tallest valid height across selected series is comparison zero. Axis bottom is `0`; top is largest displayed travel.
-3. Each plotted point exposes both travel and actual height. Single-session PNG path contains raw-height information without hover.
-4. Stored point/session JSON and raw-height CSV/comparison interpolation remain unchanged.
-5. Full chunk6a harness PASS; exact three-error lint baseline; production build PASS; `git diff --check` PASS.
-6. Focused local visual check with a seeded/real session confirms travel axis, upward curve, readable height detail, and PNG output. Cavecrew review finds no blocker.
+1. Opening normal Help shows Tuning Guide with Pit-Side Adjustment Finder first. It has no app-help cards and no Before block.
+2. Setup, Four-Bar, Load Sessions, and Compare Setups `?` actions open the matching expanded App Guide topic, including sequential topic changes/reopens; normal Settings → Guide still works.
+3. App Guide and USER_GUIDE contain all four operating topics plus the maintenance 90% rule.
+4. Maintenance working screens show concise state/action only. Automatic task description is exact and all threshold/cycle/idempotence behavior remains unchanged.
+5. Raw tuning data is unchanged; every rendered effect is translated; rendered/direct copy contains no banned academic literals, broken grammar, or patronizing repair phrases.
+6. Full chunk8 and chunk9 harnesses PASS; exact three-error lint baseline; production build PASS; `git diff --check` PASS; focused help runtime passes global/contextual/sequential/close/Android Back paths; cavecrew review finds no blocker.
+7. SOL performs independent technical QA. Technical PASS records **AWAITING OWNER TONE REVIEW** rather than closing UXF-5. Maxx's local/draft spot-review is the final product-acceptance gate.
 
 ## Routing
 
-Terra owns one initial build pass. Primary owns cross-file implementation; cavecrew handles bounded trace/review. Commit feature and durable handoff, then return to SOL High QA. Any QA failure transfers repair to SOL fixer; Terra is not re-invoked.
-
-## Terra attempt 1 evidence — 2026-07-14
-
-- Feature commit: `0c2c827`.
-- Exported pure `toTravel` and `travelToSvgY` helpers drive both SVG paths. Single chart zero uses its tallest point; comparison zero uses tallest point across all selected series. Maximum travel maps to top; zero maps to floor, including equal-height fallback.
-- Both Y axes now show travel. Single chart keeps compact raw-height labels in SVG so PNG serialization retains measurements. Single and comparison points expose Travel + Height by hover, tap, keyboard, and accessible name.
-- Stored points/session shapes, sync, localStorage, raw-height table/CSV, and `src/lib/shockCompare.ts` are byte-unchanged. Comparison-row interpolation regression passes.
-- `npx tsx scripts/chunk6a-refinement-harness.ts`: PASS.
-- `npm run lint`: exact three known baseline errors only; no new errors.
-- `npm run build`: PASS, 554 modules and 18 PWA entries.
-- `git diff --check`: PASS. Cavecrew found one harness coverage gap; repaired exact two-chart assertion; re-review returned `No issues.`
-- Local server/auth shell passed at 390px. Localhost had no remembered account, so no authenticated seeded-chart or downloaded-PNG runtime claim is made. SVG-native height labels and unchanged PNG serializer are verified by code/harness/build; final interactive visual gate remains for SOL/UXF-9.
-
-## SOL QA attempt 1 — FAIL (88) — 2026-07-14
-
-Passing: travel/common-zero/equal-height math; upward seeded SVG render; axis/fill/load behavior; raw Height + Travel content; static PNG height text path; unchanged storage/sync/CSV/types/`shockCompare.ts`; chunk6a harness; exact lint baseline; 554-module build; diff/clean tree. Cavecrew found one interaction blocker:
-
-1. `src/components/SmasherLoadsView.tsx`: point controls remove visible keyboard focus, and comparison point's touch target is only the visible 8px circle. Add a visible SVG focus ring and a larger transparent hit target to both single and comparison points while preserving visible point size and chart data/layout.
-2. Extend chunk6a harness to require both chart paths to include the larger hit target and visible focus handling/ring. Regress every passing assertion.
-
-Routing: first QA failure transfers implementation to SOL High fixer. Terra is not re-invoked.
-
-## SOL fixer attempt 2 evidence — 2026-07-14
-
-- Repair commit: `12d932f`.
-- Both chart point controls retain visible radius 4 but add transparent radius-12 pointer targets. Enter/Space/click selection and accessible names remain.
-- `onFocus`/`onBlur` drive explicit white radius-7 SVG focus rings in single and comparison charts; browser outline is not the only focus signal.
-- Component-scoped harness slices independently require hit target, focus ring, and focus/blur handlers in each chart path.
-- Full chunk6a harness PASS; exact three-error lint baseline; 554-module/18-entry build; diff check and byte-unchanged data boundaries pass.
-- Cavecrew first found global-only harness coverage; after scoped repair, re-review returned `No issues.`
-
-## SOL QA attempt 2 — PASS (96) — 2026-07-14
-
-- Attempt-1 blocker closed: both chart paths retain radius-4 visible points, own transparent radius-12 hit targets, and render explicit radius-7 focus rings through `onFocus`/`onBlur`. Enter, Space, click, accessible names, and Travel/Height titles remain.
-- Component-scoped harness independently proves interaction treatment in single and comparison charts.
-- Regressed common/single travel zero, upward coordinate mapping, equal-height floor behavior, ticks, load axis, fill, static PNG height text, edge treatment, raw-height CSV/table, storage/sync/types, and byte-unchanged `shockCompare.ts`.
-- Full chunk6a harness PASS; exact three-error lint baseline; production build PASS (554 modules, 18 PWA entries); full/repair diff checks and clean tree PASS.
-- Seeded SSR chart rendered upward polyline `54,176 160.4,112.8 320,18` with Travel axis and raw-height detail. Independent cavecrew reviewer: `No issues.`
+Terra owns one initial build pass. Primary owns this cross-file change; cavecrew handles bounded trace/review. Commit feature and durable handoff, then return to SOL High QA. Any QA failure transfers repair to SOL fixer; Terra is not re-invoked. Do not start UXF-6 before UXF-5 technical QA and owner tone disposition are recorded.
