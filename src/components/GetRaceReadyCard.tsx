@@ -46,7 +46,7 @@ export default function GetRaceReadyCard({
   const steps = [
     { key: 'car', label: 'Add your car', done: carCount > 0, icon: 'directions_car', onGo: onAddCar },
     { key: 'weekend', label: 'Start a race weekend', done: weekendCount > 0, icon: 'calendar_today', onGo: onStartWeekend },
-    { key: 'setup', label: 'Enter your baseline setup', done: setupCount > 0, icon: 'tune', onGo: onEnterSetup },
+    { key: 'setup', label: 'Enter your starting setup', done: setupCount > 0, icon: 'tune', onGo: onEnterSetup },
     { key: 'run', label: 'Log your first run', done: sessionCount > 0, icon: 'timer', onGo: onLogRun },
   ];
   const allDone = steps.every(s => s.done);

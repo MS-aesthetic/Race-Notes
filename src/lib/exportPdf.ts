@@ -1,5 +1,6 @@
 import type { AccountingEntry, ActiveSession, RaceWeekend, Setup, Todo } from '../types';
 import { getMainChecklist } from './mainChecklist';
+import { displayVersionLabel } from './setupLifecycle';
 
 export type TrackerReportKind = 'all' | 'checklist' | 'accounting';
 
@@ -79,7 +80,7 @@ function setupSection(setup: Setup, activeSession?: ActiveSession): { html: stri
       <h2>Race Notes</h2>
       <p style="font-size:13px;white-space:pre-wrap;font-style:italic;color:#333">${html(activeSession.competitionNotes || 'No notes.')}</p>` : '';
   const lines = [
-    setup.versionLabel || setup.chassis || 'Setup',
+    displayVersionLabel(setup) || setup.chassis || 'Setup',
     `Car: ${setup.chassis || 'Not named'}`,
     `Class: ${setup.carType || 'Not set'}`,
     `Track: ${setup.track || 'Not set'}`,

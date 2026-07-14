@@ -47,9 +47,11 @@ A weekend is the event container holding sessions.
 
 - **Dashboard** → **+ Race Weekend** (name, track, date).
 - Optionally bind a saved setup.
+- Crew Chief keeps that Starting Setup unchanged and records weekend changes in the Live-Trackside Setup.
 - Weather widget: GPS or zip-code fallback.
 - Creating makes the weekend active but does not open or create a session.
 - Active-weekend choice is device-local. Use Dashboard or Sessions weekend list to switch it.
+- **Finish Weekend** saves a Raced Setup when a Feature was logged, or a Finished Setup for a test day, then creates the editable Current Setup.
 
 ## Logging a session
 - Create and activate a weekend first, then Sessions → New Session.

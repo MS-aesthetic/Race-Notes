@@ -1,6 +1,31 @@
 import type { CornerSetup, RaceWeekend, Setup, SetupChange } from '../types';
+import { inferSessionType } from './tireHistory';
 
 const cloneSetup = (setup: Setup): Setup => JSON.parse(JSON.stringify(setup)) as Setup;
+
+export function lifecycleLabel(role: Setup['lifecycleRole'], weekend?: RaceWeekend): string {
+  if (role === 'baseline') return 'Starting Setup';
+  if (role === 'weekend') return 'Live-Trackside Setup';
+  if (role === 'final') {
+    const racedFeature = weekend?.sessions.some(session => inferSessionType(session) === 'Feature');
+    return racedFeature ? 'Raced Setup' : 'Finished Setup';
+  }
+  return 'Current Setup';
+}
+
+/** Map lifecycle terms inside legacy display-only text without changing persisted bytes. */
+export function displayLifecycleText(stored: string): string {
+  return stored
+    .replace(/No setup baseline/gi, 'No starting setup')
+    .replace(/Baseline Setup/g, 'Starting Setup')
+    .replace(/Weekend Setup/g, 'Live-Trackside Setup')
+    .replace(/Final Setup/g, 'Finished Setup');
+}
+
+/** Map legacy stored labels at render time without changing persisted bytes. */
+export function displayVersionLabel(setup: Setup): string {
+  return displayLifecycleText(setup.versionLabel || '');
+}
 
 export const isWeekendFinished = (weekend: RaceWeekend | null | undefined): boolean =>
   weekend?.status === 'finished';
@@ -107,7 +132,7 @@ export function startWeekendLifecycle(
     id: baselineId,
     track: weekend.track,
     date: weekend.date,
-    versionLabel: `${versionDate} Baseline Setup`,
+    versionLabel: `${versionDate} ${lifecycleLabel('baseline')}`,
     lifecycleRole: 'baseline',
     sourceSetupId: source.id,
     weekendId: weekend.id,
@@ -121,7 +146,7 @@ export function startWeekendLifecycle(
     id: weekendSetupId,
     track: weekend.track,
     date: weekend.date,
-    versionLabel: `${versionDate} Weekend Setup`,
+    versionLabel: `${versionDate} ${lifecycleLabel('weekend')}`,
     lifecycleRole: 'weekend',
     sourceSetupId: baseline.id,
     weekendId: weekend.id,
@@ -189,7 +214,7 @@ export function finishWeekendLifecycle(
       id: weekendSetupId,
       track: weekend.track,
       date: weekend.date,
-      versionLabel: `${versionDate} Weekend Setup`,
+      versionLabel: `${versionDate} ${lifecycleLabel('weekend')}`,
       lifecycleRole: 'weekend',
       sourceSetupId: legacySource.id,
       weekendId: weekend.id,
@@ -227,14 +252,14 @@ export function finishWeekendLifecycle(
   const finalSetup: Setup = existingFinal ? {
     ...cloneSetup(existingFinal),
     id: finalSetupId,
-    versionLabel: `${versionDate} Final Setup`,
+    versionLabel: `${versionDate} ${lifecycleLabel('final', weekend)}`,
     lifecycleRole: 'final',
     sourceSetupId: active.id,
     weekendId: weekend.id,
   } : {
     ...cloneSetup(active),
     id: finalSetupId,
-    versionLabel: `${versionDate} Final Setup`,
+    versionLabel: `${versionDate} ${lifecycleLabel('final', weekend)}`,
     lifecycleRole: 'final',
     sourceSetupId: active.id,
     weekendId: weekend.id,
@@ -244,7 +269,7 @@ export function finishWeekendLifecycle(
   const currentSetup: Setup = existingCurrent ? {
     ...cloneSetup(existingCurrent),
     id: currentSetupId,
-    versionLabel: `Current Setup — ${versionDate}`,
+    versionLabel: `${lifecycleLabel('current')} — ${versionDate}`,
     lifecycleRole: 'current',
     sourceSetupId: finalSetup.id,
     weekendId: undefined,
@@ -252,7 +277,7 @@ export function finishWeekendLifecycle(
   } : {
     ...cloneSetup(finalSetup),
     id: currentSetupId,
-    versionLabel: `Current Setup — ${versionDate}`,
+    versionLabel: `${lifecycleLabel('current')} — ${versionDate}`,
     lifecycleRole: 'current',
     sourceSetupId: finalSetup.id,
     weekendId: undefined,

@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict';
 import { makeBlankSetup, pickWeekendSourceSetup } from '../src/lib/setupCompat';
 import {
+  displayLifecycleText,
+  displayVersionLabel,
   finishWeekendLifecycle,
   isSetupLocked,
   isWeekendFinished,
+  lifecycleLabel,
   lifecycleSetupId,
   mergeTimestampedRecords,
   selectRaceWeekendSetup,
   startWeekendLifecycle,
   withSetupDiffLog,
 } from '../src/lib/setupLifecycle';
+import { setupToCloudRow } from '../src/lib/setupSync';
 import type { RaceWeekend } from '../src/types';
 
 const startedAt = '2026-07-13T20:00:00.000Z';
@@ -39,8 +43,8 @@ const started = startWeekendLifecycle(baseWeekend, source, startedAt);
 assert.notEqual(started.baseline.id, started.weekendSetup.id);
 assert.equal(started.weekend.setupId, started.baseline.id);
 assert.equal(started.weekend.activeSetupId, started.weekendSetup.id);
-assert.equal(started.baseline.versionLabel, 'Jul 13, 2026 Baseline Setup');
-assert.equal(started.weekendSetup.versionLabel, 'Jul 13, 2026 Weekend Setup');
+assert.equal(started.baseline.versionLabel, 'Jul 13, 2026 Starting Setup');
+assert.equal(started.weekendSetup.versionLabel, 'Jul 13, 2026 Live-Trackside Setup');
 assert.equal(isSetupLocked(started.baseline), true);
 assert.equal(isSetupLocked(started.weekendSetup), false);
 assert.equal(isWeekendFinished(started.weekend), false);
@@ -66,6 +70,7 @@ assert.equal(finished.weekend.status, 'finished');
 assert.equal(finished.weekend.finishedAt, finishedAt);
 assert.equal(finished.weekend.sessions.length, 0, 'zero-run test day must finish');
 assert.equal(finished.finalSetup.lifecycleRole, 'final');
+assert.equal(finished.finalSetup.versionLabel, 'Jul 13, 2026 Finished Setup');
 assert.equal(isSetupLocked(finished.finalSetup), true);
 assert.equal(finished.finalSetup.gear, '6.14');
 assert.equal(finished.currentSetup.lifecycleRole, 'current');
@@ -74,6 +79,39 @@ assert.equal(finished.currentSetup.gear, '6.14');
 assert.deepEqual(finished.currentSetup.changeLog, []);
 assert.equal(lifecycleSetupId(finished.weekend), finished.finalSetup.id);
 assert.equal(finishWeekendLifecycle(finished.weekend, finished.setups, finishedAt), null);
+
+const featureWeekend: RaceWeekend = {
+  ...baseWeekend,
+  id: 'wknd-feature',
+  name: 'Eldora Feature',
+  sessions: [{ id: 'feature-1', type: 'Feature 1', sessionType: 'Feature' } as RaceWeekend['sessions'][number]],
+};
+const featureStarted = startWeekendLifecycle(featureWeekend, source, startedAt);
+const featureFinished = finishWeekendLifecycle(
+  featureStarted.weekend,
+  [source, featureStarted.baseline, featureStarted.weekendSetup],
+  finishedAt,
+);
+assert.ok(featureFinished);
+assert.equal(featureFinished.finalSetup.versionLabel, 'Jul 13, 2026 Raced Setup');
+assert.equal(lifecycleLabel('final', featureWeekend), 'Raced Setup');
+assert.equal(lifecycleLabel('final', { ...baseWeekend, sessions: [{ id: 'legacy-feature', type: 'Feature' } as RaceWeekend['sessions'][number]] }), 'Raced Setup');
+assert.equal(lifecycleLabel('final', { ...baseWeekend, sessions: [{ id: 'legacy-feature-name', name: 'Feat. 1', type: '' } as RaceWeekend['sessions'][number]] }), 'Raced Setup');
+assert.equal(lifecycleLabel('final', { ...baseWeekend, sessions: [{ id: 'legacy-a-main', name: '', type: 'A-MAIN' } as RaceWeekend['sessions'][number]] }), 'Raced Setup');
+assert.equal(lifecycleLabel('final', baseWeekend), 'Finished Setup');
+assert.equal(lifecycleLabel('final'), 'Finished Setup');
+assert.equal(displayLifecycleText('Copied from Jul 13, 2026 Baseline Setup'), 'Copied from Jul 13, 2026 Starting Setup');
+assert.equal(displayLifecycleText('No setup baseline'), 'No starting setup');
+
+const legacyLabelSetup = { ...source, versionLabel: '2026-07-12 Baseline Setup' };
+const legacyLabelJson = JSON.stringify(legacyLabelSetup);
+const legacyCloudRow = setupToCloudRow(legacyLabelSetup, 'user-1');
+assert.equal(displayVersionLabel(legacyLabelSetup), '2026-07-12 Starting Setup');
+assert.equal(displayVersionLabel({ ...legacyLabelSetup, versionLabel: '2026-07-12 Weekend Setup' }), '2026-07-12 Live-Trackside Setup');
+assert.equal(displayVersionLabel({ ...legacyLabelSetup, versionLabel: '2026-07-12 Final Setup', lifecycleRole: 'final' }), '2026-07-12 Finished Setup');
+assert.equal(displayVersionLabel({ ...legacyLabelSetup, versionLabel: undefined }), '');
+assert.equal(JSON.stringify(legacyLabelSetup), legacyLabelJson);
+assert.deepEqual(setupToCloudRow(legacyLabelSetup, 'user-1'), legacyCloudRow);
 
 const carB = makeBlankSetup({
   ...source,
@@ -192,7 +230,7 @@ const blankFallback = makeBlankSetup({
   id: `setup-baseline-${noSetupLegacy.id}`,
   carId: 'car-2',
   lifecycleRole: 'baseline',
-  versionLabel: 'Jul 9, 2026 Baseline Setup',
+  versionLabel: 'Jul 9, 2026 Starting Setup',
   weekendId: noSetupLegacy.id,
   lockedAt: finishedAt,
 });

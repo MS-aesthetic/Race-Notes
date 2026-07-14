@@ -12,7 +12,7 @@ import FourBarQuickAdjust from './FourBarQuickAdjust';
 import TiresSubView from './TiresSubView';
 import { cloneSetup, makeBlankSetup, pickImmediatePriorSetupForCar, pickLatestSetupForCar } from '../lib/setupCompat';
 import { calculateTireStagger, NumericCornerField, SETUP_STEPS, formatStoredNumber, legacyValueNote, parseStoredNumber } from '../lib/setupSteps';
-import { isSetupLocked } from '../lib/setupLifecycle';
+import { displayLifecycleText, displayVersionLabel, isSetupLocked, lifecycleLabel } from '../lib/setupLifecycle';
 import { applyExplicitCornerField } from '../lib/quickAdjust';
 import { buildSetupReport, createPdfFile } from '../lib/exportPdf';
 import { shareOrDownloadReport } from '../lib/reportShare';
@@ -204,7 +204,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         </div>
         <div>
           <NumericCornerFieldInput label="Pressure" field="tirePress" data={data} onFieldChange={onFieldChange} />
-          {data.pressureSourceNote && <p className="mt-1 font-mono text-xs text-on-surface-variant">{data.pressureSourceNote}</p>}
+          {data.pressureSourceNote && <p className="mt-1 font-mono text-xs text-on-surface-variant">{displayLifecycleText(data.pressureSourceNote)}</p>}
         </div>
         <NumericCornerFieldInput label="Backspacing" field="backspacing" data={data} onFieldChange={onFieldChange} />
       </div>
@@ -303,7 +303,7 @@ export default function SetupView({
       carType: activeCar?.carType ?? source?.carType ?? '',
       carId: activeCarId ?? undefined,
       screenshots: [],
-      versionLabel: source ? `${source.versionLabel || source.chassis} Copy` : 'Current Setup',
+      versionLabel: source ? `${displayVersionLabel(source) || source.chassis} Copy` : lifecycleLabel('current'),
       lifecycleRole: 'current',
       sourceSetupId: source?.id,
       weekendId: undefined,
@@ -354,7 +354,7 @@ export default function SetupView({
       date: today,
       carId: activeCarId ?? target.carId,
       screenshots: [], // clear stale photos on clone
-      versionLabel: `${target.versionLabel || target.chassis} Copy`,
+      versionLabel: `${displayVersionLabel(target) || target.chassis} Copy`,
       lifecycleRole: 'current',
       sourceSetupId: target.id,
       weekendId: undefined,
@@ -409,7 +409,7 @@ export default function SetupView({
     try {
       // A saved setup card may belong to another car or weekend. Do not attach
       // the app's currently open run unless ownership is proven.
-      const result = await shareOrDownloadReport(createPdfFile(buildSetupReport(target)), `Share ${target.versionLabel || target.chassis || 'setup'}`);
+      const result = await shareOrDownloadReport(createPdfFile(buildSetupReport(target)), `Share ${displayVersionLabel(target) || target.chassis || 'setup'}`);
       if (result.status === 'shared') onInfo?.('Setup PDF shared.');
       else if (result.status === 'downloaded') onInfo?.('Setup PDF downloaded.');
       else if (result.status === 'failed') onInfo?.(result.error || 'Setup PDF could not be shared.');
@@ -474,7 +474,7 @@ export default function SetupView({
               </div>
               <button type="submit"
                 className="self-end sm:self-auto h-10 px-4 bg-surface-bright border border-outline text-primary hover:bg-primary/10 hover:border-primary uppercase font-mono text-xs font-bold transition-all flex items-center gap-2 rounded">
-                <span className="material-symbols-outlined text-[16px]">content_copy</span>{activeSetup ? 'Copy latest' : 'Start baseline'}
+                <span className="material-symbols-outlined text-[16px]">content_copy</span>{activeSetup ? 'Copy latest' : 'Create starting setup'}
               </button>
               {activeSetup && <button type="button" onClick={(event) => handleAddNewSetup(event, 'blank')}
                 className="self-end sm:self-auto h-10 px-4 border border-outline-variant text-on-surface-variant hover:text-on-surface uppercase font-mono text-xs font-bold transition-all rounded">
@@ -489,8 +489,8 @@ export default function SetupView({
               <EmptyState
                 icon="tune"
                 title="No setups for this car"
-                body="Start with a baseline, then tune from what the track tells you."
-                cta={{ label: 'Start baseline setup', onClick: () => document.getElementById('new-setup-name')?.focus() }}
+                body="Start with a saved setup, then tune from what the track tells you."
+                cta={{ label: 'Create starting setup', onClick: () => document.getElementById('new-setup-name')?.focus() }}
               />
             )}
             {displayedSetups.map((setupItem) => {
@@ -517,7 +517,7 @@ export default function SetupView({
                           {isActive && <span className="bg-primary/15 text-primary border border-primary/30 text-[9px] uppercase font-bold px-1.5 py-0.5 rounded tracking-wide">Active trackside</span>}
                           {isReadOnly && <span className="border border-outline-variant text-on-surface-variant text-[9px] uppercase font-bold px-1.5 py-0.5 rounded tracking-wide">View only</span>}
                         </div>
-                        {setupItem.versionLabel && <p className="font-mono text-[11px] font-bold text-primary mt-1">{setupItem.versionLabel}</p>}
+                        {setupItem.versionLabel && <p className="font-mono text-[11px] font-bold text-primary mt-1">{displayVersionLabel(setupItem)}</p>}
                         <div className="text-xs text-on-surface-variant font-mono mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
                           <span>Track: <strong>{setupItem.track || 'Not Specified'}</strong></span>
                           <span>Class: <strong>{setupItem.carType || 'Dirt Late Model'}</strong></span>
@@ -564,7 +564,7 @@ export default function SetupView({
                     <div className="min-w-0 p-2 sm:p-4 border-t border-outline-variant/50 bg-surface-container-low">
                       {isReadOnly && (
                         <div className="mb-4 rounded-lg border border-outline-variant bg-surface-container p-3 font-mono text-xs text-on-surface-variant">
-                          Baseline and Final snapshots stay unchanged. Clone this setup to make a new editable Current Setup.
+                          Starting and finished snapshots stay unchanged. Clone this setup to make a new editable Current Setup.
                         </div>
                       )}
                       <fieldset disabled={isReadOnly} className="min-w-0 space-y-6 disabled:opacity-75">
@@ -605,11 +605,11 @@ export default function SetupView({
                           className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded min-h-[60px] resize-y" />
                       </div>
 
-                      {/* Car Setup Info Baseline */}
+                      {/* Car setup details */}
                       <div className="bg-surface-container/50 border border-outline-variant/60 rounded-lg p-4 space-y-4">
                         <div className="flex items-center gap-2 border-b border-outline-variant/40 pb-2">
                           <span className="material-symbols-outlined text-primary text-[18px]">tune</span>
-                          <h4 className="font-label-sm text-xs font-bold uppercase text-on-surface tracking-wider">Car Setup Info Baseline</h4>
+                          <h4 className="font-label-sm text-xs font-bold uppercase text-on-surface tracking-wider">Car Setup Details</h4>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -736,8 +736,8 @@ export default function SetupView({
 
                       {(setupItem.changeLog?.length || 0) > 0 && (
                         <section className="rounded-lg border border-outline-variant/60 bg-surface-container/50 p-4">
-                          <h4 className="font-display text-xs font-bold uppercase text-on-surface">Weekend Changes</h4>
-                          <p className="font-mono text-[10px] text-on-surface-variant mt-1">Saved in order so Baseline and Final can always be compared.</p>
+                          <h4 className="font-display text-xs font-bold uppercase text-on-surface">Live-Trackside Changes</h4>
+                          <p className="font-mono text-[10px] text-on-surface-variant mt-1">Saved in order so Starting and finished setups can be compared.</p>
                           <div className="mt-3 space-y-2">
                             {[...(setupItem.changeLog || [])].reverse().map(change => (
                               <div key={change.id} className="rounded border border-outline-variant/40 bg-surface p-2">

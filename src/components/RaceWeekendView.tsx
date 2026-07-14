@@ -17,7 +17,7 @@ import QuickAdjustPanel from './QuickAdjustPanel';
 import { NumericCornerField, formatPsiValue, mergeImportedSetupPressure } from '../lib/setupSteps';
 import { isQuickAdjustRunAvailable, type QuickAdjustCommand } from '../lib/quickAdjust';
 import { pickImmediatePriorSetupForCar, setupUsedUniquelyMatchesCar } from '../lib/setupCompat';
-import { isWeekendFinished, lifecycleSetupId } from '../lib/setupLifecycle';
+import { displayLifecycleText, displayVersionLabel, isWeekendFinished, lifecycleLabel, lifecycleSetupId } from '../lib/setupLifecycle';
 import { buildWeekendReport, createPdfFile } from '../lib/exportPdf';
 import { shareOrDownloadReport } from '../lib/reportShare';
 
@@ -125,6 +125,9 @@ const SESSION_TYPE_CHIPS = [
   { key: 'Heat Race', code: 'Heat' },
   { key: 'Feature', code: 'Feat.' },
 ] as const;
+
+const displayStoredVersionLabel = (versionLabel: string | undefined): string =>
+  versionLabel ? displayVersionLabel({ versionLabel } as Setup) : '';
 
 // ── Main RaceWeekendView ──────────────────────────────────────────────────────
 
@@ -445,7 +448,7 @@ export default function RaceWeekendView({
   const openNewSession = () => {
     if (!currentWeekend) { openWeekendForm(); return; }
     if (activeWeekendMissingSetup) {
-      onInfo?.('Weekend Setup is missing. Restore it before logging or adjusting a run.');
+      onInfo?.(`${lifecycleLabel('weekend')} is missing. Restore it before logging or adjusting a run.`);
       return;
     }
     const activeTireIds = new Set(scopedTireInventory.map(tire => tire.id));
@@ -656,7 +659,7 @@ export default function RaceWeekendView({
                   <option value="">-- No setup selected --</option>
                   {/* Decision 3: filter to active car's setups */}
                   {scopedSetups.filter(setup => !setup.lockedAt).map(s => (
-                    <option key={s.id} value={s.id}>{s.versionLabel || s.chassis}{s.carType ? ` (${s.carType})` : ''}</option>
+                    <option key={s.id} value={s.id}>{displayVersionLabel(s) || s.chassis}{s.carType ? ` (${s.carType})` : ''}</option>
                   ))}
                 </select>
                 <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[14px]">expand_more</span>
@@ -926,8 +929,8 @@ export default function RaceWeekendView({
                 </div>
                 <span className="rounded-full border border-outline-variant px-2 py-1 font-mono text-[10px] font-bold uppercase text-on-surface-variant">Finished</span>
               </div>
-              <p className="mt-2 font-mono text-xs text-on-surface-variant">{weekend.sessions.length} run{weekend.sessions.length === 1 ? '' : 's'} · {weekend.setupName || 'Baseline saved'}</p>
-              {weekend.finalSetupId && <p className="mt-1 font-mono text-[10px] text-primary">Final Setup saved</p>}
+              <p className="mt-2 font-mono text-xs text-on-surface-variant">{weekend.sessions.length} run{weekend.sessions.length === 1 ? '' : 's'} · {displayStoredVersionLabel(weekend.setupName) || 'Starting Setup saved'}</p>
+              {weekend.finalSetupId && <p className="mt-1 font-mono text-[10px] text-primary">{lifecycleLabel('final', weekend)} saved</p>}
             </article>
           ))}
         </section>}
@@ -956,7 +959,7 @@ export default function RaceWeekendView({
               {(activeSetup?.versionLabel || currentWeekend.setupName) && (
                 <p className="font-mono text-[10px] text-on-surface-variant/70 mt-0.5 flex items-center gap-1">
                   <span className="material-symbols-outlined text-[12px]">settings_input_component</span>
-                  {activeSetup?.versionLabel || currentWeekend.setupName}
+                  {activeSetup ? displayVersionLabel(activeSetup) : displayStoredVersionLabel(currentWeekend.setupName)}
                 </p>
               )}
               <p className="font-mono text-[10px] text-primary uppercase tracking-wider mt-1">
@@ -1072,7 +1075,7 @@ export default function RaceWeekendView({
       </button>
       {activeWeekendMissingSetup && (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-center font-mono text-xs text-on-surface">
-          Weekend Setup is missing. Restore it before logging or adjusting a run. You can still finish this weekend.
+          {lifecycleLabel('weekend')} is missing. Restore it before logging or adjusting a run. You can still finish this weekend.
         </p>
       )}
 
@@ -1101,7 +1104,7 @@ export default function RaceWeekendView({
         {/* 1 ── Identity */}
         <div className="mb-6">
           <p className="font-mono text-[10px] text-on-surface-variant/70 mb-2">
-            {session.track}{session.time ? ` · ${session.time}` : ''}{session.setupUsed ? ` · ${session.setupUsed}` : ''}
+            {session.track}{session.time ? ` · ${session.time}` : ''}{session.setupUsed ? ` · ${displayLifecycleText(session.setupUsed)}` : ''}
           </p>
           <label className="flex flex-col gap-1">
             <span className="text-[10px] uppercase font-mono text-on-surface-variant">Weather</span>
@@ -1237,7 +1240,7 @@ export default function RaceWeekendView({
               </button>
             )}
           </div>
-          {session.pressureSourceNote && <p className="mb-2 font-mono text-xs text-on-surface-variant">{session.pressureSourceNote}</p>}
+          {session.pressureSourceNote && <p className="mb-2 font-mono text-xs text-on-surface-variant">{displayLifecycleText(session.pressureSourceNote)}</p>}
           <div className="grid grid-cols-2 gap-2">
             {(['lf', 'rf', 'lr', 'rr'] as const).map(corner => {
               const selectedTireId = session.tires?.[corner]?.tireId || '';
@@ -1472,7 +1475,7 @@ export default function RaceWeekendView({
                                     </button>
                                   </div>
                                 </div>
-                                <p><strong>Config:</strong> {sx.setupUsed || '—'}</p>
+                                <p><strong>Config:</strong> {sx.setupUsed ? displayLifecycleText(sx.setupUsed) : '—'}</p>
                                 <p><strong>Conditions:</strong> {sx.condition}</p>
                                 <p><strong>Notes:</strong> {sx.competitionNotes || 'None'}</p>
                                 {sx.adjustments && sx.adjustments.length > 0 && (
@@ -1501,12 +1504,12 @@ export default function RaceWeekendView({
         <section className="rounded-xl border border-primary/40 bg-primary/5 p-4 space-y-3">
           <div>
             <h2 className="font-display font-bold uppercase text-on-surface">Finish Weekend</h2>
-            <p className="font-mono text-xs text-on-surface-variant mt-1">Saves Final Setup, closes this race night or test day, and makes that setup your new Current Setup.</p>
+            <p className="font-mono text-xs text-on-surface-variant mt-1">Saves {lifecycleLabel('final', currentWeekend)}, closes this race night or test day, and makes that setup your new Current Setup.</p>
           </div>
           <button
             type="button"
             onClick={() => {
-              if (window.confirm(`Finish ${currentWeekend.name}? Final Setup will be saved and this weekend will move to history.`)) {
+              if (window.confirm(`Finish ${currentWeekend.name}? ${lifecycleLabel('final', currentWeekend)} will be saved and this weekend will move to history.`)) {
                 onFinishWeekend(currentWeekend.id);
               }
             }}

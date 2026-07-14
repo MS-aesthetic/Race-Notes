@@ -19,7 +19,7 @@ import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pu
 import { registerForPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
 import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
-import { finishWeekendLifecycle, isSetupLocked, isWeekendFinished, mergeTimestampedRecords, selectRaceWeekendSetupForSelection, startWeekendLifecycle, withSetupDiffLog } from './lib/setupLifecycle';
+import { displayVersionLabel, finishWeekendLifecycle, isSetupLocked, isWeekendFinished, lifecycleLabel, mergeTimestampedRecords, selectRaceWeekendSetupForSelection, startWeekendLifecycle, withSetupDiffLog } from './lib/setupLifecycle';
 import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
 import { applyQuickAdjust, resolveQuickAdjustTarget, type QuickAdjustCommand } from './lib/quickAdjust';
 import { materializeMainChecklist } from './lib/mainChecklist';
@@ -990,7 +990,7 @@ export default function App() {
       if (activated || pressuresChanged) {
         const pressures = setupPressureBlock(nextActive);
         const hasPressureSource = pressureBlockHasValue(pressures);
-        const sourceNote = `Pressures carried from ${nextActive.versionLabel || nextActive.chassis}`;
+        const sourceNote = `Pressures carried from ${displayVersionLabel(nextActive) || nextActive.chassis}`;
         handleUpdateSession(current => {
           const tireDetails = {
             lf: { ...current.tires?.lf, compound: nextActive.lf.tireComp || current.tires?.lf.compound || '', size: nextActive.lf.tireSize || current.tires?.lf.size || '', airPressure: pressures.lf },
@@ -1155,7 +1155,7 @@ export default function App() {
       carType: activeCar?.carType || '',
       carId: activeCarId,
       lifecycleRole: 'current',
-      versionLabel: 'Current Setup',
+      versionLabel: lifecycleLabel('current'),
       changeLog: [],
       updatedAt: now,
     });
@@ -1211,7 +1211,7 @@ export default function App() {
     // The weekend's setup owns every run, even if the garage car selector changes.
     const sessionSetup = resolveWeekendSetup(targetWeekend);
     if (!sessionSetup) {
-      setInfoToast('Weekend Setup is missing or locked. Restore it before logging a run.');
+      setInfoToast(`${lifecycleLabel('weekend')} is missing or locked. Restore it before logging a run.`);
       return;
     }
 
@@ -1262,7 +1262,7 @@ export default function App() {
       sessionType: data.type,
       name: sessionName,
       track: targetWeekend.track,
-      setupUsed: sessionSetup?.chassis || 'No setup baseline',
+      setupUsed: sessionSetup?.chassis || 'No starting setup',
       condition: '',
       trackConditionPreset: data.trackCondition || undefined,
       conditionNotes: data.conditionNotes || undefined,
@@ -1323,7 +1323,7 @@ export default function App() {
       competitionNotes: '',
       time: resolvedTime,
       weather: data.weather || '',
-      setupUsed: sessionSetup?.chassis || 'No setup baseline',
+      setupUsed: sessionSetup?.chassis || 'No starting setup',
       screenshots: []
     };
 
@@ -1490,7 +1490,7 @@ export default function App() {
       carType: activeCar?.carType || '',
       carId: activeCarId || undefined,
       lifecycleRole: 'baseline',
-      versionLabel: `${target.date || 'Race Weekend'} Baseline Setup`,
+      versionLabel: `${target.date || 'Race Weekend'} ${lifecycleLabel('baseline')}`,
       weekendId: target.id,
       lockedAt: now,
       changeLog: [],
@@ -1498,7 +1498,7 @@ export default function App() {
     });
     const result = finishWeekendLifecycle(target, savedSetupsRef.current, now, finishFallback);
     if (!result) {
-      setInfoToast('Weekend Setup is missing. Restore it before finishing this weekend.');
+      setInfoToast(`${lifecycleLabel('weekend')} is missing. Restore it before finishing this weekend.`);
       return;
     }
     const updatedWeekends = weekendsRef.current.map(item => item.id === target.id ? result.weekend : item);
@@ -1524,7 +1524,7 @@ export default function App() {
       pushWeekends(updatedWeekends, user.id, setSyncStatus);
       pushActiveSession(clearedSession, user.id, setSyncStatus);
     }
-    setInfoToast(`${target.name} finished. Final saved; Current Setup is ready.`);
+    setInfoToast(`${target.name} finished. ${lifecycleLabel('final', target)} saved; ${lifecycleLabel('current')} is ready.`);
   };
 
   const handleSelectRecentSession = (rec: SessionRecord, weekendId: string) => {
@@ -1536,7 +1536,7 @@ export default function App() {
     const targetWeekend = weekendsRef.current.find(item => item.id === weekendId);
     const currentCarSetup = resolveWeekendSetup(targetWeekend);
     if (targetWeekend && !currentCarSetup) {
-      setInfoToast('Weekend Setup is missing or locked. Restore it before loading this run.');
+      setInfoToast(`${lifecycleLabel('weekend')} is missing or locked. Restore it before loading this run.`);
       return;
     }
     const restoredPressures = resolveSessionPressureBlock(rec.pressures, rec.tires);
@@ -1552,7 +1552,7 @@ export default function App() {
       weekendId: weekendId,
       name: rec.name.toUpperCase(),
       track: rec.track,
-      setupUsed: rec.setupUsed || currentCarSetup?.chassis || 'No setup baseline',
+      setupUsed: rec.setupUsed || currentCarSetup?.chassis || 'No starting setup',
       condition: rec.condition.toUpperCase(),
       weather: rec.weather || '76°F',
       time: rec.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),

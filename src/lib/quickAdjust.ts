@@ -1,5 +1,5 @@
 import type { ActiveSession, CornerSetup, RaceWeekend, Setup, SetupAdjustment, SetupChange, ShockSession } from '../types';
-import { isSetupLocked } from './setupLifecycle';
+import { isSetupLocked, lifecycleLabel } from './setupLifecycle';
 import { parseStoredNumber, type NumericCornerField, type SetupCorner } from './setupSteps';
 
 export type QuickAdjustCommand =
@@ -39,14 +39,14 @@ export function resolveQuickAdjustTarget(
 ): QuickAdjustTarget {
   const weekend = weekends.find(item => item.id === activeWeekendId && item.status !== 'finished');
   if (!weekend?.activeSetupId) {
-    return { ok: false, error: 'Start an unfinished weekend with a valid Weekend Setup before using Quick Adjust.' };
+    return { ok: false, error: `Start an unfinished weekend with a valid ${lifecycleLabel('weekend')} before using Quick Adjust.` };
   }
   const setup = setups.find(item => item.id === weekend.activeSetupId);
   if (!setup
     || setup.lifecycleRole !== 'weekend'
     || setup.weekendId !== weekend.id
     || isSetupLocked(setup, weekends)) {
-    return { ok: false, error: 'Weekend Setup is missing or locked. Restore it before using Quick Adjust.' };
+    return { ok: false, error: `${lifecycleLabel('weekend')} is missing or locked. Restore it before using Quick Adjust.` };
   }
   if (!session.id
     || session.weekendId !== weekend.id
@@ -234,7 +234,7 @@ export function applyQuickAdjust(
   commandId: string,
 ): QuickAdjustResult {
   if (setup.lifecycleRole !== 'weekend' || isSetupLocked(setup, weekends)) {
-    return { ok: false, error: 'Weekend Setup is locked or unavailable.' };
+    return { ok: false, error: `${lifecycleLabel('weekend')} is locked or unavailable.` };
   }
   if (!session.id || !session.weekendId || setup.weekendId !== session.weekendId) {
     return { ok: false, error: 'Open a run from this active weekend before using Quick Adjust.' };
