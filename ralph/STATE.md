@@ -95,7 +95,7 @@ Separate track from WS-N…Z. Chunks 1–9 are historical and archived under `do
 | UXF | Scope | Status | Attempts | Score | Commit | Notes |
 |---|---|---|---|---|---|---|
 | UXF-1 | Duplicate Other + shared active-checklist projection | complete | 0 | 97 | 94d1e79 | SOL QA PASS: single Other, shared pure active projection across ToDo/Dashboard, persistence-safe harness, exact lint baseline, build, diff, and cavecrew gates clean. |
-| UXF-2 | Quick Adjust net-outcome coalescing | in_progress | 2 | 86 | 1dd5b75 | SOL QA attempt 1 FAIL: missing matching run row returns success while only Setup history changes. Route fail-without-mutation repair to SOL fixer. |
+| UXF-2 | Quick Adjust net-outcome coalescing | in_progress | 2 | 86 | f03a17b | SOL fixer CODE_PASS: missing matching run row now fails before mutation; focused fixture, full harness, exact lint baseline, build, diff, and cavecrew pass. Awaiting QA attempt 2. |
 | UXF-3 | Starting / Live-Trackside / Raced-or-Finished setup labels | pending | 0 | — | — | Display-label change only; lifecycle mechanics stay intact. |
 | UXF-4 | Load graph travel axis + measured-height display | pending | 0 | — | — | Display-layer change; stored points unchanged. |
 | UXF-5 | Copy tone + Tuning Guide/App Guide separation | pending | 0 | — | — | Owner tone review required to close. |
