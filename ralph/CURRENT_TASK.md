@@ -1,6 +1,6 @@
 # Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** IN PROGRESS — C6B SOL QA FAIL 1; TERRA REPAIR REQUIRED; C7 LOCKED
+**Status:** IN PROGRESS — C6B TERRA REPAIR COMPLETE; AWAITING SOL QA ATTEMPT 2; C7 LOCKED
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -99,6 +99,24 @@
 - Required repair harnesses: cross-car new-weekend source, zero-session legacy Finish,
   partial-finish retry, and unique lifecycle IDs. Existing harness/lint/build/live
   schema/migration/RLS/draft shell all pass. C7 remains blocked.
+
+### C6B Terra repair — complete, awaiting SOL QA attempt 2 (2026-07-13)
+
+- Repair commit `874fecc` keeps new-weekend source selection same-car and separates
+  active-car setup from event-owned RaceWeekend setup.
+- Legacy zero-session Finish upgrades a valid linked source into its own Weekend
+  snapshot without changing the original. Missing legacy links can use exact same-car
+  or blank fallback; dangling explicit links fail safely and never borrow another car.
+- Interrupted Finish is idempotent: deterministic Weekend/Final/Current IDs replace
+  duplicates, matching snapshots retain lock/update timestamps and history, and retry
+  completes the still-active weekend.
+- Expanded lifecycle/source harness PASS; cavecrew re-review reports no issues.
+  Exact three-error lint baseline, 540-module build, and `git diff --check` PASS.
+- Draft `https://6a55a024d663b44ca4f639c7--crew-chief-race-notes.netlify.app`
+  loads at 390 px with no console errors. Unique origin remains at login gate, so
+  legacy/partial recovery is covered by pure harness rather than authenticated UI.
+- Migration unchanged. Production, remote branch, `master`, and release APK unchanged.
+  C7 remains locked pending independent SOL QA attempt 2.
 
 ## Chunk 7 — expanded Quick Adjust
 

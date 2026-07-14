@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 6B — setup weekend lifecycle Terra build)
+> Last updated: 2026-07-13 (UX Chunk 6B — setup weekend lifecycle Terra repair)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1207,7 +1207,20 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
 - Terra feature commit `2a941d3`. Harness, cavecrew, exact lint baseline, build, 390 px
   zero-run runtime, dark/light, and draft shell passed. Draft:
   `https://6a5599e37111d0563ffaf5f3--crew-chief-race-notes.netlify.app`.
-  SOL QA attempt 1 failed: new-weekend fallback can cross cars after a car switch;
-  legacy weekends without `activeSetupId` cannot finish; interrupted local Finish
-  cannot recover and may duplicate deterministic snapshot IDs. Terra repair is required
-  before C7. Live schema/RLS/migration history remained valid.
+  SOL QA attempt 1 failed because new-weekend fallback could cross cars after a switch,
+  legacy weekends could not finish, and interrupted local Finish could not recover.
+  Live schema/RLS/migration history remained valid; repair details follow.
+- Terra repair commit `874fecc` separates active-car source selection from event-owned
+  RaceWeekend setup routing. `pickWeekendSourceSetup()` accepts only explicit/current/
+  latest setups belonging to selected car; otherwise new-weekend creation uses blank.
+- Legacy Finish creates a dedicated Weekend snapshot from valid `setupId`, or from
+  caller-provided safe same-car/blank fallback only when `setupId` is absent. Dangling
+  explicit links fail safely instead of borrowing currently selected car data.
+- Partial-Finish retry recognizes matching locked deterministic snapshots, replaces
+  duplicate Weekend/Final/Current IDs, and preserves their original lock/update times
+  and history. Expanded harness covers cross-car source, zero-run legacy, dangling link,
+  no-source blank fallback, partial retry, chronology, history, and uniqueness.
+- Repair gate: harness PASS; cavecrew re-review clean; exact three-error lint baseline;
+  build PASS (540 modules, 16 Workbox entries); 390 px draft shell and console PASS.
+  Draft `https://6a55a024d663b44ca4f639c7--crew-chief-race-notes.netlify.app`.
+  Migration unchanged; C7 remains locked pending SOL QA attempt 2.
