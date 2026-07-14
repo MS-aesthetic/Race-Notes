@@ -95,7 +95,7 @@ Separate track from WS-N…Z. Chunks 1–9 are historical and archived under `do
 | UXF | Scope | Status | Attempts | Score | Commit | Notes |
 |---|---|---|---|---|---|---|
 | UXF-1 | Duplicate Other + shared active-checklist projection | complete | 0 | 97 | 94d1e79 | SOL QA PASS: single Other, shared pure active projection across ToDo/Dashboard, persistence-safe harness, exact lint baseline, build, diff, and cavecrew gates clean. |
-| UXF-2 | Quick Adjust net-outcome coalescing | in_progress | 1 | — | — | Terra initial build pass active after UXF-1 closure. |
+| UXF-2 | Quick Adjust net-outcome coalescing | in_progress | 1 | — | 1dd5b75 | Terra CODE_PASS: run/corner/field net rows, reversal/distinct/load/session/cloud harness coverage, exact lint baseline, build, diff, and cavecrew pass. Awaiting SOL QA. |
 | UXF-3 | Starting / Live-Trackside / Raced-or-Finished setup labels | pending | 0 | — | — | Display-label change only; lifecycle mechanics stay intact. |
 | UXF-4 | Load graph travel axis + measured-height display | pending | 0 | — | — | Display-layer change; stored points unchanged. |
 | UXF-5 | Copy tone + Tuning Guide/App Guide separation | pending | 0 | — | — | Owner tone review required to close. |

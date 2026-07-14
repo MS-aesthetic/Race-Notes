@@ -1,6 +1,6 @@
 # Current Task — UXF-2 Quick Adjust Net-Outcome Coalescing
 
-**Status:** IN_PROGRESS — Terra initial build attempt 1
+**Status:** CODE_PASS — Terra initial build attempt 1; awaiting independent SOL QA
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-1 closed by SOL QA at `44be917`
@@ -49,3 +49,15 @@ Store one net adjustment row per run, corner, and field instead of one row per s
 ## Routing
 
 Terra owns one initial build pass. Commit feature and durable handoff evidence, then return to SOL High QA. Any QA failure transfers repair to SOL fixer.
+
+## Implementation evidence
+
+- Feature commit: `1dd5b75`.
+- Non-`other` commands scan Setup history newest-to-oldest by run, corner, and field; matching Setup/run rows keep original IDs, before values, and array positions while latest after/note/load/timestamp replace prior values.
+- `other`, distinct fields, and distinct runs remain separate. Reversal remains one equal-before/after row.
+- Quick Adjust lock/ownership gates remain byte-identical. App local/cloud full-state write path and JSONB mapper remain unchanged.
+- Setup renderer reverses stored history; Race Weekend renderer uses run-array order. Neither assumes new IDs or append-only updates.
+- Expanded chunk7 harness covers rapid net result, first ID, row position, distinct fields/runs, two `other` rows, reversal, latest load binding, JSON session persistence, and Setup cloud round trip; PASS.
+- `npm run lint`: exact three known baseline errors only.
+- `npm run build`: PASS, 554 modules and 18 PWA entries. `git diff --check`: PASS. Cavecrew review: `No issues.`
+- No lifecycle label, schema, mapper, stepper, package, native, deploy, push, merge, or APK change.
