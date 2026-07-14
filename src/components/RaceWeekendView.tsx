@@ -15,7 +15,7 @@ import FourBarQuickAdjust from './FourBarQuickAdjust';
 import SetupDiffView from './SetupDiffView';
 import QuickAdjustPanel from './QuickAdjustPanel';
 import { NumericCornerField, formatPsiValue, mergeImportedSetupPressure } from '../lib/setupSteps';
-import type { QuickAdjustCommand } from '../lib/quickAdjust';
+import { isQuickAdjustRunAvailable, type QuickAdjustCommand } from '../lib/quickAdjust';
 import { pickImmediatePriorSetupForCar, setupUsedUniquelyMatchesCar } from '../lib/setupCompat';
 import { isWeekendFinished, lifecycleSetupId } from '../lib/setupLifecycle';
 
@@ -186,7 +186,7 @@ export default function RaceWeekendView({
   const currentWeekend = visibleWeekends.find(w => w.id === activeWeekendId);
   const menuWeekend = visibleWeekends.find(w => w.id === menuWeekendId) ?? null;
   const activeWeekendMissingSetup = !!currentWeekend && !activeSetup;
-  const hasActiveSession = !!session.id && session.weekendId === activeWeekendId && !activeWeekendMissingSetup;
+  const hasActiveSession = isQuickAdjustRunAvailable(currentWeekend, activeSetup, session, activeWeekendId);
 
   // [10] Canonical ordering shared with ContextStrip/Dashboard.
   const sortedWeekends = sortWeekends(visibleWeekends, activeWeekendId);

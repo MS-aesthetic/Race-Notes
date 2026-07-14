@@ -19,7 +19,7 @@ import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pu
 import { registerForPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
 import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
-import { finishWeekendLifecycle, isSetupLocked, isWeekendFinished, mergeTimestampedRecords, selectRaceWeekendSetup, startWeekendLifecycle, withSetupDiffLog } from './lib/setupLifecycle';
+import { finishWeekendLifecycle, isSetupLocked, isWeekendFinished, mergeTimestampedRecords, selectRaceWeekendSetupForSelection, startWeekendLifecycle, withSetupDiffLog } from './lib/setupLifecycle';
 import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
 import { applyQuickAdjust, resolveQuickAdjustTarget, type QuickAdjustCommand } from './lib/quickAdjust';
 import { materializeMainChecklist } from './lib/mainChecklist';
@@ -178,7 +178,8 @@ export default function App() {
   });
 
   const activeCar = cars.find(c => c.id === activeCarId) ?? null;
-  const activeWeekend = weekends.find(item => item.id === activeWeekendId && !isWeekendFinished(item)) ?? null;
+  const selectedWeekend = activeWeekendId ? weekends.find(item => item.id === activeWeekendId) ?? null : null;
+  const activeWeekend = selectedWeekend && !isWeekendFinished(selectedWeekend) ? selectedWeekend : null;
   const resolveWeekendSetup = (weekend: RaceWeekend | null | undefined): Setup | null => {
     if (!weekend) return null;
     if (!weekend.activeSetupId) return null;
@@ -192,7 +193,12 @@ export default function App() {
   const activeWeekendSetup = resolveWeekendSetup(activeWeekend);
   const savedActiveSetup = setup.carId === activeCarId ? savedSetups.find(item => item.id === setup.id) ?? null : null;
   const activeCarSetup = savedActiveSetup ?? pickLatestSetupForCar(savedSetups, activeCarId);
-  const raceWeekendSetup = selectRaceWeekendSetup(activeWeekend, activeWeekendSetup, activeCarSetup);
+  const raceWeekendSetup = selectRaceWeekendSetupForSelection(
+    activeWeekendId,
+    selectedWeekend,
+    activeWeekendSetup,
+    activeCarSetup,
+  );
 
   // ── [27] Help sheet, [37]/[5] info toast, [33] online status ──────────────
   const [helpOpen, setHelpOpen] = useState(false);

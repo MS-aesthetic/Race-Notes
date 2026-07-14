@@ -23,6 +23,18 @@ export const selectRaceWeekendSetup = (
   activeCarSetup: Setup | null,
 ): Setup | null => activeWeekend ? eventSetup : activeCarSetup;
 
+/** Raw weekend selection blocks generic selected-car fallback, even when stale/finished. */
+export const selectRaceWeekendSetupForSelection = (
+  activeWeekendId: string | null,
+  selectedWeekend: RaceWeekend | null | undefined,
+  eventSetup: Setup | null,
+  activeCarSetup: Setup | null,
+): Setup | null => {
+  if (!activeWeekendId) return activeCarSetup;
+  if (!selectedWeekend || isWeekendFinished(selectedWeekend)) return null;
+  return eventSetup;
+};
+
 export const lifecycleSetupId = (weekend: RaceWeekend | null | undefined): string | undefined =>
   weekend?.finalSetupId || weekend?.activeSetupId || weekend?.baselineSetupId || weekend?.setupId;
 

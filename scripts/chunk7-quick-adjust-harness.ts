@@ -5,12 +5,15 @@ import {
   applyExplicitCornerField,
   applyQuickAdjust,
   filterLoadSessions,
+  isQuickAdjustRunAvailable,
+  normalizeQuarterInch,
   normalizeSpringRate,
   resolveQuickAdjustTarget,
   stepQuarterInch,
   stepSpringRate,
   type QuickAdjustResult,
 } from '../src/lib/quickAdjust';
+import { selectRaceWeekendSetupForSelection } from '../src/lib/setupLifecycle';
 import { setupFromCloudRow, setupToCloudRow } from '../src/lib/setupSync';
 import type { ActiveSession, RaceWeekend, ShockSession } from '../src/types';
 
@@ -46,9 +49,26 @@ assert.equal(resolveQuickAdjustTarget('w1', [{ ...weekend, sessions: [] }], [set
 
 assert.equal(normalizeSpringRate('500 lb'), '500');
 assert.equal(stepSpringRate('500 lb', 25), '525');
+assert.equal(normalizeSpringRate('510 lb'), '510');
+assert.equal(normalizeSpringRate('510.5 lb'), '510.5');
+assert.equal(stepSpringRate('510 lb', 25), '535');
+assert.equal(stepSpringRate('510 lb', -25), '485');
 assert.equal(stepSpringRate('', 25), null);
 assert.equal(stepSpringRate('unknown', 25), null);
 assert.equal(stepQuarterInch('9 in', -0.25), '8.75');
+assert.equal(normalizeQuarterInch('9.10 in'), '9.1');
+assert.equal(stepQuarterInch('9.10 in', 0.25), '9.35');
+assert.equal(stepQuarterInch('9.10 in', -0.25), '8.85');
+assert.equal(stepQuarterInch('9.125 in', 0.25), '9.375');
+
+assert.equal(selectRaceWeekendSetupForSelection(null, null, null, selectedCarSetup)?.id, selectedCarSetup.id);
+assert.equal(selectRaceWeekendSetupForSelection('missing', null, null, selectedCarSetup), null);
+assert.equal(selectRaceWeekendSetupForSelection('w1', { ...weekend, status: 'finished' }, null, selectedCarSetup), null);
+assert.equal(selectRaceWeekendSetupForSelection('w1', weekend, setup, selectedCarSetup)?.id, setup.id);
+assert.equal(isQuickAdjustRunAvailable(weekend, setup, session, 'w1'), true);
+assert.equal(isQuickAdjustRunAvailable({ ...weekend, sessions: [] }, setup, session, 'w1'), false);
+assert.equal(isQuickAdjustRunAvailable({ ...weekend, status: 'finished' }, setup, session, 'w1'), false);
+assert.equal(isQuickAdjustRunAvailable(weekend, selectedCarSetup, session, 'w1'), false);
 
 const spring = expectSuccess(applyQuickAdjust(setup, session, { kind: 'spring-rate', corner: 'lf', delta: 25 }, [weekend], now, 'q1'));
 assert.equal(spring.setup.lf.spring, '525');
@@ -56,6 +76,16 @@ assert.equal(spring.setup.changeLog?.length, 1);
 assert.equal(spring.session.adjustments.length, 1);
 assert.equal(spring.change.runId, 'run-1');
 assert.equal(spring.adjustment.runId, 'run-1');
+
+const offGridFrameSetup = { ...spring.setup, jbarFrameHeight: '9.10 in', jbarPinionHeight: '8.15 in' };
+const frameUp = expectSuccess(applyQuickAdjust(offGridFrameSetup, spring.session, { kind: 'jbar-frame', delta: 0.25 }, [weekend], now, 'frame-up'));
+assert.equal(frameUp.setup.jbarFrameHeight, '9.35');
+const frameDown = expectSuccess(applyQuickAdjust(frameUp.setup, frameUp.session, { kind: 'jbar-frame', delta: -0.25 }, [weekend], now, 'frame-down'));
+assert.equal(frameDown.setup.jbarFrameHeight, '9.1');
+const pinionUp = expectSuccess(applyQuickAdjust(frameDown.setup, frameDown.session, { kind: 'jbar-pinion', delta: 0.25 }, [weekend], now, 'pinion-up'));
+assert.equal(pinionUp.setup.jbarPinionHeight, '8.4');
+const pinionDown = expectSuccess(applyQuickAdjust(pinionUp.setup, pinionUp.session, { kind: 'jbar-pinion', delta: -0.25 }, [weekend], now, 'pinion-down'));
+assert.equal(pinionDown.setup.jbarPinionHeight, '8.15');
 
 const rounds = expectSuccess(applyQuickAdjust(spring.setup, spring.session, { kind: 'spring-rounds', corner: 'lf', delta: 0.5 }, [weekend], now, 'q2'));
 assert.equal(rounds.setup.lf.springRounds, '0.5');

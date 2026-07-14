@@ -1,6 +1,6 @@
 import type { ActiveSession, CornerSetup, RaceWeekend, Setup, SetupAdjustment, SetupChange, ShockSession } from '../types';
 import { isSetupLocked } from './setupLifecycle';
-import { formatStoredNumber, parseStoredNumber, type NumericCornerField, type SetupCorner } from './setupSteps';
+import { parseStoredNumber, type NumericCornerField, type SetupCorner } from './setupSteps';
 
 export type QuickAdjustCommand =
   | { kind: 'spring-rate'; corner: SetupCorner; delta?: number; value?: string }
@@ -22,6 +22,13 @@ export type QuickAdjustTarget =
   | { ok: false; error: string };
 
 const display = (value: string | undefined): string => value?.trim() || '—';
+
+const formatExactNumber = (value: number, decimals = 6): string => {
+  const factor = 10 ** decimals;
+  const rounded = Math.round((value + Number.EPSILON) * factor) / factor;
+  const fixed = rounded.toFixed(decimals);
+  return fixed.replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+};
 
 /** Resolve Quick Adjust only through active Weekend ownership; selected-car setup is never a fallback. */
 export function resolveQuickAdjustTarget(
@@ -52,25 +59,43 @@ export function resolveQuickAdjustTarget(
 export function normalizeSpringRate(value: string): string | null {
   const parsed = parseStoredNumber(value);
   if (parsed === '') return null;
-  return formatStoredNumber(parsed, { step: 25, decimals: 0, unit: 'lb' });
+  return formatExactNumber(parsed);
 }
 
 export function stepSpringRate(value: string | undefined, delta: number): string | null {
   const parsed = parseStoredNumber(value);
   if (parsed === '') return null;
-  return formatStoredNumber(parsed + delta, { step: 25, decimals: 0, unit: 'lb' });
+  return formatExactNumber(parsed + delta);
 }
 
 export function normalizeQuarterInch(value: string): string | null {
   const parsed = parseStoredNumber(value);
   if (parsed === '') return null;
-  return formatStoredNumber(parsed, { step: 0.25, decimals: 2, unit: 'in' });
+  return formatExactNumber(parsed);
 }
 
 export function stepQuarterInch(value: string | undefined, delta: number): string | null {
   const parsed = parseStoredNumber(value);
   if (parsed === '') return null;
-  return formatStoredNumber(parsed + delta, { step: 0.25, decimals: 2, unit: 'in' });
+  return formatExactNumber(parsed + delta);
+}
+
+export function isQuickAdjustRunAvailable(
+  weekend: RaceWeekend | null | undefined,
+  setup: Setup | null | undefined,
+  session: ActiveSession,
+  activeWeekendId: string | null,
+): boolean {
+  if (!weekend
+    || weekend.id !== activeWeekendId
+    || weekend.status === 'finished'
+    || !setup
+    || setup.lifecycleRole !== 'weekend'
+    || setup.weekendId !== weekend.id
+    || weekend.activeSetupId !== setup.id
+    || !session.id
+    || session.weekendId !== weekend.id) return false;
+  return weekend.sessions.some(record => record.id === session.id);
 }
 
 export function filterLoadSessions(
