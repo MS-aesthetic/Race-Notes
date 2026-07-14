@@ -18,7 +18,7 @@ import AuthView from './components/AuthView';
 import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, deleteShockSessionFromCloud, pushMaintenanceComponents, pullMaintenanceComponents, deleteMaintenanceComponentFromCloud, pushMaintenanceLogs, pullMaintenanceLogs, deleteMaintenanceLogFromCloud, pushChecklistTemplates, pullChecklistTemplates, deleteChecklistTemplateFromCloud, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
 import { registerForPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
-import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar } from './lib/setupCompat';
+import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
 import { finishWeekendLifecycle, isSetupLocked, isWeekendFinished, mergeTimestampedRecords, startWeekendLifecycle, withSetupDiffLog } from './lib/setupLifecycle';
 import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
 import { materializeMainChecklist } from './lib/mainChecklist';
@@ -190,7 +190,8 @@ export default function App() {
   };
   const activeWeekendSetup = resolveWeekendSetup(activeWeekend);
   const savedActiveSetup = setup.carId === activeCarId ? savedSetups.find(item => item.id === setup.id) ?? null : null;
-  const activeCarSetup = activeWeekendSetup ?? savedActiveSetup ?? pickLatestSetupForCar(savedSetups, activeCarId);
+  const activeCarSetup = savedActiveSetup ?? pickLatestSetupForCar(savedSetups, activeCarId);
+  const raceWeekendSetup = activeWeekendSetup ?? activeCarSetup;
 
   // ── [27] Help sheet, [37]/[5] info toast, [33] online status ──────────────
   const [helpOpen, setHelpOpen] = useState(false);
@@ -1063,8 +1064,12 @@ export default function App() {
     const now = new Date().toISOString();
     const weekendId = `wknd-${Date.now()}`;
     const date = data.date || new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-    const savedSource = savedSetupsRef.current.find(s => s.id === data.setupId && s.carId === activeCarId)
-      || activeCarSetup;
+    const savedSource = pickWeekendSourceSetup(
+      savedSetupsRef.current,
+      activeCarId,
+      data.setupId,
+      activeCarSetup?.id,
+    );
     const sourceSetup = savedSource || makeBlankSetup({
       id: `setup-current-source-${weekendId}`,
       chassis: activeCar?.chassis || activeCar?.name || 'My Car',
@@ -1396,7 +1401,21 @@ export default function App() {
     const target = weekendsRef.current.find(item => item.id === weekendId);
     if (!target || isWeekendFinished(target)) return;
     const now = new Date().toISOString();
-    const result = finishWeekendLifecycle(target, savedSetupsRef.current, now);
+    const finishFallback = activeCarSetup || makeBlankSetup({
+      id: `setup-baseline-${target.id}`,
+      chassis: activeCar?.chassis || activeCar?.name || 'My Car',
+      track: target.track,
+      date: target.date,
+      carType: activeCar?.carType || '',
+      carId: activeCarId || undefined,
+      lifecycleRole: 'baseline',
+      versionLabel: `${target.date || 'Race Weekend'} Baseline Setup`,
+      weekendId: target.id,
+      lockedAt: now,
+      changeLog: [],
+      updatedAt: now,
+    });
+    const result = finishWeekendLifecycle(target, savedSetupsRef.current, now, finishFallback);
     if (!result) {
       setInfoToast('Weekend Setup is missing. Restore it before finishing this weekend.');
       return;
@@ -1711,7 +1730,7 @@ export default function App() {
                   onActivateWeekend={handleActivateWeekend}
                   onCreateWeekend={handleCreateNewWeekend}
                   onCreateSession={handleCreateNewSession}
-                  activeSetup={activeCarSetup}
+                  activeSetup={raceWeekendSetup}
                   onUpdateActiveSetup={(updated) => handleSaveSetups(savedSetupsRef.current.map(item => item.id === updated.id ? updated : item), updated.id)}
                   onFinishWeekend={handleFinishWeekend}
                   initialAction={rwInitialAction ?? undefined}

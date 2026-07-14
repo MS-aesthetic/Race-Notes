@@ -133,21 +133,78 @@ export function finishWeekendLifecycle(
   weekend: RaceWeekend,
   setups: Setup[],
   now: string,
+  fallbackSetup?: Setup | null,
 ): FinishedWeekendLifecycle | null {
   if (isWeekendFinished(weekend)) return null;
-  const active = setups.find(item => item.id === weekend.activeSetupId);
-  if (!active || isSetupLocked(active)) return null;
-
   const versionDate = weekend.date || 'Race Weekend';
+  const weekendSetupId = `setup-weekend-${weekend.id}`;
+  const finalSetupId = `setup-final-${weekend.id}`;
+  const currentSetupId = `setup-current-${weekend.id}`;
+  const linkedActive = weekend.activeSetupId
+    ? setups.find(item => item.id === weekend.activeSetupId) ?? null
+    : null;
+  const recoveredActive = !weekend.activeSetupId
+    ? setups.find(item => item.id === weekendSetupId) ?? null
+    : null;
+  const linkedLegacySource = weekend.setupId
+    ? setups.find(item => item.id === weekend.setupId) ?? null
+    : null;
+  const legacySource = !weekend.activeSetupId && !recoveredActive
+    ? (weekend.setupId ? linkedLegacySource : fallbackSetup ?? null)
+    : null;
+
+  let active = linkedActive ?? recoveredActive;
+  if (active) {
+    const matchingWeekendSnapshot = active.lifecycleRole === 'weekend'
+      && active.weekendId === weekend.id;
+    if (!matchingWeekendSnapshot) return null;
+  } else if (legacySource) {
+    active = {
+      ...cloneSetup(legacySource),
+      id: weekendSetupId,
+      track: weekend.track,
+      date: weekend.date,
+      versionLabel: `${versionDate} Weekend Setup`,
+      lifecycleRole: 'weekend',
+      sourceSetupId: legacySource.id,
+      weekendId: weekend.id,
+      lockedAt: undefined,
+      changeLog: [],
+      screenshots: [...(legacySource.screenshots || [])],
+      updatedAt: now,
+    };
+  } else {
+    return null;
+  }
+
+  const existingFinal = setups.find(item => item.id === finalSetupId
+    && item.lifecycleRole === 'final'
+    && item.weekendId === weekend.id
+    && item.sourceSetupId === active.id
+    && !!item.lockedAt) ?? null;
+  const existingCurrent = setups.find(item => item.id === currentSetupId
+    && item.lifecycleRole === 'current'
+    && item.sourceSetupId === finalSetupId
+    && !item.lockedAt) ?? null;
+  const recoveringPartialFinish = !!active.lockedAt;
   const lockedWeekendSetup: Setup = {
     ...cloneSetup(active),
+    id: active.id,
     lifecycleRole: 'weekend',
-    lockedAt: now,
-    updatedAt: now,
+    weekendId: weekend.id,
+    lockedAt: active.lockedAt || now,
+    updatedAt: recoveringPartialFinish ? (active.updatedAt || active.lockedAt || now) : now,
   };
-  const finalSetup: Setup = {
+  const finalSetup: Setup = existingFinal ? {
+    ...cloneSetup(existingFinal),
+    id: finalSetupId,
+    versionLabel: `${versionDate} Final Setup`,
+    lifecycleRole: 'final',
+    sourceSetupId: active.id,
+    weekendId: weekend.id,
+  } : {
     ...cloneSetup(active),
-    id: `setup-final-${weekend.id}`,
+    id: finalSetupId,
     versionLabel: `${versionDate} Final Setup`,
     lifecycleRole: 'final',
     sourceSetupId: active.id,
@@ -155,9 +212,17 @@ export function finishWeekendLifecycle(
     lockedAt: now,
     updatedAt: now,
   };
-  const currentSetup: Setup = {
+  const currentSetup: Setup = existingCurrent ? {
+    ...cloneSetup(existingCurrent),
+    id: currentSetupId,
+    versionLabel: `Current Setup — ${versionDate}`,
+    lifecycleRole: 'current',
+    sourceSetupId: finalSetup.id,
+    weekendId: undefined,
+    lockedAt: undefined,
+  } : {
     ...cloneSetup(finalSetup),
-    id: `setup-current-${weekend.id}`,
+    id: currentSetupId,
     versionLabel: `Current Setup — ${versionDate}`,
     lifecycleRole: 'current',
     sourceSetupId: finalSetup.id,
@@ -167,11 +232,29 @@ export function finishWeekendLifecycle(
     screenshots: [...(finalSetup.screenshots || [])],
     updatedAt: now,
   };
+  const replaceIds = new Set([
+    active.id,
+    weekendSetupId,
+    finalSetupId,
+    currentSetupId,
+  ]);
+  const persistedLegacySource = legacySource && !setups.some(item => item.id === legacySource.id)
+    ? [legacySource]
+    : [];
   const nextSetups = [
     currentSetup,
     finalSetup,
-    ...setups.map(item => item.id === active.id ? lockedWeekendSetup : item),
+    lockedWeekendSetup,
+    ...persistedLegacySource,
+    ...setups.filter(item => !replaceIds.has(item.id)),
   ];
+  const baselineId = weekend.baselineSetupId
+    || weekend.setupId
+    || legacySource?.id
+    || active.sourceSetupId;
+  const baselineSource = baselineId
+    ? nextSetups.find(item => item.id === baselineId) ?? legacySource
+    : legacySource;
 
   return {
     finalSetup,
@@ -181,6 +264,11 @@ export function finishWeekendLifecycle(
       ...weekend,
       status: 'finished',
       finishedAt: now,
+      sourceSetupId: weekend.sourceSetupId || legacySource?.id || active.sourceSetupId,
+      baselineSetupId: baselineId,
+      activeSetupId: active.id,
+      setupId: baselineId,
+      setupName: weekend.setupName || baselineSource?.versionLabel || baselineSource?.chassis,
       finalSetupId: finalSetup.id,
       updatedAt: now,
     },

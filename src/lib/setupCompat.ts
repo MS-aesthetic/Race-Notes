@@ -66,6 +66,24 @@ export function pickLatestSetupForCar(setups: Setup[], carId: string | null | un
   return candidates[0].setup;
 }
 
+/** Resolve a new weekend source without ever crossing the active-car boundary. */
+export function pickWeekendSourceSetup(
+  setups: Setup[],
+  carId: string | null | undefined,
+  requestedSetupId?: string,
+  currentSetupId?: string,
+): Setup | null {
+  if (!carId) return null;
+  const requested = requestedSetupId
+    ? setups.find(setup => setup.id === requestedSetupId && setup.carId === carId) ?? null
+    : null;
+  if (requested) return requested;
+  const current = currentSetupId
+    ? setups.find(setup => setup.id === currentSetupId && setup.carId === carId) ?? null
+    : null;
+  return current ?? pickLatestSetupForCar(setups, carId);
+}
+
 /** Setup immediately older than target under the same deterministic recency rule. */
 export function pickImmediatePriorSetupForCar(setups: Setup[], target: Setup): Setup | null {
   const ordered = setups
