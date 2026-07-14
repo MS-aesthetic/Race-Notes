@@ -3,7 +3,7 @@
 > **Purpose:** single entry point for any new LLM/agent picking up this project.
 > Read this first, then the linked docs. Last updated **2026-07-14**.
 
-> **Owner UX correction handoff (2026-07-14):** Read [`docs/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md`](./docs/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md) before new UX planning or implementation. It reopens selected C6B–C9 product decisions after owner review. Prior technical QA remains useful regression evidence, but rejected language, Tuning Guide structure, per-click adjustment logging, setup progression presentation, load-graph direction, checklist UX, and maintenance choices are no longer approved behavior.
+> **Active UX correction roadmap (2026-07-14):** Start at [`SPRINT_INDEX.md`](./SPRINT_INDEX.md), then read [`plan-v3-ux-corrections.md`](./plan-v3-ux-corrections.md). Original owner handoff is archived at [`docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md`](./docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md). Prior technical QA remains useful regression evidence, but rejected language, Tuning Guide structure, per-click adjustment logging, setup progression presentation, load-graph direction, checklist UX, and maintenance choices are no longer approved behavior.
 
 > ### ⚡ Update 2026-07-12 (supersedes stale details below)
 > - **Two active trees.** Main tree `C:\Users\maxx\antigravity\Race-Notes` stays on `master` and owns the complete gitignored Android platform. UX work lives in `.worktrees\v3` on `preview-v3`. Web builds run in v3; APKs use the documented dist-to-main bridge. `.worktrees/v2` is retired.
@@ -15,8 +15,8 @@
 
 > ### 🎨 UX OVERHAUL track — `preview-v3` (active dev line as of 2026-07-12)
 > A dedicated UX/UI overhaul is in progress on a NEW worktree **`.worktrees/v3` (branch `preview-v3`, created from `master` `3ea6648`)**. `master` is untouched; the overhaul lands on `preview-v3` and merges to `master` only on owner approval.
-> - **Source of the work:** [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md) (Fable expert UX audit — 37 recs, cost/benefit) → [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md) (spec-driven, 7 build chunks).
-> - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High owns implementation; QA failures 1–2 return to Terra and failure 3 transfers build+final QA to SOL. Codex model overrides and rollout metadata are now verified: SOL → Terra → SOL works in one persistent task. Generic prose self-identification is not model evidence. **`/caveman full`** stays on. One consolidated QA pass per chunk + standing `tsc --noEmit` (3-error baseline) and `vite build` gates.
+> - **Historical source:** [`docs/archive/UX_ANALYSIS_2026-07-12.md`](./docs/archive/UX_ANALYSIS_2026-07-12.md) → [`docs/archive/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/archive/IMPLEMENTATION_PLAN_2026-07-12.md). Forward work uses `SPRINT_INDEX.md`.
+> - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High gets one initial implementation pass; any QA failure transfers fixes to GPT 5.6 SOL High, which loops with SOL QA until PASS. Codex model overrides and rollout metadata are verified in persistent tasks. Generic prose self-identification is not model evidence. **`/caveman full`** stays on.
 > - **Chunk status:** ✅ **1–9 complete**. C9 SOL QA attempt 2 PASS at `c8c4a21` + `254d928`; Chunks 6B–9 completion run closed.
 > - **New reusable code (chunks 1-4):** `src/components/ui/` (`NumberStepper`, `UndoToast`+`InfoToast`, `EmptyState`, `CollapsibleSection`, `SegmentedGrid`, `BottomSheet`, `HelpSheet`, `LapTimeKeypad`); `src/lib/undo.ts`; `src/lib/backStack.ts`; `src/lib/saveStatus.ts`; `src/lib/sessionSequence.ts`; `src/lib/serviceLog.ts`; `src/lib/scope.ts` (`pickAutoWeekend`, `parseWeekendDate`, `sortWeekends`); `src/components/ContextStrip.tsx`; `src/components/GetRaceReadyCard.tsx`. CSS: `.tap-target`, `.sticky-action-bar`, `.status-chip` + light-theme contrast bump.
 > - **Owner UX answers baked into the plan:** (1) app used during the week + at the track after each run; (2) 95% single-user → assignment/concurrency deferred; (3) most teams 1 car (some 2-3) → car UI hidden at ≤1 car; (4) **four-bar changed VERY often trackside → make it FAST, not hidden** (reverses the "fold behind expander" rec — chunk 5); (5) dusk→night racing → sunlight/light-theme tuned; (6) Main Checklist = hybrid core-reset + ad-hoc (chunk 6).
@@ -148,9 +148,9 @@ Repo (Windows host): `C:\Users\maxx\antigravity\Race-Notes`
 ## 0. Start-here reading order
 
 1. **This file (`HANDOFF.md`)** — orientation, current status, session history, gotchas.
-   - **[WS-Z handoff](./docs/HANDOFF_WS_Z_2026-07-11.md)** — exact changes, commits, validation, APK bridge, and remaining rollout gates.
+   - **[WS-Z handoff](./docs/archive/HANDOFF_WS_Z_2026-07-11.md)** — historical changes, commits, validation, APK bridge, and rollout gates.
    - **Security:** Existing copied WS-Z APKs predate secured commit `98bb2e0` and are not approved for redistribution, security QA, or native-push QA. Rebuild from current secured source first.
-2. **`plan-v2.md`** — the ACTIVE roadmap (workstreams WS-N … WS-Z). Supersedes `plan.md`.
+2. **`SPRINT_INDEX.md`** — active roadmap entry point; Sprint 1 uses `plan-v3-ux-corrections.md`.
 3. **`ralph/STATE.md`** — machine-readable loop state: what's done, scores, human gates, backlog.
 4. **`ralph/CURRENT_TASK.md`** — the work order for the WS currently in flight.
 5. **`CODEBASE_KNOWLEDGE.md`** — 1000-line deep technical reference (types, tables, components, gotchas, session history).
@@ -159,9 +159,9 @@ Repo (Windows host): `C:\Users\maxx\antigravity\Race-Notes`
 7. **`.github/agents/*.agent.md`** — the four Ralph-loop agent role definitions.
 
 > **Doc-currency note:** `CODEBASE_KNOWLEDGE.md` predates parts of v2. Current
-> workflow authority: `AGENTS.md`, this file, `plan-v2.md`, then `STATE.md`.
+> workflow authority: `AGENTS.md`, this file, `SPRINT_INDEX.md`, then `STATE.md`.
 > Older sections in this file may still mention Shopping exports/state or earlier
-> naming. The dedicated [WS-Z handoff](./docs/HANDOFF_WS_Z_2026-07-11.md) and
+> naming. The archived [WS-Z handoff](./docs/archive/HANDOFF_WS_Z_2026-07-11.md) and
 > `ralph/CURRENT_TASK.md` override those stale entries.
 
 ---
@@ -225,12 +225,11 @@ may carry transient coordination; durable decisions must land in those files.
 ```
 ┌─► 1. PLAN   ws-planner   — picks next unblocked WS, writes CURRENT_TASK.md
 │   2. BUILD  ws-builder   — implements EXACTLY the work order; lint+build before finishing;
-│                            commits "WS-x attempt N: ..." to preview-v2
+│                            commits "UXF-x attempt N: ..." to preview-v3
 │   3. TEST/QA ws-qa       — grades diff vs rubric, writes verdict+fixes to STATE/CURRENT_TASK
 │        ├ PASS (all gates + score ≥ 90) → mark complete, attempts=0 ─────────┐
-│        ├ FAIL reviewing attempt 1–2 → Terra BUILD, next attempt             │
-│        └ FAIL reviewing attempt 3 → SOL FIX takeover                        │
-│   4. FIX    ws-fixer     — escalation; fixes directly, re-runs lint/build   │
+│        └ FAIL on any attempt → SOL FIX takeover                              │
+│   4. FIX    ws-fixer     — owns every post-failure fix, re-runs lint/build  │
 └──────────────────────────── next WS ◄──────────────────────────────────────┘
 ```
 
@@ -241,11 +240,11 @@ may carry transient coordination; durable decisions must land in those files.
 | `ws-planner` | `.github/agents/ws-planner.agent.md` | **GPT 5.6 SOL High** | Analysis, spec, work order |
 | `ws-builder` | `.github/agents/ws-builder.agent.md` | **GPT 5.6 Terra High** | Feature implementation |
 | `ws-qa` | `.github/agents/ws-qa.agent.md` | **GPT 5.6 SOL High** | Independent QA, plan/task updates, loop gate |
-| `ws-fixer` | `.github/agents/ws-fixer.agent.md` | **GPT 5.6 SOL High** | Implementation takeover after third failed QA review |
+| `ws-fixer` | `.github/agents/ws-fixer.agent.md` | **GPT 5.6 SOL High** | Implementation takeover after first failed QA review |
 
 > Owner instruction (2026-07-11) supersedes prior Fable/DeepSeek/Opus routing.
-> QA failures 1–2 return to Terra. Failure 3 transfers implementation to SOL;
-> SOL then performs final QA. Dispatch model changes with an explicit model
+> Terra gets one initial build pass. Any QA failure transfers implementation
+> to SOL fixer; SOL fixer and SOL QA loop until PASS. Dispatch model changes with an explicit model
 > override on the same Codex task. `handoff_thread` moves checkout/worktree/host
 > state; it does not choose a model. Verify the executed sequence from rollout
 > `turn_context.payload.model` using `scripts/verify-agent-handoff.ps1`; if that
@@ -254,7 +253,7 @@ may carry transient coordination; durable decisions must land in those files.
 ### QA rubric (every gate is hard — any miss = FAIL)
 1. `npm run lint` clean beyond the 3-error baseline.
 2. `npm run build` succeeds (Windows).
-3. Scope: diff touches only the WS's Primary/Shared files (see ownership matrix in `plan-v2.md`).
+3. Scope: diff touches only the workstream's Primary/Shared files in the active sprint plan from `SPRINT_INDEX.md`.
 4. Architecture rules: local-first dual-write; no router; correct car/rig/global scoping; types only in `types.ts`; sync only in `sync.ts`; `delete*FromCloud` on every delete path; theme tokens (no hardcoded hex).
 5. All acceptance criteria in `CURRENT_TASK.md` demonstrably met.
 Then score the remainder 0–100 (code quality, edge cases, offline behavior, regression risk). PASS = all gates + ≥ 90.
@@ -275,11 +274,11 @@ per WS: `WS-x attempt N: …` (build) and `ws-qa: WS-x PASS (score) …` (state)
 
 ---
 
-## 4. Roadmap & status (from `plan-v2.md` + `STATE.md`)
+## 4. Historical roadmap & status (archived `docs/archive/plan-v2.md` + `STATE.md`)
 
 **v1 (plan.md, WS-A…WS-M):** COMPLETE — data model, tire lifecycle, setup diff, task↔weekend, weather history, carry-over setups, exports, UI/theme/reference passes.
 
-**v2 (plan-v2.md, WS-N…WS-Z):**
+**v2 (archived `docs/archive/plan-v2.md`, WS-N…WS-Z):**
 
 | WS | Title | Status |
 |---|---|---|
@@ -302,9 +301,9 @@ per WS: `WS-x attempt N: …` (build) and `ws-qa: WS-x PASS (score) …` (state)
 `VITE_HERE_API_KEY` + Firebase web config + VAPID in `.env.local`; migrations
 011–013 applied to live Supabase; nimbus redirect URL added to Supabase Auth.
 
-**Open WS-Z gate:** apply `supabase/migrations/014_team_delete_policies.sql`,
-then run authenticated team-delete, offline reload, light/dark, zoom, and
-mobile/incognito visual QA against latest draft. Production remains unchanged.
+**WS-Z migration status:** migration 014 was applied 2026-07-11 and verified
+live 2026-07-14 with the load-session and setup-lifecycle migrations. Remaining
+authenticated/offline/theme/zoom/mobile runtime checks are absorbed by UXF-9.
 
 **After WS-Z:** WS-T then WS-U (WS-W parked, so WS-X/WS-Y wait on it).
 
@@ -359,21 +358,21 @@ This session cleared the v2 human gates and shipped two workstreams + a rename +
 
 ## 7. Build, test & deploy procedures
 
-### Web (works in the v2 worktree)
+### Web (current v3 worktree)
 ```
-cd .worktrees\v2
+cd .worktrees\v3
 npx vite build            # → dist/  (run via cmd; PowerShell blocks npm.ps1 by exec policy)
 netlify deploy --dir=dist            # preview (default)
 netlify deploy --prod --dir=dist     # production — ONLY when Maxx explicitly says so
 ```
 
 ### Android debug APK (current working method — the "build-from-main" bridge)
-Because the v2 worktree lacks the Gradle/`google-services.json` files, the APK is produced from the main tree using the v2 web build:
+Because gitignored native files may be absent from the v3 worktree, the APK can be produced from the main tree using the v3 web build:
 ```
-# 1) build web in v2
-cd /d C:\Users\maxx\antigravity\Race-Notes\.worktrees\v2 && npx vite build
-# 2) mirror v2 dist into the main tree
-robocopy ".worktrees\v2\dist" "C:\Users\maxx\antigravity\Race-Notes\dist" /MIR
+# 1) build web in v3
+cd /d C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3 && npx vite build
+# 2) mirror v3 dist into the main tree
+robocopy ".worktrees\v3\dist" "C:\Users\maxx\antigravity\Race-Notes\dist" /MIR
 # 3) sync + assemble in the MAIN tree (has full android platform + nimbus + google-services)
 cd /d C:\Users\maxx\antigravity\Race-Notes
 set "JAVA_HOME=C:\Program Files\Microsoft\jdk-21.0.11.10-hotspot"
@@ -382,7 +381,7 @@ cd android && gradlew.bat assembleDebug --console=plain
 # → android\app\build\outputs\apk\debug\app-debug.apk   (~5.3 MB)
 ```
 Install to emulator: `"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" install -r "<apk>"` or drag onto the running emulator.
-**Caveat:** native Capacitor plugins installed only in v2 (e.g. `@capacitor/push-notifications`) are NOT in this APK, so native push won't work in it (it no-ops gracefully). For a faithful v2 APK incl. native push, the v2 worktree's Android platform must be reconstituted first (copy the gitignored Gradle files + `google-services.json` from the main tree, then build in v2). This is a known TODO.
+**Caveat:** verify current native plugins and `google-services.json` in the main tree before treating the bridged APK as release evidence. This workflow is for debug QA only.
 
 ### Release APK / production
 `android/app/build.gradle` (versionCode/versionName, keystore `crew-chief-release.jks`, pw `CrewChief2024!`, alias `crew-chief`) is gitignored and has been observed reverting — re-check before release. Bump `versionCode` for any APK meant to install over a previous one.
@@ -392,7 +391,7 @@ Install to emulator: `"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" instal
 - PowerShell has **no `&&`** — use `;` (or use cmd).
 - **cmd `set VAR=value && cmd`** captures a trailing space into VAR → wrap as `set "VAR=value"&&…` (this once produced bogus HTTP 401s in an API smoke test).
 - Deno edge functions live under `supabase/functions/` and must be **excluded from the app `tsconfig`** (already done) or `tsc` errors on `Deno`/esm.sh imports.
-- Migrations were applied via the Supabase MCP `apply_migration`; migration files 011–013 live in `.worktrees/v2/supabase/migrations/`.
+- Migrations were applied through the Supabase workflow; current migration files live in `.worktrees/v3/supabase/migrations/`.
 
 ---
 
@@ -401,14 +400,14 @@ Install to emulator: `"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" instal
 - **WS-Y must live-verify** `send-push` authenticated paths (400 malformed, 403 non-teammate, 200 success + `notifications` insert, dead-token prune) with a real user JWT, plus actual push RENDERING on Android APK + web PWA.
 - **HERE POIs** use Discover text search (`q=truck stop` / `q=rest area`) instead of category IDs — a documented robustness trade-off; consider category-ID filtering for non-English locales.
 - **Deep-link scheme:** old `com.racenotes.app` scheme kept alongside `nimbus.engineering.crewchief` for back-compat — confirm intentional or remove later.
-- **v2 Android platform** is incomplete (see §7) — reconstitute for native builds from v2, or keep the build-from-main bridge.
+- **v3 Android debug builds:** verify gitignored native files before building in v3, or use the documented build-from-main bridge.
 - WS-W (trip planner UI) parked by owner; revisit before WS-X/WS-Y can finish.
 
 ---
 
 ## 9. Owner constraints & etiquette
 
-- **Never merge `preview-v2` → `master`, and never deploy to production, without Maxx's explicit approval.** Default all deploys to Netlify preview.
+- **Never merge `preview-v3` → `master`, and never deploy to production, without Maxx's explicit approval.** Default all deploys to Netlify preview.
 - Migrations/secrets/console setup are treated as human gates — surface them; apply DB migrations only with owner awareness.
 - Keep commits scoped and use the loop's message convention (`WS-x attempt N: …`, `ws-qa: WS-x PASS …`).
 - Prefer new files (`src/lib/*`, `src/components/*`) wired with minimal `App.tsx` diffs; `App.tsx` and `types.ts` are hot shared files.

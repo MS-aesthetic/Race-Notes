@@ -2,7 +2,7 @@
 
 > Machine-readable loop state. Only **ws-planner** (status → in_progress) and
 > **ws-qa** (verdicts, completion) edit this file. Humans edit the Human Gates
-> section. See plan-v2.md §1 for the loop protocol.
+> section. See `SPRINT_INDEX.md` for the active sprint order and routing.
 
 ## How to run the loop (VS Code + Copilot)
 
@@ -11,9 +11,9 @@
    route bounded delegated work through cavecrew.
 3. `@ws-planner` using GPT 5.6 SOL High writes `ralph/CURRENT_TASK.md`.
 4. `@ws-builder` using GPT 5.6 Terra High implements and commits.
-5. `@ws-qa` using GPT 5.6 SOL High grades independently. FAIL 1–2 returns to
-   Terra. FAIL 3 transfers implementation to `@ws-fixer` using GPT 5.6 SOL High,
-   then returns to SOL QA.
+5. `@ws-qa` using GPT 5.6 SOL High grades independently. Any FAIL transfers
+   implementation to `@ws-fixer` using GPT 5.6 SOL High. Fixer and QA loop
+   until PASS; Terra is not re-invoked after its first failed build attempt.
 
 If exact models are unavailable, disclose limitation. Never claim unavailable
 model ran. `STATE.md` and `CURRENT_TASK.md` remain durable loop state; cavecrew
@@ -35,7 +35,7 @@ messages/tool results may carry transient coordination.
 | WS-W | Trip planner UI | pending | 0 | — | — | Needs WS-V |
 | WS-X | Teammates on route | pending | 0 | — | — | Needs WS-T + WS-W |
 | WS-Y | QA hardening & release | pending | 0 | — | — | Last; gates the batch |
-| WS-Z | July 11 product simplification | in_progress | 1 | — | — | Code complete; reviewer/build/draft-deploy pass. Await migration 014 + authenticated/offline/theme/zoom/mobile visual QA. |
+| WS-Z | July 11 product simplification | in_progress | 1 | — | — | Code complete. Migration 014 applied 2026-07-11 and verified live 2026-07-14 with load-session/lifecycle migrations. Remaining authenticated/offline/theme/zoom/mobile QA is absorbed by UXF-9. |
 
 Status values: `pending` · `in_progress` · `complete` · `scaffolded` (partial pre-work exists)
 
@@ -45,8 +45,9 @@ Status values: `pending` · `in_progress` · `complete` · `scaffolded` (partial
 - [x] 2. `FCM_SERVICE_ACCOUNT_JSON` secret set in Supabase + web VAPID key in `.env.local` (→ WS-S) — done 2026-07-10
 - [x] 3. HERE account + `VITE_HERE_API_KEY` in `.env.local` (→ WS-V) — done 2026-07-10
 - [x] 4. Apply migrations 011–013 to live Supabase (→ before WS-O/Q/S/T cloud sync testing) — applied 2026-07-10
+- [x] 5. Apply migration 014 team-delete policies — applied 2026-07-11; verified live 2026-07-14 with `20260714010630` and `20260714020037`
 
-**All human gates cleared 2026-07-10 → WS-S and WS-V are now unblocked.**
+**All listed migration/configuration gates are cleared.** UXF-9 owns remaining runtime acceptance; no UXF-1…8 schema gate exists.
 
 ## Grade log
 
@@ -58,7 +59,7 @@ _(ws-qa appends one line per verdict: date · WS · attempt · PASS/FAIL · scor
 - 2026-07 · WS-R · attempt 1 · PASS · 92 · Weekend checklists in RaceWeekendView (attach from template, check-off w/doneAt stamp, delete, blank option). ChecklistsTab template manager in Trackers (CRUD, starter seeds, item add/delete). App.tsx state+cloud-pull+delete-weekend nulling. lint 3-baseline only, build clean.
 - 2026-07 · WS-V · attempt 1 · PASS · 93 · All gates + live HERE API verification (decode test vector, geocode, 5.5mi truck route, 10 sorted truck stops, full error taxonomy) passed; Discover text-search POI trade-off accepted; package.json WS-S deps to re-attribute. Commit 3694aed.
 - 2026-07 · WS-S · attempt 1 · PASS · 93 · All hard gates met; push register/unregister + dual-SW build verified live; send-push deployed (verify_jwt) with 401/405/no-user-401 live smoke; 400/403/200/prune + device rendering inspection-verified, deferred to WS-Y. Commit 93d870d.
-- 2026-07-11 · WS-Z · attempt 1 · PROVISIONAL PASS · — · Cavecrew diff review and deterministic data checks pass; lint has baseline 3 errors only; build and Netlify draft HTTP smoke pass. Final score/status held for migration 014 plus authenticated/offline/theme/zoom/mobile visual QA.
+- 2026-07-11 · WS-Z · attempt 1 · PROVISIONAL PASS · — · Cavecrew diff review and deterministic data checks pass; lint has baseline 3 errors only; build and Netlify draft HTTP smoke pass. Migration 014 later applied and verified; remaining authenticated/offline/theme/zoom/mobile runtime QA is carried by UXF-9.
 
 ## Backlog
 
@@ -67,13 +68,13 @@ _(follow-up items discovered during QA — do not expand an in-flight WS)_
 - WS-Y: live-verify send-push authenticated paths (400 malformed, 403 non-teammate, 200 success + notifications insert, dead-token prune) with a real user JWT, plus actual push RENDERING on Android APK + web PWA. Inspection-only so far.
 - WS-S: `com.racenotes.app` deep-link scheme still kept alongside the nimbus scheme (back-compat) — confirm intentional or remove in a later pass.
 - WS-V: consider HERE category-ID filtering as a fallback to Discover text search for non-English locales / noisy results.
-- WS-S: PAUSED — commit the package-name rename to `nimbus.engineering.crewchief` on preview-v2 before any native/FCM work (owner-decided 2026-07-10; Firebase + google-services.json already nimbus).
-- WS-Z: apply migration 014, then verify team-member template/service deletion plus offline reload and theme/zoom/mobile presentation on draft deploy.
+- WS-S: package-name rename to `nimbus.engineering.crewchief` is complete; old `preview-v2` pause note is historical and no longer gates current UX work.
+- WS-Z: migration 014 complete; UXF-9 absorbs authenticated team-delete, offline reload, theme/font, and mobile presentation closeout.
 
 
 ## UX Overhaul (branch `preview-v3`, started 2026-07-12)
 
-Separate track from WS-N…Z. Source: `docs/UX_ANALYSIS_2026-07-12.md` (historical Fable audit, 37 recs) → `docs/IMPLEMENTATION_PLAN_2026-07-12.md` (7 chunks). Current owner routing: GPT 5.6 SOL High plans/QAs, GPT 5.6 Terra High builds; runtime metadata is authoritative and unobservable identity is `unverified`. `/caveman full`. Consolidated QA per chunk + `tsc` (3-baseline) / `vite build` gates. Runtime QA accumulates on v3 APK and Netlify drafts.
+Separate track from WS-N…Z. Chunks 1–9 are historical and archived under `docs/archive/`; current correction work starts at `SPRINT_INDEX.md` and `plan-v3-ux-corrections.md`. GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High gets one initial build pass; any FAIL transfers fixes to SOL High. Runtime metadata is authoritative and unobservable identity is `unverified`. `/caveman full`.
 
 | Chunk | Scope | Status | Commit |
 |---|---|---|---|
@@ -88,6 +89,20 @@ Separate track from WS-N…Z. Source: `docs/UX_ANALYSIS_2026-07-12.md` (historic
 | 7 | Quick Adjust expansion: spring rate/rounds, ride-height review flag, shock note/load graph, J-bar, gear, active-setup change log | ✅ complete — SOL QA attempt 2 PASS | 58e4522 + 030122c |
 | 8 | Trackers: hybrid Main Checklist, merged Templates, Maintenance Logs, 90%-interval task injection, after-create assignment, accounting defaults | ✅ complete — SOL QA PASS | 2f60420 |
 | 9 | Export share, contextual help, racing-language copy audit, final two-size/font/glove regression | ✅ complete — SOL QA attempt 2 PASS | c8c4a21 + 254d928 |
+
+## UXF correction batch (Sprint 1, started 2026-07-14)
+
+| UXF | Scope | Status | Attempts | Score | Commit | Notes |
+|---|---|---|---|---|---|---|
+| UXF-1 | Duplicate Other + shared active-checklist projection | pending | 0 | — | — | Starts after UXF-8 PASS. |
+| UXF-2 | Quick Adjust net-outcome coalescing | pending | 0 | — | — | Run-scoped coalescing; no per-tap audit trail. |
+| UXF-3 | Starting / Live-Trackside / Raced-or-Finished setup labels | pending | 0 | — | — | Display-label change only; lifecycle mechanics stay intact. |
+| UXF-4 | Load graph travel axis + measured-height display | pending | 0 | — | — | Display-layer change; stored points unchanged. |
+| UXF-5 | Copy tone + Tuning Guide/App Guide separation | pending | 0 | — | — | Owner tone review required to close. |
+| UXF-6 | Races/Days maintenance intervals + starting usage | pending | 0 | — | — | No current test-data compatibility burden. |
+| UXF-7 | Main Checklist redesign proposal | pending | 0 | — | — | Spec-only; Maxx design session gates follow-on build. |
+| UXF-8 | Docs and loop-state hygiene | in_progress | 1 | — | — | CODE_PASS; current links and diff check pass. Awaiting independent SOL QA. |
+| UXF-9 | Batch regression, draft, and owner acceptance | pending | 0 | — | — | Last; absorbs remaining WS-Z runtime checks. |
 
 ### UX chunk grade log
 - 2026-07-12 · UX-C1 · Fable QA · PASS-WITH-NOTES · primitives safe (undo state-machine no early-fire/leak; applied pagehide-commit + stepper keyboard). lint 3-baseline, build green, isolated (App.tsx untouched).

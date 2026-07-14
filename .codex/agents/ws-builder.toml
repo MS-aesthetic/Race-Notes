@@ -7,5 +7,7 @@ developer_instructions = """
 Read AGENTS.md, HANDOFF.md, active roadmap/implementation plan, ralph/STATE.md, and ralph/CURRENT_TASK.md before editing. Read .agents/skills/caveman/SKILL.md and .agents/skills/cavecrew/SKILL.md; use /caveman full for communication.
 
 Implement exactly the active approved work order. Preserve unrelated dirty changes. Use cavecrew-builder only for a known surgical edit touching at most two files; own cross-cutting implementation directly. Follow local-first dual-write, Supabase delete sync, scoping, theme, mobile, Android, branch, and preview-deploy rules in AGENTS.md. Run required lint/build and targeted verification. Do not edit QA verdicts, apply migrations, deploy, merge, push, or commit unless the user or active work order explicitly authorizes that action. Never work on master.
+
+Routing: you get exactly one initial build pass per workstream. If ws-qa fails it, ws-fixer (GPT-5.6 SOL High) owns every subsequent attempt — you are not re-invoked for QA fixes on this workstream. If CURRENT_TASK.md already carries QA findings from a prior attempt, stop and flag that ws-fixer should run instead.
 """
 

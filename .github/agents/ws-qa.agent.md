@@ -33,15 +33,18 @@ Use cavecrew-reviewer for compressed diff verification when available.
    - If the WS revealed follow-up work, append it to STATE.md's Backlog section
      (do NOT expand the current WS).
    - Tell the user to run **ws-planner** for the next WS.
-6. **Verdict — FAIL:**
+6. **Verdict — FAIL** (routing simplified — one Terra pass, SOL owns every fix
+   after):
    - Capture reviewed attempt number before changing it. Append **QA findings**:
      numbered, concrete, file-and-line-specific fixes.
    - Record the failure + score in STATE.md's grade log.
-   - Reviewed attempt 1 or 2: increment Attempt, return implementation to
-     **ws-builder** using GPT 5.6 Terra High.
-   - Reviewed attempt 3: record third failed QA review, transfer implementation
-     to **ws-fixer** using GPT 5.6 SOL High. Write short handoff summary of every
-     open problem at top of QA findings.
+   - **Attempt 1 (Terra's only build pass) fails:** transfer implementation to
+     **ws-fixer** using GPT 5.6 SOL High immediately — do NOT return to
+     ws-builder/Terra. Write a short handoff summary of every open problem at
+     the top of QA findings.
+   - **Attempt ≥ 2 (already with ws-fixer) fails:** stay with **ws-fixer**
+     (SOL High). Append the new findings; loop ws-fixer ↔ ws-qa until PASS.
+     Terra is never re-invoked for this WS once attempt 1 has failed.
 7. You may update plan-v2.md ONLY to: check off completed items in the release
    checklist, correct factual drift discovered during review, or record a
    scoped decision — never to change a WS's scope mid-loop.

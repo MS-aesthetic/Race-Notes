@@ -1,10 +1,10 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 8 — SOL QA PASS; Chunk 9 unlocked)
+> Last updated: 2026-07-14 (UX Chunk 9 — SOL QA PASS; UX correction sprints active)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
-> ⚠️ **2026-07-13:** A UX overhaul is in progress on branch **`preview-v3`** (revised chunks 1-9; 1-5 complete plus UX-R1, 6A QA-ready). It adds `src/components/ui/*` primitives, `src/lib/{undo,backStack,saveStatus,sessionSequence,serviceLog,setupSteps}.ts`, `ContextStrip`, a 5-tab nav, race-day Dashboard, trackside Setups/Tires/Load Sessions, and the C6A refinements in §25. For current state see `HANDOFF.md`, `docs/IMPLEMENTATION_PLAN_2026-07-12.md`, and `ralph/STATE.md`.
+> ⚠️ **2026-07-14:** UX Chunks 1–9 are technically complete on **`preview-v3`**. Owner-correction sprints are active; start with `SPRINT_INDEX.md`, then use `HANDOFF.md`, `ralph/CURRENT_TASK.md`, and `ralph/STATE.md` for current authority. This file remains the deep technical reference.
 
 ## 2026-07-12 UX Chunk 4 override
 

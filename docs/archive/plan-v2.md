@@ -1,3 +1,9 @@
+> **SUPERSEDED 2026-07-14** by `plan-v3-ux-corrections.md` (the active roadmap
+> for the owner UX-correction batch, UXF-1…UXF-9). This file is archived for
+> reference. WS-N…Z technical history remains the record of what those
+> workstreams did; WS-T/U/W/X/Y are **pending, not cancelled** — a future plan
+> must re-adopt them; archiving this file is not a decision to drop them.
+
 # CREW CHIEF — Build Plan v2 (Multi-Agent): ERP · Checklists · Location/Push · Truck Directions
 
 > **2026-07-12 active-track override:** this document remains authority for the

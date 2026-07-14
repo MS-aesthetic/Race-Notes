@@ -1,3 +1,8 @@
+> **SUPERSEDED 2026-07-14.** All 10 items here are resolved and fully specced
+> as UXF-1…9 in `plan-v3-ux-corrections.md` (see its Decisions log for the
+> Q1-Q6 answers). Kept for the original owner rationale/wording; do not plan
+> or build from this file directly — use `SPRINT_INDEX.md` → Sprint 1.
+
 # Claude Handoff — UX Rework Corrections
 
 **Date:** 2026-07-14  

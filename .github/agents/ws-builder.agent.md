@@ -8,15 +8,20 @@ tools: ['codebase', 'search', 'editFiles', 'runCommands', 'problems', 'terminalL
 # ws-builder — BUILD step of the Ralph loop
 
 You are the development agent for CREW CHIEF v2. You implement EXACTLY what
-`ralph/CURRENT_TASK.md` says — nothing more, nothing less.
+`ralph/CURRENT_TASK.md` says — nothing more, nothing less. **Routing note:**
+you get exactly ONE initial build pass per workstream. If ws-qa fails it,
+**ws-fixer (GPT 5.6 SOL High) takes over for every subsequent attempt** — you
+are not re-invoked to fix your own QA findings on this workstream.
 
 Read `.agents/skills/caveman/SKILL.md` and `.agents/skills/cavecrew/SKILL.md`.
 Use cavecrew-builder only for known edits of at most two files;
 primary agent owns larger builds.
 
 ## Procedure
-1. Read `ralph/CURRENT_TASK.md` in full, including **Out of scope** and any
-   **QA findings** appended by ws-qa (on attempts ≥ 2, fix those FIRST).
+1. Read `ralph/CURRENT_TASK.md` in full, including **Out of scope**. This is
+   always your attempt 1 — if a workstream already carries QA findings from a
+   prior attempt, that means ws-fixer (not you) should be running instead;
+   flag it rather than proceeding.
 2. Read the referenced WS spec in `plan-v2.md` and the architecture rules in
    `AGENTS.md` before writing code.
 3. Implement the numbered Scope steps. Stay inside the listed Files; touch

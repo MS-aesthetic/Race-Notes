@@ -2,17 +2,17 @@
 
 AI coding agent guide for the **Race Notes** PWA — a professional motorsport logbook and pit-side crew-chief tool for dirt-track racing.
 
-> **📋 Active feature roadmap:** [`plan-v2.md`](./plan-v2.md) and
+> **📋 Active feature roadmap:** [`SPRINT_INDEX.md`](./SPRINT_INDEX.md) and
 > [`ralph/STATE.md`](./ralph/STATE.md). Read these before feature work.
 >
 > **📚 Full reference:** [`CODEBASE_KNOWLEDGE.md`](./CODEBASE_KNOWLEDGE.md) — comprehensive technical reference (types, tables, localStorage keys, component details, gotchas, session history).
 >
 > **🧭 NEW AGENT? START WITH [`HANDOFF.md`](./HANDOFF.md)** — consolidated onboarding: current status, session history, worktree/branch gotchas, build/deploy procedures, and the Ralph-loop workflow.
 >
-> **🎨 UX OVERHAUL in progress on branch `preview-v3`** (Chunks 1–6A plus urgent UX-R1 complete; Chunk 6B next). Current routing: **GPT 5.6 SOL High plans and QAs; GPT 5.6 Terra High builds; `/caveman full`** for status. Plan: [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md); audit: [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md); status/backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
+> **🎨 UX correction sprints active on branch `preview-v3`.** Chunks 1–9 are technically complete; owner corrections now run from [`SPRINT_INDEX.md`](./SPRINT_INDEX.md), beginning with [`plan-v3-ux-corrections.md`](./plan-v3-ux-corrections.md). Current routing: **GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High gets one initial build pass; any QA failure transfers fixes to GPT 5.6 SOL High; `/caveman full`** for status.
 >
-> This file is current workflow authority. For v2 status trust
-> [`plan-v2.md`](./plan-v2.md), [`ralph/STATE.md`](./ralph/STATE.md), and
+> This file is current workflow authority. For active status trust
+> [`SPRINT_INDEX.md`](./SPRINT_INDEX.md), [`ralph/STATE.md`](./ralph/STATE.md), and
 > [`HANDOFF.md`](./HANDOFF.md). Current package: `nimbus.engineering.crewchief`.
 
 ---
@@ -36,9 +36,9 @@ review, and user-facing status message in this repository.
    - cross-cutting work touching three or more files: primary agent owns build;
      cavecrew investigators/reviewers support it
 4. **Model routing:** GPT 5.6 SOL High owns analysis, specification, planning,
-   and QA. GPT 5.6 Terra High owns feature implementation. QA failures 1–2 return
-   to Terra. Failure 3 (more than two failed QA reviews) transfers implementation
-   to GPT 5.6 SOL High, then SOL performs final QA. Bounded read-only
+   and QA. GPT 5.6 Terra High gets one initial feature implementation pass.
+   Any QA failure transfers implementation to GPT 5.6 SOL High; SOL fixer and
+   SOL QA then loop until PASS. Terra is not re-invoked for that workstream. Bounded read-only
    `cavecrew-investigator` scans may use Terra Medium for fast evidence gathering;
    SOL retains interpretation and decisions.
 5. Model identity comes from Codex runtime metadata (`turn_context.payload.model`),
@@ -118,7 +118,7 @@ Before marking any workstream complete, verify ALL of the following:
 
 ## Workstream Coordination
 
-`plan-v2.md` dependency graph and `ralph/STATE.md` status control execution.
+`SPRINT_INDEX.md` dependency graph and `ralph/STATE.md` status control execution.
 One workstream stays active. Parallel cavecrew investigation may be read-only;
 feature builds stay serial. `src/App.tsx` and `src/types.ts` are hot shared files:
 keep diffs small and extract logic into `src/lib/*` or `src/components/*`.
@@ -129,7 +129,8 @@ keep diffs small and extract logic into `src/lib/*` or `src/components/*`.
 
 | File | Purpose |
 |---|---|
-| `plan-v2.md` | **Active roadmap** — v2 workstreams, dependencies, ownership, Ralph loop. |
+| `SPRINT_INDEX.md` | **Active roadmap index** — serial sprint order, model routing, and plan entry points. |
+| `plan-v3-ux-corrections.md` | Active Sprint 1 UXF workstreams, dependencies, ownership, and acceptance. |
 | `ralph/STATE.md` | Durable workstream status, attempts, QA scores, gates. |
 | `CODEBASE_KNOWLEDGE.md` | Comprehensive technical reference — types, tables, localStorage keys, component details, gotchas, all session history. |
 | `src/types.ts` | All TypeScript interfaces — start here to understand domain models |
