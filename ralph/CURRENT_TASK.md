@@ -1,104 +1,125 @@
-# Current Task — UX Chunk 6A: Setup / Measurement Refinement
+# Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** COMPLETE — SOL QA PASS
+**Status:** IN PROGRESS — SOL PLAN COMPLETE; C6B READY FOR TERRA
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
+**Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
 
 ## Owner decisions
 
-- Finish Weekend never locks. Test days count. Button lives at page bottom.
+- Finish Weekend always works, including zero-run test days. Button lives at page bottom.
 - Setup history uses immutable Baseline, editable Weekend Setup, immutable Final,
   then editable Current Setup copied from Final.
-- Four-bar includes Top and Bottom bars for LR and RR. Every bar shows:
-  Frame Hole → Bar Length → Birdcage Hole; Angle at Ride Height → Angle at Full Droop.
-- Tuning priority explanations use plain race-shop English:
-  - High: try this first. Biggest likely help.
-  - Medium: try this next if first change did not fix problem.
-  - Low: fine-tuning. Check bigger items first.
-- Style has two choices only: Default = existing 1.15; Large = existing 1.45.
-  Scale numbers never appear in UI.
-- Test coherent chunks. Do not run full Android/deploy sweep after each tiny edit.
+- Use dedicated version labels; never overload chassis.
+- C7 structured and free-text changes update both current run and Weekend Setup log.
+- Main Checklist automatically receives maintenance jobs at 90% of configured
+  interval. Users can assign any job after creation, including imported/automatic jobs.
+- Testing may consolidate where risk permits. C6B keeps its own gate; C7+C8 share
+  one coherent gate; C9 owns final whole-app regression.
 
-## Chunk 6A build scope
+## Chunk 6B — setup lifecycle
 
-1. Blank setup factory defaults only; copied/existing setups remain byte-safe:
-   all weights `500`; all Ride Height C-to-C `17`; all pressure `10`; LF/RF
-   caster `3`; LF camber `4`; RF camber `-4`; rear caster/camber unchanged/blank.
-2. Label every setup height field `Ride Height C-to-C`.
-3. Four-bar block moves below normal setup fields. Add optional bottom-bar
-   ride-height/full-droop angle fields. Legacy `bottomBarAngle` remains readable
-   fallback; never destructively remap it.
-4. Tires cards show latest pressure, linked tire cycles, estimated total laps.
-   Same-date/session ordering must pick actual latest logged run.
-5. User-facing Smasher/Shock-session copy becomes `Load Session`. Add optional
-   session `rideHeightCtoC`; localStorage, cloud mapper, additive DB migration,
-   legacy hydration. Existing chart currently maps lower height lower on screen;
-   preserve unless runtime fixture disproves it.
-6. Theme UI exposes internal `large` as Default (1.15) and `xlarge` as Large
-   (1.45). Hydration normalizes legacy `standard`→`large`, `xxlarge`→`xlarge`.
-   Hide scale captions. Do not rename storage key.
-7. Tuning Guide removes AFCO and chassis-specific user-facing claims. Add visible
-   plain-English priority help using exact owner-approved meanings above.
+### Data contract
 
-## Chunk 6B design contract
+- `Setup` optional metadata: `versionLabel`, `lifecycleRole`
+  (`current|baseline|weekend|final`), `sourceSetupId`, `weekendId`, `lockedAt`,
+  `changeLog`, `updatedAt`. Missing role means editable Current for legacy data.
+- `RaceWeekend` optional metadata: `status` (`active|finished`), `finishedAt`,
+  `sourceSetupId`, `baselineSetupId`, `activeSetupId`, `finalSetupId`, `updatedAt`.
+  Missing status means active.
+- Setup changes are append-only records with unique ID, timestamp, label, optional
+  corner/field, before/after, note, run ID, and Load Session ID.
+- Keep legacy `RaceWeekend.setupId` as Baseline compatibility alias for current
+  maintenance/tire consumers. Lifecycle resolver prefers Final, then active Weekend,
+  then Baseline, then legacy setup.
 
-- Add optional setup version metadata and persisted change log. A dedicated
-  display label is required; never overwrite chassis to name a version.
-- Add optional weekend source/baseline/active/final setup IDs, status, finishedAt.
-- Starting weekend clones selected active-car setup into immutable Baseline and
-  editable Weekend Setup. All event changes target active setup ID.
-- Finish always works, even zero sessions. It snapshots Final, marks weekend
-  finished, clears active weekend, then clones Final as editable Current Setup.
-- Finished weekends excluded from auto-activation. Legacy missing status = active.
-- Migration additive. Sync mapping explicit. Offline dual-write remains first.
+### Behavior
 
-## Acceptance — Chunk 6A
+1. Starting weekend chooses selected same-car setup, else current/latest same-car
+   setup, else exact blank factory. Clone distinct Baseline and Weekend Setup rows.
+2. Baseline is view-only. Weekend Setup becomes selected edit target and owns empty
+   event change log. Weekend creation cannot later rebind lifecycle IDs.
+3. App boundary rejects mutations/deletion of Baseline/Final and completed Weekend
+   snapshots; UI also renders them view-only. Clone remains allowed and produces Current.
+4. All event setup writes resolve through `activeSetupId`, never generic latest setup.
+5. Finish transaction, local-first and synchronous: snapshot Final, lock Weekend Setup,
+   mark weekend finished, clear active weekend and active run, clone Final to editable
+   Current, select Current, persist all keys, then cloud push.
+6. Finished weekends remain visible history but cannot activate or accept runs.
+   Auto-pick, stale recovery, Dashboard, and ContextStrip exclude them.
+7. Timestamp-aware merge prevents older cloud data from undoing an offline finish.
 
-- Clean blank setup shows exact defaults; copy-last unchanged.
-- LR/RR top and bottom bar values persist independently through reload/cloud pull.
-- Latest pressure, cycles, laps match seeded hand count.
-- Optional Load Session C-to-C survives offline reload and signed-in pull.
-- Fixture height 12 at 100 lb and height 10 at 200 lb renders second point lower,
-  single and compare charts.
-- Style shows only Default/Large; old Standard opens Default, old XX-Large opens
-  Large; both themes remain readable.
-- Priority help understandable without setup vocabulary knowledge. Source/UI grep
-  finds no user-facing AFCO or chassis-specific wording.
-- `npm run lint`: exact three known baseline errors only. `npm run build`: PASS.
-- Cavecrew diff review before SOL QA. Runtime QA once after full 6A slice.
+### Cloud/migration
 
-## Build result — 2026-07-13
+- Create migration with `supabase migration new`; additive nullable/default-safe
+  columns only, no lifecycle foreign keys.
+- Explicit mappings for lifecycle fields, timestamps, setup change log, and currently
+  omitted setup scalars (`toe`, `jbar`, `jbar_frame_height`, `jbar_pinion_height`,
+  stagger/pull-bar fields as live schema requires).
+- Verify live `information_schema`, migration history, push/pull round trip, and advisors.
 
-- Blank-only defaults, exact LR/RR top+bottom four-bar layout, linked-tire
-  pressure/cycles/laps summary, Load Session naming and Ride Height C-to-C,
-  two-size Style UI, and plain tuning-priority help implemented.
-- Pressure ordering uses weekend date/time first and session timestamp only as a
-  same-date fallback. Linked tire cards never borrow another tire's pressure.
-- Additive migration `20260714010630_add_load_session_ride_height.sql` applied
-  and verified on project `swblfeayxoprodhwxqak`; explicit push/pull mapper added.
-- Cavecrew review found four issues; all fixed. Second review: zero blockers.
-- Harnesses PASS: chunk5 setup, chunk5 tires, chunk6a refinement.
-- `npm run lint`: exact three known baseline errors only. `npm run build`: PASS.
-- Runtime QA at 390×844: light/dark Style, blank defaults, complete four-bar
-  order, Load Session create/edit/reload field, and graph fixture passed. For
-  12 in/100 lb vs 10 in/200 lb, the 10 in point rendered lower (`cy 176 > 18`).
-- Netlify draft: `https://6a558ea45dc5716d3bed026a--crew-chief-race-notes.netlify.app`.
-  Production unchanged. C6B remains unimplemented by design.
+### C6B acceptance/gate
 
-## SOL QA adjudication — 2026-07-13
+- Pure harness covers start from source/blank, distinct IDs, immutable snapshots,
+  finish with zero sessions, editable Current copy, legacy defaults, and locked writes.
+- Offline reload preserves lifecycle; stale cloud fixture cannot reactivate finished event.
+- Finished weekends excluded from active pickers; history still viewable.
+- Exact three-error lint baseline; build PASS; cavecrew diff review; focused mobile
+  light/dark Default/Large runtime; authenticated cloud round trip; Netlify draft.
 
-- Feature commit: `ae9395b`.
-- Runtime metadata: `gpt-5.6-sol`, reasoning effort `high`, same persistent task.
-- Independent cavecrew commit review: zero code findings; stale status text only.
-- Three focused harnesses PASS. Type-check remains exactly three documented
-  pre-existing errors. Vite/Workbox build PASS; clean working tree before docs.
-- Netlify draft auth gate PASS with zero console errors. Prior authenticated local
-  mobile fixture evidence accepted for full C6A screens.
-- Supabase migration history contains `20260714010630`; live
-  `public.shock_sessions.ride_height_ctoc` is nullable `text` with empty default.
-- Verdict: PASS. C6A closed. C6B is next and remains untouched.
+## Chunk 7 — expanded Quick Adjust
 
-## Out of scope until later chunks
+- Active unfinished Weekend Setup only. No unsafe controls without active run/weekend.
+- Corner selector LF/RF/LR/RR.
+- Spring Rate reads setup; ±25 lb. Legacy numeric strings such as `500 lb` normalize
+  only when user changes them; blank/non-numeric values require manual entry.
+- Spring Rounds uses cumulative ±0.5. Any rounds change marks that corner's Ride
+  Height C-to-C for review. Only explicit C-to-C update clears marker.
+- Shock supports committed note plus real Load Session picker filtered by active car
+  and matching corner. Note and graph binding persist independently.
+- J-Bar Frame and Pinion use ±0.25 in. Gear is manual committed entry.
+- Four-bar remains available. Other Change free text remains.
+- Every committed structured/free-text change appends once to current run adjustments
+  and once to Weekend Setup change log. Rapid taps cannot lose or duplicate entries.
+- C7 harness covers numeric steps, marker lifecycle, car/corner graph filter, sync
+  round trip, lock protection, and one-to-one log/run entries.
 
-- Weekend version implementation (6B), expanded Quick Adjust (7), tracker reset/
-  maintenance automation/assignment (8), export/final sweep (9).
+## Chunk 8 — Trackers and Maintenance Logs
+
+- Rename visible Service wording/tab to Maintenance Logs; identifiers/storage stay stable.
+- Explain interval tracking in plain shop language: used amount, configured limit,
+  remaining amount, and why a job appears.
+- Main Checklist item kind is optional `core|adhoc`; missing kind reads as core.
+- Reset for new weekend unchecks/re-materializes core jobs. Keep-added-items toggle
+  defaults on and is remembered; when off, ad-hoc jobs are removed.
+- Entire checklist row toggles with >=56 px target. Edit action supports text, notes,
+  and assignment after creation for manual, template-imported, and automatic jobs.
+- Move Templates under Checklist as Edit List/Manage. Remove top-level Templates tab;
+  preserve CRUD and deterministic starter convergence.
+- Reconcile maintenance jobs at `pct >= 0.90` into Main Checklist with stable source ID.
+  Repeated reconciliation is idempotent. After service/reset below threshold, remove
+  only unfinished automatic job; preserve completed history.
+- Accounting new entry defaults date today and category last used; five recent distinct
+  description/category chips fill repeat details but not amount.
+
+## Chunk 9 — export, help, copy, final regression
+
+- Extract pure PDF generation into `src/lib/exportPdf.ts`; Export screen unchanged.
+- Setup/weekend card Share uses native file share when supported, desktop download fallback.
+- Add contextual help anchors for Setup, four-bar, Load Sessions, and setup diff.
+- Display-string-only racer-language audit. No identifier/storage-key renames.
+- Whole-app regression: both themes, Default/Large, 320/390 mobile, online/offline,
+  setup lifecycle, Quick Adjust, checklist/maintenance automation, assignment,
+  PDF share/download, Android back, auth shell, car scoping, deletion sync.
+- Final exact lint baseline, build, harness suite, cavecrew review, Supabase verification,
+  Android runtime, and one final Netlify draft. Production/master remain unchanged.
+
+## Execution / QA consolidation
+
+1. Terra builds C6B. SOL independently QAs C6B because it changes ownership, sync,
+   migration, and finish semantics.
+2. Terra builds C7 then C8 serially. Focused harnesses run during each build; one combined
+   lint/build/cloud/mobile/draft gate runs after both. SOL adjudicates each chunk from
+   same evidence and returns any blocker to Terra.
+3. Terra builds C9. SOL runs full regression and closes chunks 6B–9 only when all hard
+   gates pass. No production deploy, master merge, or remote push without owner request.

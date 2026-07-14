@@ -132,6 +132,12 @@ Original seven-chunk plan below remains implementation history. Current remainin
 
 Dependency: 6A → 6B → 7; 6B → 8; 7+8 → 9. Feature builds stay serial. Test once per coherent slice, then consolidated Android/preview regression per completed chunk.
 
+Execution decision (2026-07-13): isolate C6B behind its own migration/sync/lifecycle
+gate. Build C7 then C8 serially and consolidate their lint/build/cloud/mobile/draft
+verification after both, while retaining focused pure harnesses per chunk. C9 owns the
+final full-app regression and final draft. Exact active acceptance lives in
+`ralph/CURRENT_TASK.md`.
+
 ### CHUNK 5 â€” Setups: corner cards, four-bar quick-adjust, tires, diff
 **Goal:** Setups become thumb-operable at the track, with the four-bar/birdcage â€” the owner's most-common trackside adjustment â€” promoted to a first-class, â‰¤1-tap quick-adjust surface (reversed #18).
 **Covers:** 16, 17, 18(reversed), 19, 20, 21.
