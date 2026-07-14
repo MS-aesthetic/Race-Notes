@@ -1,6 +1,6 @@
 # Main Checklist Redesign Proposal — UXF-7
 
-**Status:** Proposed for Maxx review · no application code changed
+**Status:** Approved by Maxx as written on 2026-07-14 · UXF-10 build unlocked
 **Branch:** `preview-v3`
 **Goal:** one clear active list, predictable clear/reset behavior, preserved completion history, and no stale Dashboard tasks.
 
@@ -199,14 +199,14 @@ Current chunk8 fixtures lock core reopening with erased evidence, Keep-toggle de
 
 Recommended approval package:
 
-- [ ] Active work first; management behind **Manage**.
-- [ ] Dashboard shows count/mine summary only, no task-name preview.
-- [ ] Completed work stays collapsed since last reset, then moves to History.
-- [ ] Checkbox completes immediately with six-second Undo; completed rows can be marked open and completion notes remain optional/editable.
-- [ ] Clear hides recurring jobs until reset, deletes unfinished ad-hoc jobs, and archives completed work.
-- [ ] Carry preference applies only to unfinished added jobs.
-- [ ] Hidden automatic maintenance stays hidden until next reset, returns only if still due, and clears after service.
-- [ ] Saved-list import is idempotent; active edits do not rewrite saved-list definitions.
-- [ ] One optional JSON field (`archivedAt`), no SQL migration, no second checklist system.
+- [x] Active work first; management behind **Manage**.
+- [x] Dashboard shows count/mine summary only, no task-name preview.
+- [x] Completed work stays collapsed since last reset, then moves to History.
+- [x] Checkbox completes immediately with six-second Undo; completed rows can be marked open and completion notes remain optional/editable.
+- [x] Clear hides recurring jobs until reset, deletes unfinished ad-hoc jobs, and archives completed work.
+- [x] Carry preference applies only to unfinished added jobs.
+- [x] Hidden automatic maintenance stays hidden until next reset, returns only if still due, and clears after service.
+- [x] Saved-list import is idempotent; active edits do not rewrite saved-list definitions.
+- [x] One optional JSON field (`archivedAt`), no SQL migration, no second checklist system.
 
-Maxx may approve this package as written or redline any checkbox. No UXF-10 build starts before that decision is recorded.
+Maxx approved this package as written on 2026-07-14. UXF-10 implements this exact package.

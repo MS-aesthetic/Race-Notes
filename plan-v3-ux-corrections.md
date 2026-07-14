@@ -26,7 +26,7 @@
 
 ## 0. Workstream ID scheme
 
-This batch uses **UXF-1 … UXF-9** ("UX Fix"). Rationale: `WS-A…WS-M` (v1),
+This batch uses **UXF-1 … UXF-10** ("UX Fix"). Rationale: `WS-A…WS-M` (v1),
 `WS-N…WS-Z` (v2) and `UX-C1…UX-C9` / `UX-R1` (v3 chunk track) are all taken in
 `ralph/STATE.md` history; `UXF-` collides with none of them and greps cleanly.
 ws-planner picks the next eligible UXF exactly as it picked the next WS.
@@ -44,6 +44,7 @@ Correction-item → workstream map (items numbered per the handoff doc):
 | 7 Main Checklist redesign (spec-only) → future build WS | UXF-7 |
 | — docs/state hygiene (stale onboarding, stale WS-Z gate) | UXF-8 |
 | — batch regression gate | UXF-9 |
+| Approved UXF-7 Main Checklist build | UXF-10 |
 
 ## 1. Coordination
 
@@ -59,19 +60,20 @@ UXF-4  Load-graph travel view          (all Maxx questions resolved — clear to
 UXF-2  Quick Adjust coalescing         (all Maxx questions resolved — clear to build)
 UXF-6  Interval consolidation + start  (after UXF-5 — shares TrackersView.tsx;
                                         all Maxx questions resolved — clear to build)
-UXF-7  Main Checklist redesign SPEC    [Maxx design session; spec-only, no code]
+UXF-7  Main Checklist redesign SPEC    (approved 2026-07-14; complete)
+UXF-10 Main Checklist redesign BUILD   (approved UXF-7 package)
 UXF-9  Batch QA + draft deploy         (LAST — gates the batch)
 ```
 
 - The loop is serial (one WS in flight). The graph shows *eligibility*:
   UXF-1, -2, -3, -4 are mutually independent. All design questions for this
   batch were resolved with Maxx on 2026-07-14 (see §Decisions log) — no
-  workstream below is gated on a pending human decision except UXF-7, which
-  is deliberately spec-only pending a design session.
+  workstream below is gated on a pending human decision. Maxx approved UXF-7
+  as written on 2026-07-14, unlocking UXF-10.
 - `TrackersView.tsx` is the hot file of this batch (UXF-1 → UXF-5 → UXF-6 in
-  that order). `App.tsx` is touched only by UXF-3, strings only.
-- UXF-7 produces a proposal document, not code. Its follow-on build WS gets
-  added to this file by ws-planner after Maxx approves the proposal.
+  that order). UXF-10 may use minimal `App.tsx` wiring only if Manage-sheet/back behavior
+  cannot remain inside `ToDoView`; no unrelated App changes.
+- UXF-7 produced an approved proposal document, not code. UXF-10 is its exact follow-on build.
 
 ### File ownership matrix
 
@@ -86,6 +88,7 @@ UXF-9  Batch QA + draft deploy         (LAST — gates the batch)
 | UXF-7 | `docs/MAIN_CHECKLIST_REDESIGN_PROPOSAL.md` (new) | everything else read-only |
 | UXF-8 | `PROJECT_INSTRUCTIONS.md`, `docs/archive/plan-v2.md` (banner already applied), `CODEBASE_KNOWLEDGE.md` (header line only), `ralph/STATE.md` (WS-Z row + human-gates note) | `docs/archive/car-profiles/*` (RESOLVED Q6 — stays archived; the feature it specced is already built, nothing to restore) |
 | UXF-9 | test scripts, QA notes in `ralph/STATE.md` | everything (read-only + fixes) |
+| UXF-10 | `src/types.ts`, `src/lib/mainChecklist.ts`, `src/lib/checklistMaintenance.ts`, `src/components/ToDoView.tsx`, `src/components/DashboardView.tsx`, `scripts/chunk8-trackers-harness.ts` | `src/App.tsx` minimal sheet/back wiring only if required; existing Todo sync mapper is verification-only |
 
 ### Loop protocol, model routing, QA rubric
 
@@ -557,13 +560,56 @@ Maxx can approve/redline it in one sitting.
 **Human prerequisites:** none to start (analysis is unblocked); a Maxx design
 session is required to *close* it and to spawn the build WS.
 
-**Proposal status (2026-07-14): AWAITING OWNER REVIEW.** SOL drafted
+**Proposal status (2026-07-14): APPROVED / COMPLETE.** SOL drafted
 `docs/MAIN_CHECKLIST_REDESIGN_PROPOSAL.md` with 74 valid current-source references. It
 covers all owner analysis bullets and recommends active-first UI, Manage sheet, one-tap
 completion/Undo, preserved History, predictable clear/reset and automatic-maintenance
 suppression, idempotent saved lists, compact Dashboard, one optional Todo-item JSON field,
-no SQL, and an exact UXF-10 build/harness cut. No application code changed. Maxx approval
-or redline is required before UXF-7 closes or UXF-10 is added.
+no SQL, and an exact UXF-10 build/harness cut. No application code changed during UXF-7.
+Maxx approved the proposal as written on 2026-07-14; UXF-10 is now active.
+
+---
+
+## UXF-10 — Approved Main Checklist redesign build
+
+**Goal:** implement the approved UXF-7 package in
+`docs/MAIN_CHECKLIST_REDESIGN_PROPOSAL.md` without creating a second checklist system.
+
+**Scope:**
+1. Add optional `TodoItem.archivedAt` inside existing Todo JSONB; add pure current/open/
+   completed/history projections, stable recurring identity, archive, clear, reset, and
+   idempotent saved-list import helpers.
+2. Active-first Checklist UI: compact header/counts, add-task row, 56px open rows, 44px-plus
+   actions, collapsed **Completed since last reset**, six-second completion Undo, optional
+   completion-note edit, and concise clear empty state.
+3. Put saved-list import/management, carry-unfinished preference, reset, clear, and History
+   behind one Android-Back-safe **Manage** sheet.
+4. Preserve completed evidence. Clear archives completed rows, hides unfinished recurring
+   rows until reset, and deletes unfinished ad-hoc rows. Reset archives current completions;
+   only unfinished ad-hoc follows carry preference.
+5. Template recurrence requires an existing saved-list definition. Maintenance recurrence
+   requires the component to remain due. Same-cycle tombstones suppress immediate recreation;
+   archived history does not block a later eligible occurrence.
+6. Dashboard becomes one compact Checklist launcher with open/mine counts and no task-name
+   preview. Trackers and Dashboard use the same pure active projection.
+7. Extend `scripts/chunk8-trackers-harness.ts` with every fixture listed in proposal §9,
+   including legacy/default compatibility and JSON/local/cloud round trip.
+
+**Primary files:** `src/types.ts`, `src/lib/mainChecklist.ts`,
+`src/lib/checklistMaintenance.ts`, `src/components/ToDoView.tsx`,
+`src/components/DashboardView.tsx`, `scripts/chunk8-trackers-harness.ts`; minimal `App.tsx`
+wiring only if required by sheet/back behavior.
+
+**Out of scope:** new SQL/table, separate `WeekendChecklist` UI, maintenance interval math,
+setup lifecycle, Quick Adjust, accounting, team-concurrency redesign, package/native config,
+production deploy, remote push, merge, or APK.
+
+**Acceptance:** approved proposal §10 and harness §9 pass; exact three-error lint baseline;
+production build; diff check; cavecrew review; local-first reload; cloud JSON mapper/round trip;
+320/390 light/dark Default/Large runtime; one Netlify draft after coherent PASS. SOL performs
+independent QA after Terra's one initial build pass. Any QA failure transfers fixes to SOL.
+
+**Human prerequisites:** cleared by Maxx approval on 2026-07-14.
 
 ---
 
@@ -590,7 +636,7 @@ loop runs on this plan.
    applied 2026-07-11 and verified live 2026-07-14 (with 20260714010630 and
    20260714020037); remaining WS-Z closeout = the deferred
    authenticated/offline/theme/zoom/mobile visual QA, which UXF-9 absorbs.
-   Add a "UXF batch" status table (UXF-1…9, all `pending`) in the same format
+   Add a "UXF batch" status table (UXF-1…10, all `pending`) in the same format
    as the existing tables.
 5. `docs/archive/car-profiles/*.md`: already moved out of the live docs/ tree.
    **RESOLVED (Q6):** stays archived — the Car Profiles feature these docs
@@ -683,9 +729,8 @@ rationale, not just the answer.
    in this codebase (`Car`, `GarageView.tsx`, `byActiveCar`, etc. all exist).
    Archived copies stay archived as historical build notes; nothing to
    restore or build.
-7. **(UXF-7)** Main Checklist redesign still needs a short design session
-   with Maxx after the proposal doc lands — intentionally left spec-only;
-   not a blocking question, just the WS's own deliverable gate.
+7. **(UXF-7 → UXF-10)** Main Checklist redesign proposal landed and Maxx approved it as
+   written on 2026-07-14. UXF-7 is complete; exact approved implementation runs as UXF-10.
 
 ## Process note — planning-model pipeline
 

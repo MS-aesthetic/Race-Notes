@@ -1451,7 +1451,8 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
 ## 32. UXF-7 — Main Checklist Redesign Proposal (2026-07-14)
 
 - Proposal-only work lives at `docs/MAIN_CHECKLIST_REDESIGN_PROPOSAL.md`; no application
-  source or schema changed. Maxx approval/redline gates UXF-10.
+  source or schema changed in UXF-7. Maxx approved it as written on 2026-07-14, unlocking
+  UXF-10 implementation.
 - Current Main Checklist is one canonical `Todo`; Trackers and Dashboard share
   `activeChecklistItems()`. Four effective item classes exist: manual ad-hoc, legacy/core,
   saved-list/template, and automatic maintenance. Current close/reset behavior differs by
@@ -1466,3 +1467,6 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
 - Proposed UXF-10 harness replaces current evidence-erasing reset expectations with archive,
   exact-one recurring occurrence, tombstone suppression, clear-list, duplicate-import,
   Dashboard projection, action-target, and local/cloud JSON round-trip fixtures.
+- Exact UXF-10 build authority is `ralph/CURRENT_TASK.md`. It keeps one canonical Todo,
+  stores optional `archivedAt` inside existing JSONB, requires no SQL, and routes Terra's
+  initial build back to SOL for independent QA.

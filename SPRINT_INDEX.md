@@ -6,16 +6,16 @@ Ralph loop consumes one sprint file at a time. Sprints run serial: 1 → 2 → 3
 
 | Sprint | File | Content | Status |
 |---|---|---|---|
-| 1 | `plan-v3-ux-corrections.md` | UXF-1…9 — owner-correction batch (2026-07-14 handoff) | ACTIVE — run first |
+| 1 | `plan-v3-ux-corrections.md` | UXF-1…10 — owner-correction batch (2026-07-14 handoff) | ACTIVE — run first |
 | 2 | `sprint-2-quick-wins.md` | UXP-1,2,3,4,5,6,7,8,9,11,12,13,19,20 + gate — Low-difficulty audit items | pending — blocked by sprint 1 |
 | 3 | `sprint-3-second-wave.md` | UXP-10,14,15,16,17,18 + gate — Medium-difficulty audit items | pending — blocked by sprint 2 |
-| 4 | `sprint-4-design-needed.md` | UXP-21,22 — High-difficulty IA items; Maxx design session with UXF-7 | pending — design session gates build |
+| 4 | `sprint-4-design-needed.md` | UXP-21,22 — High-difficulty IA items with their own Maxx design session | pending — design session gates build |
 
 ## ID scheme
 
 `UXP-n` = "UX Polish" item n from the 2026-07-14 full UX/UI audit (22 items,
 impact×difficulty ranked). Numbering is 1:1 with the audit list. Collides with
-nothing in `ralph/STATE.md` history (WS-A…Z, UX-C1…9, UX-R1, UXF-1…9 all taken).
+nothing in `ralph/STATE.md` history (WS-A…Z, UX-C1…9, UX-R1, UXF-1…10 all taken).
 Per-sprint QA gates: UXP-QA2, UXP-QA3.
 
 ## Model routing (authoritative copy — sprint files carry a brief restate)
