@@ -1,6 +1,6 @@
 # Current Task — UXF-8 Docs and Loop-State Hygiene
 
-**Status:** QA FAIL — attempt 1; route repairs to GPT 5.6 SOL High `ws-fixer`
+**Status:** CODE_PASS — SOL fixer attempt 2; awaiting independent SOL QA
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Next workstream after independent PASS:** UXF-1
@@ -52,8 +52,14 @@ Remove stale v2 onboarding and loop-state directions before application work sta
    - `.github/agents/ws-qa.agent.md:24,48` still uses and permits edits to `plan-v2.md`.
    - `.github/agents/ws-fixer.agent.md:3,23` still says “after third failed QA review” and reads `plan-v2.md`, despite its body using first-failure takeover.
    Replace active-roadmap references with `SPRINT_INDEX.md` plus its selected sprint plan, use `preview-v3`, and make first-failure SOL takeover consistent. Preserve historical archived-plan text outside active role definitions.
+   **FIXED attempt 2:** all four active `.github/agents` roles now use `SPRINT_INDEX.md`, selected active sprint plan, `preview-v3`, and first-failure SOL takeover. Active-role grep for `plan-v2`, `preview-v2`, and third-failure language returns zero.
 2. **Active plan has stale owner-handoff path.** `plan-v3-ux-corrections.md:4` points to removed `docs/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md`; update it to `docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md`.
+   **FIXED attempt 2:** source path now names `docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md`.
 3. **Cold-start conflict rule still favors v2.** `PROJECT_INSTRUCTIONS.md:15` says “newer v2 sources win conflicts.” Replace with active sprint plan and `ralph/CURRENT_TASK.md` authority.
+   **FIXED attempt 2:** conflict rule now names active sprint plan and `ralph/CURRENT_TASK.md`.
 4. **Live worktree status is stale.** `HANDOFF.md:176` says Chunks 1–6B complete and C7 unlocked. Update current row to Chunks 1–9 technically complete, UXF-8 in QA/repair, then UXF-1.
+   **FIXED attempt 2:** live row now reports Chunks 1–9 technically complete, UXF-8 repair/QA active, UXF-1 next.
 
 Passing evidence: commit contains no `src/`, `scripts/`, schema, package, or Android change; `git diff --check` passes; current Markdown links resolve; archive moves preserve historical files; migration 014 is recorded complete; UXF table exists; worktree was clean before QA notes. Cavecrew review totals: 4 critical, 3 major, 0 minor, 0 questions.
+
+Attempt 2 evidence: repair diff touches only four `.github/agents` roles, `plan-v3-ux-corrections.md`, `PROJECT_INSTRUCTIONS.md`, `HANDOFF.md`, and durable task/state notes. Current-link scan passes; active-role stale-routing grep is zero; no application-source delta; `git diff --check` passes. Cavecrew final re-review: `No issues.` Documentation-only repair requires no lint/build.

@@ -101,7 +101,7 @@ Separate track from WS-N…Z. Chunks 1–9 are historical and archived under `do
 | UXF-5 | Copy tone + Tuning Guide/App Guide separation | pending | 0 | — | — | Owner tone review required to close. |
 | UXF-6 | Races/Days maintenance intervals + starting usage | pending | 0 | — | — | No current test-data compatibility burden. |
 | UXF-7 | Main Checklist redesign proposal | pending | 0 | — | — | Spec-only; Maxx design session gates follow-on build. |
-| UXF-8 | Docs and loop-state hygiene | in_progress | 1 | 82 | fe59cf0 | QA attempt 1 FAIL: active GitHub roles still point to plan-v2/preview-v2; fixer says third failure; active plan path, cold-start conflict rule, and live handoff row are stale. Route to SOL fixer. |
+| UXF-8 | Docs and loop-state hygiene | in_progress | 2 | 82 | fe59cf0 | SOL fixer attempt 2 CODE_PASS: active role routing, plan path, conflict rule, and live handoff row repaired; cavecrew re-review clean. Awaiting independent QA attempt 2. |
 | UXF-9 | Batch regression, draft, and owner acceptance | pending | 0 | — | — | Last; absorbs remaining WS-Z runtime checks. |
 
 ### UX chunk grade log

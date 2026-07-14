@@ -1,7 +1,7 @@
 # CREW CHIEF — Plan v3: UX Correction Batch (UXF)
 
 > **Purpose.** Single source of truth for the 2026-07-14 owner-correction batch.
-> Source of requirements: `docs/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md` (owner
+> Source of requirements: `docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md` (owner
 > rejections of Chunks 6B–9 UX/product decisions — technical QA passed, product
 > acceptance did not). This file **supersedes `plan-v2.md`** as the active
 > roadmap; plan-v2.md is archived (see §Superseded documents). The ralph loop

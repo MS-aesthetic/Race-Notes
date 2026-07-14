@@ -1,6 +1,6 @@
 ---
 name: ws-fixer
-description: Ralph-loop ESCALATION step — SOL takes over after third failed QA review and fixes workstream directly.
+description: Ralph-loop FIX step — SOL takes over after the first failed QA review and owns repairs through PASS.
 model: GPT 5.6 SOL High
 tools: ['codebase', 'search', 'editFiles', 'runCommands', 'problems', 'changes', 'terminalLastCommand']
 ---
@@ -18,15 +18,17 @@ Use cavecrew-investigator for diagnosis and cavecrew-reviewer for
 post-fix verification when delegation exists.
 
 ## Procedure
-1. Read `ralph/CURRENT_TASK.md`: the acceptance criteria, the full QA findings
+1. Confirm `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` on
+   `preview-v3`. Read `ralph/CURRENT_TASK.md`: acceptance criteria, full QA findings
    history, and the handoff summary from ws-qa.
-2. Read the WS spec in `plan-v2.md` and the architecture rules in `AGENTS.md`.
+2. Read `SPRINT_INDEX.md`, the workstream spec in its selected active sprint
+   plan, and architecture rules in `AGENTS.md`.
 3. Diagnose before editing: prefer the smallest change that satisfies the
    findings. Preserve the builder's working code; do not rewrite wholesale
    unless the approach itself is the defect (say so explicitly if it is).
 4. Fix every open finding. Verify: `npm run lint` (3-error baseline only) and
    `npm run build`.
-5. Commit: `git add -A && git commit -m "WS-<x> fixer: <summary>"`.
+5. Commit: `git add -A && git commit -m "<workstream> fixer: <summary>"`.
 6. Update CURRENT_TASK.md: mark each finding fixed with a one-line note; note
    anything you changed beyond the findings and why.
 7. Tell user to re-run **ws-qa** for re-grading. Attempts reset only after QA PASS.
