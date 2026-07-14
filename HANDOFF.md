@@ -173,7 +173,7 @@ Git worktrees in play:
 | Path | Branch | Role |
 |---|---|---|
 | `C:\Users\maxx\antigravity\Race-Notes` | `master` | **Main/release tree.** Owns complete Android platform and gitignored Gradle/SDK/Firebase files. Preserve existing dirty host/generated files. |
-| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–9 and UXF-1/2/3/4/8 complete; UXF-5 work order active. UXF-4 feature `0c2c827` plus repair `12d932f` passed SOL QA at 96. UXF-5 separates Tuning Guide from contextual App Guide help, tightens shop-language copy, and removes maintenance explanation clutter; technical QA plus Maxx tone review gate closure. Web build works here. Local gitignored debug-only Gradle scaffolding may exist from prior QA; it is not committed release configuration. |
+| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–9 and UXF-1/2/3/4/8 complete. UXF-5 feature `e2f0553` is CODE_PASS and awaits SOL technical QA, followed by Maxx's tone review. Tuning Guide now starts with the finder; operating help lives in contextual App Guide topics; maintenance working screens are concise; tuning data and behavior remain unchanged. Chunk8/9 harnesses, exact lint baseline, 555-module/18-entry build, diff, and cavecrew review pass. No deploy/schema/package/native change. Local gitignored debug-only Gradle scaffolding may exist from prior QA; it is not committed release configuration. |
 
 Audited 2026-07-13: `preview-v3` includes UX-C5 `d5ef1f4`; `master` remains
 release/stable. Git refs do not indicate Netlify deployment state. Main-tree

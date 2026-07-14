@@ -1,6 +1,6 @@
 # Current Task — UXF-5 Copy Tone and Guide Separation
 
-**Status:** PLANNED — awaiting Terra High initial build
+**Status:** CODE_PASS — awaiting SOL High technical QA; owner tone review remains final gate
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-4 closed by SOL QA at `bbaab34`; feature `0c2c827`, repair `12d932f`
@@ -81,3 +81,14 @@ Keep operational screens concise. The Tuning Guide is a tuning reference, while 
 ## Routing
 
 Terra owns one initial build pass. Primary owns this cross-file change; cavecrew handles bounded trace/review. Commit feature and durable handoff, then return to SOL High QA. Any QA failure transfers repair to SOL fixer; Terra is not re-invoked. Do not start UXF-6 before UXF-5 technical QA and owner tone disposition are recorded.
+
+## Terra attempt 1 evidence — 2026-07-14
+
+- Feature commit: `e2f0553`.
+- Tuning Guide now begins with Pit-Side Adjustment Finder. The four operating-help cards and the Before block are removed without changing the researched tuning records, directions, or cautions.
+- Sectioned Setup, Four-Bar, Load Sessions, and Compare Setups help routes to the matching expanded App Guide topic. Sectionless global Help still opens Tuning Guide; Settings → Guide retains its normal presentation.
+- Maintenance working screens retain status, progress, Used/Limit/Remaining, and Log action while removing the permanent threshold banner and row-level reason paragraphs. Automatic task descriptions are exactly `${used}/${limit} ${intervalType}`; reconciliation math, cycles, IDs, and storage shape are unchanged.
+- Professional shop-language repair is render-only. All 134 raw effect literals remain source data and pass through `plainRacerEffect`; focused corpus and grammar guards cover translated and direct copy.
+- `scripts/chunk8-trackers-harness.ts` PASS; `scripts/chunk9-export-help-harness.ts` PASS; lint reports only the exact three known errors; production build PASS with 555 modules and 18 PWA entries; `git diff --check` PASS; cavecrew final review found no issues.
+- Local signed-out auth shell opened with zero console errors. Authenticated contextual clicks were unavailable on that origin, so no such runtime claim is made. Sequential topic changes and embedded/normal Guide rendering are covered by focused SSR fixtures; existing BottomSheet close and Android Back handling remain source-verified.
+- No checklist redesign, interval behavior, lifecycle, schema, migration, sync shape, type, package, native config, deploy, push, merge, or APK change.

@@ -1384,3 +1384,27 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   diff, and cavecrew review. Harness confirms all 134 effect literals are translated and
   audited, with separate direct-copy and grammar checks. Prior final draft/Android evidence
   remains accepted for this display-only repair. No production/release/cloud/native change.
+
+## 30. UXF-5 — Tuning Guide and App Guide Separation (2026-07-14)
+
+- Feature `e2f0553` is CODE_PASS and awaits SOL technical QA plus owner tone review.
+- Sectionless `helpSection` opens Tuning Guide. The pure `isAppGuideSection()` boundary
+  recognizes `setup`, `four-bar`, `loads`, and `setup-diff`; those requests render an
+  embedded `GuideView` under an App Guide title. The section value remains the source of
+  truth on every reopen, preventing stale contextual topics.
+- Tuning Guide starts with Pit-Side Adjustment Finder. Operating instructions and the
+  maintenance 90% rule live in `GuideView` and `docs/USER_GUIDE.md`. Settings → Guide uses
+  the same component without embedded-sheet styling.
+- `plainRacerEffect` is the display-only translation boundary. Raw researched adjustment
+  records, directions, and cautions are not rewritten. The C9 harness decodes and renders
+  all 134 effect literals, audits direct copy separately, and guards concrete grammar cases.
+- Maintenance rows retain status, progress, Used/Limit/Remaining, and Log action. The
+  permanent threshold banner and row reason paragraphs are removed. Automatic Todo text is
+  exactly `${used}/${limit} ${intervalType}`; threshold, cycle, stable source ID, reset,
+  reconciliation, JSONB, and cloud behavior are unchanged.
+- Gate: chunk8 and chunk9 harnesses PASS; lint is the exact three-error baseline; production
+  build transforms 555 modules and precaches 18 PWA entries; diff and cavecrew review pass.
+  Local signed-out shell had zero console errors. Authenticated contextual runtime was not
+  available and is not claimed; sequential embedded Guide topics are covered by SSR fixtures.
+- No checklist redesign, maintenance interval change, lifecycle, schema/migration, sync/type,
+  package, native config, preview/production deploy, remote push, merge, or APK change.
