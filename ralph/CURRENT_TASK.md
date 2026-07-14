@@ -1,6 +1,6 @@
 # Current Task — UXF-6 Maintenance Intervals and Starting Usage
 
-**Status:** PLANNED — ready for Terra High initial build
+**Status:** CODE_PASS — Terra feature `6cae6cf`; awaiting independent SOL High QA
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-5 closed by owner approval at `40fcc5f`
@@ -116,3 +116,14 @@ Replace redundant Laps / Sessions / Feature Races maintenance measurements with 
 ## Routing
 
 Terra High owns one initial cross-file build pass. Cavecrew handles bounded trace/review only. Commit feature and durable handoff, then return to SOL High for independent UXF-6 QA. Any QA failure transfers to SOL fixer; Terra is not re-invoked. UXF-7 stays locked until UXF-6 QA PASS.
+
+## Terra implementation result — 2026-07-14
+
+- Feature commit: `6cae6cf`.
+- `MaintenanceIntervalType` is now Races/Days only. Race usage counts each distinct qualifying Feature weekend once, uses the existing setup-to-car resolution for car scope, and remains global for rig scope.
+- Optional `startingUsage` is normalized to a finite nonnegative whole number, adds to derived usage, yields to the existing `manualUnits` full override, and resets through normal/quick service. Date-only service values are parsed as local calendar dates so same-day weekends remain zero and the next day counts.
+- `maintenanceSync.ts` explicitly maps `starting_usage`; unsupported disposable cloud interval text normalizes to Races. Existing IDs, RLS, delete paths, JSON/local-first behavior, and checklist reconciliation remain unchanged.
+- Migration `20260714215528_add_maintenance_starting_usage.sql` was reviewed and applied once to project `swblfeayxoprodhwxqak`. Verification: integer, `NOT NULL`, default `0`; seven rows retained and read `0`; RLS still enabled. Security/performance advisors were checked before and after; existing unrelated advisor findings remain.
+- Focused chunk8 harness PASS; lint is the exact three-error baseline; production build PASS (`556` modules, `18` PWA entries); diff check PASS; cavecrew re-review found no issues.
+- Draft: `https://6a56b1449f3477512a85c566--crew-chief-race-notes.netlify.app`. Signed-out shell at 320/390 px has no horizontal overflow or console warnings. The unique draft origin had no remembered login, so authenticated component push/pull/delete and signed-in light/dark Default/Large runtime are not claimed; pure mapper, live schema, build, and focused fixtures cover those paths pending SOL adjudication.
+- No production deploy, remote push, merge, package/native configuration, or APK change. UXF-7 remains locked until SOL PASS.

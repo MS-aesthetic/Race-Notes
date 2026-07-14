@@ -1417,3 +1417,28 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   planning base after line-ending normalization. Owner acceptance followed on the draft.
 - Owner acceptance: draft deploy from `f12fb49` returned HTTP 200 and Maxx approved tone.
   Production remained unchanged.
+
+## 31. UXF-6 — Races/Days Maintenance and Starting Usage (2026-07-14)
+
+- Terra feature `6cae6cf` is CODE_PASS and awaits independent SOL QA. Visible maintenance
+  intervals are exactly Races and Days for both car and rig scopes.
+- `getComponentStatus()` counts a qualifying Feature weekend once, even with multiple
+  Feature sessions. Car items retain setup-to-car resolution; rig items count across cars.
+  A weekend date must be strictly later than the service calendar date. Date-only service
+  values are parsed locally, avoiding UTC rollover at the America/New_York boundary.
+- `MaintenanceComponent.startingUsage` is optional and defaults semantically to zero.
+  Valid whole nonnegative starting usage adds to derived Races/Days; `manualUnits` remains
+  the full override. Normal and quick service reset starting usage, while undo retains the
+  prior component bytes.
+- `src/lib/maintenanceSync.ts` is the pure cloud mapping boundary. It explicitly round-trips
+  `starting_usage`; invalid starting values become zero and unsupported disposable interval
+  text becomes Races. IDs, scope, notes, timestamps, RLS, deletion, and local-first paths
+  remain unchanged.
+- Migration `20260714215528_add_maintenance_starting_usage.sql` added integer `NOT NULL`
+  `starting_usage DEFAULT 0` to `public.maintenance_components`. It was applied once to
+  project `swblfeayxoprodhwxqak`; all seven test rows remain, read zero, and RLS remains on.
+  No interval rows were rewritten or deleted.
+- Focused chunk8 harness, exact three-error lint baseline, 556-module/18-entry build, diff,
+  and cavecrew review pass. Draft `6a56b1449f3477512a85c566` has a clean 320/390 signed-out
+  shell. The unique origin had no remembered login, so authenticated application round-trip
+  and signed-in theme/size runtime are not claimed.
