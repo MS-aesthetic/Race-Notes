@@ -15,7 +15,7 @@
 > A dedicated UX/UI overhaul is in progress on a NEW worktree **`.worktrees/v3` (branch `preview-v3`, created from `master` `3ea6648`)**. `master` is untouched; the overhaul lands on `preview-v3` and merges to `master` only on owner approval.
 > - **Source of the work:** [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md) (Fable expert UX audit — 37 recs, cost/benefit) → [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md) (spec-driven, 7 build chunks).
 > - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High owns implementation; QA failures 1–2 return to Terra and failure 3 transfers build+final QA to SOL. Codex model overrides and rollout metadata are now verified: SOL → Terra → SOL works in one persistent task. Generic prose self-identification is not model evidence. **`/caveman full`** stays on. One consolidated QA pass per chunk + standing `tsc --noEmit` (3-error baseline) and `vite build` gates.
-> - **Chunk status:** ✅ **1–6B**. SOL QA attempt 3 closed C6B after feature `2a941d3` and repairs `874fecc`/`7b58b30`. **7** is unlocked for Terra build. Trackers is **8**; export/help/final sweep is **9**.
+> - **Chunk status:** ✅ **1–6B**. **7** is Terra CODE_PASS at `58e4522`, awaiting SOL QA before C8. Trackers is **8**; export/help/final sweep is **9**.
 > - **New reusable code (chunks 1-4):** `src/components/ui/` (`NumberStepper`, `UndoToast`+`InfoToast`, `EmptyState`, `CollapsibleSection`, `SegmentedGrid`, `BottomSheet`, `HelpSheet`, `LapTimeKeypad`); `src/lib/undo.ts`; `src/lib/backStack.ts`; `src/lib/saveStatus.ts`; `src/lib/sessionSequence.ts`; `src/lib/serviceLog.ts`; `src/lib/scope.ts` (`pickAutoWeekend`, `parseWeekendDate`, `sortWeekends`); `src/components/ContextStrip.tsx`; `src/components/GetRaceReadyCard.tsx`. CSS: `.tap-target`, `.sticky-action-bar`, `.status-chip` + light-theme contrast bump.
 > - **Owner UX answers baked into the plan:** (1) app used during the week + at the track after each run; (2) 95% single-user → assignment/concurrency deferred; (3) most teams 1 car (some 2-3) → car UI hidden at ≤1 car; (4) **four-bar changed VERY often trackside → make it FAST, not hidden** (reverses the "fold behind expander" rec — chunk 5); (5) dusk→night racing → sunlight/light-theme tuned; (6) Main Checklist = hybrid core-reset + ad-hoc (chunk 6).
 > - **Testing:** v3 APKs use the build-from-main bridge: run lint then build in v3; mirror v3 `dist` to main; run raw `npx cap sync android` (not main `npm run android:sync`, which rebuilds master); run `assembleDebug`. Current Chunk 4 APK is versionCode 14/versionName 3.9 at the standard debug output. Android emulator QA passed fresh-profile hero→weekend→new-session, quick-service cost→Accounting→Undo, and session ⋯ delete→Undo. Emulator native `screencap` showed white because WebView tile-memory/compositor warnings; direct WebView capture and DOM verified rendered UI.
@@ -45,6 +45,18 @@
 > - Evidence: expanded lifecycle/source harness PASS; exact three-error lint baseline; 540-module build PASS; cavecrew re-review clean; 390 px draft shell and console PASS. Unique draft origin lacked remembered auth, so SOL must independently adjudicate full authenticated sync evidence.
 > - Repair 2 closes QA-attempt-2 blockers: RaceWeekend gets owned event Setup or null with guarded run/quick-adjust UI; no-link legacy Finish uses exact blank setup values; unlocked Weekend bytes rebuild stale deterministic Final/Current rows; and finished-weekend relationship locks Weekend snapshots even without `lockedAt`. Clone stays allowed.
 > - SOL QA attempt 3 evidence: two cavecrew reviews clean; expanded harness PASS; exact three-error lint baseline; 540-module/16-entry build; diff check and clean tree PASS; 390×844 draft shell with zero console errors. Live migration present; 23/23 checked mapped columns, RLS, authenticated CRUD, and zero relevant security-advisor findings verified. Both lifecycle tables are empty, so no authenticated data round trip exists. Draft: https://6a55a43a8cc5f6b9da612c69--crew-chief-race-notes.netlify.app.
+
+> ### 🔧 UX-C7 Quick Adjust — Terra CODE_PASS 2026-07-13
+> - Feature commit `58e4522`; awaiting independent SOL QA. C8 stays locked until verdict.
+> - `src/lib/quickAdjust.ts` owns event/run target resolution, numeric normalization,
+>   Load Session filtering, marker rules, and atomic one-to-one Setup/run history.
+> - `QuickAdjustPanel.tsx` adds LF/RF/LR/RR Spring Rate ±25, Spring Rounds ±0.5,
+>   shock note plus real same-car/corner Load Session, J-Bar ±0.25, manual gear,
+>   Other Change, and Four-bar entry. Garage selection never supplies event data.
+> - Optional C7 fields round-trip through existing setup-corner/change-log/session JSON.
+>   `setupSync.ts` makes unchanged row mapping pure-testable; no SQL migration.
+> - Focused harness and diff check PASS; lint exact three-error baseline; cavecrew final
+>   review clean. Build/cloud/mobile/Netlify gate deliberately consolidated after C8.
 
 > ### 🧭 Owner revision — 2026-07-13
 > - Finish Weekend is always available at page bottom. No race/session gate; test days may be finished normally.

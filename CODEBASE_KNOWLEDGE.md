@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 6B — SOL QA attempt 3 PASS)
+> Last updated: 2026-07-13 (UX Chunk 7 — Terra CODE_PASS, awaiting SOL QA)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1262,3 +1262,35 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   setup/weekend finding; existing RLS performance warnings predate C6B. Current
   Supabase new-table grant change does not affect this existing-table column migration.
   C6B closed; C7 unlocked.
+
+## 27. UX Chunk 7 — Expanded Quick Adjust (2026-07-13)
+
+- Terra feature commit `58e4522` is CODE_PASS and awaits independent SOL QA. C8 must
+  not start until that verdict.
+- `src/lib/quickAdjust.ts` is pure C7 authority. `resolveQuickAdjustTarget()` accepts
+  only device-active unfinished weekend, its exact `activeSetupId` Weekend Setup, and
+  an active run ID still present in that weekend. No selected-car setup fallback.
+- `applyQuickAdjust()` derives changes from latest App refs, then produces one
+  `SetupChange` and one `SetupAdjustment` with shared timestamp, `sessionId`/`runId`,
+  and optional `loadSessionId`. App persists setups, weekend session mirror, active
+  session, and active setup together before debounced cloud writes. Monotonic command
+  suffixes prevent same-millisecond collisions.
+- `QuickAdjustPanel.tsx` supplies LF/RF/LR/RR Spring Rate ±25 lb, cumulative Spring
+  Rounds ±0.5, independent shock note and Load Session binding, J-Bar Frame/Pinion
+  ±0.25 in, manual gear, Other Change, and Four-bar access. Step actions parse stored
+  values only when committed; blank/non-numeric spring/J-Bar values require manual
+  numeric entry. Existing strings remain untouched until edit.
+- Corner JSON adds optional `springRounds`, `rideHeightNeedsReview`, and `shockNote`.
+  Spring-round input sets review marker even when cumulative value returns to zero.
+  Only explicit `loadCtoC` editing in Setup UI clears it. Marker is displayed beside
+  Ride Height C-to-C and omitted from generic diff noise.
+- Load Session filtering uses event Setup `carId` plus selected corner. Setup UI now
+  lists real Load Sessions instead of sample data. Existing `boundGraphId` stores link.
+- `src/lib/setupSync.ts` extracts setup row mapping from `sync.ts` without row-shape
+  change. Corner/change-log/run objects remain JSONB, so C7 requires no SQL migration.
+- `scripts/chunk7-quick-adjust-harness.ts` covers numeric normalization/steps, strict
+  event and present-run resolution, marker set/clear, same-car/corner filtering,
+  independent shock fields, rapid sequential exact-once logs, mapper round trip, and
+  lifecycle lock rejection. Harness and diff check pass; lint remains exact three
+  known baseline errors. Cavecrew review findings were fixed; re-review found no issues.
+  Full build/cloud/mobile/Netlify gate is intentionally consolidated after C8.

@@ -212,6 +212,26 @@ performance-policy warnings predate this column-only migration. C7 remains locke
 - C7 harness covers numeric steps, marker lifecycle, car/corner graph filter, sync
   round trip, lock protection, and one-to-one log/run entries.
 
+### C7 Terra CODE_PASS — awaiting SOL QA
+
+- Feature commit `58e4522`. `QuickAdjustPanel` routes Spring Rate, Spring Rounds,
+  shock note/Load Session, J-Bar, gear, Other Change, and Four-bar through one
+  App-owned atomic commit path.
+- Target resolution requires active unfinished weekend, its valid event-owned Weekend
+  Setup, and a run ID still present in that weekend. Selected Garage car/setup never
+  participates. App refs serialize rapid commands before React renders.
+- Each successful command appends one provenance-bearing run adjustment and one Setup
+  change. New optional corner/history fields remain inside existing JSON columns;
+  `setupSync.ts` extracts the unchanged explicit mapper for pure round-trip tests.
+  No SQL migration.
+- Spring strings remain byte-preserved until deliberate edit. Step/manual commit then
+  canonicalizes numeric values. Spring rounds mark Ride Height C-to-C; only explicit
+  C-to-C editing clears marker. Setup Load picker now uses real same-car/corner rows.
+- Focused harness PASS; `git diff --check` PASS; lint has exact three known baseline
+  errors only. Cavecrew review found two medium and three low issues; all fixed, then
+  re-review returned `No issues.` Full build/cloud/mobile/draft gate stays consolidated
+  after C8 per owner direction. C8 remains locked pending SOL C7 verdict.
+
 ## Chunk 8 — Trackers and Maintenance Logs
 
 - Rename visible Service wording/tab to Maintenance Logs; identifiers/storage stay stable.
