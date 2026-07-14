@@ -11,62 +11,61 @@ import {
   MaintenanceStatus,
   MAINTENANCE_DUE_THRESHOLD,
   RaceWeekend,
-  SESSION_TYPE_LAPS,
-  SessionType,
   Setup,
 } from '../types';
+import { inferSessionType } from './tireHistory';
+import { parseWeekendDate } from './scope';
 
 /** Default catalog offered on first open of the Service tab (user-editable). */
 export const DEFAULT_COMPONENTS: Array<
   Pick<MaintenanceComponent, 'name' | 'category' | 'scope' | 'intervalType' | 'intervalValue'>
 > = [
   { name: 'Engine oil',      category: 'Oil',          scope: 'car', intervalType: 'races', intervalValue: 3 },
-  { name: 'Motor freshen',   category: 'Motor',        scope: 'car', intervalType: 'laps',  intervalValue: 250 },
-  { name: 'Trans fluid',     category: 'Transmission', scope: 'car', intervalType: 'days',  intervalValue: 60 },
+  { name: 'Motor freshen',   category: 'Motor',        scope: 'car', intervalType: 'races', intervalValue: 10 },
+  { name: 'Transmission fluid', category: 'Transmission', scope: 'car', intervalType: 'days', intervalValue: 60 },
   { name: 'Wheel bearings',  category: 'Bearings',     scope: 'car', intervalType: 'races', intervalValue: 10 },
-  { name: 'Shock rebuild',   category: 'Shocks',       scope: 'car', intervalType: 'laps',  intervalValue: 300 },
+  { name: 'Shock rebuild',   category: 'Shocks',       scope: 'car', intervalType: 'races', intervalValue: 10 },
   { name: 'Trailer bearings', category: 'Trailer',     scope: 'rig', intervalType: 'days',  intervalValue: 180 },
 ];
 
-/**
- * Sessions since a given ISO timestamp.
- * - carId === null → count every weekend (rig scope: hauler goes to every race).
- * - carId set → only weekends whose bound Setup (weekend.setupId → savedSetups)
- *   has a matching carId. Weekends with no bound setup, or a bound setup with
- *   no carId, are excluded (ambiguous — don't guess which car ran them).
- */
-function sessionsSince(
+const calendarDay = (date: Date): number =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+const parseServiceDate = (raw: string): Date => {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (dateOnly) return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  return new Date(raw);
+};
+
+/** Count each Feature weekend once, strictly after the service calendar day. */
+function racesSince(
   weekends: RaceWeekend[],
   sinceIso: string,
   carId: string | null,
   savedSetups: Setup[],
-): { type: string; date: string }[] {
-  const since = new Date(sinceIso).getTime();
-  const out: { type: string; date: string }[] = [];
-  for (const w of weekends) {
+): number {
+  const since = parseServiceDate(sinceIso);
+  if (Number.isNaN(since.getTime())) return 0;
+  const sinceDay = calendarDay(since);
+  return weekends.filter(w => {
+    const weekendDate = parseWeekendDate(w.date);
+    if (!weekendDate || calendarDay(weekendDate) <= sinceDay) return false;
     if (carId) {
       const boundSetup = w.setupId ? savedSetups.find(s => s.id === w.setupId) : undefined;
-      if (!boundSetup?.carId || boundSetup.carId !== carId) continue;
+      if (!boundSetup?.carId || boundSetup.carId !== carId) return false;
     }
-    for (const s of w.sessions) {
-      const d = new Date(s.time || w.date).getTime();
-      if (!Number.isNaN(d) && d >= since) out.push({ type: s.name || s.type, date: w.date });
-    }
-  }
-  return out;
+    return w.sessions.some(session => inferSessionType(session) === 'Feature');
+  }).length;
 }
 
-function lapsForSessionName(name: string): number {
-  // Match "Test 2" → "Test", "Heat Race 3" → "Heat Race", etc.
-  const base = (Object.keys(SESSION_TYPE_LAPS) as SessionType[]).find(
-    t => name === t || name.startsWith(`${t} `),
-  );
-  return base ? SESSION_TYPE_LAPS[base] : 0;
-}
+export const normalizeStartingUsage = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value >= 0
+    ? value
+    : 0;
 
 /**
  * Derive current usage vs interval for a component.
- * - scope 'car': counts laps/sessions/races only from weekends whose bound
+ * - scope 'car': counts races only from weekends whose bound
  *   Setup carries this component's carId (via weekend.setupId → Setup.carId
  *   in savedSetups). Weekends with no resolvable car are excluded.
  * - scope 'rig': counts across every weekend regardless of car — the hauler
@@ -79,17 +78,20 @@ export function getComponentStatus(
   savedSetups: Setup[],
 ): MaintenanceStatus {
   const { intervalType, intervalValue, lastServicedAt, manualUnits, scope, carId } = component;
+  const startingUsage = normalizeStartingUsage(component.startingUsage);
   let used = 0;
 
   if (typeof manualUnits === 'number') {
     used = manualUnits;
   } else if (intervalType === 'days') {
-    used = Math.floor((Date.now() - new Date(lastServicedAt).getTime()) / 86_400_000);
+    used = startingUsage + Math.floor((Date.now() - new Date(lastServicedAt).getTime()) / 86_400_000);
   } else {
-    const sessions = sessionsSince(weekends, lastServicedAt, scope === 'car' ? (carId ?? null) : null, savedSetups);
-    if (intervalType === 'laps') used = sessions.reduce((n, s) => n + lapsForSessionName(s.type), 0);
-    else if (intervalType === 'races') used = sessions.filter(s => s.type.startsWith('Feature')).length;
-    else used = sessions.length; // 'sessions'
+    used = startingUsage + racesSince(
+      weekends,
+      lastServicedAt,
+      scope === 'car' ? (carId ?? null) : null,
+      savedSetups,
+    );
   }
 
   const pct = intervalValue > 0 ? used / intervalValue : 0;
@@ -107,6 +109,7 @@ export function applyServiceLog(
     ...component,
     lastServicedAt: log.date || new Date().toISOString(),
     manualUnits: typeof component.manualUnits === 'number' ? 0 : undefined,
+    startingUsage: 0,
     updatedAt: new Date().toISOString(),
   };
 }

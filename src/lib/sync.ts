@@ -2,7 +2,9 @@ import { supabase } from './supabase';
 import { Setup, RaceWeekend, ActiveSession, SessionRecord, Todo, TireInventoryItem, Car, ShockSession, WeatherHistoryDay, WeatherSnapshot, MaintenanceComponent, MaintenanceLog, ChecklistTemplate, WeekendChecklist, SavedTrip } from '../types';
 import { mergeTimestampedRecords } from './setupLifecycle';
 import { setupFromCloudRow, setupToCloudRow } from './setupSync';
+import { maintenanceComponentFromCloudRow, maintenanceComponentToCloudRow } from './maintenanceSync';
 export { setupFromCloudRow, setupToCloudRow } from './setupSync';
+export { maintenanceComponentFromCloudRow, maintenanceComponentToCloudRow } from './maintenanceSync';
 
 // ---------------------------------------------------------------------------
 // Local-First Sync Engine
@@ -510,21 +512,7 @@ export function pushMaintenanceComponents(components: MaintenanceComponent[], us
   if (pushDebounceTimers.has(key)) clearTimeout(pushDebounceTimers.get(key)!);
   pushDebounceTimers.set(key, setTimeout(async () => {
     try {
-      const rows = components.map(c => ({
-        id: c.id,
-        user_id: userId,
-        scope: c.scope,
-        car_id: c.carId ?? null,
-        name: c.name,
-        category: c.category,
-        interval_type: c.intervalType,
-        interval_value: c.intervalValue,
-        last_serviced_at: c.lastServicedAt,
-        manual_units: c.manualUnits ?? null,
-        notes: c.notes || '',
-        created_at: c.createdAt,
-        updated_at: new Date().toISOString(),
-      }));
+      const rows = components.map(c => maintenanceComponentToCloudRow(c, userId));
       const { error } = await supabase.from('maintenance_components').upsert(rows, { onConflict: 'id' });
       if (error) console.warn('Sync: pushMaintenanceComponents error:', error.message);
       else onStatus?.('Maintenance components synced to cloud');
@@ -541,20 +529,7 @@ export async function pullMaintenanceComponents(onStatus?: SyncCallback): Promis
     if (error) { console.warn('Sync: pullMaintenanceComponents error:', error.message); return []; }
     if (!data) return [];
     onStatus?.(`Pulled ${data.length} maintenance components from cloud`);
-    return data.map((r: Record<string, unknown>) => ({
-      id: r.id as string,
-      scope: (r.scope as MaintenanceComponent['scope']) || 'car',
-      carId: (r.car_id as string) ?? undefined,
-      name: (r.name as string) || '',
-      category: (r.category as string) || 'Other',
-      intervalType: (r.interval_type as MaintenanceComponent['intervalType']) || 'races',
-      intervalValue: (r.interval_value as number) ?? 1,
-      lastServicedAt: (r.last_serviced_at as string) || new Date().toISOString(),
-      manualUnits: (r.manual_units as number) ?? undefined,
-      notes: (r.notes as string) || undefined,
-      createdAt: (r.created_at as string) || new Date().toISOString(),
-      updatedAt: (r.updated_at as string) || new Date().toISOString(),
-    }));
+    return data.map((r: Record<string, unknown>) => maintenanceComponentFromCloudRow(r));
   } catch (e) {
     console.warn('Sync: pullMaintenanceComponents failed', e);
     return [];

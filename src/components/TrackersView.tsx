@@ -399,6 +399,7 @@ function ServiceTab({
   const [addScope, setAddScope] = useState<'car' | 'rig'>('car');
   const [addIntervalType, setAddIntervalType] = useState<MaintenanceIntervalType>('races');
   const [addIntervalValue, setAddIntervalValue] = useState('');
+  const [addStartingUsage, setAddStartingUsage] = useState('');
 
   // Log modal state
   const [logDate, setLogDate] = useState('');
@@ -421,6 +422,7 @@ function ServiceTab({
       category: d.category,
       intervalType: d.intervalType,
       intervalValue: d.intervalValue,
+      startingUsage: 0,
       lastServicedAt: now,
       createdAt: now,
       updatedAt: now,
@@ -436,6 +438,8 @@ function ServiceTab({
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!addName.trim() || !addIntervalValue) return;
+    const startingUsage = addStartingUsage.trim() === '' ? 0 : Number(addStartingUsage);
+    if (!Number.isFinite(startingUsage) || !Number.isInteger(startingUsage) || startingUsage < 0) return;
     const now = new Date().toISOString();
     const comp: MaintenanceComponent = {
       id: uid('maint'),
@@ -445,13 +449,14 @@ function ServiceTab({
       category: addCategory,
       intervalType: addIntervalType,
       intervalValue: parseFloat(addIntervalValue),
+      startingUsage,
       lastServicedAt: now,
       createdAt: now,
       updatedAt: now,
     };
     onSaveComponents([...components, comp]);
     setAddName(''); setAddCategory('Other'); setAddScope('car');
-    setAddIntervalType('races'); setAddIntervalValue('');
+    setAddIntervalType('races'); setAddIntervalValue(''); setAddStartingUsage('');
     setShowAddForm(false);
   };
 
@@ -492,7 +497,7 @@ function ServiceTab({
   };
 
   const unitLabel = (c: MaintenanceComponent): string =>
-    ({ laps: 'laps', sessions: 'sess', races: 'races', days: 'days' }[c.intervalType]);
+    ({ races: 'races', days: 'days' }[c.intervalType]);
 
   const renderRow = (c: MaintenanceComponent) => {
     const status = getComponentStatus(c, weekends, savedSetups);
@@ -589,9 +594,7 @@ function ServiceTab({
               <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">Measure by</label>
               <select value={addIntervalType} onChange={e => setAddIntervalType(e.target.value as MaintenanceIntervalType)}
                 className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-xs outline-none">
-                <option value="laps">Laps</option>
-                <option value="sessions">Sessions</option>
-                <option value="races">Feature races</option>
+                <option value="races">Races</option>
                 <option value="days">Days</option>
               </select>
             </div>
@@ -600,6 +603,13 @@ function ServiceTab({
               <input required type="number" min="1" step="any" placeholder="e.g. 250" value={addIntervalValue} onChange={e => setAddIntervalValue(e.target.value)}
                 className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
             </div>
+          </div>
+          <div>
+            <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+              {addIntervalType === 'races' ? 'Races already run' : 'Days already in service'} <span className="normal-case opacity-60">(optional)</span>
+            </label>
+            <input type="number" min="0" step="1" placeholder="0" value={addStartingUsage} onChange={e => setAddStartingUsage(e.target.value)}
+              className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
           </div>
           <div className="flex gap-2">
             <button type="submit" className="flex-1 py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80">Add Maintenance Job</button>

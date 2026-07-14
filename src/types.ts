@@ -503,7 +503,7 @@ export const MAINTENANCE_CATEGORIES = [
 export type MaintenanceCategory = typeof MAINTENANCE_CATEGORIES[number] | string;
 
 /** How a component's service interval is measured */
-export type MaintenanceIntervalType = 'laps' | 'sessions' | 'races' | 'days';
+export type MaintenanceIntervalType = 'races' | 'days';
 
 /** Usage fraction at which a component is flagged "due" (before overdue) */
 export const MAINTENANCE_DUE_THRESHOLD = 0.8;
@@ -521,11 +521,13 @@ export interface MaintenanceComponent {
   name: string;                       // e.g. "Engine oil", "LR bearing"
   category: MaintenanceCategory;
   intervalType: MaintenanceIntervalType;
-  intervalValue: number;              // e.g. 250 (laps), 3 (races), 60 (days)
+  intervalValue: number;              // e.g. 3 (races), 60 (days)
   /** ISO — usage is derived from sessions/weekends AFTER this timestamp */
   lastServicedAt: string;
   /** Manual counter for items that can't be derived from session data */
   manualUnits?: number;
+  /** Existing races/days already on a part when it is first added */
+  startingUsage?: number;
   notes?: string;
   createdAt: string;
   updatedAt: string;

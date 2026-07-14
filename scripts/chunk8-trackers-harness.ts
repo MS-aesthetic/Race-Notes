@@ -10,7 +10,10 @@ import {
 } from '../src/lib/checklistMaintenance';
 import { activeChecklistItems } from '../src/lib/mainChecklist';
 import { lastAccountingCategory, localDateValue, recentAccountingRepeats } from '../src/lib/accountingDefaults';
-import { MAINTENANCE_CATEGORIES, type AccountingEntry, type MaintenanceComponent, type Todo, type TodoItem } from '../src/types';
+import { applyServiceLog, DEFAULT_COMPONENTS, getComponentStatus, normalizeStartingUsage } from '../src/lib/maintenance';
+import { maintenanceComponentFromCloudRow, maintenanceComponentToCloudRow } from '../src/lib/maintenanceSync';
+import { buildQuickServiceRecords } from '../src/lib/serviceLog';
+import { MAINTENANCE_CATEGORIES, type AccountingEntry, type MaintenanceComponent, type MaintenanceLog, type RaceWeekend, type Setup, type Todo, type TodoItem } from '../src/types';
 
 const core: TodoItem = { id: 'core', text: 'Torque wheels', done: true, completionNote: '80 ft-lb', completedAt: '2026-07-13', removedUntilReset: true };
 const adhoc: TodoItem = { id: 'adhoc', text: 'Grab fuel', done: true, kind: 'adhoc', sourceType: 'manual' };
@@ -87,6 +90,81 @@ assert.equal(dueWeekendReset[0].items.filter(item => item.sourceType === 'mainte
 const afterReset = reconcileMaintenanceChecklist(completed, [component(100, '2026-07-14')], [], [], 'below');
 assert.equal(afterReset[0].items.some(item => item.sourceType === 'maintenance' && item.done), true);
 
+const derivedComponent = (overrides: Partial<MaintenanceComponent> = {}): MaintenanceComponent => ({
+  id: 'derived', scope: 'car', carId: 'car-a', name: 'Motor freshen', category: 'Motor', intervalType: 'races',
+  intervalValue: 20, startingUsage: 10, lastServicedAt: '2026-07-01', createdAt: '2026-01-01', updatedAt: '2026-07-13',
+  ...overrides,
+});
+const setupA = { id: 'setup-a', carId: 'car-a' } as Setup;
+const setupB = { id: 'setup-b', carId: 'car-b' } as Setup;
+const featureSession = (name: string, sessionType?: 'Feature') => ({
+  id: `session-${name}`, name, type: name, sessionType,
+}) as RaceWeekend['sessions'][number];
+const weekend = (id: string, date: string, setupId: string, sessions: RaceWeekend['sessions']): RaceWeekend => ({
+  id, name: id, track: 'Track', date, setupId, sessions,
+}) as RaceWeekend;
+
+const sameDay = weekend('same-day', 'Jul 1, 2026', setupA.id, [featureSession('Feature')]);
+const nextDayTwoFeatures = weekend('next-day', 'Jul 2, 2026', setupA.id, [
+  featureSession('Feature 1', 'Feature'), featureSession('Feature 2', 'Feature'),
+]);
+assert.equal(getComponentStatus(derivedComponent(), [], [setupA]).used, 10);
+assert.equal(getComponentStatus(derivedComponent(), [sameDay, nextDayTwoFeatures], [setupA]).used, 11);
+
+for (const legacyFeatureName of ['Feature 1', 'Feat. 1', 'A-MAIN']) {
+  const inferred = weekend(`inferred-${legacyFeatureName}`, 'Jul 2, 2026', setupA.id, [featureSession(legacyFeatureName)]);
+  assert.equal(getComponentStatus(derivedComponent(), [inferred], [setupA]).used, 11);
+}
+
+const carBWeekend = weekend('car-b-weekend', 'Jul 3, 2026', setupB.id, [featureSession('A-MAIN')]);
+assert.equal(getComponentStatus(derivedComponent({ startingUsage: 0 }), [nextDayTwoFeatures, carBWeekend], [setupA, setupB]).used, 1);
+assert.equal(getComponentStatus(derivedComponent({ scope: 'rig', carId: undefined, startingUsage: 0 }), [nextDayTwoFeatures, carBWeekend], [setupA, setupB]).used, 2);
+assert.equal(getComponentStatus(derivedComponent({ manualUnits: 4 }), [nextDayTwoFeatures], [setupA]).used, 4);
+
+assert.equal(normalizeStartingUsage(3), 3);
+assert.equal(normalizeStartingUsage(-1), 0);
+assert.equal(normalizeStartingUsage(1.5), 0);
+assert.equal(normalizeStartingUsage(Number.NaN), 0);
+
+const startingDue = derivedComponent({ id: 'starting-due', intervalValue: 10, startingUsage: 9 });
+const dueFromStartingUsage = reconcileMaintenanceChecklist([main], [startingDue], [], [setupA], 'starting-due');
+assert.equal(dueFromStartingUsage[0].items.some(item => item.sourceId === 'maintenance:starting-due'), true);
+
+const serviceLog: MaintenanceLog = {
+  id: 'service', componentId: derivedComponent().id, date: '2026-07-14', type: 'service',
+};
+const serviceReset = applyServiceLog(derivedComponent(), serviceLog);
+assert.equal(serviceReset.startingUsage, 0);
+assert.equal(serviceReset.lastServicedAt, '2026-07-14');
+const manualReset = applyServiceLog(derivedComponent({ manualUnits: 12 }), serviceLog);
+assert.equal(manualReset.manualUnits, 0);
+assert.equal(manualReset.startingUsage, 0);
+
+const quickOriginal = derivedComponent({ startingUsage: 7 });
+const quickOriginalBytes = JSON.stringify(quickOriginal);
+const quickService = buildQuickServiceRecords(quickOriginal, { componentId: quickOriginal.id, notes: '', dateISO: '2026-07-14' }, [], [setupA], null);
+assert.equal(quickService.updatedComponent.startingUsage, 0);
+assert.equal(JSON.stringify(quickOriginal), quickOriginalBytes);
+
+const cloudRow = maintenanceComponentToCloudRow(derivedComponent(), 'user-1', '2026-07-14T00:00:00Z');
+assert.equal(cloudRow.starting_usage, 10);
+const cloudRoundTrip = maintenanceComponentFromCloudRow(cloudRow);
+assert.equal(cloudRoundTrip.startingUsage, 10);
+assert.equal(cloudRoundTrip.intervalType, 'races');
+assert.equal(maintenanceComponentFromCloudRow({ ...cloudRow, interval_type: 'days', starting_usage: 0 }).intervalType, 'days');
+assert.equal(maintenanceComponentFromCloudRow({ ...cloudRow, interval_type: 'laps', starting_usage: 2.5 }).intervalType, 'races');
+assert.equal(maintenanceComponentFromCloudRow({ ...cloudRow, interval_type: 'laps', starting_usage: 2.5 }).startingUsage, 0);
+assert.equal(maintenanceComponentFromCloudRow({ ...cloudRow, starting_usage: -1 }).startingUsage, 0);
+assert.equal(maintenanceComponentFromCloudRow({ ...cloudRow, starting_usage: Number.POSITIVE_INFINITY }).startingUsage, 0);
+assert.deepEqual(DEFAULT_COMPONENTS.map(item => [item.name, item.intervalType, item.intervalValue]), [
+  ['Engine oil', 'races', 3],
+  ['Motor freshen', 'races', 10],
+  ['Transmission fluid', 'days', 60],
+  ['Wheel bearings', 'races', 10],
+  ['Shock rebuild', 'races', 10],
+  ['Trailer bearings', 'days', 180],
+]);
+
 const entries: AccountingEntry[] = [
   { id: '3', name: 'Pit fuel', description: '20 gal methanol', category: 'Fuel', amount: 100, type: 'expense', date: '2026-07-13T12:00:00Z' },
   { id: '2', name: 'Pit fuel duplicate', description: '20 gal methanol', category: 'Fuel', amount: 90, type: 'expense', date: '2026-07-12T12:00:00Z' },
@@ -105,6 +183,9 @@ const root = process.cwd();
 const trackersSource = readFileSync(join(root, 'src/components/TrackersView.tsx'), 'utf8');
 const todoSource = readFileSync(join(root, 'src/components/ToDoView.tsx'), 'utf8');
 const dashboardSource = readFileSync(join(root, 'src/components/DashboardView.tsx'), 'utf8');
+const maintenanceSource = readFileSync(join(root, 'src/lib/maintenance.ts'), 'utf8');
+const serviceLogSource = readFileSync(join(root, 'src/lib/serviceLog.ts'), 'utf8');
+const typesSource = readFileSync(join(root, 'src/types.ts'), 'utf8');
 assert.match(trackersSource, /label: 'Maintenance Logs'/);
 assert.doesNotMatch(trackersSource, /label: 'Service'/);
 assert.doesNotMatch(trackersSource, /label: 'Templates'/);
@@ -116,5 +197,13 @@ assert.match(dashboardSource, /activeChecklistItems\(mainChecklist\)/);
 assert.match(dashboardSource, /Maintenance Due/);
 assert.doesNotMatch(trackersSource, /Below 90%|At least 90% of the limit|Each item shows how much has been used/);
 assert.match(trackersSource, /Used \{status\.used\} · Limit \{status\.limit\} · Remaining \{remaining\}/);
+assert.match(trackersSource, /<option value="races">Races<\/option>/);
+assert.match(trackersSource, /<option value="days">Days<\/option>/);
+assert.match(trackersSource, /Races already run/);
+assert.match(trackersSource, /Days already in service/);
+assert.doesNotMatch(trackersSource, /<option value="laps">|<option value="sessions">|Feature races/);
+assert.doesNotMatch(maintenanceSource, /intervalType: 'laps'|intervalType: 'sessions'/);
+assert.doesNotMatch(serviceLogSource, /night|nights/);
+assert.match(typesSource, /MaintenanceIntervalType = 'races' \| 'days'/);
 
 console.log('Chunk 8 Trackers harness PASS');

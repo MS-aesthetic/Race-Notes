@@ -103,13 +103,11 @@ export function pickWorstComponent(
 }
 
 const UNIT_LABEL: Record<MaintenanceComponent['intervalType'], [string, string]> = {
-  laps: ['lap', 'laps'],
-  sessions: ['session', 'sessions'],
   races: ['race', 'races'],
-  days: ['night', 'nights'],
+  days: ['day', 'days'],
 };
 
-/** Chip copy: "2 nights over" (overdue) or "240/250 laps" (due). */
+/** Dashboard maintenance status copy. */
 export function describeServiceStatus(
   component: MaintenanceComponent,
   status: MaintenanceStatus,
