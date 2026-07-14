@@ -117,7 +117,8 @@ assert.equal(fourBarAdjustmentLabel('rr', 'bottomBarAngRH'), 'RR bottom angle at
 
 const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 assert.match(appSource, /handleUpdateSession\(current =>/);
-assert.match(appSource, /const updatedSession = typeof update === 'function'/);
+assert.match(appSource, /const candidate = typeof update === 'function' \? update\(activeSessionRef\.current\) : update/);
+assert.match(appSource, /const updatedSession: ActiveSession = \{ \.\.\.candidate, updatedAt:/);
 assert.match(appSource, /preserveInfoToast/);
 assert.match(appSource, /const pressures = setupPressureBlock\(nextActive\)/);
 assert.match(appSource, /pressureSourceNote: hasPressureSource \? sourceNote : undefined/);

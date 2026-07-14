@@ -14,6 +14,8 @@ import { cloneSetup, makeBlankSetup, pickImmediatePriorSetupForCar, pickLatestSe
 import { calculateTireStagger, NumericCornerField, SETUP_STEPS, formatStoredNumber, legacyValueNote, parseStoredNumber } from '../lib/setupSteps';
 import { isSetupLocked } from '../lib/setupLifecycle';
 import { applyExplicitCornerField } from '../lib/quickAdjust';
+import { buildSetupReport, createPdfFile } from '../lib/exportPdf';
+import { shareOrDownloadReport } from '../lib/reportShare';
 
 interface SetupViewProps {
   savedSetups: Setup[];
@@ -33,6 +35,7 @@ interface SetupViewProps {
   /** Deep-link into a specific sub-tab (e.g. from Dashboard Tires panel). */
   initialSubTab?: 'setups' | 'smasherloads' | 'tires';
   onInfo?: (message: string) => void;
+  onHelp?: (section: string) => void;
   onGoToGarage?: () => void;
 }
 
@@ -214,7 +217,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
 export default function SetupView({
   savedSetups, activeSetupId, onSaveSetups, user, tireInventory, onSaveTires, onDeleteTireFromCloud,
   activeCarId = null, activeCar = null, shockSessions = [], onSaveShockSessions, weekends = [],
-  initialSubTab, onInfo, onGoToGarage,
+  initialSubTab, onInfo, onHelp, onGoToGarage,
 }: SetupViewProps) {
   const [subTab, setSubTab] = useState<'setups' | 'smasherloads' | 'tires'>(initialSubTab ?? 'setups');
   const [setups, setSetups] = useState<Setup[]>(savedSetups);
@@ -222,6 +225,7 @@ export default function SetupView({
   const [expandedId, setExpandedId] = useState<string | null>(activeSetupId);
   const [newSetupName, setNewSetupName] = useState('');
   const [uploadingSetupId, setUploadingSetupId] = useState<string | null>(null);
+  const [sharingSetupId, setSharingSetupId] = useState<string | null>(null);
 
   const [showCompare, setShowCompare] = useState(false);
   const [compareIds, setCompareIds] = useState<{ a?: string; b?: string }>({});
@@ -399,18 +403,37 @@ export default function SetupView({
   const noCar = !activeCarId;
   const activeSetup = displayedSetups.find(s => s.id === activeId) ?? pickLatestSetupForCar(setups, activeCarId);
   const priorSetup = (target: Setup) => pickImmediatePriorSetupForCar(displayedSetups, target);
+  const handleShareSetup = async (target: Setup) => {
+    if (sharingSetupId) return;
+    setSharingSetupId(target.id);
+    try {
+      // A saved setup card may belong to another car or weekend. Do not attach
+      // the app's currently open run unless ownership is proven.
+      const result = await shareOrDownloadReport(createPdfFile(buildSetupReport(target)), `Share ${target.versionLabel || target.chassis || 'setup'}`);
+      if (result.status === 'shared') onInfo?.('Setup PDF shared.');
+      else if (result.status === 'downloaded') onInfo?.('Setup PDF downloaded.');
+      else if (result.status === 'failed') onInfo?.(result.error || 'Setup PDF could not be shared.');
+    } catch (error) {
+      onInfo?.(error instanceof Error ? error.message : 'Setup PDF could not be created.');
+    } finally {
+      setSharingSetupId(null);
+    }
+  };
 
   return (
     <div className="space-y-4" id="setup-view-root">
 
       {/* Page Header & sub-tab nav */}
       <div className="flex flex-col gap-3 border-b border-outline-variant pb-4">
-        <div>
-          <h2 className="font-display font-bold tracking-tight text-2xl uppercase text-on-surface">Setups</h2>
-          <p className="font-label-sm text-xs text-on-surface-variant font-mono mt-1 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
-            Autosaver Active — Changes saved automatically live trackside
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display font-bold tracking-tight text-2xl uppercase text-on-surface">Setups</h2>
+            <p className="font-label-sm text-xs text-on-surface-variant font-mono mt-1 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+              Saved as you change it
+            </p>
+          </div>
+          {onHelp && <button type="button" onClick={() => onHelp('setup')} aria-label="Setup help" title="Setup sheet help" className="flex min-h-12 min-w-12 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary"><span className="material-symbols-outlined">help</span></button>}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <SubTabBtn tab="setups" label="Setups" icon="settings_input_component" />
@@ -510,9 +533,9 @@ export default function SetupView({
                         </button>
                       )}
                       <div className="w-full min-w-0 flex flex-wrap items-center justify-end gap-1 border-t border-outline-variant/60 pt-2 sm:w-auto sm:border-t-0 sm:border-l sm:pt-0 sm:pl-2">
-                        <button type="button" title="Share with Team" onClick={(e) => { e.stopPropagation(); alert('Data is instantly shared and synced with your Team. Manage your team in the Settings tab.'); }}
-                          className="p-1.5 text-on-surface-variant hover:text-primary transition-colors rounded">
-                          <span className="material-symbols-outlined text-[18px]">group</span>
+                        <button type="button" title="Share setup PDF" disabled={sharingSetupId === setupItem.id} onClick={(e) => { e.stopPropagation(); void handleShareSetup(setupItem); }}
+                          className="flex min-h-12 min-w-12 items-center justify-center text-on-surface-variant hover:text-primary transition-colors rounded disabled:opacity-40">
+                          <span className="material-symbols-outlined text-[18px]">{sharingSetupId === setupItem.id ? 'progress_activity' : 'share'}</span>
                         </button>
                         <button type="button" title="Clone setup" onClick={(e) => { e.stopPropagation(); handleCloneSetup(setupItem.id); }}
                           className="p-1.5 text-on-surface-variant hover:text-primary transition-colors rounded">
@@ -707,6 +730,7 @@ export default function SetupView({
                       {/* Four-bar is part of this setup, after all four corner values. */}
                       <FourBarQuickAdjust
                         setup={setupItem}
+                        onHelp={onHelp}
                         onFieldChange={(corner, field, value) => handleCornerChange(setupItem.id, corner, field, value)}
                       />
 
@@ -784,6 +808,7 @@ export default function SetupView({
           sessions={shockSessions}
           onSave={onSaveShockSessions}
           onGoToGarage={onGoToGarage}
+          onHelp={onHelp}
         />
       )}
 
@@ -808,6 +833,7 @@ export default function SetupView({
             initialAId={compareIds.a}
             initialBId={compareIds.b}
             onClose={() => setShowCompare(false)}
+            onHelp={onHelp}
         />
       )}
     </div>

@@ -208,7 +208,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
         <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
           {showForm ? 'expand_less' : 'add'}
         </span>
-        {showForm ? 'Cancel' : 'Add Entry'}
+        {showForm ? 'Cancel' : 'Log Money'}
       </button>
 
       {/* Add form */}
@@ -230,7 +230,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
 
           {recentRepeats.length > 0 && (
             <div>
-              <p className="font-mono text-[10px] uppercase text-on-surface-variant mb-1.5">Repeat a recent entry</p>
+              <p className="font-mono text-[10px] uppercase text-on-surface-variant mb-1.5">Repeat a recent charge</p>
               <div className="flex flex-wrap gap-2">
                 {recentRepeats.map(repeat => (
                   <button key={`${repeat.description}:${repeat.category}`} type="button"
@@ -299,7 +299,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
           </div>
 
           <button type="submit" className="w-full py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80">
-            Save Entry
+            Save to Accounting
           </button>
         </form>
       )}
@@ -310,7 +310,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
           icon="account_balance"
           title="No money logged yet"
           body="Track race-night income and expenses from one ledger."
-          cta={{ label: 'Add first entry', onClick: () => setShowForm(true) }}
+          cta={{ label: 'Log first charge', onClick: () => setShowForm(true) }}
         />
       ) : (
         <div className="space-y-2">
@@ -560,7 +560,7 @@ function ServiceTab({
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary font-mono text-[11px] uppercase font-bold transition-colors"
         >
           <span className="material-symbols-outlined text-[15px]">{showAddForm ? 'close' : 'add'}</span>
-          {showAddForm ? 'Cancel' : 'Add Maintenance Item'}
+          {showAddForm ? 'Cancel' : 'Add Maintenance Job'}
         </button>
         {components.length === 0 && !showAddForm && (
           <button
@@ -614,7 +614,7 @@ function ServiceTab({
             </div>
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="flex-1 py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80">Add Maintenance Item</button>
+            <button type="submit" className="flex-1 py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80">Add Maintenance Job</button>
             <button type="button" onClick={() => setShowAddForm(false)} className="px-4 py-2.5 border border-outline-variant rounded-lg font-mono text-xs text-on-surface-variant">Cancel</button>
           </div>
         </form>
@@ -624,10 +624,10 @@ function ServiceTab({
       {components.length === 0 && !showAddForm && (
         <EmptyState
           icon="build_circle"
-          title="No maintenance items yet"
-          body="Add common race-car maintenance intervals or build your own."
-          cta={{ label: 'Add common items', onClick: addDefaults }}
-          secondaryCta={{ label: 'Create maintenance item', onClick: () => setShowAddForm(true) }}
+          title="No maintenance jobs yet"
+          body="Add common race-car maintenance limits or build your own job."
+          cta={{ label: 'Add common jobs', onClick: addDefaults }}
+          secondaryCta={{ label: 'Create maintenance job', onClick: () => setShowAddForm(true) }}
         />
       )}
 
@@ -832,7 +832,7 @@ function TemplatesTab({
                 <span className="material-symbols-outlined text-primary text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>fact_check</span>
                 <div className="flex-1 min-w-0">
                   <span className="font-mono text-sm font-semibold text-on-surface block truncate">{tmpl.name}</span>
-                  <span className="font-mono text-[10px] text-on-surface-variant/50">{tmpl.category} · {tmpl.items.length} items</span>
+                  <span className="font-mono text-[10px] text-on-surface-variant/50">{tmpl.category} · {tmpl.items.length} jobs</span>
                 </div>
                 <span className="material-symbols-outlined text-on-surface-variant/50 text-[16px] transition-transform duration-200"
                   style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>expand_more</span>
@@ -846,7 +846,7 @@ function TemplatesTab({
                   {/* Items list */}
                   <div className="divide-y divide-outline-variant/20">
                     {tmpl.items.length === 0 && (
-                      <p className="px-4 py-2 font-mono text-[10px] text-on-surface-variant/40 italic">No items yet. Add below.</p>
+                      <p className="px-4 py-2 font-mono text-[10px] text-on-surface-variant/40 italic">No jobs yet. Add one below.</p>
                     )}
                     {tmpl.items.map(item => (
                       <div key={item.id} className="flex items-center gap-2 px-4 py-2">
@@ -862,7 +862,7 @@ function TemplatesTab({
                   {/* Add item */}
                   <div className="flex items-center gap-2 p-3 border-t border-outline-variant/40">
                     <input
-                      placeholder="Add item…"
+                      placeholder="Add job…"
                       value={newItemText[tmpl.id] || ''}
                       onChange={e => setNewItemText(prev => ({ ...prev, [tmpl.id]: e.target.value }))}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem(tmpl.id); } }}

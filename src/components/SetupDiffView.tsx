@@ -7,9 +7,10 @@ interface SetupDiffViewProps {
   onClose: () => void;
   initialAId?: string;
   initialBId?: string;
+  onHelp?: (section: string) => void;
 }
 
-export default function SetupDiffView({ setups, onClose, initialAId, initialBId }: SetupDiffViewProps) {
+export default function SetupDiffView({ setups, onClose, initialAId, initialBId, onHelp }: SetupDiffViewProps) {
   const valid = (id: string | undefined) => !!id && setups.some(s => s.id === id);
   const [setupAId, setSetupAId] = useState<string>(() => valid(initialAId) ? initialAId! : (setups[0]?.id || ''));
   const [setupBId, setSetupBId] = useState<string>(() => valid(initialBId) ? initialBId! : (setups[1]?.id || setups[0]?.id || ''));
@@ -34,9 +35,12 @@ export default function SetupDiffView({ setups, onClose, initialAId, initialBId 
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display text-base font-bold uppercase tracking-wide text-on-surface">Compare Setups</h3>
-          <button onClick={onClose} className="text-on-surface-variant hover:text-primary">
-            <span className="material-symbols-outlined">close</span>
-          </button>
+          <div className="flex items-center gap-1">
+            {onHelp && <button type="button" onClick={() => onHelp('setup-diff')} aria-label="Setup comparison help" title="How to read setup changes" className="flex min-h-12 min-w-12 items-center justify-center rounded-full text-on-surface-variant hover:text-primary"><span className="material-symbols-outlined">help</span></button>}
+            <button onClick={onClose} aria-label="Close setup comparison" className="flex min-h-12 min-w-12 items-center justify-center rounded-full text-on-surface-variant hover:text-primary">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
         </div>
 
         {/* Pickers */}

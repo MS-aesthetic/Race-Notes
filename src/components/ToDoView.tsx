@@ -135,7 +135,7 @@ export default function ToDoView({
   const importTemplate = () => {
     const template = templates.find(item => item.id === selectedTemplateId);
     if (!template) return;
-    if (activeTodo?.items.length && !window.confirm(`Add ${template.items.length} items from ${template.name} to Main Checklist?`)) return;
+    if (activeTodo?.items.length && !window.confirm(`Add ${template.items.length} jobs from ${template.name} to Main Checklist?`)) return;
     const stamp = Date.now();
     const imported: TodoItem[] = template.items.map((item, index) => ({
       id: `item-${stamp}-${index}-${Math.random().toString(36).slice(2, 7)}`,
@@ -312,7 +312,7 @@ export default function ToDoView({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="font-display font-bold uppercase text-primary text-sm tracking-wide">Main Checklist</h3>
-            <p className="font-mono text-[10px] text-on-surface-variant/60 mt-1">One active team list. Add items manually or import a template.</p>
+            <p className="font-mono text-[10px] text-on-surface-variant/60 mt-1">One active team list. Add jobs or bring them in from a saved list.</p>
           </div>
           {onManageTemplates && (
             <button type="button" onClick={onManageTemplates} className="shrink-0 min-h-11 px-3 border border-outline-variant rounded font-mono text-[10px] font-bold uppercase text-on-surface-variant hover:text-primary hover:border-primary">
@@ -343,7 +343,7 @@ export default function ToDoView({
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-outline-variant/40">
           <label className="flex items-center gap-2 min-h-11 cursor-pointer font-mono text-[10px] uppercase text-on-surface-variant">
             <input type="checkbox" checked={keepAddedItems} onChange={event => setKeepPreference(event.target.checked)} className="w-5 h-5 accent-primary" />
-            Keep added items on reset
+            Keep added jobs on reset
           </label>
           <button type="button" onClick={resetForWeekend} className="min-h-11 px-3 border border-outline-variant rounded font-mono text-[10px] uppercase font-bold text-on-surface-variant hover:text-primary hover:border-primary">
             Reset for New Weekend

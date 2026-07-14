@@ -6,7 +6,7 @@ type TrackCondition = 'all' | 'slick' | 'rubber' | 'wet' | 'tacky';
 type CarBehavior = 'select' | 'loose-entry' | 'loose-center' | 'loose-exit'
                  | 'tight-entry' | 'tight-center' | 'tight-exit' | 'need-drive';
 type AdjPriority = 'high' | 'medium' | 'low';
-type AdjustmentApplication = 'Dirt Late Model' | 'Modified' | 'Package-dependent';
+type AdjustmentApplication = 'Dirt Late Model' | 'Modified';
 
 interface Adjustment {
   component: string;
@@ -21,6 +21,50 @@ function adjustmentApplicability(adjustment: Adjustment): string {
   if (adjustment.application === 'Dirt Late Model') return 'Dirt Late Model only — make sure your car has this part';
   if (adjustment.application === 'Modified') return 'Modified only — make sure your car has this part';
   return 'Basic direction — change one thing, then test it';
+}
+
+/** Keep the researched direction intact while translating academic terms. */
+export function plainRacerEffect(value: string): string {
+  const replacements: Array<[RegExp, string]> = [
+    [/rear roll center/gi, 'rear roll point'],
+    [/forward weight transfer/gi, 'weight moving to the front'],
+    [/rearward weight transfer/gi, 'weight moving to the rear'],
+    [/braking transitions?/gi, 'braking'],
+    [/throttle transitions?/gi, 'getting back on the gas'],
+    [/trailing arm design angles?/gi, 'bar angles'],
+    [/rear steer geometry/gi, 'bar angles and rear steer'],
+    [/lateral roll force/gi, 'side load'],
+    [/snap oversteer/gi, 'the rear snapping loose'],
+    [/understeer/gi, 'push'],
+    [/oversteer/gi, 'loose condition'],
+    [/at the apex/gi, 'in the middle'],
+    [/through the apex/gi, 'through the middle'],
+    [/apex/gi, 'middle'],
+    [/dynamically/gi, 'while the car is moving'],
+    [/progressively/gi, 'smoothly'],
+    [/progressive/gi, 'smooth'],
+    [/compliant/gi, 'soft'],
+    [/mechanical clamping force/gi, 'force planting the tire'],
+    [/tire contact patch/gi, 'part of the tire touching the track'],
+    [/tire footprint/gi, 'part of the tire on the track'],
+    [/body roll/gi, 'the car leaning'],
+    [/chassis posture/gi, 'how the car sits'],
+    [/the chassis/gi, 'the car'],
+    [/chassis/gi, 'car'],
+    [/pivot/gi, 'turn'],
+    [/deceleration/gi, 'slowing down'],
+    [/acceleration/gi, 'getting on the gas'],
+    [/cornering loads/gi, 'load in the corner'],
+    [/induces?/gi, 'adds'],
+    [/promotes?/gi, 'adds'],
+    [/preserving/gi, 'keeping'],
+    [/preserves/gi, 'keeps'],
+    [/preserve/gi, 'keep'],
+  ];
+  const clean = replacements.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), value)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clean;
 }
 
 interface ConditionGroup {
@@ -40,7 +84,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
   {
     id: 'loose-entry',
     title: 'Car is Loose on Entry',
-    subtitle: 'Loose-In / Oversteer at Turn-In',
+    subtitle: 'Rear steps out getting into the corner',
     type: 'tighten',
     baseAdjustments: [
       { component: 'Shocks', location: 'Left Rear', action: 'Less Rebound (Decrease)', priority: 'high',
@@ -54,7 +98,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       { component: 'Shocks', location: 'Left Rear', action: 'More Compression (Increase)', priority: 'medium',
         effect: 'Stiffening LR compression prevents the left rear chassis corner from collapsing during braking transitions. This preserves the trailing arm design angles and maintains proper rear steer geometry through turn-in.' },
       { component: 'J-Bar', location: 'Pinion / Axle Mount', action: 'Lower (½" at a time)', priority: 'medium',
-        effect: 'Lowering the pinion side increases the J-bar rake angle. Under power, this geometry pushes the LR tire harder into the track, adding mechanical downforce that keeps the rear planted.' },
+        effect: 'Lowering the pinion side adds J-bar rake. Under power, it pushes the LR tire harder into the track and helps keep the rear planted.' },
       { component: '4-Link', location: 'RR Lower Rod', action: 'Lower on Chassis', priority: 'medium',
         effect: 'Lowering the right rear bottom bar on the chassis reduces the RR trailing arm angle, limiting entry roll steer so the rear axle tracks squarer and more stable through turn-in.' },
       { component: 'Springs', location: 'Left Front', action: 'Stiffer Rate (+25 lbs)', priority: 'medium',
@@ -87,7 +131,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       ],
       tacky: [
         { component: 'Shocks', location: 'Both Fronts', action: 'Soften compression (vs. slick)', priority: 'medium',
-          effect: 'On high-grip tacky tracks, the premier entry-tightening change is to soften front compression, letting the nose dive instantly. The massive available front-end traction pivots the heavy car through turn-in without binding.' },
+          effect: 'On a tacky track, try softer front compression first. It lets the nose settle and helps the car turn without binding.' },
         { component: 'Shocks', location: 'Right Rear', action: 'Less Compression + Lower RR Lower Link', priority: 'high',
           effect: 'Under high-grip tacky entry conditions, soften RR compression and lower the RR lower link. This lets the RR tire immediately absorb the lateral roll force of turn-in, planting the tire patch into the clay for a stable, planted feel.' },
       ],
@@ -98,7 +142,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
   {
     id: 'tight-entry',
     title: 'Car is Tight on Entry',
-    subtitle: 'Push-In / Understeer at Turn-In',
+    subtitle: 'Front will not turn getting into the corner',
     type: 'loosen',
     baseAdjustments: [
       { component: 'Shocks', location: 'Left Rear', action: 'More Rebound (Increase)', priority: 'high',
@@ -106,7 +150,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       { component: 'Shocks', location: 'Right Front', action: 'Less Compression (Decrease)', priority: 'high',
         effect: 'Decreasing RF compression allows the chassis to roll onto the RF tire faster. Rapid RF loading speeds up front-end response, helping the car pivot into the corner rather than pushing straight ahead.' },
       { component: 'Shocks', location: 'Both Fronts', action: 'Less Compression (Decrease)', priority: 'high',
-        effect: 'Softening both front shocks allows the nose to dive quickly under braking. Faster forward pitch shifts weight off the rear, reducing rear traction and freeing the car to rotate. On heavy/tacky tracks this is the premier entry-loosening move.' },
+        effect: 'Softening both front shocks lets the nose settle faster under braking. That takes some load off the rear and helps the car rotate. Try this early on a heavy or tacky track.' },
       { component: 'J-Bar', location: 'Chassis / Frame Mount', action: 'Lower (½" at a time)', priority: 'high',
         effect: 'Lowering the frame-side J-bar lowers the rear roll center, promoting progressive body roll and allowing the car to turn in more easily. The rear transfers weight more gradually, which frees up rotation on entry.' },
       { component: '4-Link', location: 'RR Bottom Bar', action: 'Steepen (Raise chassis / Lower birdcage)', priority: 'high',
@@ -114,11 +158,11 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       { component: 'Shocks', location: 'Left Rear', action: 'More Compression (Increase)', priority: 'medium',
         effect: 'Stiffening LR compression on a tight-entry car (especially if it is "slamming down") resists the rear-end squat under deceleration. This can help free the front to pivot by keeping the rear geometry stable.' },
       { component: 'J-Bar', location: 'Pinion / Axle Mount', action: 'Raise (½" at a time)', priority: 'medium',
-        effect: 'Raising the pinion side flattens the J-bar angle, reducing the vertical downforce component on the LR under deceleration. This makes the rear lighter and easier to rotate on entry.' },
+        effect: 'Raising the pinion side flattens the J-bar and takes some load off the LR while slowing. The rear can rotate easier on entry.' },
       { component: 'Cross-Weight', location: 'RF or LR Perch', action: 'Remove (Lower %)', priority: 'medium',
         effect: 'Less cross-weight (wedge) allows the car to pivot more freely. Turn the RF or LR perch counter-clockwise ½ to 1 full turn. Removing wedge is one of the most direct ways to loosen a tight-on-entry car.' },
       { component: 'Caster Split', location: 'Front End', action: 'Increase', priority: 'medium',
-        effect: 'Adding caster split (more RF caster than LF) increases the dynamic steering angle during body roll. More caster split on the RF helps steer the front end into the corner — can help cure a push on entry.' },
+        effect: 'More RF caster than LF makes the front steer harder as the car rolls. That can help a push on entry.' },
       { component: 'Tire Spacing', location: 'Right Rear', action: 'Add ½" Wheel Spacer', priority: 'medium',
         effect: 'A RR spacer widens the right-side track. This increases roll leverage on entry, letting the right rear step out and rotate — loosening the car at turn-in.' },
       { component: 'Stagger', location: 'Rear Axle', action: 'Add (Increase)', priority: 'medium',
@@ -145,7 +189,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
         { component: 'Springs', location: 'Right Front', action: 'Softer Rate', priority: 'medium',
           effect: 'On tacky track with excellent grip, a softer RF spring allows the front to roll deeper and generate real steering force. This helps cure a push by maximizing RF loading through the full range of body roll.' },
         { component: 'Shocks', location: 'Both Fronts', action: 'Decrease compression (more aggressively)', priority: 'high',
-          effect: 'On heavy/tacky, the premier entry-loosening change is soften front compression AND soften the LF spring. The massive available traction lets the nose dive instantly, pivoting the car without binding.' },
+          effect: 'On heavy or tacky dirt, try softer front compression and a softer LF spring. The nose settles faster so the car can point into the corner.' },
       ],
     },
   },
@@ -154,7 +198,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
   {
     id: 'loose-center',
     title: 'Car is Loose in Center',
-    subtitle: 'Loose-Middle / Oversteer at Apex',
+    subtitle: 'Rear steps out in the middle of the corner',
     type: 'tighten',
     baseAdjustments: [
       { component: 'Shocks', location: 'Right Front', action: 'Check which RF rebound direction fits your car', priority: 'high',
@@ -164,7 +208,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       { component: 'Shocks', location: 'Right Rear', action: 'More Compression (Increase)', priority: 'high',
         effect: 'Increasing RR compression controls the rate at which side bite builds on the RR tire. The controlled weight transfer cushions the rear against snap oversteer at the apex.' },
       { component: 'Springs', location: 'Right Rear', action: 'Softer Rate', priority: 'high',
-        effect: 'A softer RR spring allows the chassis to squat heavily onto the RR, crushing the tire tread into the dirt. More carcass deformation equals more side bite — the primary fix for a car sliding in the middle.' },
+        effect: 'A softer RR spring lets the car settle onto that tire. The tire digs harder and adds side bite when the car slides in the middle.' },
       { component: 'J-Bar', location: 'Pinion / Axle Mount', action: 'Lower (Increase rake angle)', priority: 'medium',
         effect: 'Lowering the pinion side increases J-bar rake angle, pushing the LR tire harder into the track under cornering loads. More downforce on the LR = more side bite at the apex.' },
       { component: 'J-Bar', location: 'Both Ends', action: 'Lower both equally (lower roll center)', priority: 'medium',
@@ -208,7 +252,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
   {
     id: 'tight-center',
     title: 'Car is Tight in Center',
-    subtitle: 'Tight-Middle / Understeer Through Apex',
+    subtitle: 'Front pushes in the middle of the corner',
     type: 'loosen',
     baseAdjustments: [
       { component: 'Shocks', location: 'Right Front', action: 'More Rebound (Increase)', priority: 'high',
@@ -262,7 +306,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
   {
     id: 'loose-exit',
     title: 'Car is Loose on Exit',
-    subtitle: 'Loose-Out / Oversteer on Throttle',
+    subtitle: 'Rear steps out when you get on the gas',
     type: 'tighten',
     baseAdjustments: [
       { component: 'Shocks', location: 'Left Rear', action: 'Less Compression (Decrease)', priority: 'high',
@@ -326,7 +370,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
   {
     id: 'tight-exit',
     title: 'Car is Tight on Exit',
-    subtitle: 'Tight-Out / Push on Throttle',
+    subtitle: 'Front pushes when you get on the gas',
     type: 'loosen',
     baseAdjustments: [
       { component: 'Shocks', location: 'Right Front', action: 'More Rebound (Increase)', priority: 'high',
@@ -336,9 +380,9 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       { component: 'Shocks', location: 'Left Rear', action: 'More Compression (Increase)', priority: 'high',
         effect: 'Increasing LR compression keeps the left rear chassis from collapsing too quickly under throttle transition, preserving rear steer geometry. This prevents the hike-up from triggering too much roll steer that would push the front.' },
       { component: 'Pull Bar', location: 'Spring / Bushing', action: 'Stiffer Spring (or Harder Bushing)', priority: 'high',
-        effect: 'A stiffer pull bar delivers a more immediate and aggressive torque spike on throttle. The rear is hooking too hard — a stiffer pull bar tries to break traction and encourage rotation. If not spinning tires but not driving forward → stiffen.' },
+        effect: 'A stiffer pull bar gives the rear tires a harder hit on throttle. Use it when the rear hooks too hard and the car will not rotate. If the tires are not spinning but the car will not drive forward, try stiffer.' },
       { component: 'J-Bar', location: 'Pinion / Axle Mount', action: 'Raise (Flatten rake angle)', priority: 'high',
-        effect: 'Raising the pinion side flattens the J-bar angle, reducing the mechanical downforce component on the rear end under power. Less downforce = less side bite = car can rotate off the corner rather than pushing.' },
+        effect: 'Raising the pinion side flattens the J-bar and takes load off the rear under power. Less side bite can help the car rotate off the corner.' },
       { component: '4-Link', location: 'LR Bottom Bar', action: 'Steepen (Raise chassis / Lower birdcage)', priority: 'high',
         effect: 'Steepening the LR bottom bar accelerates LR chassis hike-up speed on throttle. Faster hike creates more aggressive rear steer, swinging the rear to the right and rotating the car off the corner.' },
       { component: 'Shocks', location: 'Left Rear', action: 'Less Rebound (Decrease)', priority: 'high',
@@ -354,16 +398,16 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
       { component: 'Stagger', location: 'Rear Axle', action: 'Add slightly', priority: 'medium',
         effect: 'More rear stagger gives natural left-turn rotation under the power — on a tight-exit car this extra rotation is needed to get the car turned and driving down the straight.' },
       { component: 'Caster Split', location: 'Front End', action: 'Reduce (on heavy/tacky)', priority: 'low',
-        effect: 'On heavy/tacky tracks, reducing caster split can cure a tight exit by reducing the dynamic steering lock-in on throttle. The front tires don\'t steer as aggressively, allowing the rear to take over.' },
+        effect: 'On heavy or tacky dirt, less caster split can free a tight exit. The front tires steer less aggressively and let the rear finish the corner.' },
     ],
     conditionAdjustments: {
       slick: [
         { component: 'Shocks', location: 'Right Front', action: 'Stiffen RF rebound + Reduce rear stagger', priority: 'high',
-          effect: 'The premier dry-slick tight-exit fix: stiffen RF rebound and reduce rear stagger. RF rebound holds chassis flat so front tires stay on ground while rear progressively loads. Reducing stagger removes natural rear steer that is working against rotation.' },
+          effect: 'For a tight exit on dry-slick, try more RF rebound and less rear stagger. This keeps the front working while taking away some rear steer.' },
       ],
       rubber: [
         { component: 'Pull Bar', location: 'Spring', action: 'Stiffen aggressively', priority: 'high',
-          effect: 'The rubber groove hooks the rear very hard. A stiff pull bar delivers an aggressive torque spike to break the rear loose and create rotation — necessary when the groove is holding the car in a push.' },
+          effect: 'A rubbered groove can hook the rear hard. A stiffer pull bar gives the rear tires a harder hit and can help the car rotate.' },
         { component: 'Tires', location: 'Right Rear', action: 'Verify pressure with tire maker and hot readings', priority: 'high',
           effect: 'Rubbered-track pressure depends on the tire and car. Use measured hot pressure and track rules instead of a copied universal number.' },
       ],
@@ -375,7 +419,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
         { component: 'Shocks', location: 'Right Front', action: 'Check which RF rebound direction fits your car', priority: 'high',
           effect: 'RF rebound direction can differ between cars on high-grip tracks. Check your shock builder notes and make one measured change before evaluating exit balance.' },
         { component: 'Pull Bar', location: 'Spring', action: 'Stiffer', priority: 'medium',
-          effect: 'On tacky track the rear hooks hard. A stiffer pull bar helps rotate the car off the corner by delivering a more aggressive torque spike.' },
+          effect: 'On tacky dirt the rear can hook hard. A stiffer pull bar gives the rear tires a harder hit and can help the car rotate off the corner.' },
       ],
     },
   },
@@ -384,7 +428,7 @@ const BEHAVIOR_DATA: ConditionGroup[] = [
   {
     id: 'need-drive',
     title: 'Need More Drive Off the Corner',
-    subtitle: 'Add Forward Bite / Exit Traction',
+    subtitle: 'Help the rear tires hook up off the corner',
     type: 'drive',
     baseAdjustments: [
       { component: 'Pull Bar', location: 'Rate + Location', action: 'Tune rate to conditions; Raise both ends; Move LEFT', priority: 'high',
@@ -570,6 +614,25 @@ export default function QuickReferenceView() {
   return (
     <div className="space-y-4 text-on-surface pb-8" id="quick-reference-page">
 
+      <section className="grid gap-3">
+        <div data-help-anchor="setup" className="scroll-mt-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
+          <h2 className="font-display font-bold uppercase text-on-surface">Setup Sheet</h2>
+          <p className="mt-1 font-mono text-xs text-on-surface-variant">Record what is on the car now. Change one item at a time when you can, then log what the driver felt. Ride height, pressure, spring, shock, gear, and bar numbers only help when they match the car that made the run.</p>
+        </div>
+        <div data-help-anchor="four-bar" className="scroll-mt-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
+          <h2 className="font-display font-bold uppercase text-on-surface">Four-Bar</h2>
+          <p className="mt-1 font-mono text-xs text-on-surface-variant">Frame hole, bar length, and birdcage hole show where each bar is mounted. Measure bar angle at ride height and full droop the same way every time. Small hole or angle changes can make a big difference, so write down the change before the next run.</p>
+        </div>
+        <div data-help-anchor="loads" className="scroll-mt-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
+          <h2 className="font-display font-bold uppercase text-on-surface">Load Sessions</h2>
+          <p className="mt-1 font-mono text-xs text-on-surface-variant">A Load Session saves shock or smasher load against height for one corner. Lower height appears farther down the graph. Save ride height C-to-C when known so later graphs can be compared to the car as it sat that day.</p>
+        </div>
+        <div data-help-anchor="setup-diff" className="scroll-mt-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
+          <h2 className="font-display font-bold uppercase text-on-surface">Compare Setups</h2>
+          <p className="mt-1 font-mono text-xs text-on-surface-variant">Before is the older setup. After is the newer setup. Highlighted rows changed. Use the list to see exactly what moved between race nights; it does not tell you whether the change was good or bad.</p>
+        </div>
+      </section>
+
       {/* ── MAIN SELECTOR CARD ─────────────────────────────────────────── */}
       <section className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b border-outline-variant/60 flex items-center gap-2">
@@ -586,9 +649,9 @@ export default function QuickReferenceView() {
 
         <div className="p-4 space-y-3">
           <div className="rounded border border-outline-variant bg-surface-container-high p-3 text-xs text-on-surface-variant leading-relaxed">
-            <p className="font-mono font-bold uppercase text-on-surface">Applicability</p>
-            <p>This guide gives a starting direction. Only use an adjustment when your car has that part. Fifth-coil items are Dirt Late Model only.</p>
-            <p className="mt-1">Your shock builder, tire maker, measured hot pressures, and track rules still control.</p>
+            <p className="font-mono font-bold uppercase text-on-surface">Before You Change Anything</p>
+            <p>This guide gives a starting direction. Only try a change when your car has that part. Fifth-coil items are for Dirt Late Models.</p>
+            <p className="mt-1">Follow your shock builder, tire maker, hot-pressure notes, and track rules.</p>
           </div>
           <div className="rounded border-2 border-primary/50 bg-primary/10 p-3 text-xs leading-relaxed text-on-surface">
             <p className="font-mono font-bold uppercase text-primary">What High / Medium / Low means</p>
@@ -757,7 +820,7 @@ export default function QuickReferenceView() {
                       </div>
                       <div className="md:w-3/5 text-[11px] text-on-surface leading-relaxed border-t md:border-t-0 border-outline-variant/30 pt-2 md:pt-0">
                         <span className="text-[9px] text-on-surface-variant font-mono uppercase font-semibold block mb-0.5">Why it works</span>
-                        {adj.effect}
+                        {plainRacerEffect(adj.effect)}
                       </div>
                     </div>
                   </div>
@@ -797,17 +860,17 @@ export default function QuickReferenceView() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-xl">schema</span>
             <div className="text-left">
-              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Shock Adjustment Handling Impacts</h3>
-              <p className="text-[10px] font-mono text-on-surface-variant">How each shock change affects handling — entry · middle · exit</p>
+              <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">What Shock Changes Do</h3>
+              <p className="text-[10px] font-mono text-on-surface-variant">What the driver may feel on entry, in the middle, and on exit</p>
             </div>
           </div>
           <span className="material-symbols-outlined text-on-surface-variant">{shockOpen ? 'expand_less' : 'expand_more'}</span>
         </button>
         {shockOpen && (
           <div className="border-t border-outline-variant/60 bg-surface p-4 space-y-4">
-            {/* GRT Matrix */}
+            {/* First shock changes to try */}
             <div>
-              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest mb-2">Shock Adjustment Matrix — Priority Order by Condition</p>
+              <p className="text-[10px] font-mono uppercase font-bold text-primary tracking-widest mb-2">Shock Changes to Try First</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-[10px] font-mono border-collapse">
                   <thead>
@@ -880,7 +943,7 @@ export default function QuickReferenceView() {
                   },
                   {
                     corner: 'RR — Right Rear',
-                    comp: { stiffen: 'Controls lateral weight transfer rate to RR → cushions mid/exit loading → tightens middle', soften: 'Allows RR to absorb torque hit smoothly → prevents snap break → loosens exit snap' },
+                    comp: { stiffen: 'Slows weight moving onto RR → tightens middle', soften: 'Lets RR take the throttle hit more smoothly → calms a loose snap on exit' },
                     reb: { stiffen: 'Holds RR side bite longer → car stays planted in groove → tighter through exit', soften: 'Releases RR side bite faster → car can rotate off corner → loosens exit' },
                   },
                 ].map(({ corner, comp, reb }) => (
@@ -923,7 +986,7 @@ export default function QuickReferenceView() {
                       ['RF', 'Reb', 'Tighter middle & exit — holds nose down, prevents early lift', 'Looser middle & exit — nose rises faster, weight transfers rearward quickly'],
                       ['LR', 'Comp', 'Tighter middle & exit — preserves trailing arm geometry under throttle', 'Looser exit / more drive — smooth progressive squat, more forward bite'],
                       ['LR', 'Reb', 'Tighter entry — "ties down" LR under braking, rear stays planted', 'Looser entry — LR extends freely, reduces rear snap on turn-in'],
-                      ['RR', 'Comp', 'Tighter middle — controls lateral weight transfer rate to RR', 'Loosens exit snap — absorbs torque hit, RR cushions on throttle'],
+                      ['RR', 'Comp', 'Tighter middle — slows weight moving onto RR', 'Calmer exit — RR takes the throttle hit more smoothly'],
                       ['RR', 'Reb', 'Tighter exit — holds RR side bite, car stays planted in groove', 'Looser exit — releases RR side bite faster, car can rotate off corner'],
                     ].map(([corner, adj, stiffen, soften]) => (
                       <tr key={`${corner}-${adj}`} className="border-b border-outline-variant/20">
@@ -1173,7 +1236,7 @@ export default function QuickReferenceView() {
                   <p className="text-error font-bold text-[10px] uppercase">Raise Frame Mount</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Raises rear roll center</li>
-                    <li>Faster, more direct lateral weight transfer on entry</li>
+                    <li>Moves weight to the outside rear faster on entry</li>
                     <li>Reduces body roll — rear plants more immediately</li>
                     <li><strong className="text-on-surface">Tightens corner entry</strong> — use for loose-on-entry</li>
                   </ul>
@@ -1198,8 +1261,8 @@ export default function QuickReferenceView() {
                   <p className="text-error font-bold text-[10px] uppercase">Lower Pinion Mount (Steepen Rake)</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
                     <li>Steeper J-bar rake angle under power</li>
-                    <li>Converts lateral forces into vertical downforce on LR</li>
-                    <li>Adds mechanical forward bite</li>
+                    <li>Pushes the LR tire harder into the track</li>
+                    <li>Adds forward bite</li>
                     <li><strong className="text-on-surface">Tightens exit &amp; adds drive</strong></li>
                     <li>Also increases LR side bite at mid-corner</li>
                   </ul>
@@ -1207,7 +1270,7 @@ export default function QuickReferenceView() {
                 <div className="bg-surface-container border border-primary/30 rounded p-2.5 space-y-1">
                   <p className="text-primary font-bold text-[10px] uppercase">Raise Pinion Mount (Flatten Rake)</p>
                   <ul className="text-on-surface-variant space-y-0.5 list-disc pl-3 text-[10px] leading-relaxed">
-                    <li>Flatter rake — less mechanical downforce under power</li>
+                    <li>Flatter rake — less load on the rear under power</li>
                     <li>Rear end lighter under acceleration</li>
                     <li>Easier to rotate off the corner</li>
                     <li><strong className="text-on-surface">Loosens exit</strong> — use for tight-on-exit push</li>

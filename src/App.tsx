@@ -203,6 +203,11 @@ export default function App() {
 
   // ── [27] Help sheet, [37]/[5] info toast, [33] online status ──────────────
   const [helpOpen, setHelpOpen] = useState(false);
+  const [helpSection, setHelpSection] = useState<string | undefined>();
+  const openHelp = (section?: string) => {
+    setHelpSection(section);
+    setHelpOpen(true);
+  };
   const [infoToast, setInfoToast] = useState<string | null>(null);
   useEffect(() => {
     if (!infoToast) return;
@@ -1648,7 +1653,7 @@ export default function App() {
             <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1">
               {/* Tuning Guide sheet ([27]) */}
               <button
-                onClick={() => setHelpOpen(true)}
+                onClick={() => openHelp()}
                 aria-label="Tuning Guide"
                 title="Tuning Guide"
                 className="flex min-w-0 max-w-full flex-wrap items-center justify-center gap-1 px-2 min-h-12 rounded-full text-on-surface-variant hover:text-primary transition-colors text-center leading-tight"
@@ -1786,6 +1791,7 @@ export default function App() {
                   initialSubTab={setupSubTab}
                   onSaveSetups={handleSaveSetups}
                   onInfo={setInfoToast}
+                  onHelp={openHelp}
                   onGoToGarage={() => setActiveTab('settings')}
                 />
               )}
@@ -1810,6 +1816,8 @@ export default function App() {
                   shockSessions={shockSessions}
                   onCommitQuickAdjust={handleCommitQuickAdjust}
                   onInfo={setInfoToast}
+                  onHelp={openHelp}
+                  accounting={accounting}
                   onFinishWeekend={handleFinishWeekend}
                   initialAction={rwInitialAction ?? undefined}
                   onInitialActionConsumed={() => setRwInitialAction(null)}
@@ -1977,7 +1985,7 @@ export default function App() {
       </div>
 
       {/* [27] Help & Reference sheet — replaces the Quick Reference tab */}
-      <HelpSheet open={helpOpen} onClose={() => setHelpOpen(false)}>
+      <HelpSheet open={helpOpen} onClose={() => setHelpOpen(false)} section={helpSection}>
         <QuickReferenceView />
       </HelpSheet>
 

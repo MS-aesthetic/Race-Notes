@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import BottomSheet from './BottomSheet';
 
 export interface HelpSheetProps {
@@ -14,9 +14,17 @@ export interface HelpSheetProps {
  * as children to avoid coupling this primitive to screen components.
  */
 export default function HelpSheet({ open, onClose, section, children }: HelpSheetProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open || !section) return;
+    const frame = window.requestAnimationFrame(() => {
+      contentRef.current?.querySelector<HTMLElement>(`[data-help-anchor="${section}"]`)?.scrollIntoView({ block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, section]);
   return (
     <BottomSheet open={open} onClose={onClose} title="Tuning Guide">
-      <div data-help-section={section} className="space-y-3">
+      <div ref={contentRef} data-help-section={section} className="space-y-3">
         <div className="rounded-lg border border-primary/50 bg-primary/10 p-3">
           <p className="font-display text-base font-bold uppercase text-on-surface">Tuning Guide</p>
           <p className="mt-1 font-mono text-xs text-on-surface-variant">Basic dirt-oval setup direction. Change one thing, test it, and follow your tire and track rules.</p>

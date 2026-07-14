@@ -2,8 +2,15 @@ import { useState, useEffect } from 'react';
 import { Setup, ActiveSession, RaceWeekend, AccountingEntry, Todo, TireInventoryItem } from '../types';
 import { User } from '@supabase/supabase-js';
 import { pullSharedData } from '../lib/sync';
-import { getMainChecklist } from '../lib/mainChecklist';
 import { sortWeekends } from '../lib/scope';
+import {
+  buildMasterReport,
+  buildSetupReport,
+  buildTrackersReport,
+  buildWeekendReport,
+  openPrintReport,
+  type TrackerReportKind,
+} from '../lib/exportPdf';
 import EmptyState from './ui/EmptyState';
 
 interface ExportViewProps {
@@ -19,30 +26,6 @@ interface ExportViewProps {
   tireInventory?: TireInventoryItem[];
   onStartWeekend?: () => void;
 }
-
-type TrackerKind = 'all' | 'checklist' | 'accounting';
-
-const REPORT_CSS = `
-  body{font-family:'Inter',sans-serif;color:#111;padding:32px;max-width:900px;margin:0 auto;line-height:1.5}
-  .header{border-bottom:3px solid #ba1a20;padding-bottom:16px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start}
-  .logo{font-size:20px;font-weight:900;color:#ba1a20;text-transform:uppercase;letter-spacing:-1px}
-  .sub{font-size:12px;color:#555;margin-top:4px}
-  .meta{text-align:right;font-size:12px;color:#555}
-  h1{color:#ba1a20;text-transform:uppercase;font-size:22px;margin:24px 0 4px}
-  h2{text-transform:uppercase;font-size:14px;color:#444;border-bottom:1px solid #ddd;padding-bottom:6px;margin:24px 0 12px}
-  table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px}
-  th{background:#f0f0f0;text-align:left;padding:6px 10px;font-size:12px;text-transform:uppercase}
-  td{padding:5px 10px;border-bottom:1px solid #eee;vertical-align:top}
-  .total-row td{font-weight:bold;background:#fafafa;border-top:2px solid #ddd}
-  .session-card{border:1px solid #ddd;padding:12px 16px;margin-bottom:12px;border-left:4px solid #ba1a20}
-  .session-header{display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;font-weight:bold;text-transform:uppercase}
-  ul{list-style:none;padding:0;margin:0}
-  li{padding:4px 0;border-bottom:1px solid #eee;font-size:13px}
-  li.done{color:#888;text-decoration:line-through}
-  .empty{color:#999;font-size:13px;font-style:italic}
-  small{color:#777}
-  @media print{body{padding:16px}}
-`;
 
 export default function ExportView({
   user = null,
@@ -67,7 +50,7 @@ export default function ExportView({
   // [10] Canonical weekend ordering (date descending; no active concept here).
   const sortedWeekendOptions = sortWeekends(weekends, null);
   const [selectedWeekendId, setSelectedWeekendId] = useState<string>(sortWeekends(weekends, null)[0]?.id || '');
-  const [selectedTracker, setSelectedTracker] = useState<TrackerKind>('all');
+  const [selectedTracker, setSelectedTracker] = useState<TrackerReportKind>('all');
 
   // Cloud/local hydration can populate weekends after first render.
   useEffect(() => {
@@ -91,121 +74,14 @@ export default function ExportView({
     }
   }, [user]);
 
-  const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-
-  // ── Shared print shell ──────────────────────────────────────────────────
-  const printReport = (title: string, subtitle: string, bodyHtml: string) => {
-    const pw = window.open('', '_blank');
-    if (!pw) {
-      alert('Allow popups to export the report.');
-      return;
-    }
-    pw.document.write(
-      `<!DOCTYPE html><html><head><title>${title}</title><style>${REPORT_CSS}</style></head><body>` +
-        `<div class="header"><div><div class="logo">CREW CHIEF — ${title}</div>` +
-        `<div class="sub">${subtitle}</div></div>` +
-        `<div class="meta">Generated ${new Date().toLocaleString()}</div></div>` +
-        bodyHtml +
-        `<script>window.onload=function(){window.print()}</script></body></html>`,
-    );
-    pw.document.close();
-  };
-
-  // ── Section builders (return HTML strings) ───────────────────────────────
-  const setupSection = (s: Setup): string => {
-    const adj = activeSession.adjustments
-      .map(
-        (a) =>
-          `<tr><td style="font-family:monospace">[${a.icon?.toUpperCase() || 'SET'}] ${a.label}</td><td style="text-align:right;font-weight:bold">${a.value}</td></tr>`,
-      )
-      .join('');
-    return `
-      <h1>${s.chassis || 'Unspecified Chassis'}</h1>
-      <p style="color:#555;font-size:14px">${s.carType || 'No class'} · Track base: ${s.track || '—'}</p>
-      <h2>Chassis Corner Metrics</h2>
-      <table><thead><tr><th>Corner</th><th>Spring</th><th>Shock</th><th>Tire Press</th></tr></thead><tbody>
-        <tr><td>Left Front</td><td>${s.lf.spring} lb</td><td>${s.lf.shock}</td><td>${s.lf.tirePress} psi</td></tr>
-        <tr><td>Right Front</td><td>${s.rf.spring} lb</td><td>${s.rf.shock}</td><td>${s.rf.tirePress} psi</td></tr>
-        <tr><td>Left Rear</td><td>${s.lr.spring} lb</td><td>${s.lr.shock}</td><td>${s.lr.tirePress} psi</td></tr>
-        <tr><td>Right Rear</td><td>${s.rr.spring} lb</td><td>${s.rr.shock}</td><td>${s.rr.tirePress} psi</td></tr>
-      </tbody></table>
-      <h2>Active Session — ${activeSession.name || 'Unnamed'}</h2>
-      <table><tbody>
-        <tr><td>Finish</td><td><strong>${activeSession.finishPos || '—'}</strong> (${activeSession.gap || '—'})</td><td>Best Lap</td><td><strong>${activeSession.bestLap || '—'}s</strong></td></tr>
-        <tr><td>Avg Lap</td><td>${activeSession.avgLap || '—'}s</td><td>Max RPM</td><td>${activeSession.maxRpm || '—'}</td></tr>
-        <tr><td>Conditions</td><td colspan="3">${activeSession.condition || '—'}</td></tr>
-      </tbody></table>
-      <h2>Setup Adjustments (${activeSession.adjustments.length})</h2>
-      ${adj ? `<table><tbody>${adj}</tbody></table>` : '<p class="empty">No adjustments recorded.</p>'}
-      <h2>Competition Notes</h2>
-      <p style="font-size:13px;white-space:pre-wrap;font-style:italic;color:#333">${activeSession.competitionNotes || 'No notes.'}</p>
-    `;
-  };
-
-  const weekendSection = (w: RaceWeekend): string => {
-    const linkedAcct = accounting.filter((e) => e.weekendId === w.id);
-    const totalIncome = linkedAcct.filter((e) => e.type === 'income').reduce((s, e) => s + e.amount, 0);
-    const totalExpense = linkedAcct.filter((e) => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
-
-    const sessions = w.sessions
-      .map(
-        (s) => `<div class="session-card"><div class="session-header"><strong>${s.name}</strong><span>${s.type}</span></div>
-        <table><tbody>
-          <tr><td>Best Lap</td><td><strong>${s.bestLap || '—'}</strong></td><td>Finish</td><td><strong>${s.finishPos || '—'}</strong></td></tr>
-          <tr><td>Conditions</td><td colspan="3">${s.condition || '—'}</td></tr>
-          ${s.competitionNotes ? `<tr><td valign="top">Notes</td><td colspan="3">${s.competitionNotes}</td></tr>` : ''}
-        </tbody></table></div>`,
-      )
-      .join('');
-
-    const acctHtml = linkedAcct.length
-      ? `<table><thead><tr><th>Name</th><th>Type</th><th>Amount</th></tr></thead><tbody>
-          ${linkedAcct.map((e) => `<tr><td>${e.name}</td><td>${e.type}</td><td>${e.type === 'income' ? '+' : '−'}${fmt(e.amount)}</td></tr>`).join('')}
-          <tr class="total-row"><td><strong>Net</strong></td><td colspan="2"><strong>${fmt(totalIncome - totalExpense)}</strong></td></tr>
-        </tbody></table>`
-      : '<p class="empty">No accounting linked.</p>';
-
-    return `
-      <h1>${w.name}</h1>
-      <p style="color:#555;font-size:14px">${w.track} · ${w.date}</p>
-      ${w.notes ? `<div style="background:#f9f9f9;border-left:3px solid #ba1a20;padding:10px 14px;margin:12px 0;font-size:13px">${w.notes}</div>` : ''}
-      <h2>Sessions (${w.sessions.length})</h2>
-      ${w.sessions.length ? sessions : '<p class="empty">No sessions recorded.</p>'}
-      <h2>Accounting</h2>${acctHtml}
-    `;
-  };
-
-  const trackersSection = (kind: TrackerKind): string => {
-    const allTasks = getMainChecklist(todos)?.items ?? [];
-    const tasksHtml =
-      kind === 'all' || kind === 'checklist'
-        ? `<h2>Main Checklist (${allTasks.length})</h2>${
-            allTasks.length
-              ? `<ul>${allTasks.map((t) => `<li class="${t.done ? 'done' : ''}">${t.done ? '✓' : '○'} ${t.text}</li>`).join('')}</ul>`
-              : '<p class="empty">Main Checklist empty.</p>'
-          }`
-        : '';
-    const income = accounting.filter((e) => e.type === 'income').reduce((s, e) => s + e.amount, 0);
-    const expense = accounting.filter((e) => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
-    const acctHtml =
-      kind === 'all' || kind === 'accounting'
-        ? `<h2>Accounting (${accounting.length})</h2>${
-            accounting.length
-              ? `<table><thead><tr><th>Date</th><th>Name</th><th>Type</th><th>Amount</th></tr></thead><tbody>
-                  ${accounting.map((e) => `<tr><td>${e.date}</td><td>${e.name}</td><td>${e.type}</td><td>${e.type === 'income' ? '+' : '−'}${fmt(e.amount)}</td></tr>`).join('')}
-                  <tr class="total-row"><td colspan="3"><strong>Net</strong></td><td><strong>${fmt(income - expense)}</strong></td></tr>
-                </tbody></table>`
-              : '<p class="empty">No accounting entries.</p>'
-          }`
-        : '';
-    return tasksHtml + acctHtml || '<p class="empty">Nothing to export.</p>';
-  };
-
   // ── Export actions ───────────────────────────────────────────────────────
   const selectedSetup = setupOptions.find((s) => s.id === selectedSetupId) ?? setup;
 
-  const exportSetup = () =>
-    printReport('Setup Report', `${selectedSetup.chassis || 'Setup'} · ${selectedSetup.carType || ''}`, setupSection(selectedSetup));
+  const print = (report: ReturnType<typeof buildSetupReport>) => {
+    if (!openPrintReport(report)) alert('Allow popups to print the report.');
+  };
+
+  const exportSetup = () => print(buildSetupReport(selectedSetup, activeSession));
 
   const exportWeekend = () => {
     const w = weekends.find((x) => x.id === selectedWeekendId);
@@ -213,26 +89,10 @@ export default function ExportView({
       alert('Select a race weekend first.');
       return;
     }
-    printReport('Weekend Report', `${w.name} · ${w.track}`, weekendSection(w));
+    print(buildWeekendReport(w, accounting));
   };
-
-  const trackerLabel: Record<TrackerKind, string> = {
-    all: 'All Trackers',
-    checklist: 'Main Checklist',
-    accounting: 'Accounting',
-  };
-  const exportTrackers = () => printReport('Trackers Report', trackerLabel[selectedTracker], trackersSection(selectedTracker));
-
-  const exportAll = () => {
-    const body =
-      setupSection(selectedSetup) +
-      (weekends.length
-        ? `<h1 style="page-break-before:always">Weekends (${weekends.length})</h1>` + weekends.map(weekendSection).join('')
-        : '') +
-      `<h1 style="page-break-before:always">Trackers</h1>` +
-      trackersSection('all');
-    printReport('Master Report', 'Full team export — setup, weekends & trackers', body);
-  };
+  const exportTrackers = () => print(buildTrackersReport(selectedTracker, todos, accounting));
+  const exportAll = () => print(buildMasterReport(selectedSetup, activeSession, weekends, todos, accounting));
 
   const selectClass =
     'w-full bg-surface-container border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-2.5 rounded outline-none appearance-none cursor-pointer pr-8';
@@ -346,7 +206,7 @@ export default function ExportView({
             <span className="font-mono text-xs uppercase font-bold text-on-surface tracking-wide">Export Trackers</span>
           </div>
           <div className="relative">
-            <select value={selectedTracker} onChange={(e) => setSelectedTracker(e.target.value as TrackerKind)} className={selectClass}>
+            <select value={selectedTracker} onChange={(e) => setSelectedTracker(e.target.value as TrackerReportKind)} className={selectClass}>
               <option value="all">All Trackers</option>
               <option value="checklist">Main Checklist</option>
               <option value="accounting">Accounting</option>
@@ -462,7 +322,7 @@ export default function ExportView({
                 <div key={w.id} className="p-4 border border-outline-variant bg-surface-container rounded flex justify-between items-center">
                   <div>
                     <p className="font-bold text-sm text-on-surface uppercase">{w.name}</p>
-                    <p className="font-mono text-[10px] text-on-surface-variant mt-0.5">{w.track} • {w.sessions?.length || 0} Sessions</p>
+                    <p className="font-mono text-[10px] text-on-surface-variant mt-0.5">{w.track} • {w.sessions?.length || 0} Runs</p>
                   </div>
                   <button
                     onClick={() => onImportWeekend?.(w)}

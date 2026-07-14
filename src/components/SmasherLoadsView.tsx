@@ -19,6 +19,7 @@ interface SmasherLoadsViewProps {
   /** When lifted to App.tsx, save handler is passed in */
   onSave?: (sessions: ShockSession[]) => void;
   onGoToGarage?: () => void;
+  onHelp?: (section: string) => void;
 }
 
 // ─── Image compression helper ─────────────────────────────────────────────────
@@ -374,7 +375,7 @@ function saveToStorage(sessions: ShockSession[]) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function SmasherLoadsView({ activeCarId = null, sessions: sessionsProp, onSave, onGoToGarage }: SmasherLoadsViewProps = {}) {
+export default function SmasherLoadsView({ activeCarId = null, sessions: sessionsProp, onSave, onGoToGarage, onHelp }: SmasherLoadsViewProps = {}) {
   // When lifted state is provided use it; otherwise fall back to localStorage.
   const [localSessions, setLocalSessions] = useState<ShockSession[]>(loadFromStorage);
   const sessions = sessionsProp ?? localSessions;
@@ -544,6 +545,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {onHelp && <button type="button" onClick={() => onHelp('loads')} aria-label="Load Session help" title="Load Session help" className="flex h-12 w-12 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary"><span className="material-symbols-outlined">help</span></button>}
             {displayedSessions.length > 1 && (
               <button
                 onClick={() => setCompareMode(prev => !prev)}

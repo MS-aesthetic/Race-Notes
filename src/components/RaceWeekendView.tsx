@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS, ShockSession } from '../types';
+import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS, ShockSession, AccountingEntry } from '../types';
 import { sortBySize } from '../lib/tireSize';
 import { sortWeekends } from '../lib/scope';
 import { useBackClosable } from '../lib/backStack';
@@ -18,6 +18,8 @@ import { NumericCornerField, formatPsiValue, mergeImportedSetupPressure } from '
 import { isQuickAdjustRunAvailable, type QuickAdjustCommand } from '../lib/quickAdjust';
 import { pickImmediatePriorSetupForCar, setupUsedUniquelyMatchesCar } from '../lib/setupCompat';
 import { isWeekendFinished, lifecycleSetupId } from '../lib/setupLifecycle';
+import { buildWeekendReport, createPdfFile } from '../lib/exportPdf';
+import { shareOrDownloadReport } from '../lib/reportShare';
 
 // ── Data passed up to App's create handlers ([15]) ───────────────────────────
 
@@ -62,6 +64,8 @@ interface RaceWeekendViewProps {
   shockSessions?: ShockSession[];
   onCommitQuickAdjust?: (command: QuickAdjustCommand) => { ok: boolean; error?: string };
   onInfo?: (message: string) => void;
+  onHelp?: (section: string) => void;
+  accounting?: AccountingEntry[];
   /** [15] One-shot: open a creation modal as soon as the tab mounts. */
   initialAction?: 'new-session' | 'new-weekend';
   onInitialActionConsumed?: () => void;
@@ -128,7 +132,7 @@ export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
   onUpdateSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
   activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
-  activeSetup = null, shockSessions = [], onCommitQuickAdjust, onInfo, onFinishWeekend, initialAction, onInitialActionConsumed,
+  activeSetup = null, shockSessions = [], onCommitQuickAdjust, onInfo, onHelp, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -172,6 +176,7 @@ export default function RaceWeekendView({
   const [lapPadOpen, setLapPadOpen] = useState(false);
   const [fourBarOpen, setFourBarOpen] = useState(false);
   const [sessionDiff, setSessionDiff] = useState<{ a: string; b: string } | null>(null);
+  const [sharingWeekendId, setSharingWeekendId] = useState<string | null>(null);
 
   // Android hardware back closes these modals first ([29])
   useBackClosable(wkFormOpen, () => setWkFormOpen(false));
@@ -202,6 +207,20 @@ export default function RaceWeekendView({
     if (!target) return null;
     const prior = pickImmediatePriorSetupForCar(scopedSetups, target);
     return prior ? { a: prior.id, b: target.id } : null;
+  };
+  const handleShareWeekend = async (weekend: RaceWeekend) => {
+    if (sharingWeekendId) return;
+    setSharingWeekendId(weekend.id);
+    try {
+      const result = await shareOrDownloadReport(createPdfFile(buildWeekendReport(weekend, accounting)), `Share ${weekend.name || 'race weekend'}`);
+      if (result.status === 'shared') onInfo?.('Weekend PDF shared.');
+      else if (result.status === 'downloaded') onInfo?.('Weekend PDF downloaded.');
+      else if (result.status === 'failed') onInfo?.(result.error || 'Weekend PDF could not be shared.');
+    } catch (error) {
+      onInfo?.(error instanceof Error ? error.message : 'Weekend PDF could not be created.');
+    } finally {
+      setSharingWeekendId(null);
+    }
   };
 
   // ── Session helpers ──────────────────────────────────────────────────────────
@@ -678,7 +697,7 @@ export default function RaceWeekendView({
         <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-2">
           <span className="material-symbols-outlined text-primary">add_circle</span>
           <h3 className="font-display text-base font-bold uppercase text-on-surface tracking-wide">
-            Start New Logger Session
+            Log a Run
           </h3>
         </div>
 
@@ -693,7 +712,7 @@ export default function RaceWeekendView({
 
           {/* Session type — [11] pre-selected by suggestNextSession, one-tap editable */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Session Type</label>
+            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Run Type</label>
             <div className="grid grid-cols-5 gap-1">
               {SESSION_TYPE_CHIPS.map(({ key, code }) => (
                 <button
@@ -750,7 +769,7 @@ export default function RaceWeekendView({
           {(nsPrefill.pressures || nsPrefill.tires) && (
             <p className="font-mono text-[10px] text-on-surface-variant/50 flex items-center gap-1">
               <span className="material-symbols-outlined text-[13px] text-primary">history</span>
-              Pressures &amp; tires carried over from the last session.
+              Pressures and tires carried over from the last run.
             </p>
           )}
 
@@ -827,7 +846,7 @@ export default function RaceWeekendView({
                 {nsWxStr}
               </div>
             ) : (
-              <p className="font-mono text-[10px] text-on-surface-variant/40 italic">No weather fetched — session will log without it.</p>
+              <p className="font-mono text-[10px] text-on-surface-variant/40 italic">No weather fetched — run will save without it.</p>
             )}
           </div>
 
@@ -941,7 +960,7 @@ export default function RaceWeekendView({
                 </p>
               )}
               <p className="font-mono text-[10px] text-primary uppercase tracking-wider mt-1">
-                {currentWeekend.sessions.length} Session{currentWeekend.sessions.length !== 1 ? 's' : ''} logged
+                {currentWeekend.sessions.length} run{currentWeekend.sessions.length !== 1 ? 's' : ''} logged
               </p>
             </div>
             <button
@@ -1049,7 +1068,7 @@ export default function RaceWeekendView({
           : 'border-primary/50 hover:border-primary hover:bg-primary/10 active:scale-[0.98] text-primary'}`}
       >
         <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
-        New Session
+        Log Run
       </button>
       {activeWeekendMissingSetup && (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-center font-mono text-xs text-on-surface">
@@ -1296,7 +1315,7 @@ export default function RaceWeekendView({
           <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Competition Notes</h3>
           <textarea
             className="w-full bg-[#0e0e0e] border border-outline-variant rounded p-3 text-sm text-on-surface font-mono min-h-[80px]"
-            placeholder="Log general session feedback…"
+            placeholder="What did the driver feel on this run?"
             value={session.competitionNotes || ''}
             onChange={e => onUpdateSession({ ...session, competitionNotes: e.target.value })}
           />
@@ -1371,7 +1390,7 @@ export default function RaceWeekendView({
                         {isWeekendFinished(wk) && <span className="font-mono text-[9px] border border-outline-variant text-on-surface-variant px-1.5 py-0.5 rounded uppercase font-bold">Finished</span>}
                       </div>
                       <span className="font-mono text-[10px] text-on-surface-variant">
-                        {wk.track}{wk.date ? ` · ${wk.date}` : ''} · {wkSessions.length} session{wkSessions.length !== 1 ? 's' : ''}
+                        {wk.track}{wk.date ? ` · ${wk.date}` : ''} · {wkSessions.length} run{wkSessions.length !== 1 ? 's' : ''}
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
@@ -1435,7 +1454,7 @@ export default function RaceWeekendView({
                             {expandedSessionId === sx.id && (
                               <div className="p-3 bg-[#0e0e0e] border-t border-outline-variant/30 text-xs font-mono text-on-surface-variant space-y-2">
                                 <div className="flex justify-between items-center mb-2">
-                                  <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Session Details</span>
+                                  <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Run Details</span>
                                   <div className="flex items-center gap-2">
                                     {!isWeekendFinished(wk) && <button
                                       onClick={(e) => { e.stopPropagation(); onSelectSession(sx, wk.id); }}
@@ -1552,7 +1571,7 @@ export default function RaceWeekendView({
       </BottomSheet>
 
       <BottomSheet open={fourBarOpen} onClose={() => setFourBarOpen(false)} title="Four-bar quick-adjust">
-        <FourBarQuickAdjust setup={activeSetup} compact onFieldChange={handleQuickFourBarChange} />
+        <FourBarQuickAdjust setup={activeSetup} compact onFieldChange={handleQuickFourBarChange} onHelp={onHelp} />
       </BottomSheet>
 
       {sessionDiff && (
@@ -1561,6 +1580,7 @@ export default function RaceWeekendView({
           initialAId={sessionDiff.a}
           initialBId={sessionDiff.b}
           onClose={() => setSessionDiff(null)}
+          onHelp={onHelp}
         />
       )}
 
@@ -1571,6 +1591,15 @@ export default function RaceWeekendView({
       >
         {menuWeekend && (
           <div className="space-y-1 pb-2">
+            <button
+              type="button"
+              disabled={sharingWeekendId === menuWeekend.id}
+              onClick={() => { void handleShareWeekend(menuWeekend); }}
+              className="tap-target-block w-full gap-3 rounded-xl px-3 text-left text-on-surface hover:bg-surface-container-high disabled:opacity-40"
+            >
+              <span className="material-symbols-outlined text-primary">{sharingWeekendId === menuWeekend.id ? 'progress_activity' : 'share'}</span>
+              Share weekend PDF
+            </button>
             <button
               type="button"
               onClick={() => { setMenuWeekendId(null); openWeekendForm(menuWeekend); }}

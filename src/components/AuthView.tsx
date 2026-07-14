@@ -169,7 +169,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
                 </span>
               </div>
               <p className="text-[11px] text-on-surface-variant/70 leading-relaxed">
-                Your setups, session logs, and weekend data sync automatically
+                Your setups, run logs, and weekend data sync automatically
                 across all your devices. Data stays available offline.
               </p>
             </div>

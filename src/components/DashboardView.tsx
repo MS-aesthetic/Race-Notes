@@ -254,7 +254,7 @@ export default function DashboardView({
             <EmptyState
               icon="sports_score"
               title="No race weekends yet"
-              body="Start a weekend and the dashboard lights up — sessions, laps and maintenance all hang off it."
+              body="Start a weekend, then log runs, laps, setup changes, and maintenance."
               cta={{ label: '+ Race Weekend', icon: 'calendar_today', onClick: onStartNewWeekend }}
             />
           </div>
@@ -283,7 +283,7 @@ export default function DashboardView({
                 </div>
                 <div className="text-[11px] font-mono mt-1.5 flex items-center gap-3">
                   <span className="text-on-surface-variant">
-                    {activeWeekend.sessions.length} session{activeWeekend.sessions.length === 1 ? '' : 's'}
+                    {activeWeekend.sessions.length} run{activeWeekend.sessions.length === 1 ? '' : 's'}
                   </span>
                   {awLastLap && (
                     <span className="text-on-surface-variant">
@@ -479,7 +479,7 @@ export default function DashboardView({
       >
         <div className="space-y-3 pb-2">
           <p className="text-sm text-on-surface-variant">
-            Runs live inside a race weekend. Start one and you’ll go straight into your first session.
+            Runs live inside a race weekend. Start one and you’ll go straight into your first run.
           </p>
           {visibleWeekends.length > 0 ? (
             <button

@@ -18,6 +18,7 @@ interface FourBarQuickAdjustProps {
   ) => void;
   compact?: boolean;
   disabledReason?: string;
+  onHelp?: (section: string) => void;
 }
 
 interface FieldSpec {
@@ -106,13 +107,16 @@ function BarSection({ corner, data, bar, onFieldChange }: {
   );
 }
 
-export default function FourBarQuickAdjust({ setup, onFieldChange, compact = false, disabledReason }: FourBarQuickAdjustProps) {
+export default function FourBarQuickAdjust({ setup, onFieldChange, compact = false, disabledReason, onHelp }: FourBarQuickAdjustProps) {
   if (!setup) {
     return <div className="rounded-xl border border-dashed border-outline-variant bg-surface-container p-4 font-mono text-sm text-on-surface-variant">{disabledReason ?? 'Select a setup for this car to adjust four-bar.'}</div>;
   }
   return (
     <div className={compact ? 'space-y-4' : 'space-y-4 rounded-xl border-2 border-primary/60 bg-surface-container-high p-4'}>
-      {!compact && <div><h3 className="font-display text-lg font-bold uppercase tracking-wide text-on-surface">FOUR-BAR / BIRDCAGE</h3><p className="font-mono text-xs text-on-surface-variant">Both rear corners. Top and bottom bars. Change one item, then log result.</p></div>}
+      <div className={`flex items-start gap-3 ${compact ? 'justify-end' : 'justify-between'}`}>
+        {!compact && <div><h3 className="font-display text-lg font-bold uppercase tracking-wide text-on-surface">FOUR-BAR / BIRDCAGE</h3><p className="font-mono text-xs text-on-surface-variant">Both rear corners. Top and bottom bars. Change one item, then log result.</p></div>}
+        {onHelp && <button type="button" onClick={() => onHelp('four-bar')} aria-label="Four-bar help" title="What do these four-bar numbers mean?" className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary"><span className="material-symbols-outlined">help</span></button>}
+      </div>
       {(['lr', 'rr'] as const).map(corner => (
         <section key={corner} className="space-y-3 rounded-xl border border-outline-variant bg-surface-container-low p-3">
           <h4 className="font-display text-base font-bold uppercase text-primary">{corner === 'lr' ? 'Left Rear' : 'Right Rear'}</h4>
