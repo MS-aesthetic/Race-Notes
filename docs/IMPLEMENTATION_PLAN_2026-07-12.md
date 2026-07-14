@@ -1,6 +1,6 @@
 ﻿# IMPLEMENTATION PLAN
 
-> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunk 1 `e04b15c` ✅ · Chunk 2 `306445d` ✅ · Chunk 3 `c68f27d` ✅ · Chunk 4 `21405e9` ✅ · urgent UX-R1 regression repair `b6d702e` ✅ · Chunk 5 `d5ef1f4` ✅ · Chunk 6A implementation QA-ready (commit/SOL adjudication pending) · 6B-9 pending. C6A delivers exact blank defaults, complete setup-bottom four-bar layout, tire summary, Load Session ride height, two-size Style UI, and plain tuning-priority help. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; real SOL → Terra → SOL handoff ran in one persistent task. `/caveman full`. Status + backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
+> **PROGRESS (2026-07-13) — branch `preview-v3`:** Chunk 1 `e04b15c` ✅ · Chunk 2 `306445d` ✅ · Chunk 3 `c68f27d` ✅ · Chunk 4 `21405e9` ✅ · urgent UX-R1 regression repair `b6d702e` ✅ · Chunk 5 `d5ef1f4` ✅ · Chunk 6A `ae9395b` ✅ SOL QA PASS · 6B-9 pending. C6A delivers exact blank defaults, complete setup-bottom four-bar layout, tire summary, Load Session ride height, two-size Style UI, and plain tuning-priority help. Current routing: GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High builds; real SOL → Terra → SOL handoff ran in one persistent task. `/caveman full`. Status + backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
 **CREW CHIEF â€” UX overhaul, all 37 recommendations (owner-adjusted)**
 
 **Sequencing philosophy.** Three rules drive the ordering:

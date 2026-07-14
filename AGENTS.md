@@ -9,7 +9,7 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 >
 > **🧭 NEW AGENT? START WITH [`HANDOFF.md`](./HANDOFF.md)** — consolidated onboarding: current status, session history, worktree/branch gotchas, build/deploy procedures, and the Ralph-loop workflow.
 >
-> **🎨 UX OVERHAUL in progress on branch `preview-v3`** (4 of 7 chunks plus urgent UX-R1 repair done; Chunk 5 next). Current routing: **GPT 5.6 SOL High plans and QAs; GPT 5.6 Terra High builds; `/caveman full`** for status. Plan: [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md); audit: [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md); status/backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
+> **🎨 UX OVERHAUL in progress on branch `preview-v3`** (Chunks 1–6A plus urgent UX-R1 complete; Chunk 6B next). Current routing: **GPT 5.6 SOL High plans and QAs; GPT 5.6 Terra High builds; `/caveman full`** for status. Plan: [`docs/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/IMPLEMENTATION_PLAN_2026-07-12.md); audit: [`docs/UX_ANALYSIS_2026-07-12.md`](./docs/UX_ANALYSIS_2026-07-12.md); status/backlog: `HANDOFF.md` UX section + `ralph/STATE.md`.
 >
 > This file is current workflow authority. For v2 status trust
 > [`plan-v2.md`](./plan-v2.md), [`ralph/STATE.md`](./ralph/STATE.md), and

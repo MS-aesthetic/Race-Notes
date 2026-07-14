@@ -1172,12 +1172,13 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   Default and `xxlarge` to Large without changing the storage key/type union.
 - Tuning Guide uses basic dirt-oval language, no AFCO/package-specific claims,
   and explains High/Medium/Low in direct try-first/try-next/fine-tune terms.
-- Verification: three focused harnesses PASS; cavecrew second review has zero
-  blockers; lint remains exactly three known baseline errors; Vite build PASS.
+- Feature commit `ae9395b`. SOL QA PASS using verified `gpt-5.6-sol` high runtime
+  metadata. Three focused harnesses PASS; cavecrew review has zero code findings;
+  lint remains exactly three known baseline errors; Vite build PASS.
   Local mobile runtime at 390×844 passed light/dark contrast, setup defaults,
   four-bar order, Load Session create/edit/reload, and graph direction.
 - Netlify draft: `https://6a558ea45dc5716d3bed026a--crew-chief-race-notes.netlify.app`.
-  Production remains unchanged.
+  Auth gate and console PASS. Production remains unchanged.
 - C6B is intentionally separate: immutable Baseline → editable Weekend Setup →
   immutable Final → editable Current Setup. Finish Weekend will always be
   available at the page bottom, including test days with zero sessions.

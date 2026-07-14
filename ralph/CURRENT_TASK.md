@@ -1,6 +1,6 @@
 # Current Task — UX Chunk 6A: Setup / Measurement Refinement
 
-**Status:** BUILD COMPLETE — CODE_PASS + RUNTIME_PASS — SOL QA NEXT
+**Status:** COMPLETE — SOL QA PASS
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 
@@ -84,6 +84,19 @@
   12 in/100 lb vs 10 in/200 lb, the 10 in point rendered lower (`cy 176 > 18`).
 - Netlify draft: `https://6a558ea45dc5716d3bed026a--crew-chief-race-notes.netlify.app`.
   Production unchanged. C6B remains unimplemented by design.
+
+## SOL QA adjudication — 2026-07-13
+
+- Feature commit: `ae9395b`.
+- Runtime metadata: `gpt-5.6-sol`, reasoning effort `high`, same persistent task.
+- Independent cavecrew commit review: zero code findings; stale status text only.
+- Three focused harnesses PASS. Type-check remains exactly three documented
+  pre-existing errors. Vite/Workbox build PASS; clean working tree before docs.
+- Netlify draft auth gate PASS with zero console errors. Prior authenticated local
+  mobile fixture evidence accepted for full C6A screens.
+- Supabase migration history contains `20260714010630`; live
+  `public.shock_sessions.ride_height_ctoc` is nullable `text` with empty default.
+- Verdict: PASS. C6A closed. C6B is next and remains untouched.
 
 ## Out of scope until later chunks
 
