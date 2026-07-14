@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-13 (UX Chunk 6A — setup/measurement refinement)
+> Last updated: 2026-07-13 (UX Chunk 6B — setup weekend lifecycle Terra build)
 > Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1182,3 +1182,29 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
 - C6B is intentionally separate: immutable Baseline → editable Weekend Setup →
   immutable Final → editable Current Setup. Finish Weekend will always be
   available at the page bottom, including test days with zero sessions.
+
+---
+
+## 26. UX Chunk 6B — Setup Weekend Lifecycle (2026-07-13)
+
+- `src/lib/setupLifecycle.ts` is the lifecycle authority: start, finish, lock checks,
+  setup diff history, finished-event checks, and timestamp-aware local/cloud merge.
+- New weekends clone a same-car source into distinct `setup-baseline-{weekendId}` and
+  `setup-weekend-{weekendId}` rows. `RaceWeekend.setupId` remains the Baseline alias;
+  `activeSetupId` owns every event edit and run setup lookup.
+- Baseline, Final, and completed Weekend Setup are immutable in UI and at the
+  `App.tsx` save boundary. Clone remains allowed and produces editable Current.
+- Finish is local-first and permits zero sessions. It creates `setup-final-*`, locks
+  Weekend Setup, marks the weekend finished, clears active weekend/run, creates
+  `setup-current-*` from Final, and selects Current. Finished weekends remain history
+  and are excluded from automatic selection/context.
+- Setup and weekend sync now use explicit row mappers and `updatedAt`. Toe, J-Bar,
+  J-Bar frame/pinion, lifecycle IDs/status, version labels, locks, and change logs all
+  round-trip. ActiveSession also carries `updatedAt` to protect an offline finish.
+- Migration `20260714020037_setup_weekend_lifecycle.sql` is additive and was applied
+  to project `swblfeayxoprodhwxqak`; live information schema and migration history
+  verified. Existing RLS/advisor findings were unchanged by this column-only migration.
+- Terra feature commit `2a941d3`. Harness, cavecrew, exact lint baseline, build, 390 px
+  zero-run runtime, dark/light, and draft shell passed. Draft:
+  `https://6a5599e37111d0563ffaf5f3--crew-chief-race-notes.netlify.app`.
+  Awaiting SOL High independent QA before C7.

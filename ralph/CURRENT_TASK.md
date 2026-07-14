@@ -1,6 +1,6 @@
 # Current Task — UX Chunks 6B–9 Completion Run
 
-**Status:** IN PROGRESS — SOL PLAN COMPLETE; C6B READY FOR TERRA
+**Status:** IN PROGRESS — C6B TERRA BUILD COMPLETE (`2a941d3`); SOL QA NEXT
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Model route:** GPT 5.6 SOL High plan/QA; GPT 5.6 Terra High build.
 **Communication/delegation:** `/caveman full`; cavecrew investigators/reviewers.
@@ -66,6 +66,23 @@
 - Finished weekends excluded from active pickers; history still viewable.
 - Exact three-error lint baseline; build PASS; cavecrew diff review; focused mobile
   light/dark Default/Large runtime; authenticated cloud round trip; Netlify draft.
+
+### C6B Terra result — 2026-07-13
+
+- Feature commit `2a941d3`; cavecrew review PASS after fixing both cross-car
+  `activeSetupId` ownership paths.
+- Pure lifecycle harness PASS. Lint remains the exact three known errors. Vite build
+  PASS (540 modules, 16 Workbox entries). `git diff --check` PASS.
+- Additive migration `20260714020037_setup_weekend_lifecycle.sql` applied to and
+  verified on Supabase project `swblfeayxoprodhwxqak`; all 25 expected columns and
+  migration history are present. Existing advisor warnings were not broadened.
+- Local 390 px runtime PASS: start from exact blank, immutable Baseline, editable
+  Weekend Setup/change log, page-bottom Finish with zero runs, finished history,
+  immutable Final and Weekend snapshots, editable selected Current, dark/light.
+- Draft `https://6a5599e37111d0563ffaf5f3--crew-chief-race-notes.netlify.app` loads
+  cleanly. Its unique origin had no remembered account, so authenticated draft data
+  entry was not performed; SOL must adjudicate cloud evidence independently.
+- Production, `master`, remote branch, and release APK unchanged. C7 not started.
 
 ## Chunk 7 — expanded Quick Adjust
 
