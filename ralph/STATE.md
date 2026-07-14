@@ -94,7 +94,7 @@ Separate track from WS-N…Z. Chunks 1–9 are historical and archived under `do
 
 | UXF | Scope | Status | Attempts | Score | Commit | Notes |
 |---|---|---|---|---|---|---|
-| UXF-1 | Duplicate Other + shared active-checklist projection | in_progress | 1 | — | 94d1e79 | Terra CODE_PASS: single category source, shared active projection, focused harness, exact lint baseline, build, diff, and cavecrew review pass. Awaiting SOL QA. |
+| UXF-1 | Duplicate Other + shared active-checklist projection | complete | 0 | 97 | 94d1e79 | SOL QA PASS: single Other, shared pure active projection across ToDo/Dashboard, persistence-safe harness, exact lint baseline, build, diff, and cavecrew gates clean. |
 | UXF-2 | Quick Adjust net-outcome coalescing | pending | 0 | — | — | Run-scoped coalescing; no per-tap audit trail. |
 | UXF-3 | Starting / Live-Trackside / Raced-or-Finished setup labels | pending | 0 | — | — | Display-label change only; lifecycle mechanics stay intact. |
 | UXF-4 | Load graph travel axis + measured-height display | pending | 0 | — | — | Display-layer change; stored points unchanged. |
@@ -105,6 +105,7 @@ Separate track from WS-N…Z. Chunks 1–9 are historical and archived under `do
 | UXF-9 | Batch regression, draft, and owner acceptance | pending | 0 | — | — | Last; absorbs remaining WS-Z runtime checks. |
 
 ### UX chunk grade log
+- 2026-07-14 · UXF-1 · SOL High QA attempt 1 · PASS · 97 · Single Maintenance `Other`; pure shared active projection drives ToDo and Dashboard open/mine/count; removed unfinished core stays excluded after JSON round trip. Chunk8 harness, exact three-error lint baseline, 554-module/18-entry build, diff, scope, clean tree, and cavecrew review pass. No schema/package/native/deploy change.
 - 2026-07-14 · UXF-8 · SOL High QA attempt 3 · PASS · 96 · Native and GitHub agent roles agree on one Terra pass then first-failure SOL takeover; cold v3/SPRINT_INDEX route, archived paths/content, PROJECT authority, HANDOFF status, migration state, nine-row UXF table, current links, scope, diff check, and clean tree pass. Cavecrew: no issues. Documentation-only; lint/build not required. UXF-8 closed; UXF-1 unlocked.
 - 2026-07-14 · UXF-8 · SOL High QA attempt 2 · FAIL · 88 · Four active GitHub roles, archived source path, PROJECT authority, HANDOFF live row, archive preservation, links, migration state, UXF table, scope, diff, and clean tree pass. Cavecrew found one remaining active native-agent mismatch: `.codex/agents/ws-fixer.toml:2` still says takeover after three failed reviews. Route to SOL fixer attempt 3.
 - 2026-07-14 · UXF-8 · SOL High QA attempt 1 · FAIL · 82 · Archive moves, current Markdown links, migration state, UXF table, diff check, and no-source-change gate pass. Active `.github/agents` role files still route to retired `plan-v2.md`/`preview-v2`; fixer description still says third failure; active plan source path, PROJECT conflict rule, and live HANDOFF status are stale. First-failure policy routes repair to SOL fixer.

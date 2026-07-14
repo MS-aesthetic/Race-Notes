@@ -1,6 +1,6 @@
 # Current Task — UXF-1 Duplicate Other + Shared Active Checklist Projection
 
-**Status:** CODE_PASS — Terra initial build attempt 1; awaiting independent SOL QA
+**Status:** COMPLETE — SOL QA attempt 1 PASS
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-8 closed by SOL QA attempt 3 at `780e4dd`
@@ -59,3 +59,7 @@ Terra owns this one initial build pass. Commit feature and durable handoff evide
 - `npm run build`: PASS, 554 modules and 18 PWA precache entries.
 - `git diff --check`: PASS. Cavecrew investigator found no additional duplicate; reviewer: `No issues.`
 - No schema, storage shape, package, native, deploy, push, merge, or APK change.
+
+## QA verdict
+
+**PASS — 97.** Feature diff matches UXF-1 exactly. Category mapping renders `Other` once; shared selector is pure and preserves order/object references; ToDo behavior stays equivalent; Dashboard open/mine/count use same active projection; JSON round trip, focused harness, exact three-error lint baseline, 554-module/18-entry build, diff check, clean tree, and cavecrew review pass. UXF-1 closed.
