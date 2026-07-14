@@ -15,6 +15,7 @@ import CollapsibleSection from './ui/CollapsibleSection';
 import EmptyState from './ui/EmptyState';
 import UndoToast, { InfoToast } from './ui/UndoToast';
 import GetRaceReadyCard from './GetRaceReadyCard';
+import { localDateValue } from '../lib/accountingDefaults';
 
 interface DashboardViewProps {
   weekends: RaceWeekend[];
@@ -120,7 +121,7 @@ export default function DashboardView({
   const [svcOpen, setSvcOpen] = useState(false);
   const [svcNotes, setSvcNotes] = useState('');
   const [svcCost, setSvcCost] = useState('');
-  const [svcDate, setSvcDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [svcDate, setSvcDate] = useState(() => localDateValue());
   const [svcComponentId, setSvcComponentId] = useState('');
   const [svcToast, setSvcToast] = useState<QuickServiceOutcome | null>(null);
   const selectedServiceComponent = visibleMaintenance.find(c => c.id === svcComponentId) ?? worst?.component ?? null;
@@ -138,7 +139,7 @@ export default function DashboardView({
     setSvcComponentId(worst?.component.id ?? visibleMaintenance[0]?.id ?? '');
     setSvcNotes('');
     setSvcCost('');
-    setSvcDate(new Date().toISOString().slice(0, 10));
+    setSvcDate(localDateValue());
     setSvcOpen(true);
   };
 

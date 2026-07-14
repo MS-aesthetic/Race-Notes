@@ -10,7 +10,7 @@ import {
 } from '../src/lib/checklistMaintenance';
 import { activeChecklistItems } from '../src/lib/mainChecklist';
 import { lastAccountingCategory, localDateValue, recentAccountingRepeats } from '../src/lib/accountingDefaults';
-import { applyServiceLog, DEFAULT_COMPONENTS, getComponentStatus, normalizeStartingUsage } from '../src/lib/maintenance';
+import { applyServiceLog, calendarDaysSince, DEFAULT_COMPONENTS, getComponentStatus, normalizeStartingUsage } from '../src/lib/maintenance';
 import { maintenanceComponentFromCloudRow, maintenanceComponentToCloudRow } from '../src/lib/maintenanceSync';
 import { buildQuickServiceRecords } from '../src/lib/serviceLog';
 import { MAINTENANCE_CATEGORIES, type AccountingEntry, type MaintenanceComponent, type MaintenanceLog, type RaceWeekend, type Setup, type Todo, type TodoItem } from '../src/types';
@@ -110,6 +110,15 @@ const nextDayTwoFeatures = weekend('next-day', 'Jul 2, 2026', setupA.id, [
 ]);
 assert.equal(getComponentStatus(derivedComponent(), [], [setupA]).used, 10);
 assert.equal(getComponentStatus(derivedComponent(), [sameDay, nextDayTwoFeatures], [setupA]).used, 11);
+const isoSameDay = weekend('iso-same-day', '2026-07-01', setupA.id, [featureSession('Feature')]);
+const isoNextDay = weekend('iso-next-day', '2026-07-02', setupA.id, [featureSession('Feature')]);
+assert.equal(getComponentStatus(derivedComponent(), [isoSameDay], [setupA]).used, 10);
+assert.equal(getComponentStatus(derivedComponent(), [isoNextDay], [setupA]).used, 11);
+
+assert.equal(calendarDaysSince('2026-07-01', new Date(2026, 6, 1, 23, 59)), 0);
+assert.equal(calendarDaysSince('2026-07-01', new Date(2026, 6, 2, 0, 1)), 1);
+assert.equal(calendarDaysSince('2026-03-07', new Date(2026, 2, 8, 23, 0)), 1);
+assert.equal(calendarDaysSince('2026-10-31', new Date(2026, 10, 1, 1, 0)), 1);
 
 for (const legacyFeatureName of ['Feature 1', 'Feat. 1', 'A-MAIN']) {
   const inferred = weekend(`inferred-${legacyFeatureName}`, 'Jul 2, 2026', setupA.id, [featureSession(legacyFeatureName)]);
@@ -201,6 +210,10 @@ assert.match(trackersSource, /<option value="races">Races<\/option>/);
 assert.match(trackersSource, /<option value="days">Days<\/option>/);
 assert.match(trackersSource, /Races already run/);
 assert.match(trackersSource, /Days already in service/);
+assert.match(trackersSource, /setLogDate\(localDateValue\(\)\)/);
+assert.match(dashboardSource, /useState\(\(\) => localDateValue\(\)\)/);
+assert.match(dashboardSource, /setSvcDate\(localDateValue\(\)\)/);
+assert.doesNotMatch(dashboardSource, /setSvcDate\(new Date\(\)\.toISOString\(\)\.slice\(0, 10\)\)/);
 assert.doesNotMatch(trackersSource, /<option value="laps">|<option value="sessions">|Feature races/);
 assert.doesNotMatch(maintenanceSource, /intervalType: 'laps'|intervalType: 'sessions'/);
 assert.doesNotMatch(serviceLogSource, /night|nights/);

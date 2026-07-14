@@ -29,12 +29,28 @@ export const DEFAULT_COMPONENTS: Array<
 ];
 
 const calendarDay = (date: Date): number =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
+
+const parseLocalDateOnly = (raw: string): Date | null => {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!dateOnly) return null;
+  const parsed = new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
 
 const parseServiceDate = (raw: string): Date => {
-  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
-  if (dateOnly) return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  const dateOnly = parseLocalDateOnly(raw);
+  if (dateOnly) return dateOnly;
   return new Date(raw);
+};
+
+const parseRaceWeekendDate = (raw: string): Date | null =>
+  parseLocalDateOnly(raw) ?? parseWeekendDate(raw);
+
+export const calendarDaysSince = (sinceRaw: string, now = new Date()): number => {
+  const since = parseServiceDate(sinceRaw);
+  if (Number.isNaN(since.getTime()) || Number.isNaN(now.getTime())) return 0;
+  return Math.max(0, calendarDay(now) - calendarDay(since));
 };
 
 /** Count each Feature weekend once, strictly after the service calendar day. */
@@ -48,7 +64,7 @@ function racesSince(
   if (Number.isNaN(since.getTime())) return 0;
   const sinceDay = calendarDay(since);
   return weekends.filter(w => {
-    const weekendDate = parseWeekendDate(w.date);
+    const weekendDate = parseRaceWeekendDate(w.date);
     if (!weekendDate || calendarDay(weekendDate) <= sinceDay) return false;
     if (carId) {
       const boundSetup = w.setupId ? savedSetups.find(s => s.id === w.setupId) : undefined;
@@ -84,7 +100,7 @@ export function getComponentStatus(
   if (typeof manualUnits === 'number') {
     used = manualUnits;
   } else if (intervalType === 'days') {
-    used = startingUsage + Math.floor((Date.now() - new Date(lastServicedAt).getTime()) / 86_400_000);
+    used = startingUsage + calendarDaysSince(lastServicedAt);
   } else {
     used = startingUsage + racesSince(
       weekends,

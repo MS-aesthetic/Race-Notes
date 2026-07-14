@@ -461,7 +461,7 @@ function ServiceTab({
   };
 
   const openLogModal = (c: MaintenanceComponent) => {
-    setLogDate(new Date().toISOString().slice(0, 10));
+    setLogDate(localDateValue());
     setLogType('service'); setLogNotes(''); setLogCost('');
     setLogModalComp(c);
   };
