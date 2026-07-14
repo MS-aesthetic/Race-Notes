@@ -1,6 +1,6 @@
 # Current Task — UXF-4 Load Graph Travel Axis
 
-**Status:** QA FAIL attempt 1 (88) — SOL fixer attempt 2 required; Terra retired for UXF-4
+**Status:** CODE_PASS — SOL fixer attempt 2 complete at `12d932f`; independent SOL QA attempt 2 required
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-3 closed by SOL QA at `04f1351`; feature `72ea4f8`
@@ -87,3 +87,12 @@ Passing: travel/common-zero/equal-height math; upward seeded SVG render; axis/fi
 2. Extend chunk6a harness to require both chart paths to include the larger hit target and visible focus handling/ring. Regress every passing assertion.
 
 Routing: first QA failure transfers implementation to SOL High fixer. Terra is not re-invoked.
+
+## SOL fixer attempt 2 evidence — 2026-07-14
+
+- Repair commit: `12d932f`.
+- Both chart point controls retain visible radius 4 but add transparent radius-12 pointer targets. Enter/Space/click selection and accessible names remain.
+- `onFocus`/`onBlur` drive explicit white radius-7 SVG focus rings in single and comparison charts; browser outline is not the only focus signal.
+- Component-scoped harness slices independently require hit target, focus ring, and focus/blur handlers in each chart path.
+- Full chunk6a harness PASS; exact three-error lint baseline; 554-module/18-entry build; diff check and byte-unchanged data boundaries pass.
+- Cavecrew first found global-only harness coverage; after scoped repair, re-review returned `No issues.`
