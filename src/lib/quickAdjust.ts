@@ -274,18 +274,12 @@ export function applyQuickAdjust(
       : existingChange.id;
     const adjustmentId = `${baseId}-run`;
     const matchingAdjustmentIndex = adjustments.findIndex(entry => entry.id === adjustmentId);
-    const existingAdjustment = matchingAdjustmentIndex >= 0 ? adjustments[matchingAdjustmentIndex] : undefined;
+    if (matchingAdjustmentIndex < 0) {
+      return { ok: false, error: 'Matching run adjustment history is missing. Reload this run before saving another change.' };
+    }
+    const existingAdjustment = adjustments[matchingAdjustmentIndex];
     const adjustment: SetupAdjustment = {
-      ...(existingAdjustment || {
-        id: adjustmentId,
-        icon: details.icon,
-        label: existingChange.label,
-        value: '',
-        corner: existingChange.corner,
-        field: existingChange.field,
-        sessionId: runId,
-        runId,
-      }),
+      ...existingAdjustment,
       timestamp: now,
       before: originalBefore,
       after: details.after,
@@ -301,9 +295,7 @@ export function applyQuickAdjust(
       },
       session: {
         ...session,
-        adjustments: matchingAdjustmentIndex >= 0
-          ? adjustments.map((entry, index) => index === matchingAdjustmentIndex ? adjustment : entry)
-          : adjustments,
+        adjustments: adjustments.map((entry, index) => index === matchingAdjustmentIndex ? adjustment : entry),
         updatedAt: now,
       },
       change,

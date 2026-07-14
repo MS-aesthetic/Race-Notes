@@ -146,6 +146,23 @@ const distinctFieldBase = makeBlankSetup({
   carId: 'car-a', lifecycleRole: 'weekend', weekendId: 'w1', changeLog: [],
 });
 const distinctFieldSession = { ...session, adjustments: [] };
+const orphanSetup = {
+  ...distinctFieldBase,
+  gear: '6.20',
+  changeLog: [{
+    id: 'orphan-setup', timestamp: now, label: 'Gear', field: 'gear',
+    before: '6.00', after: '6.20', sessionId: 'run-1', runId: 'run-1',
+  }],
+};
+const orphanSession = { ...distinctFieldSession, adjustments: [] };
+const orphanSetupBefore = JSON.stringify(orphanSetup);
+const orphanSessionBefore = JSON.stringify(orphanSession);
+const orphanResult = applyQuickAdjust(orphanSetup, orphanSession, { kind: 'gear', value: '6.30' }, [weekend], now, 'orphan-next');
+assert.equal(orphanResult.ok, false);
+if (orphanResult.ok === false) assert.match(orphanResult.error, /Matching run adjustment history is missing/);
+assert.equal(JSON.stringify(orphanSetup), orphanSetupBefore);
+assert.equal(JSON.stringify(orphanSession), orphanSessionBefore);
+
 const distinctGear = expectSuccess(applyQuickAdjust(distinctFieldBase, distinctFieldSession, { kind: 'gear', value: '6.20' }, [weekend], now, 'distinct-gear'));
 const distinctRounds = expectSuccess(applyQuickAdjust(distinctGear.setup, distinctGear.session, { kind: 'spring-rounds', corner: 'lf', delta: 0.5 }, [weekend], now, 'distinct-rounds'));
 assert.equal(distinctRounds.setup.changeLog?.length, 2);
