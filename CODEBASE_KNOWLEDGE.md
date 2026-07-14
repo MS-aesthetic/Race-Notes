@@ -1447,3 +1447,22 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   `localDateValue()` when normal or quick service opens. Fixtures pass in Eastern, Pacific,
   and UTC. Final cavecrew review found no issues; UXF-6 is closed and UXF-7 proposal analysis
   is unlocked.
+
+## 32. UXF-7 — Main Checklist Redesign Proposal (2026-07-14)
+
+- Proposal-only work lives at `docs/MAIN_CHECKLIST_REDESIGN_PROPOSAL.md`; no application
+  source or schema changed. Maxx approval/redline gates UXF-10.
+- Current Main Checklist is one canonical `Todo`; Trackers and Dashboard share
+  `activeChecklistItems()`. Four effective item classes exist: manual ad-hoc, legacy/core,
+  saved-list/template, and automatic maintenance. Current close/reset behavior differs by
+  class and completed evidence is preserved only consistently for maintenance.
+- Proposal recommends active-first layout, one Manage sheet, one-tap completion with Undo,
+  since-last-reset completed summary plus archived History, explicit bulk-clear semantics,
+  carry-only-unfinished preference, idempotent saved-list import, same-weekend automatic-job
+  suppression, and a count-only Dashboard launcher.
+- Data recommendation adds only optional `TodoItem.archivedAt` inside existing Todo JSONB.
+  Existing source IDs/cycles drive recurrence. No new table, SQL migration, or separate
+  WeekendChecklist system.
+- Proposed UXF-10 harness replaces current evidence-erasing reset expectations with archive,
+  exact-one recurring occurrence, tombstone suppression, clear-list, duplicate-import,
+  Dashboard projection, action-target, and local/cloud JSON round-trip fixtures.

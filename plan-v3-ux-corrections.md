@@ -557,6 +557,14 @@ Maxx can approve/redline it in one sitting.
 **Human prerequisites:** none to start (analysis is unblocked); a Maxx design
 session is required to *close* it and to spawn the build WS.
 
+**Proposal status (2026-07-14): AWAITING OWNER REVIEW.** SOL drafted
+`docs/MAIN_CHECKLIST_REDESIGN_PROPOSAL.md` with 74 valid current-source references. It
+covers all owner analysis bullets and recommends active-first UI, Manage sheet, one-tap
+completion/Undo, preserved History, predictable clear/reset and automatic-maintenance
+suppression, idempotent saved lists, compact Dashboard, one optional Todo-item JSON field,
+no SQL, and an exact UXF-10 build/harness cut. No application code changed. Maxx approval
+or redline is required before UXF-7 closes or UXF-10 is added.
+
 ---
 
 ## UXF-8 — Docs & loop-state hygiene *(do first)*
