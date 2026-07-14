@@ -1,6 +1,6 @@
 # Current Task — UXF-3 Setup Lifecycle Display Labels
 
-**Status:** CODE_PASS — Terra initial build attempt 1 complete at `72ea4f8`; independent SOL QA required
+**Status:** COMPLETE — SOL High QA attempt 1 PASS (97)
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
 **Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md`
 **Prerequisite:** UXF-2 closed by SOL QA at `0c55e7f`
@@ -66,3 +66,12 @@ Terra owns one initial build pass. Primary owns cross-cutting build; cavecrew ha
 - `npm run build`: PASS, 554 modules and 18 PWA entries.
 - `git diff --check`: PASS. Old-role source sweep: only display-mapping literals/comments remain.
 - Cavecrew review required two bounded display repairs, then returned `No issues.`
+
+## SOL QA attempt 1 — PASS (97) — 2026-07-14
+
+- Independently inspected full feature and handoff range. Lifecycle mechanics, locks, ownership, finish/idempotency recovery, timestamp merge, sync mapping, and persisted role shapes remain unchanged.
+- Starting, Live-Trackside, Current, Raced, and Finished label rules pass for current and legacy Feature records (`sessionType`, `Feature`, `Feat. 1`, `A-MAIN`). Missing/no-Feature weekend safely uses Finished.
+- Legacy version labels, pressure notes, and session fallback wording map only at display/export boundaries. Object JSON and setup cloud-row parity assertions pass.
+- Old visible lifecycle phrase sweep returns no matches outside mapping literals/comments.
+- Full chunk6b harness PASS; exact three-error lint baseline; production build PASS (554 modules, 18 PWA entries); feature-range diff check and clean worktree PASS.
+- Independent cavecrew reviewer: `No issues.` No schema, migration, package, native, deploy, push, merge, or APK change.
