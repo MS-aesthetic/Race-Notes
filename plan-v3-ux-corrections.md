@@ -611,15 +611,20 @@ independent QA after Terra's one initial build pass. Any QA failure transfers fi
 
 **Human prerequisites:** cleared by Maxx approval on 2026-07-14.
 
-**Implementation status (2026-07-14): CODE_PASS / awaiting SOL QA.** Terra feature `3b40a1e`
-implements the approved one-list lifecycle and active-first UI with no SQL. Focused lifecycle,
-maintenance, import, completion/Undo, Dashboard, and Todo cloud-row fixtures pass; lint remains
-the exact known three-error baseline; the 557-module/18-entry build, diff, cavecrew re-review,
-Android signed-in runtime, and draft `6a56c2018589bea4d591667d` pass. Required bridge scope was
+**Implementation status (2026-07-14): COMPLETE — SOL QA attempt 2 PASS.** Terra feature
+`3b40a1e` implements the approved one-list lifecycle and active-first UI with no SQL. SOL repair
+`075be90` closes two independent-review edges: reset preserves a current visible recurrence over
+a hidden duplicate, and nested keyboard controls cannot trigger row completion. Focused
+lifecycle, maintenance, import, completion/Undo, Dashboard, cloud-row, and both repair fixtures
+pass; lint remains the exact known three-error baseline; the 557-module/18-entry build, diff,
+clean tree, and cavecrew re-review pass. Android signed-in runtime and the feature draft
+`6a56c2018589bea4d591667d` passed their available checks; the draft predates the narrow repair,
+which was adjudicated by source/harness/lint/build/diff/review. Required bridge scope was
 slightly broader than the initial file matrix: `App.tsx` supplies new-weekend maintenance
 eligibility, `TrackersView.tsx` supplies the same context to manual reset, and `sync.ts` calls a
 new pure byte-equivalent `todoSync.ts` mapper so JSONB round-trip is executable in the harness.
-No new store, mapper column, schema, package, or native configuration was introduced.
+No new store, mapper column, schema, package, or native configuration was introduced. UXF-9 is
+now the active final batch gate.
 
 ---
 
@@ -691,6 +696,11 @@ fixes; rewriting CODEBASE_KNOWLEDGE body; any src change.
 
 **Acceptance criteria:** all of the above green + Maxx sign-off logged.
 **Human prerequisites:** Maxx walkthrough availability.
+
+**Planning status (2026-07-14): READY.** `ralph/CURRENT_TASK.md` now names every current
+harness, exact repository/data/runtime/display gates, one-final-draft policy, WS-Z absorption,
+and the ten-item Maxx walkthrough. No UXF-9 application implementation has started. Technical
+PASS must wait at **AWAITING OWNER ACCEPTANCE** until Maxx signs off.
 
 ---
 

@@ -1,197 +1,128 @@
-# Current Task — UXF-10 Approved Main Checklist Redesign
+# Current Task — UXF-9 Final Batch QA and Owner Acceptance
 
-**Status:** SOL FIXER — QA ATTEMPT 1 FAILED
+**Status:** READY — SOL TECHNICAL GATE
 **Branch/worktree:** `preview-v3` · `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`
-**Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md` → UXF-10
-**Approved design:** `docs/MAIN_CHECKLIST_REDESIGN_PROPOSAL.md`
-**Prerequisite:** Maxx approved UXF-7 as written on 2026-07-14; proposal commit `b1855a6`
+**Sprint authority:** `SPRINT_INDEX.md` → Sprint 1 `plan-v3-ux-corrections.md` → UXF-9
+**Prerequisites:** UXF-1…8 and UXF-10 complete. UXF-10 feature `3b40a1e`, SOL repair
+`075be90`, and QA attempt 2 PASS on 2026-07-14.
 
-## Owner decision
+## Goal
 
-Implement the UXF-7 proposal as written. Preserve one canonical Main Checklist. Do not revive
-the separate `WeekendChecklist` model and do not create a new table.
+Run one final whole-batch technical and runtime gate, publish one final Netlify draft, then
+walk Maxx through the ten UX corrections. Technical PASS does not close UXF-9. Only Maxx's
+item-by-item product acceptance closes Sprint 1 and unlocks Sprint 2.
 
-## Required behavior
+## Execution owner and repair routing
 
-### 1. Pure lifecycle model
+1. GPT 5.6 SOL High owns the UXF-9 technical gate and acceptance record.
+2. Do not start a feature build. If a regression is found, record the exact failed acceptance
+   item, make the smallest SOL-fixer repair, add a focused regression fixture, and repeat the
+   affected gate before continuing.
+3. Use cavecrew only for bounded tracing and final diff review. The primary agent owns the
+   cross-cutting gate and any SOL repair.
+4. Do not invoke Terra for UXF-9 failures.
 
-1. Add optional `archivedAt?: string` to `TodoItem`. It remains inside existing Todo `items`
-   JSONB; no Supabase migration.
-2. Keep `activeChecklistItems(list)` as the shared open-work projection used by Trackers and
-   Dashboard: exclude `done`, `removedUntilReset`, and `archivedAt` rows.
-3. Add explicit pure projections for:
-   - current visible: `!removedUntilReset && !archivedAt`;
-   - completed since reset: `done && !removedUntilReset && !archivedAt`;
-   - history: `done && archivedAt`.
-   Preserve input order and object references where a helper only filters.
-4. On first clear/reset/archive lifecycle write, normalize legacy/core recurrence identity to
-   `core:<canonicalTodoId>:<itemId>` when missing. Never rewrite archived history later.
-5. Pure clear operation:
-   - unfinished ad-hoc rows are removed;
-   - unfinished core/template/maintenance rows get `removedUntilReset: true`;
-   - current completed rows get `archivedAt: now` and keep task, notes, assignee,
-     `completionNote`, `completedAt`, source identity, and source cycle;
-   - already archived rows stay byte-equivalent;
-   - resulting active count is zero.
-6. Pure new-weekend/manual reset operation:
-   - archives current completed occurrences instead of erasing or reopening them;
-   - keeps already archived history unchanged;
-   - carries only unfinished ad-hoc rows when preference is ON; removes them when OFF;
-   - completed ad-hoc rows never auto-reopen;
-   - legacy/core sources receive exactly one open current occurrence;
-   - template sources receive exactly one open occurrence only while their saved-list
-     definition exists, with current definition text;
-   - maintenance sources receive exactly one open current-cycle occurrence only while the
-     component remains due;
-   - hidden eligible recurring rows return; ineligible template/maintenance rows do not;
-   - repeated reset is idempotent and never duplicates active occurrences.
-7. Add a pure saved-list import helper keyed by stable
-   `template:<templateId>:<templateItemId>` source IDs. Existing active or tombstoned current
-   occurrences block duplicates; a tombstone stays hidden until reset. Archived history does
-   not block a new active occurrence. Repeated import is idempotent.
+## Required technical gate
 
-### 2. Maintenance reconciliation
+### 1. Automated regression
 
-1. Keep 90% threshold, component/service-cycle identity, car/rig scope, Races/Days math, and
-   service behavior unchanged.
-2. While due, an unarchived current-cycle row—including a tombstone—suppresses recreation.
-   Archived history does not satisfy active existence.
-3. At reset, reopen exactly one occurrence only if the component remains due.
-4. Service or below-threshold reconciliation removes unfinished open/tombstoned automatic rows
-   for that source. Preserve completed current rows and archived history.
-5. Later service cycles may create one new occurrence.
+Run every current focused harness:
 
-### 3. Checklist UI
+- `scripts/chunk5-setup-harness.ts`
+- `scripts/chunk5-tires-harness.ts`
+- `scripts/chunk6a-refinement-harness.ts`
+- `scripts/chunk6b-lifecycle-harness.ts`
+- `scripts/chunk7-quick-adjust-harness.ts`
+- `scripts/chunk8-trackers-harness.ts`
+- `scripts/chunk9-export-help-harness.ts`
+- `scripts/ux-r1-starters-harness.ts`
+- `scripts/ux-r1-color-harness.ts`
 
-1. First screen order: compact **Checklist** header with `N open`, optional `N mine`, and one
-   **Manage** button; add-task row immediately follows; active open jobs follow.
-2. Keep whole-row completion target at least 56px. Use one 44px-plus overflow/action target per
-   row for Edit and Remove. Label destructive action **Remove**; no unexplained close glyph.
-   Each active row retains task text, short note when present, and assignee. Preserve the
-   existing **My Tasks** filter/count behavior.
-3. Checkbox/row completes immediately, exactly once, without required modal. Show a six-second
-   Undo action that restores prior item bytes. Completion note remains optional through the
-   completed-row action.
-4. Completed work appears in a collapsed **Completed since last reset** summary. Each completed
-   row offers **Mark open** and **Add/Edit completion note**. Mark open clears completion fields
-   and `archivedAt` only for that selected current occurrence. Bulk **Clear completed** stays
-   inside **Manage**, not in this summary.
-5. Empty active state says **Checklist clear** and offers **Add task** plus
-   **Add from saved list**. Do not claim this is the first task.
-6. Remove nested task-list scrolling. App/page owns vertical scrolling.
+Also rerun the sync/lifecycle checks named in `HANDOFF.md`. Assertions must reflect only
+approved UXF behavior; do not weaken a check to obtain PASS.
 
-### 4. Manage sheet
+### 2. Repository gate
 
-Use existing `BottomSheet` so scrim, Escape, and Android Back close correctly. One **Manage**
-sheet owns:
+1. `npm run lint` shows exactly the three documented pre-existing errors and no new error.
+2. Windows production build succeeds.
+3. `git diff --check` passes and the worktree is clean before deployment.
+4. Cavecrew final review finds no blocker in the full Sprint 1 range.
 
-- Add from saved list;
-- Manage saved lists through existing callback;
-- `Carry unfinished added jobs to next weekend` preference using
-  `race_notes_keep_added_items`, default ON;
-- Reset for new weekend with exact effect confirmation;
-- Clear current list with exact effect confirmation;
-- Clear completed, archiving current completed occurrences without changing open work;
-- View History grouped by completion date.
+### 3. Data and runtime gate
 
-Active occurrence edits never rewrite saved-list definitions. Permanent definition changes
-remain in saved-list management.
+Verify without destructive live-data cleanup:
 
-### 5. Dashboard
+1. Offline/local-first reload preserves current data and the signed-in device fallback.
+2. Authenticated cloud round trip preserves:
+   - a coalesced Quick Adjust `changeLog` entry;
+   - Starting / Live-Trackside / Current / Raced-or-Finished lifecycle bytes and display;
+   - a checklist `removedUntilReset` tombstone plus archived/completion fields;
+   - UXF-6 maintenance `starting_usage` and Races/Days behavior.
+3. Car-scoped setup/tire/load data and rig-global maintenance remain correctly scoped.
+4. Team-visible deletion paths and local/cloud merge behavior remain intact.
+5. If authenticated cloud evidence is unavailable, disclose it. Do not claim a pass from a
+   signed-out preview shell or pure mapper alone.
 
-Replace current collapsible task preview with one compact launcher:
+### 4. Display and device gate
 
-- nonzero: `Checklist · N open · M mine` when mine is nonzero;
-- zero: `Checklist clear`;
-- no task-name preview and no repeated list title/count block.
+1. Verify 320px and 390px mobile widths in light and dark themes at Default and Large size.
+2. Verify Dashboard, Setup lifecycle, Quick Adjust, travel/load graphs, Tuning Guide/App Guide,
+   Main Checklist/Manage/History/Undo, Maintenance Logs, Accounting, and PDF share/download.
+3. Verify Android Back closes sheets/help before app exit. Use the existing debug build path
+   only if needed; do not create or copy a release APK or change native version/config.
+4. Absorb the remaining WS-Z authenticated/offline/theme/zoom/mobile checks and record WS-Z
+   complete only when their evidence is real.
 
-Use the same `activeChecklistItems()` projection as Trackers. Maintenance Due remains its own
-surface.
+### 5. Final draft
 
-### 6. Persistence and compatibility
+After the local gate is coherent, create exactly one new Netlify draft. Never deploy production.
+Hard-refresh the unique draft and repeat the signed-out shell plus every authenticated check the
+origin permits. Record the exact URL and distinguish draft evidence from Android/local evidence.
 
-1. Keep App's React/localStorage/cloud Todo dual-write path unchanged.
-2. `archivedAt`, tombstones, assignments, completion fields, `sourceId`, and `sourceCycle` must
-   survive local JSON and existing `pushTodos`/`pullTodos` JSONB round trip.
-3. Missing legacy `kind` remains core. Missing `archivedAt` remains current unless tombstoned.
-4. Existing completed rows show under **Completed since last reset** until first clear/reset,
-   then archive.
-5. No SQL migration, sync-column mapper, data rewrite, or second checklist system.
+## Owner walkthrough
 
-## Focused harness
+Present the final draft to Maxx and record accept/reject for each correction:
 
-Expand `scripts/chunk8-trackers-harness.ts` before broad runtime work. Required fixtures:
+1. Cleared checklist jobs stay off Dashboard and Maintenance category has one Other.
+2. Quick Adjust shows one net result per field/run instead of every tap.
+3. Setup progression reads Starting → Live-Trackside → Current → Raced/Finished.
+4. Load graphs rise with compression using Travel while retaining measured Height.
+5. Tuning Guide starts with the adjustment finder; operating help stays in App Guide.
+6. Maintenance uses only Races/Days, starting usage, correct defaults, and reset behavior.
+7. Main Checklist design: active-first list, completion evidence, Manage, clear/reset/history.
+8. Documentation/agent routing follows Sprint index, preview-v3, and first-failure SOL policy.
+9. Export/share, contextual help, language, two sizes, contrast, and mobile presentation remain
+   accepted from the completed product chunks.
+10. Whole-app offline/cloud/car-scope behavior is acceptable on the final draft/device.
 
-1. Trackers/Dashboard shared active projection excludes done, tombstoned, and archived rows.
-2. Completed ad-hoc archives, never auto-reopens, and carry toggle affects only unfinished
-   ad-hoc rows.
-3. Recurring core archives and gets exactly one open occurrence; template does so only when
-   its definition exists; maintenance does so only while due. Include zero-occurrence cases.
-4. Clear hides recurring open rows, deletes unfinished ad-hoc rows, archives completed rows,
-   and produces active count zero.
-   Separately, Clear completed archives only completed current rows and preserves open rows.
-5. Saved-list import is source-ID-idempotent; tombstone suppresses same-cycle import; archived
-   history allows one fresh active occurrence.
-6. Hidden due maintenance does not resurrect before reset; reset reopens once; service removes
-   unfinished hidden/open rows; completed/history survives; later cycle creates once.
-7. Template edit/add/delete/restore remains deterministic without duplicates.
-8. Edit/assignment/completion-note provenance and archived history bytes survive.
-9. JSON/localStorage and Todo cloud-row round trip preserve all optional lifecycle fields.
-10. Source/UI guards require 56px rows, 44px actions, one Manage entry, BottomSheet, concise
-    empty state, no Dashboard task previews, and no nested task-list scroll.
-11. Completion commits once without opening required modal; six-second Undo restores prior
-    bytes; Mark open and note edit remain available.
+Record each answer in `ralph/STATE.md`. If Maxx rejects an item, keep UXF-9 open and create a
+scoped follow-up work order. If all ten are accepted, close UXF-9, Sprint 1, and WS-Z as supported
+by evidence; then update `SPRINT_INDEX.md` to unlock Sprint 2.
 
-## Validation and handoff
+## Deliverables
 
-1. Run focused chunk8 harness first.
-2. Run exact three-error lint baseline, production build, and `git diff --check`.
-3. Use cavecrew only for bounded trace/review; primary builder owns cross-file implementation.
-4. Verify local-first reload and existing cloud Todo mapper round trip. No schema change.
-5. Verify 320/390 widths, light/dark, Default/Large, Manage/History/Undo, clear/reset, empty
-   state, and Android Back. Create one Netlify draft after coherent PASS; never production.
-6. Update `ralph/CURRENT_TASK.md`, `ralph/STATE.md`, `HANDOFF.md`,
-   `CODEBASE_KNOWLEDGE.md`, and plan with actual evidence. Commit feature and docs.
-7. Return same persistent task to GPT 5.6 SOL High for independent UXF-10 QA. Any QA failure
-   stays with SOL fixer; Terra is not re-invoked.
+- Exact command/runtime/cloud evidence in `ralph/STATE.md`, `HANDOFF.md`, and
+  `CODEBASE_KNOWLEDGE.md`.
+- One final Netlify draft URL.
+- Ten-item owner acceptance record.
+- Technical PASS state must read **AWAITING OWNER ACCEPTANCE**, not complete.
 
-## Terra implementation result — 2026-07-14
+## Prohibited actions
 
-- Feature commit: `3b40a1e`.
-- One canonical Main Checklist preserved. Optional `archivedAt` stays inside existing Todo
-  `items` JSONB; no SQL, schema, package, or native-config change.
-- Pure projections, recurrence identity, archive/clear/reset, saved-list import, maintenance
-  cycle handling, exactly-once completion/Undo restore, and pure Todo cloud-row mapping are
-  covered by the expanded Chunk 8 harness.
-- `App.tsx` change is the required new-weekend reset context bridge; `TrackersView.tsx` passes
-  the same maintenance/weekend/setup context into manual reset; `sync.ts` now calls the
-  extracted byte-equivalent pure Todo mapper. These are required lifecycle/persistence bridges,
-  not new stores or behavior outside the approved checklist package.
-- Gates: Chunk 8 harness PASS; lint is the exact known three-error baseline; production build
-  PASS at 557 modules / 18 PWA entries; `git diff --check` PASS; final cavecrew re-review found
-  no blockers.
-- Android debug installed with existing local data. Verified compact Dashboard launcher,
-  active-first list, completion toast, completed summary, Mark open, Manage sheet Android Back,
-  light/dark, and Default/Large. Test state was restored afterward. No release APK created.
-- Draft: `https://6a56c2018589bea4d591667d--crew-chief-race-notes.netlify.app/`.
-  Signed-out shell is clean at 390px with no overflow or console warnings. Unique preview origin
-  had no remembered authentication; authenticated preview cloud data is not claimed.
+No production deploy, remote push, branch merge, Supabase schema/data rewrite, package change,
+native configuration change, release APK, or Sprint 2 application work.
 
-## SOL QA attempt 1 findings — 2026-07-14
+## UXF-10 closure evidence — 2026-07-14
 
-1. Reset selects the first open recurrence even when it is a hidden tombstone. With legacy
-   duplicate source rows ordered hidden-first, reset can reactivate stale assignment/note bytes
-   and hide the newer visible occurrence. Reset must prefer a non-tombstoned open row and hide
-   every other duplicate.
-2. Active row `onKeyDown` handles bubbled Enter/Space from its nested overflow button (and other
-   controls). Keyboard-opening task actions can complete the task. Row completion must run only
-   when the row itself owns the keyboard event.
-
-Per current routing, SOL owns repair and repeat QA. Terra is not re-invoked.
-
-## Out of scope
-
-- No maintenance interval/math change, setup lifecycle, Quick Adjust, Accounting, or team-
-  concurrency redesign.
-- No new route/store/context, SQL/table, package, native config, production deploy, remote push,
-  merge, release APK, or UXF-9 work before SOL PASS.
+- SOL QA attempt 1 found two blockers and recorded them in `183a20d`.
+- SOL repair `075be90` makes reset prefer the current visible recurrence over a hidden duplicate
+  and prevents nested keyboard controls from triggering row completion.
+- Expanded Chunk 8 harness PASS, exact known three-error lint baseline, 557-module / 18-entry
+  production build PASS, `git diff --check` PASS, clean tree, and cavecrew re-review no issues.
+- Draft `https://6a56c2018589bea4d591667d--crew-chief-race-notes.netlify.app/` remains the
+  UXF-10 feature draft. Independent signed-out checks passed at 320px and 390px with no overflow
+  or console warnings. It predates the narrow SOL repair; no second draft was created because
+  UXF-10 authorized one draft. Repair was adjudicated through source, harness, lint, build,
+  diff, and review evidence. Terra's earlier signed-in Android runtime evidence remains valid.
+- UXF-10 is complete. No SQL, production deploy, push, merge, package/native change, or release
+  APK occurred during QA/repair.

@@ -1491,8 +1491,20 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   assignment, provenance, and completion fields round-trip through `items` unchanged.
 - App new-weekend reset and manual Trackers reset both receive templates plus current
   maintenance/weekend/setup context so serviced or no-longer-due jobs do not reopen.
-- Evidence: expanded Chunk 8 harness PASS; exact known three-error lint baseline; 557 modules /
-  18 PWA entries build; diff and cavecrew re-review clean; Android signed-in debug verified
-  Dashboard/Checklist/Manage/Back, completion/Mark open, light/dark and Default/Large. Draft
-  `6a56c2018589bea4d591667d` has a clean 390px signed-out shell; authenticated preview data was
-  unavailable and is not claimed. SOL independent QA is pending.
+- SOL QA attempt 1 found two edges. Repair `075be90` makes reset preserve the current visible
+  recurrence when a hidden duplicate appears first and prevents keyboard events from nested row
+  controls from completing the task. The expanded harness contains both regressions.
+- Final UXF-10 evidence: expanded Chunk 8 harness PASS; exact known three-error lint baseline;
+  557 modules / 18 PWA entries build; diff, clean tree, and cavecrew re-review clean. Android
+  signed-in debug verified Dashboard/Checklist/Manage/Back, completion/Mark open, light/dark and
+  Default/Large before the narrow repair. Draft `6a56c2018589bea4d591667d` is independently
+  clean at 320px and 390px signed-out with no overflow or console warnings; authenticated
+  preview data was unavailable and is not claimed. UXF-10 closed after SOL QA attempt 2.
+
+## 34. UXF-9 — Final Batch Gate (planned 2026-07-14)
+
+- Exact authority is `ralph/CURRENT_TASK.md`. UXF-9 runs the complete focused harness suite,
+  exact lint/build/diff gates, authenticated cloud and offline-local checks, 320/390 theme and
+  size runtime, Android Back, and one final Netlify draft.
+- Technical PASS moves to **AWAITING OWNER ACCEPTANCE**. Only Maxx's ten-item walkthrough and
+  acceptance closes UXF-9/Sprint 1 and unlocks Sprint 2. No UXF-9 application code has started.
