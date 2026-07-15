@@ -1508,3 +1508,20 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   size runtime, Android Back, and one final Netlify draft.
 - Technical PASS moves to **AWAITING OWNER ACCEPTANCE**. Only Maxx's ten-item walkthrough and
   acceptance closes UXF-9/Sprint 1 and unlocks Sprint 2. No UXF-9 application code has started.
+
+## 35. UXF-9P — Owner Preflight Corrections (2026-07-14)
+
+- Feature `0361278` adds `src/components/CarRequiredPrompt.tsx` and
+  `src/lib/raceDayGate.ts`. Dashboard, Setups, Sessions, and ContextStrip share a direct Add a
+  Car path. App owns the hard guard and forces Settings → Garage even when Settings was already
+  open on another section. No-car session creation returns before any mutation.
+- Global Tuning Guide remains `QuickReferenceView` and starts at Pit-Side Adjustment Finder.
+  Operating-help cards remain only in Settings → Guide/context help.
+- Visible event copy is Race Day/Race Days across UI, guide, PDF/CSV/share, auth, and
+  accessibility. Internal RaceWeekend names, IDs, local/cloud shapes, DB names, and lifecycle
+  roles remain byte-compatible. Only known generated legacy lifecycle labels receive display
+  translation; arbitrary user text is never rewritten.
+- Evidence: ten harnesses PASS; exact known three-error lint baseline; 559 modules / 18 PWA
+  entries build; diff and cavecrew review clean. Final draft `6a56d1d228995bd1cef8c421` is
+  overflow- and console-clean at 320/390 signed-out. Authenticated draft data was unavailable.
+- Final independent execution plan is `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md`.

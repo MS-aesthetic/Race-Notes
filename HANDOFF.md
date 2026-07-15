@@ -10,7 +10,7 @@
 > - **`master` == `origin/master` == `98bb2e0`+cleanup.** The `preview` (v1) and `preview-v2` branches were retired/removed after consolidation; `master` is the single source of truth. Deploys still default to Netlify preview; production only on Maxx's explicit say-so.
 > - **Migration 014 IS applied to live Supabase** (`20260711151905`, applied 2026-07-11). Ignore older "014 not applied" notes.
 > - **Current APK provenance:** root `race_notes.apk` remains UX-R1 versionCode 15/versionName 4.0. Chunk 5 was runtime-tested from `.worktrees\v3\android\app\build\outputs\apk\debug\app-debug.apk`, versionCode 16/versionName 4.1; it was not copied to the root release artifact. Production remains unchanged.
-> - **Current Netlify draft:** `https://6a55bd0dfd16f2bd74bf6c1a--crew-chief-race-notes.netlify.app` (UX-C9 Terra CODE_PASS). Production remains untouched.
+> - **Current Netlify draft:** `https://6a56d1d228995bd1cef8c421--crew-chief-race-notes.netlify.app` (UXF-9P `0361278`, final Claude QA target). Production remains untouched.
 > - **Repo hygiene pass done:** removed dead PWABuilder/TWA leftovers (root gradle files, `pwabuilder-adv-sw.js`, `metadata.json`, `build_apk.bat`, `PWA_INSTRUCTIONS.md`), retired v1 `plan.md`, untracked `.idea/` + root `local.properties`, and added `android/app/google-services.json` to `.gitignore`.
 
 > ### 🎨 UX OVERHAUL track — `preview-v3` (active dev line as of 2026-07-12)
@@ -173,7 +173,7 @@ Git worktrees in play:
 | Path | Branch | Role |
 |---|---|---|
 | `C:\Users\maxx\antigravity\Race-Notes` | `master` | **Main/release tree.** Owns complete Android platform and gitignored Gradle/SDK/Firebase files. Preserve existing dirty host/generated files. |
-| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–9 and UXF-1/2/3/4/5/6/7/8/10 complete. UXF-10 feature `3b40a1e` plus SOL repair `075be90` passed QA attempt 2: one canonical active-first Checklist, Manage/History, six-second Undo, preserved completion evidence, deterministic recurrence, compact Dashboard, and optional `archivedAt` in existing JSONB with no SQL. Draft `https://6a56c2018589bea4d591667d--crew-chief-race-notes.netlify.app/` is the feature draft and was independently clean at 320/390 signed-out; it predates the narrow SOL repair, which passed harness/lint/build/diff/review. Prior signed-in Android debug runtime passed. UXF-9 final technical gate and owner walkthrough are now active through `ralph/CURRENT_TASK.md`. UXF-6 migration `20260714215528` remains applied/verified. No production/push/merge/package/native/release-APK change. |
+| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–9 and UXF-1/2/3/4/5/6/7/8/10/9P complete. UXF-9P `0361278` adds hard no-car Garage routing, Race Day display vocabulary, and finder-first Tuning Guide regression coverage. Final QA target `https://6a56d1d228995bd1cef8c421--crew-chief-race-notes.netlify.app/` is clean at 320/390 signed-out; ten harnesses, exact lint baseline, 559-module build, diff, and cavecrew review pass. Claude Fable executes `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md`; technical PASS then waits for Maxx acceptance. Prior signed-in Android debug runtime remains supporting evidence. UXF-6 migration `20260714215528` remains applied/verified. No production/push/merge/package/native/release-APK change. |
 
 Audited 2026-07-13: `preview-v3` includes UX-C5 `d5ef1f4`; `master` remains
 release/stable. Git refs do not indicate Netlify deployment state. Main-tree
@@ -406,6 +406,19 @@ Install to emulator: `"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" instal
 ---
 
 ## 9. Owner constraints & etiquette
+
+### Current handoff — UXF-9 final QA (2026-07-14)
+
+- UXF-9P feature `0361278` is complete: zero-car actions route directly to Settings → Garage,
+  race-day/run creation is guarded before forms and mutation, global Tuning Guide starts at the
+  Adjustment Finder, and visible event wording is Race Day/Race Days.
+- Internal `RaceWeekend` types, IDs, storage keys, sync/database names, and lifecycle role remain
+  unchanged. Legacy generated labels map only at display time; arbitrary user labels are preserved.
+- Final draft: `https://6a56d1d228995bd1cef8c421--crew-chief-race-notes.netlify.app/`.
+- Exact Claude Fable QA authority: `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md`.
+- Ten harnesses, exact three-error lint baseline, 559-module/18-entry build, diff check, and
+  cavecrew review pass. Signed-out draft is clean at 320/390; authenticated feature QA remains.
+- Next state after technical PASS is `AWAITING OWNER ACCEPTANCE`, not complete.
 
 - **Never merge `preview-v3` → `master`, and never deploy to production, without Maxx's explicit approval.** Default all deploys to Netlify preview.
 - Migrations/secrets/console setup are treated as human gates — surface them; apply DB migrations only with owner awareness.

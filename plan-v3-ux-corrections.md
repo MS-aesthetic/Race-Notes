@@ -676,15 +676,19 @@ fixes; rewriting CODEBASE_KNOWLEDGE body; any src change.
 
 ## UXF-9P — Owner preflight corrections *(added 2026-07-14; blocks UXF-9)*
 
+**Status:** COMPLETE at feature `0361278`. Final draft:
+`https://6a56d1d228995bd1cef8c421--crew-chief-race-notes.netlify.app/`.
+Claude Fable execution authority is `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md`.
+
 **Scope:** add a direct, prominent Add a Car path across Setups/Sessions/Dashboard/Context
 strip and guard race-day/run creation before any form or follow-on action; preserve current
 finder-first global Tuning Guide and add regression coverage; change display-only Weekend/Race
 Weekend vocabulary to Race Day/Race Days across UI, guide, reports, exports, and accessibility
 without renaming internal types, IDs, storage, DB, lifecycle roles, or legacy stored bytes.
 
-**Acceptance:** focused no-car/copy/guide harness, affected existing harnesses, exact lint
-baseline, production build, diff, cavecrew review, mobile theme/size runtime, and one current
-Netlify draft. After PASS, write `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md` and resume UXF-9.
+**Acceptance evidence:** focused no-car/copy/guide harness, affected existing harnesses, exact
+lint baseline, production build, diff, cavecrew review, 320/390 signed-out runtime, and current
+Netlify draft all pass. `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md` now controls UXF-9 execution.
 
 ---
 
