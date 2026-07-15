@@ -102,6 +102,7 @@ assert.equal(lifecycleLabel('final', baseWeekend), 'Finished Setup');
 assert.equal(lifecycleLabel('final'), 'Finished Setup');
 assert.equal(displayLifecycleText('Copied from Jul 13, 2026 Baseline Setup'), 'Copied from Jul 13, 2026 Starting Setup');
 assert.equal(displayLifecycleText('No setup baseline'), 'No starting setup');
+assert.equal(displayLifecycleText('Race Weekend Starting Setup'), 'Race Day Starting Setup');
 
 const legacyLabelSetup = { ...source, versionLabel: '2026-07-12 Baseline Setup' };
 const legacyLabelJson = JSON.stringify(legacyLabelSetup);

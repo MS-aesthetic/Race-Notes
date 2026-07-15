@@ -21,9 +21,9 @@ assert.match(settings, /value: 'xlarge'.*label: 'Large'/);
 assert.doesNotMatch(settings, /1\.15x|1\.45x|1\.7x|1x scale|XX-Large|X-Large/);
 
 assert.doesNotMatch(guide, /AFCO|chassis-specific|class\/chassis/i);
-assert.match(guide, /High:<\/strong> Try this first\. Biggest likely help\./);
+assert.match(guide, /High:<\/strong> Try first\./);
 assert.match(guide, /Medium:<\/strong> Try this next if the first change did not fix the problem\./);
-assert.match(guide, /Low:<\/strong> Fine-tuning\. Check the bigger items first\./);
+assert.match(guide, /Low:<\/strong> Fine-tuning after the bigger items are checked\./);
 
 assert.match(types, /rideHeightCtoC\?: string/);
 assert.match(loads, /New Load Session/);

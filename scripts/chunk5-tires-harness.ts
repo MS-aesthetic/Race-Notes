@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { RaceWeekend, Setup, TireInventoryItem } from '../src/types';
-import { getRecentPressureHistory, getTireTotalLaps, getTireUsageHistory, syncTireLifecycle } from '../src/lib/tireHistory';
+import { buildTireUsageCsv, getRecentPressureHistory, getTireTotalLaps, getTireUsageHistory, syncTireLifecycle } from '../src/lib/tireHistory';
 import { parseTireSize } from '../src/lib/tireSize';
 import { filterCompatibleSessions, suggestNextSession } from '../src/lib/sessionSequence';
 import { setupUsedUniquelyMatchesCar } from '../src/lib/setupCompat';
@@ -30,6 +30,7 @@ const weekends: RaceWeekend[] = [
 ];
 
 const history = getRecentPressureHistory(weekends, [setupA, setupB], tires, 'car-a');
+assert.match(buildTireUsageCsv(tires, weekends).split('\n')[0], /Race Day/);
 assert.equal(history.lf.length, 2);
 assert.equal(history.lf[0].pressure, '12 psi');
 assert.equal(history.lf[0].sessionName, 'new');

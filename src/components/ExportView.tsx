@@ -86,7 +86,7 @@ export default function ExportView({
   const exportWeekend = () => {
     const w = weekends.find((x) => x.id === selectedWeekendId);
     if (!w) {
-      alert('Select a race weekend first.');
+      alert('Select a Race Day first.');
       return;
     }
     print(buildWeekendReport(w, accounting));
@@ -104,7 +104,7 @@ export default function ExportView({
       <header className="mb-2 flex flex-col gap-1">
         <h1 className="font-display text-2xl sm:text-3xl uppercase text-on-surface font-bold tracking-tight">Data Export</h1>
         <p className="font-mono text-xs text-on-surface-variant">
-          Compile setups, weekends and trackers into formatted PDF reports.
+          Compile setups, Race Days and trackers into formatted PDF reports.
         </p>
       </header>
 
@@ -170,7 +170,7 @@ export default function ExportView({
         <div className="bg-surface-container border border-outline-variant rounded p-4 space-y-3">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[18px]">calendar_today</span>
-            <span className="font-mono text-xs uppercase font-bold text-on-surface tracking-wide">Export Weekend</span>
+            <span className="font-mono text-xs uppercase font-bold text-on-surface tracking-wide">Export Race Day</span>
           </div>
           {weekends.length ? (
             <>
@@ -186,15 +186,15 @@ export default function ExportView({
               </div>
               <button onClick={exportWeekend} className={actionBtnClass}>
                 <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-                Export Weekend
+                Export Race Day
               </button>
             </>
           ) : (
             <EmptyState
               icon="calendar_today"
-              title="No weekends to export"
-              body="Log a race weekend and it'll be ready to print here."
-              cta={onStartWeekend ? { label: 'Start race weekend', onClick: onStartWeekend } : undefined}
+              title="No Race Days to export"
+              body="Log a Race Day and it'll be ready to print here."
+              cta={onStartWeekend ? { label: 'Start Race Day', onClick: onStartWeekend } : undefined}
             />
           )}
         </div>
@@ -252,7 +252,7 @@ export default function ExportView({
           </button>
           <button
             onClick={() => {
-              const header = 'Date,Name,Description,Amount,Type,Payer,Payee,Weekend';
+              const header = 'Date,Name,Description,Amount,Type,Payer,Payee,Race Day';
               const rows = accounting.map((e) =>
                 [e.date, e.name, e.description || '', String(e.amount), e.type, e.payer || '', e.payee || '', e.weekendName || '']
                   .map((v) => `"${String(v).replace(/"/g, '""')}"`)
@@ -313,10 +313,10 @@ export default function ExportView({
             <div className="flex flex-col gap-3">
               <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-on-surface flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-base">calendar_today</span>
-                Race Weekends
+                Race Days
               </h3>
               {sharedWeekends.length === 0 && (
-                <div className="p-4 border border-outline-variant/30 rounded bg-surface-container/20 text-xs text-on-surface-variant italic">No race weekends shared with you yet.</div>
+                <div className="p-4 border border-outline-variant/30 rounded bg-surface-container/20 text-xs text-on-surface-variant italic">No Race Days shared with you yet.</div>
               )}
               {sharedWeekends.map((w) => (
                 <div key={w.id} className="p-4 border border-outline-variant bg-surface-container rounded flex justify-between items-center">

@@ -39,7 +39,7 @@ export function resolveQuickAdjustTarget(
 ): QuickAdjustTarget {
   const weekend = weekends.find(item => item.id === activeWeekendId && item.status !== 'finished');
   if (!weekend?.activeSetupId) {
-    return { ok: false, error: `Start an unfinished weekend with a valid ${lifecycleLabel('weekend')} before using Quick Adjust.` };
+    return { ok: false, error: `Start an unfinished Race Day with a valid ${lifecycleLabel('weekend')} before using Quick Adjust.` };
   }
   const setup = setups.find(item => item.id === weekend.activeSetupId);
   if (!setup
@@ -51,7 +51,7 @@ export function resolveQuickAdjustTarget(
   if (!session.id
     || session.weekendId !== weekend.id
     || !weekend.sessions.some(record => record.id === session.id)) {
-    return { ok: false, error: 'Open a run from this active weekend before using Quick Adjust.' };
+    return { ok: false, error: 'Open a run from this active Race Day before using Quick Adjust.' };
   }
   return { ok: true, weekend, setup, session };
 }
@@ -237,7 +237,7 @@ export function applyQuickAdjust(
     return { ok: false, error: `${lifecycleLabel('weekend')} is locked or unavailable.` };
   }
   if (!session.id || !session.weekendId || setup.weekendId !== session.weekendId) {
-    return { ok: false, error: 'Open a run from this active weekend before using Quick Adjust.' };
+    return { ok: false, error: 'Open a run from this active Race Day before using Quick Adjust.' };
   }
   const details = changeDetails(setup, command);
   if ('error' in details) return { ok: false, error: details.error };

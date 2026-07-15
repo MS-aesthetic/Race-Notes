@@ -121,7 +121,7 @@ export default function QuickAdjustPanel({ setup, loadSessions, onCommit, onOpen
           <option value="">No Load Session</option>
           {matchingLoads.map(item => <option key={item.id} value={item.id}>{item.label || item.shock} · {item.date}</option>)}
         </select>
-        {matchingLoads.length === 0 && <p className="font-mono text-xs text-on-surface-variant">No {corner.toUpperCase()} Load Sessions saved for this weekend's car.</p>}
+        {matchingLoads.length === 0 && <p className="font-mono text-xs text-on-surface-variant">No {corner.toUpperCase()} Load Sessions saved for this Race Day's car.</p>}
       </section>
 
       <section className="grid gap-3 border-t border-outline-variant/60 pt-3 sm:grid-cols-2">

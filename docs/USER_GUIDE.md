@@ -21,7 +21,7 @@ Sign-in is mandatory before any tab renders (`isUnlocked` gate in `App.tsx`).
 - Tip: sign in with the same account on phone + tablet to share data across devices.
 
 ## Creating a team
-A team shares cars, setups, tires, weekends, and tasks automatically via Supabase RLS (`in_same_team()`).
+A team shares cars, setups, tires, Race Days, and tasks automatically via Supabase RLS (`in_same_team()`).
 
 - Create a team with a name (car number / team name).
 - Invite crew members; once accepted, all data is shared both ways.
@@ -49,20 +49,20 @@ Every setup, tire, and load graph is scoped to the **active car**.
 - Record each bar angle at Ride Height and Full Droop using the same measuring method every time.
 - Four-bar measurements save with the setup and appear in setup comparisons.
 
-## Creating a weekend
-A weekend is the event container holding sessions.
+## Creating a Race Day
+A Race Day is the event container holding sessions.
 
-- **Dashboard** → **+ Race Weekend** (name, track, date).
+- **Dashboard** → **+ Race Day** (name, track, date).
 - Optionally bind a saved setup.
-- Crew Chief keeps that Starting Setup unchanged and records weekend changes in the Live-Trackside Setup.
+- Crew Chief keeps that Starting Setup unchanged and records Race Day changes in the Live-Trackside Setup.
 - Weather widget: GPS or zip-code fallback.
-- Creating makes the weekend active but does not open or create a session.
-- Active-weekend choice is device-local. Use Dashboard or Sessions weekend list to switch it.
-- **Finish Weekend** saves a Raced Setup when a Feature was logged, or a Finished Setup for a test day, then creates the editable Current Setup.
+- Creating makes the Race Day active but does not open or create a session.
+- Active Race Day choice is device-local. Use Dashboard or the Sessions list to switch it.
+- **Finish Race Day** saves a Raced Setup when a Feature was logged, or a Finished Setup for a test day, then creates the editable Current Setup.
 
 ## Logging a session
-- Create and activate a weekend first, then Sessions → New Session.
-- Sessions always belong to the active weekend. Choose type (Test / Hot Laps / Qualifying / Heat Race / Feature); repeats auto-number.
+- Create and activate a Race Day first, then Sessions → New Session.
+- Sessions always belong to the active Race Day. Choose type (Test / Hot Laps / Qualifying / Heat Race / Feature); repeats auto-number.
 - Handling: Tight / Neutral / Loose at entry, center, exit, with notes.
 - Pick the tire on each corner from inventory; **Import from Setup** fills all four at once.
 - Log lap times, adjustments, photos.
@@ -93,7 +93,7 @@ A weekend is the event container holding sessions.
 - **Trackers** → **Checklist** always opens one Main Checklist.
 - Add an item manually, with optional note and assignee.
 - Or select a template and tap **Import**; imported items are fresh unchecked copies.
-- Main Checklist is global, not linked to a weekend.
+- Main Checklist is global, not linked to a Race Day.
 - Open items also surface on Dashboard.
 
 ## Assigning tasks

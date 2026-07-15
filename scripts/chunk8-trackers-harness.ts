@@ -333,6 +333,9 @@ assert.doesNotMatch(trackersSource, /Below 90%|At least 90% of the limit|Each it
 assert.match(trackersSource, /Used \{status\.used\} · Limit \{status\.limit\} · Remaining \{remaining\}/);
 assert.match(trackersSource, /<option value="races">Races<\/option>/);
 assert.match(trackersSource, /<option value="days">Days<\/option>/);
+assert.match(trackersSource, /No Race Day \(general\)/);
+assert.match(trackersSource, /All Race Days/);
+assert.match(todoSource, /Reset for new Race Day/);
 assert.match(trackersSource, /Races already run/);
 assert.match(trackersSource, /Days already in service/);
 assert.match(trackersSource, /setLogDate\(localDateValue\(\)\)/);

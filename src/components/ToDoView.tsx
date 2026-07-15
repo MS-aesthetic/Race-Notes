@@ -226,7 +226,7 @@ export default function ToDoView({
   };
 
   const resetForWeekend = () => {
-    if (!window.confirm('Reset for a new weekend? Completed work moves to History. Eligible recurring jobs return. Unfinished added jobs follow your carry setting.')) return;
+    if (!window.confirm('Reset for a new Race Day? Completed work moves to History. Eligible recurring jobs return. Unfinished added jobs follow your carry setting.')) return;
     setCompletionUndo(null);
     commitTodos(resetMainChecklist(
       todosRef.current,
@@ -502,11 +502,11 @@ export default function ToDoView({
               onChange={event => setKeepPreference(event.target.checked)}
               className="h-5 w-5 accent-primary"
             />
-            Carry unfinished added jobs to next weekend
+            Carry unfinished added jobs to next Race Day
           </label>
 
           <div className="grid gap-2">
-            <button type="button" onClick={resetForWeekend} className="min-h-12 rounded-xl border border-outline-variant px-4 text-left font-mono text-xs font-bold text-on-surface">Reset for new weekend</button>
+            <button type="button" onClick={resetForWeekend} className="min-h-12 rounded-xl border border-outline-variant px-4 text-left font-mono text-xs font-bold text-on-surface">Reset for new Race Day</button>
             <button type="button" onClick={clearCompleted} disabled={completedItems.length === 0} className="min-h-12 rounded-xl border border-outline-variant px-4 text-left font-mono text-xs font-bold text-on-surface disabled:opacity-40">Clear completed</button>
             <button type="button" onClick={clearCurrentList} className="min-h-12 rounded-xl border border-red-500/50 px-4 text-left font-mono text-xs font-bold text-red-400">Clear current list</button>
             <button type="button" onClick={() => setShowHistory(value => !value)} className="min-h-12 rounded-xl border border-outline-variant px-4 text-left font-mono text-xs font-bold text-primary">

@@ -42,11 +42,13 @@ assert.match(setupReport.bodyHtml, /Current Run/);
 assert.ok(setupReport.textLines.some(line => line.includes('LF | 500')));
 
 const weekendReport = buildWeekendReport(weekend, accounting);
+assert.equal(weekendReport.title, 'Race Day Report');
+assert.ok(weekendReport.textLines.some(line => line.includes('Race Day notes:')));
 assert.match(weekendReport.bodyHtml, /Runs \(1\)/);
 assert.match(weekendReport.bodyHtml, /Heat 1/);
 assert.ok(weekendReport.textLines.some(line => line.includes('Net:')));
 assert.match(buildTrackersReport('all', todos, accounting).bodyHtml, /Torque wheels/);
-assert.match(buildMasterReport(setup, INITIAL_ACTIVE_SESSION, [weekend], todos, accounting).bodyHtml, /Weekends \(1\)/);
+assert.match(buildMasterReport(setup, INITIAL_ACTIVE_SESSION, [weekend], todos, accounting).bodyHtml, /Race Days \(1\)/);
 assert.equal(reportFilename('Eldora Speedway', '2026-07-12'), 'crewchief-eldora-speedway-2026-07-12.pdf');
 
 const printHtml = renderReportHtml(setupReport, generatedAt);
@@ -69,7 +71,7 @@ const adapter = (overrides: Partial<ReportShareAdapter> = {}): ReportShareAdapte
   ...overrides,
 });
 let calls: string[] = [];
-assert.equal((await shareOrDownloadReport(file, 'Weekend', adapter({
+assert.equal((await shareOrDownloadReport(file, 'Race Day', adapter({
   isNative: true,
   nativeShare: async () => { calls.push('native'); },
   download: () => calls.push('download'),
@@ -77,7 +79,7 @@ assert.equal((await shareOrDownloadReport(file, 'Weekend', adapter({
 assert.deepEqual(calls, ['native']);
 
 calls = [];
-assert.equal((await shareOrDownloadReport(file, 'Weekend', adapter({
+assert.equal((await shareOrDownloadReport(file, 'Race Day', adapter({
   webCanShare: () => true,
   webShare: async () => { calls.push('web'); },
   download: () => calls.push('download'),
@@ -85,7 +87,7 @@ assert.equal((await shareOrDownloadReport(file, 'Weekend', adapter({
 assert.deepEqual(calls, ['web']);
 
 calls = [];
-assert.equal((await shareOrDownloadReport(file, 'Weekend', adapter({
+assert.equal((await shareOrDownloadReport(file, 'Race Day', adapter({
   webCanShare: () => true,
   webShare: async () => { throw new DOMException('User cancelled', 'AbortError'); },
   download: () => calls.push('download'),
@@ -93,13 +95,13 @@ assert.equal((await shareOrDownloadReport(file, 'Weekend', adapter({
 assert.deepEqual(calls, []);
 
 calls = [];
-assert.equal((await shareOrDownloadReport(file, 'Weekend', adapter({
+assert.equal((await shareOrDownloadReport(file, 'Race Day', adapter({
   isNative: true,
   nativeShare: async () => { throw new Error('Plugin failed'); },
   download: () => calls.push('download'),
 }))).status, 'failed');
 assert.deepEqual(calls, []);
-assert.equal((await shareOrDownloadReport(file, 'Weekend', adapter({ download: () => { throw new Error('Disk full'); } }))).status, 'failed');
+assert.equal((await shareOrDownloadReport(file, 'Race Day', adapter({ download: () => { throw new Error('Disk full'); } }))).status, 'failed');
 
 const source = (relative: string) => readFileSync(join(process.cwd(), relative), 'utf8');
 const quickRef = source('src/components/QuickReferenceView.tsx');
@@ -163,7 +165,7 @@ assert.match(diffView, /onHelp\('setup-diff'\)/);
 assert.match(quickRef, /<strong>High:<\/strong> Try first\./);
 assert.match(quickRef, /<strong>Medium:<\/strong> Try this next if the first change did not fix the problem\./);
 assert.match(quickRef, /<strong>Low:<\/strong> Fine-tuning after the bigger items are checked\./);
-assert.match(weekendView, /Share weekend PDF/);
+assert.match(weekendView, /Share Race Day PDF/);
 assert.doesNotMatch(pdfSource, /from ['"]react['"]/);
 assert.doesNotMatch([quickRef, setupView, weekendView].join('\n'), /AFCO|chassis-specific|package-specific|Package-dependent|Share with Team|Start New Logger Session|Shock Adjustment Handling Impacts|Adjustment Matrix/i);
 const quickReferenceDataStart = quickRef.indexOf('const BEHAVIOR_DATA:');

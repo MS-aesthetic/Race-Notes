@@ -20,6 +20,7 @@ import { pickImmediatePriorSetupForCar, setupUsedUniquelyMatchesCar } from '../l
 import { displayLifecycleText, displayVersionLabel, isWeekendFinished, lifecycleLabel, lifecycleSetupId } from '../lib/setupLifecycle';
 import { buildWeekendReport, createPdfFile } from '../lib/exportPdf';
 import { shareOrDownloadReport } from '../lib/reportShare';
+import CarRequiredPrompt from './CarRequiredPrompt';
 
 // ── Data passed up to App's create handlers ([15]) ───────────────────────────
 
@@ -65,6 +66,7 @@ interface RaceWeekendViewProps {
   onCommitQuickAdjust?: (command: QuickAdjustCommand) => { ok: boolean; error?: string };
   onInfo?: (message: string) => void;
   onHelp?: (section: string) => void;
+  onGoToGarage: () => void;
   accounting?: AccountingEntry[];
   /** [15] One-shot: open a creation modal as soon as the tab mounts. */
   initialAction?: 'new-session' | 'new-weekend';
@@ -135,7 +137,7 @@ export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
   onUpdateSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
   activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
-  activeSetup = null, shockSessions = [], onCommitQuickAdjust, onInfo, onHelp, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
+  activeSetup = null, shockSessions = [], onCommitQuickAdjust, onInfo, onHelp, onGoToGarage, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -194,7 +196,7 @@ export default function RaceWeekendView({
   const currentWeekend = visibleWeekends.find(w => w.id === activeWeekendId);
   const menuWeekend = visibleWeekends.find(w => w.id === menuWeekendId) ?? null;
   const activeWeekendMissingSetup = !!currentWeekend && !activeSetup;
-  const hasActiveSession = isQuickAdjustRunAvailable(currentWeekend, activeSetup, session, activeWeekendId);
+  const hasActiveSession = !!activeCarId && isQuickAdjustRunAvailable(currentWeekend, activeSetup, session, activeWeekendId);
 
   // [10] Canonical ordering shared with ContextStrip/Dashboard.
   const sortedWeekends = sortWeekends(visibleWeekends, activeWeekendId);
@@ -215,12 +217,12 @@ export default function RaceWeekendView({
     if (sharingWeekendId) return;
     setSharingWeekendId(weekend.id);
     try {
-      const result = await shareOrDownloadReport(createPdfFile(buildWeekendReport(weekend, accounting)), `Share ${weekend.name || 'race weekend'}`);
-      if (result.status === 'shared') onInfo?.('Weekend PDF shared.');
-      else if (result.status === 'downloaded') onInfo?.('Weekend PDF downloaded.');
-      else if (result.status === 'failed') onInfo?.(result.error || 'Weekend PDF could not be shared.');
+      const result = await shareOrDownloadReport(createPdfFile(buildWeekendReport(weekend, accounting)), `Share ${weekend.name || 'Race Day'}`);
+      if (result.status === 'shared') onInfo?.('Race Day PDF shared.');
+      else if (result.status === 'downloaded') onInfo?.('Race Day PDF downloaded.');
+      else if (result.status === 'failed') onInfo?.(result.error || 'Race Day PDF could not be shared.');
     } catch (error) {
-      onInfo?.(error instanceof Error ? error.message : 'Weekend PDF could not be created.');
+      onInfo?.(error instanceof Error ? error.message : 'Race Day PDF could not be created.');
     } finally {
       setSharingWeekendId(null);
     }
@@ -414,6 +416,10 @@ export default function RaceWeekendView({
   // ── [15] Weekend create/edit modal ──────────────────────────────────────────
 
   const openWeekendForm = (editing?: RaceWeekend) => {
+    if (!editing && !activeCarId) {
+      onGoToGarage();
+      return;
+    }
     setWkEditingId(editing?.id ?? null);
     setWkName(editing?.name ?? '');
     setWkTrack(editing?.track ?? '');
@@ -426,6 +432,11 @@ export default function RaceWeekendView({
   const handleWeekendFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!wkName.trim() || !wkTrack.trim()) return;
+    if (!wkEditingId && !activeCarId) {
+      setWkFormOpen(false);
+      onGoToGarage();
+      return;
+    }
     if (wkEditingId) {
       const wk = weekends.find(w => w.id === wkEditingId);
       if (wk) {
@@ -446,6 +457,7 @@ export default function RaceWeekendView({
   // ── [15]/[11] New-session modal (pre-populated by suggestNextSession) ──────
 
   const openNewSession = () => {
+    if (!activeCarId) { onGoToGarage(); return; }
     if (!currentWeekend) { openWeekendForm(); return; }
     if (activeWeekendMissingSetup) {
       onInfo?.(`${lifecycleLabel('weekend')} is missing. Restore it before logging or adjusting a run.`);
@@ -598,14 +610,14 @@ export default function RaceWeekendView({
         <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-2">
           <span className="material-symbols-outlined text-primary">calendar_today</span>
           <h3 className="font-display text-base font-bold uppercase text-on-surface tracking-wide">
-            {wkEditingId ? 'Edit Race Weekend' : 'Create Race Weekend'}
+            {wkEditingId ? 'Edit Race Day' : 'Create Race Day'}
           </h3>
         </div>
 
         <form onSubmit={handleWeekendFormSubmit} className="space-y-3">
           <div>
             <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
-              Weekend Event Name
+              Race Day Name
             </label>
             <input
               type="text"
@@ -679,7 +691,7 @@ export default function RaceWeekendView({
               type="submit"
               className="px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
             >
-              {wkEditingId ? 'SAVE CHANGES' : 'CREATE WEEKEND'}
+              {wkEditingId ? 'SAVE CHANGES' : 'CREATE RACE DAY'}
             </button>
           </div>
         </form>
@@ -707,7 +719,7 @@ export default function RaceWeekendView({
         <form onSubmit={handleNewSessionSubmit} className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
           {/* Session always belongs to device-active weekend. */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Active Weekend</label>
+            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Active Race Day</label>
             <div className="w-full bg-surface-container text-xs text-on-surface p-2.5 border border-outline-variant rounded font-mono">
               {currentWeekend.name} ({currentWeekend.track})
             </div>
@@ -882,13 +894,22 @@ export default function RaceWeekendView({
 
   // ── Empty / no-selection states ─────────────────────────────────────────────
 
+  if (visibleWeekends.length === 0 && !activeCarId) {
+    return (
+      <div className="h-full">
+        <CarRequiredPrompt onAddCar={onGoToGarage} />
+        {undoToastEl}
+      </div>
+    );
+  }
+
   if (visibleWeekends.length === 0) {
     return (
       <div className="h-full">
         <EmptyState
           icon="event"
-          title="No race weekends yet — where are you racing next?"
-          cta={{ label: 'New weekend', icon: 'add', onClick: () => openWeekendForm() }}
+          title="No Race Days yet — where are you racing next?"
+          cta={{ label: 'New Race Day', icon: 'add', onClick: () => openWeekendForm() }}
         />
         {weekendFormModal}
         {undoToastEl}
@@ -901,15 +922,17 @@ export default function RaceWeekendView({
     const history = sortedWeekends.filter(weekend => isWeekendFinished(weekend));
     return (
       <div className="space-y-5 pb-4">
-        <section className="rounded-xl border border-outline-variant bg-surface-container p-4 text-center space-y-3">
-          <p className="font-display text-base font-bold uppercase text-on-surface">No active weekend</p>
-          <p className="font-mono text-xs text-on-surface-variant">Start a race night or test day. Finished weekends stay below as history.</p>
-          <button type="button" onClick={() => openWeekendForm()} className="min-h-12 px-4 rounded-xl bg-primary text-on-primary font-display font-bold uppercase">
-            + New weekend
-          </button>
-        </section>
+        {!activeCarId ? <CarRequiredPrompt onAddCar={onGoToGarage} /> : (
+          <section className="rounded-xl border border-outline-variant bg-surface-container p-4 text-center space-y-3">
+            <p className="font-display text-base font-bold uppercase text-on-surface">No active Race Day</p>
+            <p className="font-mono text-xs text-on-surface-variant">Start a race night or test day. Finished Race Days stay below as history.</p>
+            <button type="button" onClick={() => openWeekendForm()} className="min-h-12 px-4 rounded-xl bg-primary text-on-primary font-display font-bold uppercase">
+              + New Race Day
+            </button>
+          </section>
+        )}
         {available.length > 0 && <section className="space-y-2">
-          <h2 className="font-display text-sm font-bold uppercase text-on-surface">Open weekends</h2>
+          <h2 className="font-display text-sm font-bold uppercase text-on-surface">Open Race Days</h2>
           <div className="flex flex-wrap gap-2">
           {available.map(weekend => (
             <button key={weekend.id} onClick={() => onActivateWeekend(weekend.id)} className="px-3 py-2 border border-primary/50 rounded text-primary font-mono text-xs font-bold uppercase">
@@ -919,7 +942,7 @@ export default function RaceWeekendView({
           </div>
         </section>}
         {history.length > 0 && <section className="space-y-3">
-          <h2 className="font-display text-sm font-bold uppercase text-on-surface">Weekend history</h2>
+          <h2 className="font-display text-sm font-bold uppercase text-on-surface">Race Day history</h2>
           {history.map(weekend => (
             <article key={weekend.id} className="rounded-xl border border-outline-variant bg-surface-container p-4">
               <div className="flex items-start justify-between gap-3">
@@ -968,7 +991,7 @@ export default function RaceWeekendView({
             </div>
             <button
               type="button"
-              aria-label="Edit weekend"
+              aria-label="Edit Race Day"
               onClick={() => openWeekendForm(currentWeekend)}
               className="flex min-w-12 min-h-12 items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors"
             >
@@ -1051,10 +1074,10 @@ export default function RaceWeekendView({
 
           {/* Weekend Notes */}
           <div className="p-4">
-            <label className="font-mono text-[10px] uppercase font-bold text-on-surface-variant tracking-wider block mb-2">Weekend Notes</label>
+            <label className="font-mono text-[10px] uppercase font-bold text-on-surface-variant tracking-wider block mb-2">Race Day Notes</label>
             <textarea
               className="w-full bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded p-3 text-sm text-on-surface font-mono min-h-[72px] outline-none resize-none"
-              placeholder="Overall notes for this weekend — goals, track conditions, key takeaways…"
+              placeholder="Overall notes for this Race Day — goals, track conditions, key takeaways…"
               value={currentWeekend.notes || ''}
               onChange={e => handleWeekendNotes(e.target.value)}
             />
@@ -1063,19 +1086,21 @@ export default function RaceWeekendView({
         </section>
       )}
 
-      <button
-        onClick={openNewSession}
-        disabled={activeWeekendMissingSetup}
-        className={`w-full flex items-center justify-center gap-2 py-3 min-h-12 rounded-xl border-2 border-dashed transition-all font-display font-bold uppercase tracking-wider text-sm ${activeWeekendMissingSetup
-          ? 'border-outline-variant/50 text-on-surface-variant/50 cursor-not-allowed'
-          : 'border-primary/50 hover:border-primary hover:bg-primary/10 active:scale-[0.98] text-primary'}`}
-      >
-        <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
-        Log Run
-      </button>
+      {!activeCarId ? <CarRequiredPrompt onAddCar={onGoToGarage} /> : (
+        <button
+          onClick={openNewSession}
+          disabled={activeWeekendMissingSetup}
+          className={`w-full flex items-center justify-center gap-2 py-3 min-h-12 rounded-xl border-2 border-dashed transition-all font-display font-bold uppercase tracking-wider text-sm ${activeWeekendMissingSetup
+            ? 'border-outline-variant/50 text-on-surface-variant/50 cursor-not-allowed'
+            : 'border-primary/50 hover:border-primary hover:bg-primary/10 active:scale-[0.98] text-primary'}`}
+        >
+          <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
+          Log Run
+        </button>
+      )}
       {activeWeekendMissingSetup && (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-center font-mono text-xs text-on-surface">
-          {lifecycleLabel('weekend')} is missing. Restore it before logging or adjusting a run. You can still finish this weekend.
+          {lifecycleLabel('weekend')} is missing. Restore it before logging or adjusting a run. You can still finish this Race Day.
         </p>
       )}
 
@@ -1363,11 +1388,11 @@ export default function RaceWeekendView({
       </section>
       )}
 
-      {/* ── All Weekends (active first, then date desc — [15]) ────────────── */}
+      {/* ── All Race Days (active first, then date desc — [15]) ───────────── */}
       {sortedWeekends.length > 0 && (
         <section>
           <h2 className="text-on-surface font-display font-bold uppercase mb-3 text-sm tracking-wide">
-            All Weekends
+            All Race Days
           </h2>
 
           <div className="flex flex-col gap-3">
@@ -1410,7 +1435,7 @@ export default function RaceWeekendView({
                       <span
                         role="button"
                         tabIndex={0}
-                        aria-label={`Weekend actions for ${wk.name}`}
+                        aria-label={`Race Day actions for ${wk.name}`}
                         onClick={event => { event.stopPropagation(); setMenuWeekendId(prev => prev === wk.id ? null : wk.id); }}
                         onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setMenuWeekendId(prev => prev === wk.id ? null : wk.id); } }}
                         className="flex min-w-12 min-h-12 items-center justify-center rounded-full text-on-surface-variant hover:text-primary"
@@ -1431,7 +1456,7 @@ export default function RaceWeekendView({
                           icon="timer"
                           title="No runs logged yet"
                           body={isWeekendFinished(wk) ? 'Test day finished with no logged runs.' : 'Log a run after your first laps.'}
-                          cta={isWeekendFinished(wk) ? undefined : (isActiveWk ? { label: '+ Log run', onClick: openNewSession } : { label: 'Make weekend active', onClick: () => onActivateWeekend(wk.id) })}
+                          cta={isWeekendFinished(wk) ? undefined : (isActiveWk ? { label: '+ Log run', onClick: openNewSession } : { label: 'Make Race Day active', onClick: () => onActivateWeekend(wk.id) })}
                         />
                       )}
                       {wkSessions.map(sx => {
@@ -1503,19 +1528,19 @@ export default function RaceWeekendView({
       {currentWeekend && !isWeekendFinished(currentWeekend) && (
         <section className="rounded-xl border border-primary/40 bg-primary/5 p-4 space-y-3">
           <div>
-            <h2 className="font-display font-bold uppercase text-on-surface">Finish Weekend</h2>
+            <h2 className="font-display font-bold uppercase text-on-surface">Finish Race Day</h2>
             <p className="font-mono text-xs text-on-surface-variant mt-1">Saves {lifecycleLabel('final', currentWeekend)}, closes this race night or test day, and makes that setup your new Current Setup.</p>
           </div>
           <button
             type="button"
             onClick={() => {
-              if (window.confirm(`Finish ${currentWeekend.name}? ${lifecycleLabel('final', currentWeekend)} will be saved and this weekend will move to history.`)) {
+              if (window.confirm(`Finish ${currentWeekend.name}? ${lifecycleLabel('final', currentWeekend)} will be saved and this Race Day will move to history.`)) {
                 onFinishWeekend(currentWeekend.id);
               }
             }}
             className="w-full min-h-12 rounded-xl border-2 border-primary bg-primary text-on-primary font-display font-bold uppercase tracking-wide"
           >
-            Finish Weekend
+            Finish Race Day
           </button>
         </section>
       )}
@@ -1590,7 +1615,7 @@ export default function RaceWeekendView({
       <BottomSheet
         open={!!menuWeekend}
         onClose={() => setMenuWeekendId(null)}
-        title={menuWeekend?.name ?? 'Weekend'}
+        title={menuWeekend?.name ?? 'Race Day'}
       >
         {menuWeekend && (
           <div className="space-y-1 pb-2">
@@ -1601,7 +1626,7 @@ export default function RaceWeekendView({
               className="tap-target-block w-full gap-3 rounded-xl px-3 text-left text-on-surface hover:bg-surface-container-high disabled:opacity-40"
             >
               <span className="material-symbols-outlined text-primary">{sharingWeekendId === menuWeekend.id ? 'progress_activity' : 'share'}</span>
-              Share weekend PDF
+              Share Race Day PDF
             </button>
             <button
               type="button"
@@ -1609,7 +1634,7 @@ export default function RaceWeekendView({
               className="tap-target-block w-full gap-3 rounded-xl px-3 text-left text-on-surface hover:bg-surface-container-high"
             >
               <span className="material-symbols-outlined text-primary">edit</span>
-              Edit weekend
+              Edit Race Day
             </button>
             <button
               type="button"
@@ -1617,7 +1642,7 @@ export default function RaceWeekendView({
               className="tap-target-block w-full gap-3 rounded-xl px-3 text-left text-red-400 hover:bg-surface-container-high"
             >
               <span className="material-symbols-outlined">delete</span>
-              Delete weekend
+              Delete Race Day
             </button>
           </div>
         )}

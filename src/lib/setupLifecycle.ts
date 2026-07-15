@@ -17,6 +17,7 @@ export function lifecycleLabel(role: Setup['lifecycleRole'], weekend?: RaceWeeke
 export function displayLifecycleText(stored: string): string {
   return stored
     .replace(/No setup baseline/gi, 'No starting setup')
+    .replace(/^Race Weekend (?=(?:Baseline|Weekend|Final|Starting|Live-Trackside|Finished|Raced|Current) Setup$)/, 'Race Day ')
     .replace(/Baseline Setup/g, 'Starting Setup')
     .replace(/Weekend Setup/g, 'Live-Trackside Setup')
     .replace(/Final Setup/g, 'Finished Setup');
@@ -125,7 +126,7 @@ export function startWeekendLifecycle(
 ): StartedWeekendLifecycle {
   const baselineId = `setup-baseline-${weekend.id}`;
   const weekendSetupId = `setup-weekend-${weekend.id}`;
-  const versionDate = weekend.date || 'Race Weekend';
+  const versionDate = weekend.date || 'Race Day';
 
   const baseline: Setup = {
     ...cloneSetup(source),
@@ -186,7 +187,7 @@ export function finishWeekendLifecycle(
   fallbackSetup?: Setup | null,
 ): FinishedWeekendLifecycle | null {
   if (isWeekendFinished(weekend)) return null;
-  const versionDate = weekend.date || 'Race Weekend';
+  const versionDate = weekend.date || 'Race Day';
   const weekendSetupId = `setup-weekend-${weekend.id}`;
   const finalSetupId = `setup-final-${weekend.id}`;
   const currentSetupId = `setup-current-${weekend.id}`;

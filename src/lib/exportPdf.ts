@@ -138,7 +138,7 @@ function weekendSection(weekend: RaceWeekend, accounting: AccountingEntry[]): { 
     lines: [
       weekend.name,
       `${weekend.track} | ${weekend.date}`,
-      weekend.notes ? `Weekend notes: ${weekend.notes}` : '',
+      weekend.notes ? `Race Day notes: ${weekend.notes}` : '',
       `Runs: ${weekend.sessions.length}`,
       ...weekend.sessions.flatMap(run => [
         `${run.name} (${run.type})`,
@@ -184,9 +184,9 @@ export function buildSetupReport(setup: Setup, activeSession?: ActiveSession): R
 export function buildWeekendReport(weekend: RaceWeekend, accounting: AccountingEntry[] = []): ReportDocument {
   const section = weekendSection(weekend, accounting);
   return {
-    title: 'Weekend Report',
+    title: 'Race Day Report',
     subtitle: `${weekend.name} · ${weekend.track}`,
-    filename: reportFilename(weekend.track || weekend.name || 'weekend', weekend.date),
+    filename: reportFilename(weekend.track || weekend.name || 'race-day', weekend.date),
     bodyHtml: section.html,
     textLines: section.lines,
   };
@@ -206,10 +206,10 @@ export function buildMasterReport(setup: Setup, activeSession: ActiveSession, we
   const weekendParts = weekends.map(weekend => weekendSection(weekend, accounting));
   const trackersPart = trackersSection('all', todos, accounting);
   return {
-    title: 'Master Report', subtitle: 'Full race-team report — setup, weekends and trackers',
+    title: 'Master Report', subtitle: 'Full race-team report — setup, Race Days and trackers',
     filename: reportFilename('full-report'),
     bodyHtml: setupPart.html
-      + (weekendParts.length ? `<h1 style="page-break-before:always">Weekends (${weekendParts.length})</h1>${weekendParts.map(part => part.html).join('')}` : '')
+      + (weekendParts.length ? `<h1 style="page-break-before:always">Race Days (${weekendParts.length})</h1>${weekendParts.map(part => part.html).join('')}` : '')
       + `<h1 style="page-break-before:always">Trackers</h1>${trackersPart.html}`,
     textLines: [...setupPart.lines, '', ...weekendParts.flatMap(part => [...part.lines, '']), ...trackersPart.lines],
   };

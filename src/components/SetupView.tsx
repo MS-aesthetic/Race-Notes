@@ -4,6 +4,7 @@ import { User } from '@supabase/supabase-js';
 import { uploadAttachment, deleteAttachment } from '../lib/sync';
 import SmasherLoadsView from './SmasherLoadsView';
 import SetupDiffView from './SetupDiffView';
+import CarRequiredPrompt from './CarRequiredPrompt';
 import { byActiveCar } from '../lib/scope';
 import { sortBySize } from '../lib/tireSize';
 import EmptyState from './ui/EmptyState';
@@ -460,10 +461,7 @@ export default function SetupView({
 
           {/* Create New Setup */}
           {noCar ? (
-            <div className="bg-surface-container border border-outline-variant rounded-lg p-4 flex items-center gap-3 text-on-surface-variant">
-              <span className="material-symbols-outlined text-[22px] flex-shrink-0">directions_car</span>
-              <span className="font-mono text-xs">Add a car in <strong className="text-on-surface">Settings → Garage</strong> to start.</span>
-            </div>
+            <CarRequiredPrompt onAddCar={() => onGoToGarage?.()} />
           ) : (
             <form onSubmit={handleAddNewSetup} className="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
               <div className="flex-grow">

@@ -72,7 +72,7 @@ function WeekendPicker({ weekends, value, onChange }: { weekends: RaceWeekend[];
         }}
         className="flex-1 p-2 bg-surface-container border border-outline-variant/50 focus:border-primary text-xs font-mono rounded outline-none"
       >
-        <option value="">No Weekend (general)</option>
+        <option value="">No Race Day (general)</option>
         {weekends.map(w => <option key={w.id} value={w.id}>{w.name} — {w.track}</option>)}
       </select>
     </div>
@@ -92,7 +92,7 @@ function WeekendFilter({ weekends, value, onChange }: { weekends: RaceWeekend[];
           onChange={e => onChange(e.target.value)}
           className="w-full bg-surface-container border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-2 rounded-lg outline-none appearance-none cursor-pointer pr-7"
         >
-          <option value="">All Weekends</option>
+          <option value="">All Race Days</option>
           {weekends.map(w => <option key={w.id} value={w.id}>{w.name} — {w.track}</option>)}
         </select>
         <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[15px]">expand_more</span>

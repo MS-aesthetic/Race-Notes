@@ -16,6 +16,7 @@ import EmptyState from './ui/EmptyState';
 import UndoToast, { InfoToast } from './ui/UndoToast';
 import GetRaceReadyCard from './GetRaceReadyCard';
 import { localDateValue } from '../lib/accountingDefaults';
+import CarRequiredPrompt from './CarRequiredPrompt';
 
 interface DashboardViewProps {
   weekends: RaceWeekend[];
@@ -96,9 +97,14 @@ export default function DashboardView({
   const totalSessions = weekends.reduce((n, w) => n + w.sessions.length, 0);
 
   const handleLogRun = () => {
+    if (carCount === 0) {
+      onGoToGarage();
+      return;
+    }
     if (activeWeekend) onStartNewSession();
     else setNoWeekendSheetOpen(true);
   };
+  const handleStartRaceDay = () => carCount === 0 ? onGoToGarage() : onStartNewWeekend();
 
   // Filter at display time — never mutate the master arrays
   const displayedSetups = byActiveCar(savedSetups, activeCarId);
@@ -218,8 +224,10 @@ export default function DashboardView({
           onClick={handleLogRun}
           className="w-full min-h-16 bg-primary text-on-primary rounded-xl shadow-lg font-display text-2xl font-bold uppercase tracking-wide flex items-center justify-center gap-3 hover:opacity-90 active:scale-[0.99] transition-all"
         >
-          <span className="material-symbols-outlined text-[30px]" style={{ fontVariationSettings: "'FILL' 1" }}>timer</span>
-          + Log Run
+          <span className="material-symbols-outlined text-[30px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+            {carCount === 0 ? 'directions_car' : 'timer'}
+          </span>
+          {carCount === 0 ? 'Add a Car to Log Runs' : '+ Log Run'}
         </button>
         {lastRun && (
           <button
@@ -235,25 +243,27 @@ export default function DashboardView({
         )}
       </section>
 
-      {/* [9] ACTIVE WEEKEND SUMMARY — the full list lives in the Sessions tab */}
+      {/* [9] ACTIVE RACE DAY SUMMARY — the full list lives in the Sessions tab */}
       <section id="section-active-weekend">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">Active Weekend</h2>
+          <h2 className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">Active Race Day</h2>
           <button
-            onClick={onStartNewWeekend}
+            onClick={handleStartRaceDay}
             className="min-h-12 px-2 font-mono text-[11px] font-bold uppercase text-primary hover:opacity-80"
           >
-            + New Weekend
+            + New Race Day
           </button>
         </div>
 
-        {visibleWeekends.length === 0 ? (
+        {carCount === 0 ? (
+          <CarRequiredPrompt onAddCar={onGoToGarage} />
+        ) : visibleWeekends.length === 0 ? (
           <div className="bg-surface-container border border-outline-variant rounded-lg">
             <EmptyState
               icon="sports_score"
-              title="No race weekends yet"
-              body="Start a weekend, then log runs, laps, setup changes, and maintenance."
-              cta={{ label: '+ Race Weekend', icon: 'calendar_today', onClick: onStartNewWeekend }}
+              title="No Race Days yet"
+              body="Start a Race Day, then log runs, laps, setup changes, and maintenance."
+              cta={{ label: '+ Race Day', icon: 'calendar_today', onClick: handleStartRaceDay }}
             />
           </div>
         ) : !activeWeekend ? (
@@ -262,7 +272,7 @@ export default function DashboardView({
             className="w-full min-h-12 px-4 py-3 flex items-center justify-between gap-2 bg-surface-container border border-outline-variant rounded-lg text-left hover:bg-surface-container-high transition-colors"
           >
             <span className="font-mono text-xs text-on-surface-variant">
-              No active weekend — pick one in <span className="text-primary font-bold">Sessions</span>
+              No active Race Day — pick one in <span className="text-primary font-bold">Sessions</span>
             </span>
             <span className="material-symbols-outlined text-on-surface-variant/50 text-[18px]">arrow_forward</span>
           </button>
@@ -291,7 +301,7 @@ export default function DashboardView({
                 </div>
               </button>
               <button
-                aria-label={`Weekend actions for ${activeWeekend.name}`}
+                aria-label={`Race Day actions for ${activeWeekend.name}`}
                 onClick={() => setWeekendMenuOpen(true)}
                 className="min-w-12 flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
               >
@@ -430,11 +440,11 @@ export default function DashboardView({
       <BottomSheet
         open={noWeekendSheetOpen}
         onClose={() => setNoWeekendSheetOpen(false)}
-        title="No active weekend — start one?"
+        title="No active Race Day — start one?"
       >
         <div className="space-y-3 pb-2">
           <p className="text-sm text-on-surface-variant">
-            Runs live inside a race weekend. Start one and you’ll go straight into your first run.
+            Runs live inside a Race Day. Start one and you’ll go straight into your first run.
           </p>
           {visibleWeekends.length > 0 ? (
             <button
@@ -442,7 +452,7 @@ export default function DashboardView({
               className="w-full min-h-14 bg-primary text-on-primary rounded-xl font-display font-bold uppercase tracking-wide flex items-center justify-center gap-2 active:opacity-90"
             >
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
-              <span className="truncate">Start weekend at {lastTrack || 'last track'} today</span>
+              <span className="truncate">Start Race Day at {lastTrack || 'last track'} today</span>
             </button>
           ) : (
             <button
@@ -450,7 +460,7 @@ export default function DashboardView({
               className="w-full min-h-14 bg-primary text-on-primary rounded-xl font-display font-bold uppercase tracking-wide flex items-center justify-center gap-2 active:opacity-90"
             >
               <span className="material-symbols-outlined">calendar_today</span>
-              Set up your first weekend
+              Set up your first Race Day
             </button>
           )}
           <button
@@ -466,7 +476,7 @@ export default function DashboardView({
       <BottomSheet
         open={weekendMenuOpen}
         onClose={() => setWeekendMenuOpen(false)}
-        title={activeWeekend?.name ?? 'Weekend'}
+        title={activeWeekend?.name ?? 'Race Day'}
       >
         <div className="space-y-1 pb-2">
           <button
@@ -481,7 +491,7 @@ export default function DashboardView({
             className="tap-target-block gap-3 rounded-xl px-3 text-left text-red-400 hover:bg-surface-container-high transition-colors"
           >
             <span className="material-symbols-outlined">delete</span>
-            Delete weekend
+            Delete Race Day
           </button>
         </div>
       </BottomSheet>

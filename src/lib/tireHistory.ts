@@ -180,7 +180,7 @@ const csvEscape = (val: string | number): string => {
 };
 
 export function buildTireUsageCsv(tires: TireInventoryItem[], weekends: RaceWeekend[]): string {
-  const header = ['Tire #', 'Size', 'Compound', 'Weekend', 'Track', 'Date', 'Session', 'Session Type', 'Corner', 'Est. Laps'];
+  const header = ['Tire #', 'Size', 'Compound', 'Race Day', 'Track', 'Date', 'Session', 'Session Type', 'Corner', 'Est. Laps'];
   const lines = [header.join(',')];
 
   for (const tire of tires) {
@@ -237,7 +237,7 @@ export function buildTireUsageReportHtml(tires: TireInventoryItem[], weekends: R
         <h2>Tire #${tire.tireNumber} <span class="meta">${tire.size} · ${tire.compound} · BS ${tire.wheelBackspacing}"${tire.durometer ? ` · Duro ${tire.durometer}` : ''}</span></h2>
         <p class="total">Total estimated laps: <strong>${totalLaps}</strong> across ${usage.length} session${usage.length !== 1 ? 's' : ''}</p>
         <table>
-          <thead><tr><th>Date</th><th>Weekend</th><th>Track</th><th>Session</th><th>Type</th><th>Corner</th><th>Laps</th></tr></thead>
+          <thead><tr><th>Date</th><th>Race Day</th><th>Track</th><th>Session</th><th>Type</th><th>Corner</th><th>Laps</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>`;

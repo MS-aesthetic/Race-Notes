@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import AuthView from './AuthView';
 import ExportView from './ExportView';
 import GarageView from './GarageView';
@@ -29,6 +29,7 @@ interface SettingsViewProps {
   tireCount: (carId: string) => number;
   shockCount: (carId: string) => number;
   initialSubTab?: 'account' | 'appearance' | 'export' | 'garage' | 'guide';
+  garageRequestKey?: number;
   onClearAllData?: () => Promise<void>;
   tireInventory?: TireInventoryItem[];
   onStartWeekend?: () => void;
@@ -43,10 +44,14 @@ const ACCENT_PRESETS = [
   { label: 'Cyan',        hex: '#7de8e8' },
 ];
 
-export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, onClearAllData, tireInventory = [], onStartWeekend }: SettingsViewProps) {
+export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, garageRequestKey = 0, onClearAllData, tireInventory = [], onStartWeekend }: SettingsViewProps) {
   const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>(initialSubTab ?? 'garage');
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0); // 0=idle, 1=confirm, 2=clearing
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (garageRequestKey > 0) setSubTab('garage');
+  }, [garageRequestKey]);
 
   return (
     <div className="flex flex-col gap-4 h-full">
@@ -109,7 +114,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                 <h3 className="font-display font-bold uppercase text-sm text-red-400 tracking-wide">Danger Zone</h3>
               </div>
               <p className="text-[11px] text-on-surface-variant font-mono">
-                Permanently deletes all your weekends, setups, tires, cars, and shock data — both on this device and from the cloud. This cannot be undone.
+                Permanently deletes all your Race Days, setups, tires, cars, and shock data — both on this device and from the cloud. This cannot be undone.
               </p>
 
               {clearStep === 0 && (

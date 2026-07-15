@@ -44,6 +44,7 @@ import { buildQuickServiceRecords, type QuickServiceOutcome, type QuickServiceRe
 import { useOnlineStatus } from './lib/saveStatus';
 import { hasOpenSheets, isPopSuppressed } from './lib/backStack';
 import { isAppGuideSection } from './lib/helpRouting';
+import { resolveRaceDayCreationTarget } from './lib/raceDayGate';
 import { Todo } from './types';
 
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
@@ -366,6 +367,7 @@ export default function App() {
   // Initial Settings sub-tab (former header chip deep-links now live in the
   // ContextStrip / HelpSheet, so nothing sets this at runtime anymore)
   const [settingsSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>('garage');
+  const [settingsViewKey, setSettingsViewKey] = useState(0);
   // Deep-link into SetupView sub-tabs from Dashboard
   const [setupSubTab, setSetupSubTab] = useState<'setups' | 'smasherloads' | 'tires'>('setups');
 
@@ -491,12 +493,23 @@ export default function App() {
   // This one-shot action tells the Sessions tab to open a modal on arrival.
   const [rwInitialAction, setRwInitialAction] = useState<'new-session' | 'new-weekend' | null>(null);
   const continueToRunAfterWeekendRef = useRef(false);
+  const openGarage = () => {
+    setSettingsViewKey(value => value + 1);
+    setActiveTab('settings');
+  };
   const openRaceWeekendAction = (action: 'new-session' | 'new-weekend') => {
-    setRwInitialAction(action);
-    setActiveTab('raceweekend');
+    const target = resolveRaceDayCreationTarget(activeCarId, action);
+    setRwInitialAction(target.initialAction);
+    if (target.tab === 'settings') openGarage();
+    else setActiveTab(target.tab);
   };
 
   const openWeekendForRun = () => {
+    if (!activeCarId) {
+      continueToRunAfterWeekendRef.current = false;
+      openRaceWeekendAction('new-weekend');
+      return;
+    }
     continueToRunAfterWeekendRef.current = true;
     openRaceWeekendAction('new-weekend');
   };
@@ -967,7 +980,7 @@ export default function App() {
         blockedMutation = true;
       }
     }
-    if (blockedMutation) setInfoToast('Historical setups are view-only. Finish the weekend before editing Current Setup.');
+    if (blockedMutation) setInfoToast('Historical setups are view-only. Finish the Race Day before editing Current Setup.');
 
     const requestedActiveId = eventSetupId || activeId;
     const requested = requestedActiveId ? safeSetups.find(item => item.id === requestedActiveId) : null;
@@ -1018,7 +1031,7 @@ export default function App() {
       ? weekendsRef.current.find(item => item.id === updatedSession.weekendId)
       : null;
     if (isWeekendFinished(targetWeekend)) {
-      setInfoToast('Finished weekends are view-only.');
+      setInfoToast('Finished Race Days are view-only.');
       return;
     }
     const updatedWeekends = applyActiveSessionToWeekends(weekendsRef.current, updatedSession);
@@ -1098,7 +1111,7 @@ export default function App() {
   const handleActivateWeekend = (weekendId: string) => {
     const target = weekends.find(w => w.id === weekendId);
     if (!target || isWeekendFinished(target)) {
-      setInfoToast('Finished weekends stay in history and cannot be made active.');
+      setInfoToast('Finished Race Days stay in history and cannot be made active.');
       return;
     }
     setActiveWeekendId(target.id);
@@ -1137,7 +1150,7 @@ export default function App() {
   const handleCreateNewWeekend = (data: NewWeekendData) => {
     if (!data.name.trim() || !data.track.trim()) return;
     if (!activeCarId) {
-      setInfoToast('Choose a car before starting a weekend.');
+      setInfoToast('Add a car before starting a Race Day.');
       return;
     }
 
@@ -1209,6 +1222,10 @@ export default function App() {
   };
 
   const handleCreateNewSession = (data: NewSessionData) => {
+    if (!activeCarId) {
+      openGarage();
+      return;
+    }
     // Sessions may only be created under the device-active weekend.
     if (!activeWeekendId || data.weekendId !== activeWeekendId) return;
 
@@ -1392,6 +1409,10 @@ export default function App() {
   // dated today (handleCreateNewWeekend auto-activates it), then deep-link
   // straight into the new-session flow on the Sessions tab.
   const handleQuickStartWeekend = () => {
+    if (!activeCarId) {
+      openRaceWeekendAction('new-weekend');
+      return;
+    }
     const track = sortWeekends(weekends, activeWeekendId).find(w => w.track)?.track || 'Home Track';
     const today = new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
     handleCreateNewWeekend({ name: `${track} — ${today}`, track, date: today });
@@ -1497,7 +1518,7 @@ export default function App() {
       carType: activeCar?.carType || '',
       carId: activeCarId || undefined,
       lifecycleRole: 'baseline',
-      versionLabel: `${target.date || 'Race Weekend'} ${lifecycleLabel('baseline')}`,
+      versionLabel: `${target.date || 'Race Day'} ${lifecycleLabel('baseline')}`,
       weekendId: target.id,
       lockedAt: now,
       changeLog: [],
@@ -1505,7 +1526,7 @@ export default function App() {
     });
     const result = finishWeekendLifecycle(target, savedSetupsRef.current, now, finishFallback);
     if (!result) {
-      setInfoToast(`${lifecycleLabel('weekend')} is missing. Restore it before finishing this weekend.`);
+      setInfoToast(`${lifecycleLabel('weekend')} is missing. Restore it before finishing this Race Day.`);
       return;
     }
     const updatedWeekends = weekendsRef.current.map(item => item.id === target.id ? result.weekend : item);
@@ -1625,7 +1646,7 @@ export default function App() {
           <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto">
             <div className="w-full max-w-sm">
               <p className="text-center text-on-surface-variant text-xs leading-relaxed mb-6">
-                Register or sign in to start tracking setups, sessions, and race weekends.
+                Register or sign in to start tracking setups, sessions, and Race Days.
                 <br />
                 <span className="text-on-surface-variant/50">
                   Once you've signed in on this device, the app keeps working with no signal.
@@ -1694,6 +1715,7 @@ export default function App() {
             onSelectCar={handleSelectCar}
             onSelectWeekend={handleActivateWeekend}
             onNewWeekend={() => openRaceWeekendAction('new-weekend')}
+            onAddCar={openGarage}
           />
         )}
 
@@ -1768,7 +1790,7 @@ export default function App() {
                   }}
                   onGoToSetups={() => setActiveTab('setups')}
                   onGoToSessions={() => setActiveTab('raceweekend')}
-                  onGoToGarage={() => setActiveTab('settings')}
+                  onGoToGarage={openGarage}
                   onGoToTodos={() => { setTrackersSubTab('checklist'); setActiveTab('trackers'); }}
                   onGoToTires={() => {
                     setSetupSubTab('tires');
@@ -1799,7 +1821,7 @@ export default function App() {
                   onSaveSetups={handleSaveSetups}
                   onInfo={setInfoToast}
                   onHelp={openHelp}
-                  onGoToGarage={() => setActiveTab('settings')}
+                  onGoToGarage={openGarage}
                 />
               )}
 
@@ -1828,6 +1850,7 @@ export default function App() {
                   onFinishWeekend={handleFinishWeekend}
                   initialAction={rwInitialAction ?? undefined}
                   onInitialActionConsumed={() => setRwInitialAction(null)}
+                  onGoToGarage={openGarage}
                 />
               )}
 
@@ -1854,6 +1877,7 @@ export default function App() {
                   shockCount={carShockCount}
                   onStartWeekend={() => openRaceWeekendAction('new-weekend')}
                   initialSubTab={settingsSubTab}
+                  garageRequestKey={settingsViewKey}
                   onClearAllData={handleClearAllData}
                   tireInventory={tireInventory}
                 />

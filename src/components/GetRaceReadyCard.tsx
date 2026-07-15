@@ -45,7 +45,7 @@ export default function GetRaceReadyCard({
 
   const steps = [
     { key: 'car', label: 'Add your car', done: carCount > 0, icon: 'directions_car', onGo: onAddCar },
-    { key: 'weekend', label: 'Start a race weekend', done: weekendCount > 0, icon: 'calendar_today', onGo: onStartWeekend },
+    { key: 'weekend', label: 'Start a Race Day', done: weekendCount > 0, icon: 'calendar_today', onGo: onStartWeekend },
     { key: 'setup', label: 'Enter your starting setup', done: setupCount > 0, icon: 'tune', onGo: onEnterSetup },
     { key: 'run', label: 'Log your first run', done: sessionCount > 0, icon: 'timer', onGo: onLogRun },
   ];
@@ -108,7 +108,7 @@ export default function GetRaceReadyCard({
 
       {allDone ? (
         <p className="px-4 pb-4 text-sm text-on-surface-variant">
-          Car, weekend, setup and first run all logged. Go be fast.
+          Car, Race Day, setup and first run all logged. Go be fast.
         </p>
       ) : (
         <div className="px-2 pb-2">
