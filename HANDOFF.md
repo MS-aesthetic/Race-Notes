@@ -1,7 +1,16 @@
 # CREW CHIEF — Agent Handoff & Onboarding
 
 > **Purpose:** single entry point for any new LLM/agent picking up this project.
-> Read this first, then the linked docs. Last updated **2026-07-14**.
+> Read this first, then the linked docs. Last updated **2026-07-15**.
+
+> ### Play privacy/account deletion follow-up (2026-07-15)
+> - Active branch: `codex/play-policy-delete-account` from Release 5.0 `master`.
+> - Settings → Account now includes the privacy policy and permanent authenticated account deletion.
+> - Public pages: `/privacy/`, `/delete-account/`, `/request-received/`; stable URLs use `https://crew-chief-race-notes.netlify.app` after an explicitly authorized production publish.
+> - Supabase migrations `20260715161026`, `20260715161241`, `20260715161505`, and `20260715161637` are applied live. `delete-account` Edge Function v1 is ACTIVE with JWT verification.
+> - Deletion removes owned uploads before Auth deletion, resolves team ownership, anonymizes cached teammate identity, revokes sessions, then deletes Auth. Client racing data clears only after server success.
+> - Play listing must use the public privacy URL and account-deletion URL. Confirm its developer entity is exactly **Nimbus Engineering** before submission.
+> - Final draft: `https://6a57b47b1712493e1f563ff9--crew-chief-race-notes.netlify.app/`. Netlify Forms is enabled and detected `account-deletion-request`; 390px policy/deletion/app-shell checks had no overflow or console errors. Production unchanged.
 
 > **Active UX correction roadmap (2026-07-14):** Start at [`SPRINT_INDEX.md`](./SPRINT_INDEX.md), then read [`plan-v3-ux-corrections.md`](./plan-v3-ux-corrections.md). Original owner handoff is archived at [`docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md`](./docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md). Prior technical QA remains useful regression evidence, but rejected language, Tuning Guide structure, per-click adjustment logging, setup progression presentation, load-graph direction, checklist UX, and maintenance choices are no longer approved behavior.
 

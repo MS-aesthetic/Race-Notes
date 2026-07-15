@@ -3,8 +3,11 @@ import AuthView from './AuthView';
 import ExportView from './ExportView';
 import GarageView from './GarageView';
 import GuideView from './GuideView';
+import PrivacyPolicyView from './PrivacyPolicyView';
+import BottomSheet from './ui/BottomSheet';
 import { User } from '@supabase/supabase-js';
 import { AppUser } from '../lib/supabase';
+import { DELETE_ACCOUNT_CONFIRMATION, isDeleteAccountConfirmed } from '../lib/accountDeletion';
 import { Setup, ActiveSession, AppTheme, RaceWeekend, AccountingEntry, Todo, Car, TireInventoryItem } from '../types';
 
 interface SettingsViewProps {
@@ -31,6 +34,7 @@ interface SettingsViewProps {
   initialSubTab?: 'account' | 'appearance' | 'export' | 'garage' | 'guide';
   garageRequestKey?: number;
   onClearAllData?: () => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
   tireInventory?: TireInventoryItem[];
   onStartWeekend?: () => void;
 }
@@ -44,10 +48,34 @@ const ACCENT_PRESETS = [
   { label: 'Cyan',        hex: '#7de8e8' },
 ];
 
-export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, garageRequestKey = 0, onClearAllData, tireInventory = [], onStartWeekend }: SettingsViewProps) {
+export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, garageRequestKey = 0, onClearAllData, onDeleteAccount, tireInventory = [], onStartWeekend }: SettingsViewProps) {
   const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>(initialSubTab ?? 'garage');
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0); // 0=idle, 1=confirm, 2=clearing
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePhrase, setDeletePhrase] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const closeDeleteSheet = () => {
+    if (deletingAccount) return;
+    setDeleteOpen(false);
+    setDeletePhrase('');
+    setDeleteError('');
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (!isDeleteAccountConfirmed(deletePhrase) || deletingAccount) return;
+    setDeletingAccount(true);
+    setDeleteError('');
+    try {
+      await onDeleteAccount();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Account deletion did not finish. Device data was kept. Sign in again and retry.');
+      setDeletingAccount(false);
+    }
+  };
 
   useEffect(() => {
     if (garageRequestKey > 0) setSubTab('garage');
@@ -107,6 +135,23 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
           <div className="flex flex-col gap-4 pb-8">
             <AuthView user={user} profile={profile} onAuthChange={onAuthChange} />
 
+            <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-lg">privacy_tip</span>
+                <h3 className="font-display font-bold uppercase text-sm tracking-wide">Privacy</h3>
+              </div>
+              <p className="text-[11px] text-on-surface-variant font-mono">
+                See what data CREW CHIEF uses, where it is stored, and how to remove it.
+              </p>
+              <button
+                type="button"
+                onClick={() => setPrivacyOpen(true)}
+                className="min-h-11 w-full rounded-lg border border-outline-variant px-3 font-mono text-xs uppercase tracking-wider text-primary hover:bg-primary/10"
+              >
+                Privacy Policy
+              </button>
+            </div>
+
             {/* ── Danger Zone ──────────────────────────────────────────────── */}
             <div className="bg-surface-container border border-red-500/30 rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2">
@@ -114,7 +159,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                 <h3 className="font-display font-bold uppercase text-sm text-red-400 tracking-wide">Danger Zone</h3>
               </div>
               <p className="text-[11px] text-on-surface-variant font-mono">
-                Permanently deletes all your Race Days, setups, tires, cars, and shock data — both on this device and from the cloud. This cannot be undone.
+                Clear racing records while keeping your login, or permanently delete the entire account.
               </p>
 
               {clearStep === 0 && (
@@ -127,13 +172,13 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                   }}
                   className="w-full py-2 rounded-lg border border-red-500/50 text-red-400 font-mono text-xs uppercase tracking-wider hover:bg-red-500/10 transition-colors"
                 >
-                  Clear All Data
+                  Clear Racing Data
                 </button>
               )}
 
               {clearStep === 1 && (
                 <div className="flex flex-col gap-2">
-                  <p className="text-xs font-mono text-red-400 text-center font-bold">Are you sure? This cannot be undone.</p>
+                  <p className="text-xs font-mono text-red-400 text-center font-bold">Clear racing records but keep this account?</p>
                   <div className="flex gap-2">
                     <button
                       onClick={() => { setClearStep(0); if (clearTimerRef.current) clearTimeout(clearTimerRef.current); }}
@@ -150,7 +195,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                       }}
                       className="flex-1 py-2 rounded-lg bg-red-500/20 border border-red-500 text-red-400 font-mono text-xs uppercase tracking-wider font-bold hover:bg-red-500/30 transition-colors"
                     >
-                      Yes, Delete Everything
+                      Yes, Clear Records
                     </button>
                   </div>
                 </div>
@@ -159,6 +204,22 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
               {clearStep === 2 && (
                 <p className="text-xs font-mono text-on-surface-variant text-center py-2">Clearing…</p>
               )}
+
+              <div className="border-t border-red-500/20 pt-3">
+                {user ? (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteOpen(true)}
+                    className="min-h-11 w-full rounded-lg border border-red-500 bg-red-500/10 px-3 font-mono text-xs font-bold uppercase tracking-wider text-red-400 hover:bg-red-500/20"
+                  >
+                    Delete Account
+                  </button>
+                ) : (
+                  <p className="text-[11px] font-mono text-on-surface-variant">
+                    Connect and sign in to delete the cloud account. Offline records can still be cleared above.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -295,6 +356,56 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
 
         {subTab === 'guide' && <GuideView />}
       </div>
+
+      <BottomSheet open={privacyOpen} onClose={() => setPrivacyOpen(false)} title="Privacy Policy">
+        <PrivacyPolicyView />
+      </BottomSheet>
+
+      <BottomSheet open={deleteOpen} onClose={closeDeleteSheet} title="Delete Account">
+        <div className="space-y-4 pb-2">
+          <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-on-surface-variant">
+            This permanently deletes your login, cloud records, owned uploads, and CREW CHIEF data on this device.
+            It cannot be undone. If you own a shared team, another member becomes owner.
+          </div>
+          <label className="block space-y-2">
+            <span className="font-mono text-xs text-on-surface-variant">
+              Type <strong className="text-on-surface">{DELETE_ACCOUNT_CONFIRMATION}</strong> to confirm
+            </span>
+            <input
+              value={deletePhrase}
+              onChange={(event) => setDeletePhrase(event.target.value)}
+              disabled={deletingAccount}
+              autoCapitalize="characters"
+              autoComplete="off"
+              className="min-h-12 w-full rounded-lg border border-outline-variant bg-surface px-3 font-mono text-base text-on-surface outline-none focus:border-red-400"
+              aria-label="Type DELETE to confirm account deletion"
+            />
+          </label>
+          {deleteError && (
+            <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+              {deleteError}
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={closeDeleteSheet}
+              disabled={deletingAccount}
+              className="min-h-11 rounded-lg border border-outline-variant px-3 font-mono text-xs uppercase text-on-surface-variant disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmDeleteAccount}
+              disabled={!isDeleteAccountConfirmed(deletePhrase) || deletingAccount}
+              className="min-h-11 rounded-lg border border-red-500 bg-red-500/20 px-3 font-mono text-xs font-bold uppercase text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {deletingAccount ? 'Deleting…' : 'Delete Forever'}
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
     </div>
   );
 }

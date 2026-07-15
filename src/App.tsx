@@ -13,7 +13,7 @@ import {
   INITIAL_SHOCK_SESSIONS,
 } from './data';
 
-import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, AppUser } from './lib/supabase';
+import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, deleteAccount as deleteCloudAccount, AppUser } from './lib/supabase';
 import AuthView from './components/AuthView';
 import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, deleteShockSessionFromCloud, pushMaintenanceComponents, pullMaintenanceComponents, deleteMaintenanceComponentFromCloud, pushMaintenanceLogs, pullMaintenanceLogs, deleteMaintenanceLogFromCloud, pushChecklistTemplates, pullChecklistTemplates, deleteChecklistTemplateFromCloud, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
 import { registerForPush } from './lib/push';
@@ -45,6 +45,7 @@ import { useOnlineStatus } from './lib/saveStatus';
 import { hasOpenSheets, isPopSuppressed } from './lib/backStack';
 import { isAppGuideSection } from './lib/helpRouting';
 import { resolveRaceDayCreationTarget } from './lib/raceDayGate';
+import { clearCrewChiefLocalData } from './lib/accountDeletion';
 import { Todo } from './types';
 
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
@@ -357,6 +358,17 @@ export default function App() {
     setChecklistTemplates([]);
     setWeekendChecklists([]);
     setSyncStatus('All data cleared');
+  };
+
+  const handleDeleteAccount = async () => {
+    await deleteCloudAccount();
+    clearCrewChiefLocalData(window.localStorage);
+    setUser(null);
+    setProfile(null);
+    setTeam(null);
+    setTeamMembers([]);
+    setHasLocalAcct(false);
+    window.location.reload();
   };
 
   // Count helpers for GarageView / delete guard
@@ -1879,6 +1891,7 @@ export default function App() {
                   initialSubTab={settingsSubTab}
                   garageRequestKey={settingsViewKey}
                   onClearAllData={handleClearAllData}
+                  onDeleteAccount={handleDeleteAccount}
                   tireInventory={tireInventory}
                 />
               )}
