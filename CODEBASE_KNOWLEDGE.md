@@ -1,10 +1,10 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-14 (UX Chunk 9 — SOL QA PASS; UX correction sprints active)
-> Branch at time of writing: `preview-v3` (active UX worktree; release `master` remains separate)
+> Last updated: 2026-07-14 (Release 5.0 promoted to `master`)
+> Branch at time of writing: `master` (release baseline; future work branches from here)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
-> ⚠️ **2026-07-14:** UX Chunks 1–9 are technically complete on **`preview-v3`**. Owner-correction sprints are active; start with `SPRINT_INDEX.md`, then use `HANDOFF.md`, `ralph/CURRENT_TASK.md`, and `ralph/STATE.md` for current authority. This file remains the deep technical reference.
+> ⚠️ **2026-07-14:** UX Chunks 1–9 and correction Sprint 1 were owner-approved and released to **`master`** as 5.0. Start with `SPRINT_INDEX.md`, then use `HANDOFF.md`, `ralph/CURRENT_TASK.md`, and `ralph/STATE.md` for current authority. This file remains the deep technical reference.
 
 ## 2026-07-12 UX Chunk 4 override
 
@@ -770,13 +770,13 @@ $env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-21.0.11.10-hotspot"
 $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 ```
 
-**versionCode / versionName:** last verified `6` / `"3.3"` (checked directly in `android/app/build.gradle` on 2026-07-01). **Re-verify this before trusting it** — see the unresolved anomaly note in §0: this value has been found silently reverted to old values (e.g. back to `3`/`"3.0"`) more than once during session 8, by a process other than the assistant. Bump both values with every APK build meant to install over a previous version.
+**versionCode / versionName:** Release 5.0 is verified at `17` / `"5.0"`. Re-check `android/app/build.gradle` before every release and bump both values for any Play Store update or installable replacement.
 
-**`android/app/build.gradle` is gitignored** (`.gitignore` has a `build.gradle` entry that matches this path specifically) and contains the release keystore password in plaintext (`CrewChief2024!`). This means: (1) version bumps here are **local-only and never appear in git history/commits**, and (2) don't assume `git log`/`git diff` will show version history for this file — check the live file directly.
+**`android/app/build.gradle` is tracked as of Release 5.0** so package/version and Android build configuration are reproducible from Git. Release credentials remain local-only in ignored `android/keystore.properties` or environment variables. Never copy signing credentials into tracked files.
 
 **Android API 36 readiness (session 8):** bumped ahead of Google Play's Aug 31, 2026 Android 16 (API 36) requirement deadline.
 - `android/variables.gradle`: `compileSdkVersion` / `targetSdkVersion` 35 → 36
-- `android/build.gradle` (and a duplicate, seemingly-unused copy at repo root `build.gradle` — kept in sync anyway): AGP classpath `8.3.2` → `8.9.1`
+- `android/build.gradle`: AGP classpath `8.3.2` → `8.9.1`
 - `android/gradle/wrapper/gradle-wrapper.properties`: Gradle `8.7` → `8.11.1`
 
 **Android permissions required** (`android/app/src/main/AndroidManifest.xml`):
@@ -1079,7 +1079,7 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   offline launch therefore keeps icons and layout intact.
 - Runtime QA: 320×800 Android WebView passed dark/light × Standard/Large/X-Large/
   XX-Large; cold offline launch passed after HTTP/service-worker cache removal.
-  Current APK is versionCode 15/versionName 4.0 at root `race_notes.apk`.
+  That historical QA APK was versionCode 15/versionName 4.0; Release 5.0 supersedes it.
 - Project Codex roles live in `.codex/agents/*.toml`. Model changes happen by
   continuing one task with an explicit model override: SOL planning/QA → Terra
   implementation → SOL QA. `handoff_thread` is for checkout/worktree/host state,
@@ -1501,13 +1501,13 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   clean at 320px and 390px signed-out with no overflow or console warnings; authenticated
   preview data was unavailable and is not claimed. UXF-10 closed after SOL QA attempt 2.
 
-## 34. UXF-9 — Final Batch Gate (planned 2026-07-14)
+## 34. UXF-9 — Final Batch Gate (historical plan, closed 2026-07-14)
 
 - Exact authority is `ralph/CURRENT_TASK.md`. UXF-9 runs the complete focused harness suite,
   exact lint/build/diff gates, authenticated cloud and offline-local checks, 320/390 theme and
   size runtime, Android Back, and one final Netlify draft.
-- Technical PASS moves to **AWAITING OWNER ACCEPTANCE**. Only Maxx's ten-item walkthrough and
-  acceptance closes UXF-9/Sprint 1 and unlocks Sprint 2. No UXF-9 application code has started.
+- The planned Claude Fable authenticated walkthrough was not run. Maxx instead directly authorized
+  Release 5.0 after the automated release gates; UXF-9/Sprint 1 is closed and Sprint 2 is unstarted.
 
 ## 35. UXF-9P — Owner Preflight Corrections (2026-07-14)
 
@@ -1525,3 +1525,23 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   entries build; diff and cavecrew review clean. Final draft `6a56d1d228995bd1cef8c421` is
   overflow- and console-clean at 320/390 signed-out. Authenticated draft data was unavailable.
 - Final independent execution plan is `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md`.
+
+## 36. Release 5.0 — Master and Android Packaging (2026-07-14)
+
+- Owner authorized promotion of `preview-v3` into `master`, GitHub publication, release APK,
+  and Google Play AAB. Sprint 1 is closed; Sprint 2 remains unstarted.
+- Package is `nimbus.engineering.crewchief`, version code 17, version name 5.0, target/compile
+  API 36. Signed release outputs use one matching certificate.
+- Root `.gitignore` now anchors obsolete root Gradle ignores. Essential Android Gradle files
+  are tracked so a fresh Git clone can build. Release secrets moved from tracked documentation
+  and hardcoded Gradle config into ignored `android/keystore.properties` or environment values.
+- Existing Git history already contained old signing credentials before this release. Rotate
+  upload credentials/key through Google Play when practical; history rewrite is a separate
+  disruptive operation and was not performed.
+- Release artifacts live under ignored `release/`: `CrewChief-5.0-release.apk`,
+  `CrewChief-5.0-play.aab`, and tracked `SHA256SUMS.txt`. AAB is Google Play upload artifact.
+- Automated evidence: ten harnesses pass; exact known three-error lint baseline; 559 modules /
+  18 PWA entries web build; Gradle `assembleRelease` + `bundleRelease` pass; APK signature,
+  package/version/API, AAB JAR signature, and matching certificate pass.
+- Existing emulator had a debug-signature install, so release `adb install -r` was not forced;
+  uninstalling it would destroy local test data. Separate Claude authenticated QA was not run.

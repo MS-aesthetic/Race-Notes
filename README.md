@@ -1,19 +1,43 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# CREW CHIEF Race Notes
 
-# Run and deploy your AI Studio app
+Mobile-first dirt-track racing logbook and pit-side crew-chief tool. React 19, TypeScript,
+Vite PWA, Capacitor Android, and optional Supabase sync.
 
-This contains everything you need to run your app locally.
-https://ai.studio/apps/214ee800-c9d1-4124-8d65-1dd74f6101b9
+## Local web app
 
-## Run Locally
+```powershell
+npm ci
+npm run dev
+```
 
-**Prerequisites:**  Node.js
+Copy `.env.example` to `.env.local` when cloud auth/sync is needed. App keeps local-first
+offline behavior without cloud credentials.
 
+## Validation
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```powershell
+npm run lint
+npm run build
+```
+
+Lint currently has three documented pre-existing TypeScript errors. See `AGENTS.md`.
+
+## Android
+
+Android package: `nimbus.engineering.crewchief`.
+
+```powershell
+npm run android:build:debug
+npm run android:build:release
+npm run android:build:bundle
+```
+
+Release signing uses ignored `android/keystore.properties` or these environment variables:
+`ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and
+`ANDROID_KEY_PASSWORD`. Never commit signing credentials, keystores, Firebase configuration,
+or local SDK paths.
+
+## Project guidance
+
+Read `HANDOFF.md`, `SPRINT_INDEX.md`, `ralph/STATE.md`, and `AGENTS.md` before feature work.
+Production deploys and release merges require explicit owner approval.

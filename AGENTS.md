@@ -9,7 +9,7 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 >
 > **🧭 NEW AGENT? START WITH [`HANDOFF.md`](./HANDOFF.md)** — consolidated onboarding: current status, session history, worktree/branch gotchas, build/deploy procedures, and the Ralph-loop workflow.
 >
-> **🎨 UX correction sprints active on branch `preview-v3`.** Chunks 1–9 are technically complete; owner corrections now run from [`SPRINT_INDEX.md`](./SPRINT_INDEX.md), beginning with [`plan-v3-ux-corrections.md`](./plan-v3-ux-corrections.md). Current routing: **GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High gets one initial build pass; any QA failure transfers fixes to GPT 5.6 SOL High; `/caveman full`** for status.
+> **🏁 Release 5.0 is the `master` baseline.** Sprint 1 and UXF-9P were owner-approved for release on 2026-07-14. Future work starts from [`SPRINT_INDEX.md`](./SPRINT_INDEX.md) on a new feature branch/worktree created from `master`. Current routing: **GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High gets one initial build pass; any QA failure transfers fixes to GPT 5.6 SOL High; `/caveman full`** for status.
 >
 > This file is current workflow authority. For active status trust
 > [`SPRINT_INDEX.md`](./SPRINT_INDEX.md), [`ralph/STATE.md`](./ralph/STATE.md), and
@@ -56,13 +56,14 @@ review, and user-facing status message in this repository.
 
 ## Branch & Deploy Workflow (READ FIRST)
 
-> **BRANCH RULE — current UX feature work runs on `preview-v3`.** Use worktree
-> `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`. Never commit feature work
-> directly to `master`:
+> **BRANCH RULE — `master` is the released baseline.** Never commit new feature work
+> directly to `master`. Create a new branch/worktree from current `master`:
 > ```bash
-> git checkout preview-v3
+> git switch master
+> git pull --ff-only
+> git switch -c codex/<workstream>
 > # ...make changes...
-> git push origin preview-v3
+> git push -u origin codex/<workstream>
 > ```
 >
 > **DEPLOY RULE — default to PREVIEW.** Always deploy to a Netlify **preview/draft**
@@ -225,7 +226,7 @@ App runs fully offline without these — Supabase calls are wrapped in try/catch
 - Capacitor 8 wraps the PWA as a native Android app. After any web change: `npm run android:sync` to push to native.
 - Android source is in `android/` — avoid editing native files unless changing permissions or splash screens. Exception: `MainActivity`'s deep-link intent-filter (`com.racenotes.app://auth-callback`) is required for native Google OAuth — don't remove it.
 - Target API 36 (Android 16), AGP 8.9.1, Gradle 8.11.1 — bumped ahead of Google Play's Aug 31, 2026 API-36 requirement.
-- The built APK artifact is `race_notes.apk` at project root (also see `CrewChief.apk` naming used in some build scripts). Also copied to Google Drive as `CrewChief-preview.apk` (both `G:\My Drive\` and `G:\My Drive\Google AI Studio\`).
+- Release artifacts are written under ignored `release/`: `CrewChief-5.0-release.apk` for direct installation and `CrewChief-5.0-play.aab` for Google Play. Track artifact hashes and release notes, not APK/AAB binaries.
 - **Bump `versionCode` and `versionName`** in `android/app/build.gradle` with every APK build meant to install over a previous version.
-- `android/app/build.gradle` (versionCode/versionName, keystore password) is **gitignored** — changes there never show up in git history. **This value has been observed reverting unexpectedly outside of any known process** — always re-check the live file before assuming its versionCode.
+- `android/app/build.gradle` is tracked as of Release 5.0. Signing credentials belong only in ignored `android/keystore.properties` or the documented environment variables. Always re-check the tracked version values and never commit credentials or keystores.
 - Real builds/git pushes for this repo should go through **Windows-MCP PowerShell** (real Windows Git Credential Manager), not a Linux sandbox — sandboxes typically lack git push credentials and can produce spurious `tsc`/build artifacts on cross-platform mounts. **Never write repo files through a Linux mount** (`cp`/`>` over `/sessions/.../mnt/...`) — it can produce null-byte-corrupted files. Use the host-side file tools.

@@ -694,6 +694,10 @@ Netlify draft all pass. `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md` now controls UXF-9 
 
 ## UXF-9 — Batch QA, draft deploy, owner acceptance *(last; gates the batch)*
 
+**Release status:** CLOSED by explicit owner release authorization on 2026-07-14. Release 5.0
+was promoted to `master`; automated web and signed Android release gates passed. The separate
+Claude Fable authenticated plan remains an unexecuted reference and is not claimed as evidence.
+
 **Scope:**
 1. Full harness suite PASS: chunk6a, chunk6b, chunk7, chunk8, chunk9,
    ux-r1-starters, ux-r1-color, plus sync/lifecycle checks named in
@@ -715,10 +719,10 @@ Netlify draft all pass. `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md` now controls UXF-9 
 **Acceptance criteria:** all of the above green + Maxx sign-off logged.
 **Human prerequisites:** Maxx walkthrough availability.
 
-**Planning status (2026-07-14): READY.** `ralph/CURRENT_TASK.md` now names every current
-harness, exact repository/data/runtime/display gates, one-final-draft policy, WS-Z absorption,
-and the ten-item Maxx walkthrough. No UXF-9 application implementation has started. Technical
-PASS must wait at **AWAITING OWNER ACCEPTANCE** until Maxx signs off.
+**Release status (2026-07-14): CLOSED BY OWNER AUTHORIZATION.** The technical gates and
+owner-requested corrections are complete. Maxx explicitly authorized promotion to `master`,
+GitHub publication, and Android release packaging. The separate Claude Fable authenticated
+walkthrough was not run and is recorded as an unexecuted follow-up rather than a release claim.
 
 ---
 

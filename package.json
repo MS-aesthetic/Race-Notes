@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "crew-chief-race-notes",
   "private": true,
-  "version": "0.0.0",
+  "version": "5.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -13,7 +13,8 @@
     "android:open": "npx cap open android",
     "android:run": "npm run build && npx cap sync android && npx cap run android",
     "android:build:debug": "npm run build && npx cap sync android && cd android && .\\gradlew assembleDebug",
-    "android:build:release": "npm run build && npx cap sync android && cd android && .\\gradlew assembleRelease"
+    "android:build:release": "npm run build && npx cap sync android && cd android && .\\gradlew assembleRelease",
+    "android:build:bundle": "npm run build && npx cap sync android && cd android && .\\gradlew bundleRelease"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

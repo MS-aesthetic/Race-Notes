@@ -5,16 +5,16 @@
 
 > **Active UX correction roadmap (2026-07-14):** Start at [`SPRINT_INDEX.md`](./SPRINT_INDEX.md), then read [`plan-v3-ux-corrections.md`](./plan-v3-ux-corrections.md). Original owner handoff is archived at [`docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md`](./docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md). Prior technical QA remains useful regression evidence, but rejected language, Tuning Guide structure, per-click adjustment logging, setup progression presentation, load-graph direction, checklist UX, and maintenance choices are no longer approved behavior.
 
-> ### ⚡ Update 2026-07-12 (supersedes stale details below)
-> - **Two active trees.** Main tree `C:\Users\maxx\antigravity\Race-Notes` stays on `master` and owns the complete gitignored Android platform. UX work lives in `.worktrees\v3` on `preview-v3`. Web builds run in v3; APKs use the documented dist-to-main bridge. `.worktrees/v2` is retired.
-> - **`master` == `origin/master` == `98bb2e0`+cleanup.** The `preview` (v1) and `preview-v2` branches were retired/removed after consolidation; `master` is the single source of truth. Deploys still default to Netlify preview; production only on Maxx's explicit say-so.
+> ### ⚡ Release update 2026-07-14 (supersedes stale details below)
+> - **Release 5.0 baseline:** Main tree `C:\Users\maxx\antigravity\Race-Notes` on `master` now owns released web and Android source. `preview-v3` was promoted and is retired. Future work uses a new branch/worktree from `master`.
+> - **`master` is the release source of truth.** The `preview` (v1), `preview-v2`, and `preview-v3` development lines are retired after consolidation. Deploys still default to Netlify preview; production only on Maxx's explicit say-so.
 > - **Migration 014 IS applied to live Supabase** (`20260711151905`, applied 2026-07-11). Ignore older "014 not applied" notes.
-> - **Current APK provenance:** root `race_notes.apk` remains UX-R1 versionCode 15/versionName 4.0. Chunk 5 was runtime-tested from `.worktrees\v3\android\app\build\outputs\apk\debug\app-debug.apk`, versionCode 16/versionName 4.1; it was not copied to the root release artifact. Production remains unchanged.
-> - **Current Netlify draft:** `https://6a56d1d228995bd1cef8c421--crew-chief-race-notes.netlify.app` (UXF-9P `0361278`, final Claude QA target). Production remains untouched.
+> - **Android release artifacts:** `release/CrewChief-5.0-release.apk` and `release/CrewChief-5.0-play.aab`, package `nimbus.engineering.crewchief`, versionCode 17/versionName 5.0. The AAB is the Google Play upload package. Artifact hashes are in `release/SHA256SUMS.txt`.
+> - **Release validation draft:** `https://6a56d1d228995bd1cef8c421--crew-chief-race-notes.netlify.app` (UXF-9P `0361278`). Netlify production remains untouched; GitHub/Android release does not publish Netlify production.
 > - **Repo hygiene pass done:** removed dead PWABuilder/TWA leftovers (root gradle files, `pwabuilder-adv-sw.js`, `metadata.json`, `build_apk.bat`, `PWA_INSTRUCTIONS.md`), retired v1 `plan.md`, untracked `.idea/` + root `local.properties`, and added `android/app/google-services.json` to `.gitignore`.
 
-> ### 🎨 UX OVERHAUL track — `preview-v3` (active dev line as of 2026-07-12)
-> A dedicated UX/UI overhaul is in progress on a NEW worktree **`.worktrees/v3` (branch `preview-v3`, created from `master` `3ea6648`)**. `master` is untouched; the overhaul lands on `preview-v3` and merges to `master` only on owner approval.
+> ### 🎨 UX OVERHAUL track — historical release lineage
+> The UX/UI overhaul was built in `.worktrees/v3` on `preview-v3`, then promoted to `master` for Release 5.0 by owner authorization on 2026-07-14. The worktree and local branch are retired after release.
 > - **Historical source:** [`docs/archive/UX_ANALYSIS_2026-07-12.md`](./docs/archive/UX_ANALYSIS_2026-07-12.md) → [`docs/archive/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/archive/IMPLEMENTATION_PLAN_2026-07-12.md). Forward work uses `SPRINT_INDEX.md`.
 > - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High gets one initial implementation pass; any QA failure transfers fixes to GPT 5.6 SOL High, which loops with SOL QA until PASS. Codex model overrides and rollout metadata are verified in persistent tasks. Generic prose self-identification is not model evidence. **`/caveman full`** stays on.
 > - **Chunk status:** ✅ **1–9 complete**. C9 SOL QA attempt 2 PASS at `c8c4a21` + `254d928`; Chunks 6B–9 completion run closed.
@@ -172,8 +172,7 @@ Git worktrees in play:
 
 | Path | Branch | Role |
 |---|---|---|
-| `C:\Users\maxx\antigravity\Race-Notes` | `master` | **Main/release tree.** Owns complete Android platform and gitignored Gradle/SDK/Firebase files. Preserve existing dirty host/generated files. |
-| `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3` | `preview-v3` | **Active UX dev tree.** Chunks 1–9 and UXF-1/2/3/4/5/6/7/8/10/9P complete. UXF-9P `0361278` adds hard no-car Garage routing, Race Day display vocabulary, and finder-first Tuning Guide regression coverage. Final QA target `https://6a56d1d228995bd1cef8c421--crew-chief-race-notes.netlify.app/` is clean at 320/390 signed-out; ten harnesses, exact lint baseline, 559-module build, diff, and cavecrew review pass. Claude Fable executes `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md`; technical PASS then waits for Maxx acceptance. Prior signed-in Android debug runtime remains supporting evidence. UXF-6 migration `20260714215528` remains applied/verified. No production/push/merge/package/native/release-APK change. |
+| `C:\Users\maxx\antigravity\Race-Notes` | `master` | **Release 5.0 baseline.** Contains promoted UX Sprint 1 and reproducible Android Gradle project. Local signing/Firebase/SDK files remain ignored. Ten harnesses, exact lint baseline, 559-module web build, signed APK/AAB, package/version, and certificate gates pass. Future work branches from this commit. |
 
 Audited 2026-07-13: `preview-v3` includes UX-C5 `d5ef1f4`; `master` remains
 release/stable. Git refs do not indicate Netlify deployment state. Main-tree
@@ -384,7 +383,7 @@ Install to emulator: `"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" instal
 **Caveat:** verify current native plugins and `google-services.json` in the main tree before treating the bridged APK as release evidence. This workflow is for debug QA only.
 
 ### Release APK / production
-`android/app/build.gradle` (versionCode/versionName, keystore `crew-chief-release.jks`, pw `CrewChief2024!`, alias `crew-chief`) is gitignored and has been observed reverting — re-check before release. Bump `versionCode` for any APK meant to install over a previous one.
+`android/app/build.gradle` is tracked and stores package/version plus environment/property-based signing wiring. Credentials stay in ignored `android/keystore.properties` or environment variables. Re-check version values before release; never copy signing credentials into tracked files.
 
 ### Environment quirks that WILL bite you
 - **PowerShell blocks `npm`** (`npm.ps1 cannot be loaded` exec policy) → run npm/npx via **cmd** (`npm.cmd`) or use `mcp__Desktop_Commander__start_process` with `shell: "cmd"`.
@@ -407,7 +406,7 @@ Install to emulator: `"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" instal
 
 ## 9. Owner constraints & etiquette
 
-### Current handoff — UXF-9 final QA (2026-07-14)
+### Current handoff — Release 5.0 (2026-07-14)
 
 - UXF-9P feature `0361278` is complete: zero-car actions route directly to Settings → Garage,
   race-day/run creation is guarded before forms and mutation, global Tuning Guide starts at the
@@ -415,12 +414,12 @@ Install to emulator: `"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" instal
 - Internal `RaceWeekend` types, IDs, storage keys, sync/database names, and lifecycle role remain
   unchanged. Legacy generated labels map only at display time; arbitrary user labels are preserved.
 - Final draft: `https://6a56d1d228995bd1cef8c421--crew-chief-race-notes.netlify.app/`.
-- Exact Claude Fable QA authority: `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md`.
+- `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md` remains a useful unexecuted authenticated regression plan; do not claim it ran.
 - Ten harnesses, exact three-error lint baseline, 559-module/18-entry build, diff check, and
   cavecrew review pass. Signed-out draft is clean at 320/390; authenticated feature QA remains.
-- Next state after technical PASS is `AWAITING OWNER ACCEPTANCE`, not complete.
+- Maxx authorized release directly. Sprint 1 is closed; Sprint 2 waits for a new owner-started branch.
 
-- **Never merge `preview-v3` → `master`, and never deploy to production, without Maxx's explicit approval.** Default all deploys to Netlify preview.
+- **Never deploy Netlify production or merge a future release branch without Maxx's explicit approval.** Default web deploys to Netlify preview.
 - Migrations/secrets/console setup are treated as human gates — surface them; apply DB migrations only with owner awareness.
 - Keep commits scoped and use the loop's message convention (`WS-x attempt N: …`, `ws-qa: WS-x PASS …`).
 - Prefer new files (`src/lib/*`, `src/components/*`) wired with minimal `App.tsx` diffs; `App.tsx` and `types.ts` are hot shared files.

@@ -1,13 +1,13 @@
 # CREW CHIEF — Sprint Index (UX tracks)
 
-Branch `preview-v3`, worktree `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3`.
+Release baseline `master`, worktree `C:\Users\maxx\antigravity\Race-Notes`.
 Ralph loop consumes one sprint file at a time. Sprints run serial: 1 → 2 → 3 → 4.
 (Sprint 4's Maxx design session can be scheduled any time; its build work runs last.)
 
 | Sprint | File | Content | Status |
 |---|---|---|---|
-| 1 | `plan-v3-ux-corrections.md` | UXF-1…10 — owner-correction batch (2026-07-14 handoff) | ACTIVE — run first |
-| 2 | `sprint-2-quick-wins.md` | UXP-1,2,3,4,5,6,7,8,9,11,12,13,19,20 + gate — Low-difficulty audit items | pending — blocked by sprint 1 |
+| 1 | `plan-v3-ux-corrections.md` | UXF-1…10 — owner-correction batch (2026-07-14 handoff) | COMPLETE — released as 5.0 |
+| 2 | `sprint-2-quick-wins.md` | UXP-1,2,3,4,5,6,7,8,9,11,12,13,19,20 + gate — Low-difficulty audit items | pending — next after owner starts it |
 | 3 | `sprint-3-second-wave.md` | UXP-10,14,15,16,17,18 + gate — Medium-difficulty audit items | pending — blocked by sprint 2 |
 | 4 | `sprint-4-design-needed.md` | UXP-21,22 — High-difficulty IA items with their own Maxx design session | pending — design session gates build |
 

@@ -9,6 +9,7 @@ coverage/
 
 # Android / Capacitor
 android/local.properties
+android/keystore.properties
 android/app/google-services.json
 android/app/build/
 android/build/
@@ -24,9 +25,9 @@ android/captures/
 .gradle/
 *.iml
 local.properties
-build.gradle
-gradle.properties
-settings.gradle
+/build.gradle
+/gradle.properties
+/settings.gradle
 
 .vscode/
 .antigravity/
