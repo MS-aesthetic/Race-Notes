@@ -17,10 +17,33 @@ type Membership = {
   role: 'owner' | 'member';
 };
 
+type RemainingMember = {
+  id: string;
+  user_id: string;
+  role: 'owner' | 'member';
+  created_at: string;
+};
+
 type StorageObject = {
   bucket_id: string;
   name: string;
 };
+
+// Keep this list byte-for-byte aligned with src/lib/teamDataOwnership.ts.
+// Storage, identity, device, live, and external-share records stay personal.
+const TEAM_DATA_TRANSFER_TABLES = [
+  'setups',
+  'race_weekends',
+  'todos',
+  'tire_inventory',
+  'cars',
+  'shock_sessions',
+  'maintenance_components',
+  'maintenance_logs',
+  'checklist_templates',
+  'weekend_checklists',
+  'saved_trips',
+] as const;
 
 function bannerMatchesObject(url: string | null, objectName: string): boolean {
   if (!url) return false;
@@ -28,6 +51,20 @@ function bannerMatchesObject(url: string | null, objectName: string): boolean {
     return decodeURIComponent(url).endsWith(`/${objectName}`);
   } catch {
     return url.endsWith(`/${objectName}`);
+  }
+}
+
+async function transferPersistentTeamData(
+  admin: ReturnType<typeof createClient>,
+  departingUserId: string,
+  successorUserId: string,
+): Promise<void> {
+  for (const table of TEAM_DATA_TRANSFER_TABLES) {
+    const { error } = await admin
+      .from(table)
+      .update({ user_id: successorUserId })
+      .eq('user_id', departingUserId);
+    if (error) throw new Error(`team_data_transfer_${table}_failed`);
   }
 }
 
@@ -115,6 +152,7 @@ Deno.serve(async (req: Request) => {
       .eq('user_id', userId);
     if (membershipError) throw new Error('team_membership_lookup_failed');
 
+    const teamPlans: Array<{ membership: Membership; remaining: RemainingMember[] }> = [];
     for (const membership of (membershipRows ?? []) as Membership[]) {
       const { data: remainingRows, error: remainingError } = await admin
         .from('team_members')
@@ -123,16 +161,40 @@ Deno.serve(async (req: Request) => {
         .neq('user_id', userId)
         .order('created_at', { ascending: true });
       if (remainingError) throw new Error('team_successor_lookup_failed');
-      const remaining = remainingRows ?? [];
+      teamPlans.push({ membership, remaining: (remainingRows ?? []) as RemainingMember[] });
+    }
 
+    const continuingTeams = teamPlans.filter((plan) => plan.remaining.length > 0);
+    const hasAmbiguousContinuingTeams = continuingTeams.length > 1;
+    if (hasAmbiguousContinuingTeams) {
+      // Current tables lack team_id, so one departing row cannot be partitioned
+      // safely across multiple teams. Preserve legacy membership cleanup only.
+      console.warn('delete-account: ambiguous_multi_team_transfer_skipped');
+    }
+
+    for (const { membership, remaining } of teamPlans) {
       if (!remaining.length) {
         const { error } = await admin.from('teams').delete().eq('id', membership.team_id);
         if (error) throw new Error('empty_team_delete_failed');
-      } else if (membership.role === 'owner' && !remaining.some((row) => row.role === 'owner')) {
+        continue;
+      }
+
+      const existingOwner = remaining.find((row) => row.role === 'owner');
+      const successor = membership.role === 'owner'
+        ? existingOwner ?? remaining[0]
+        : existingOwner;
+
+      if (!successor) throw new Error('team_owner_lookup_failed');
+
+      if (!hasAmbiguousContinuingTeams) {
+        await transferPersistentTeamData(admin, userId, successor.user_id);
+      }
+
+      if (membership.role === 'owner' && !existingOwner) {
         const { error } = await admin
           .from('team_members')
           .update({ role: 'owner' })
-          .eq('id', remaining[0].id);
+          .eq('id', successor.id);
         if (error) throw new Error('team_owner_transfer_failed');
       }
     }

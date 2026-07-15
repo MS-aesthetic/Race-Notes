@@ -63,7 +63,11 @@ assert.ok(edge.indexOf("admin.auth.admin.signOut(accessToken, 'global')") < edge
 assert.match(edge, /code: 'reauth_required'/);
 assert.match(edge, /team_owner_transfer_failed/);
 assert.match(edge, /if \(!remaining\.length\)/, 'every sole-member team is removed regardless of legacy role');
-assert.match(edge, /membership\.role === 'owner' && !remaining\.some/, 'only a departing owner triggers promotion');
+assert.match(edge, /const TEAM_DATA_TRANSFER_TABLES = \[/);
+assert.match(edge, /await transferPersistentTeamData\(admin, userId, successor\.user_id\)/);
+assert.match(edge, /team_data_transfer_\$\{table\}_failed/);
+assert.match(edge, /membership\.role === 'owner' && !existingOwner/, 'only a departing owner triggers promotion');
+assert.ok(edge.indexOf('await transferPersistentTeamData') < edge.indexOf("admin.auth.admin.signOut(accessToken, 'global')"), 'persistent team data transfers before session revocation');
 
 const migration = read('supabase/migrations/20260715161026_account_deletion_support.sql');
 assert.match(migration, /tire_inventory_user_id_fkey/);
@@ -85,6 +89,11 @@ assert.match(bannerListing, /drop policy if exists "Banners are publicly accessi
 
 const activeUserInvoker = read('supabase/migrations/20260715161637_make_active_user_check_invoker.sql');
 assert.match(activeUserInvoker, /security invoker/);
+
+const canonicalOwnerPolicies = read('supabase/migrations/20260715180000_team_data_owner_write_policies.sql');
+assert.match(canonicalOwnerPolicies, /Team can insert canonical owner rows/);
+assert.match(canonicalOwnerPolicies, /Team can delete canonical owner rows/);
+assert.match(canonicalOwnerPolicies, /can_manage_team_owned_data/);
 
 const privacy = read('public/privacy/index.html');
 assert.match(privacy, /Effective July 15, 2026/);

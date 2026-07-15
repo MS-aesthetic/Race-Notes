@@ -1,10 +1,10 @@
 import type { Setup } from '../types';
 import { normalizeSetup } from './setupCompat';
 
-export const setupToCloudRow = (raw: Setup, userId: string): Record<string, unknown> => {
+export const setupToCloudRow = (raw: Setup, ownerUserId: string): Record<string, unknown> => {
   const s = normalizeSetup(raw);
   return {
-    id: s.id, user_id: userId, chassis: s.chassis, track: s.track, date: s.date,
+    id: s.id, user_id: ownerUserId, chassis: s.chassis, track: s.track, date: s.date,
     car_type: s.carType, gear: s.gear || '', toe: s.toe || '', jbar: s.jbar || '',
     jbar_frame_height: s.jbarFrameHeight || '', jbar_pinion_height: s.jbarPinionHeight || '',
     front_stagger: s.frontStagger || '', rear_stagger: s.rearStagger || '',

@@ -25,9 +25,9 @@ type SyncCallback = (message: string) => void;
 
 const pushDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-export const weekendToCloudRow = (w: RaceWeekend, userId: string): Record<string, unknown> => ({
+export const weekendToCloudRow = (w: RaceWeekend, ownerUserId: string): Record<string, unknown> => ({
   id: w.id,
-  user_id: userId,
+  user_id: ownerUserId,
   name: w.name,
   track: w.track,
   date: w.date,

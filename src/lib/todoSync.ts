@@ -1,9 +1,9 @@
 import type { Todo } from '../types';
 
-export function todoToCloudRow(todo: Todo, userId: string, updatedAt = new Date().toISOString()) {
+export function todoToCloudRow(todo: Todo, ownerUserId: string, updatedAt = new Date().toISOString()) {
   return {
     id: todo.id,
-    user_id: userId,
+    user_id: ownerUserId,
     title: todo.title,
     items: todo.items,
     is_template: todo.is_template ?? false,

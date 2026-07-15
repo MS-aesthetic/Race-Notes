@@ -3,11 +3,11 @@ import { normalizeStartingUsage } from './maintenance';
 
 export const maintenanceComponentToCloudRow = (
   component: MaintenanceComponent,
-  userId: string,
+  ownerUserId: string,
   updatedAt = new Date().toISOString(),
 ): Record<string, unknown> => ({
   id: component.id,
-  user_id: userId,
+  user_id: ownerUserId,
   scope: component.scope,
   car_id: component.carId ?? null,
   name: component.name,

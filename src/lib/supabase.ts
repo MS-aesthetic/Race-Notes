@@ -346,7 +346,10 @@ export async function uploadTeamBanner(teamId: string, file: File): Promise<stri
   return data.publicUrl;
 }
 
-export async function getUserTeam(userId: string): Promise<Team | null> {
+export async function getUserTeam(
+  userId: string,
+  options?: { throwOnError?: boolean },
+): Promise<Team | null> {
   const { data, error } = await supabase
     .from('team_members')
     .select('team_id, teams(*)')
@@ -354,6 +357,7 @@ export async function getUserTeam(userId: string): Promise<Team | null> {
     
   if (error) {
     console.warn('getUserTeam error:', error);
+    if (options?.throwOnError) throw error;
     return null;
   }
   if (!data || data.length === 0) return null;
