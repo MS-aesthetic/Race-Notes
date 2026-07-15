@@ -674,6 +674,20 @@ fixes; rewriting CODEBASE_KNOWLEDGE body; any src change.
 
 ---
 
+## UXF-9P — Owner preflight corrections *(added 2026-07-14; blocks UXF-9)*
+
+**Scope:** add a direct, prominent Add a Car path across Setups/Sessions/Dashboard/Context
+strip and guard race-day/run creation before any form or follow-on action; preserve current
+finder-first global Tuning Guide and add regression coverage; change display-only Weekend/Race
+Weekend vocabulary to Race Day/Race Days across UI, guide, reports, exports, and accessibility
+without renaming internal types, IDs, storage, DB, lifecycle roles, or legacy stored bytes.
+
+**Acceptance:** focused no-car/copy/guide harness, affected existing harnesses, exact lint
+baseline, production build, diff, cavecrew review, mobile theme/size runtime, and one current
+Netlify draft. After PASS, write `docs/CLAUDE_FABLE_FINAL_QA_PLAN.md` and resume UXF-9.
+
+---
+
 ## UXF-9 — Batch QA, draft deploy, owner acceptance *(last; gates the batch)*
 
 **Scope:**
