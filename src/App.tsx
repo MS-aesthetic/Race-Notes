@@ -15,7 +15,7 @@ import {
 
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, deleteAccount as deleteCloudAccount, AppUser } from './lib/supabase';
 import AuthView from './components/AuthView';
-import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pushTodos, deleteWeekendFromCloud, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, deleteCarFromCloud, pushShockSessions, pullShockSessions, deleteShockSessionFromCloud, pushMaintenanceComponents, pullMaintenanceComponents, deleteMaintenanceComponentFromCloud, pushMaintenanceLogs, pullMaintenanceLogs, deleteMaintenanceLogFromCloud, pushChecklistTemplates, pullChecklistTemplates, deleteChecklistTemplateFromCloud, pushWeekendChecklists, pullWeekendChecklists } from './lib/sync';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pushTodos, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, pushMaintenanceLogs, pullMaintenanceLogs, pushChecklistTemplates, pullChecklistTemplates, pushWeekendChecklists, pullWeekendChecklists, deleteTeamSharedRecordFromCloud } from './lib/sync';
 import { registerForPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
 import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
@@ -46,7 +46,19 @@ import { hasOpenSheets, isPopSuppressed } from './lib/backStack';
 import { isAppGuideSection } from './lib/helpRouting';
 import { resolveRaceDayCreationTarget } from './lib/raceDayGate';
 import { clearCrewChiefLocalData } from './lib/accountDeletion';
-import { resolveSyncOwnerId } from './lib/teamDataOwnership';
+import {
+  buildOwnerCatchupKey,
+  discardSoloOnlyTeamDeletes,
+  enqueuePendingPersonalTireDelete,
+  enqueuePendingTeamDelete,
+  pendingTeamDeletesForAccount,
+  readPendingTeamDeletes,
+  readPendingPersonalTireDeletes,
+  removePendingTeamDelete,
+  removePendingPersonalTireDelete,
+  resolveSyncOwnerId,
+  type TeamSharedSyncTable,
+} from './lib/teamDataOwnership';
 import { Todo } from './types';
 
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
@@ -147,7 +159,13 @@ export default function App() {
   };
 
   const handleDeleteTireFromCloud = async (tireId: string) => {
-    if (user) await deleteTireFromCloud(tireId);
+    if (!user) return;
+    enqueuePendingPersonalTireDelete(window.localStorage, {
+      accountId: user.id,
+      tireId,
+      queuedAt: new Date().toISOString(),
+    });
+    setDeleteReplayVersion(version => version + 1);
   };
 
   // ── Cars & Garage ──────────────────────────────────────────────────────────
@@ -231,6 +249,12 @@ export default function App() {
   }, [cars, activeCarId]);
 
   const handleSaveCars = (updated: Car[]) => {
+    if (user) {
+      const remainingIds = new Set(updated.map(car => car.id));
+      cars
+        .filter(car => !remainingIds.has(car.id))
+        .forEach(car => queueSharedCloudDelete('cars', car.id));
+    }
     setCars(updated);
     localStorage.setItem('race_notes_cars', JSON.stringify(updated));
     if (syncOwnerId) pushCars(updated, syncOwnerId, team?.id ?? null, setSyncStatus);
@@ -259,7 +283,7 @@ export default function App() {
       const remainingIds = new Set(updated.map(session => session.id));
       shockSessions
         .filter(session => !remainingIds.has(session.id))
-        .forEach(session => deleteShockSessionFromCloud(session.id));
+        .forEach(session => queueSharedCloudDelete('shock_sessions', session.id));
     }
     setShockSessions(updated);
     localStorage.setItem('race_notes_shock_graphs', JSON.stringify(updated));
@@ -267,30 +291,60 @@ export default function App() {
   };
 
   const handleSaveMaintenance = (updated: MaintenanceComponent[]) => {
+    if (user) {
+      const remainingIds = new Set(updated.map(component => component.id));
+      maintenance
+        .filter(component => !remainingIds.has(component.id))
+        .forEach(component => queueSharedCloudDelete('maintenance_components', component.id));
+    }
     setMaintenance(updated);
     localStorage.setItem('race_notes_maintenance', JSON.stringify(updated));
     if (syncOwnerId) pushMaintenanceComponents(updated, syncOwnerId, setSyncStatus);
   };
 
   const handleSaveTodos = (updated: Todo[]) => {
+    if (user) {
+      const remainingIds = new Set(updated.map(todo => todo.id));
+      todos
+        .filter(todo => !remainingIds.has(todo.id))
+        .forEach(todo => queueSharedCloudDelete('todos', todo.id));
+    }
     setTodos(updated);
     localStorage.setItem('race_notes_todos', JSON.stringify(updated));
     if (syncOwnerId) pushTodos(updated, syncOwnerId, setSyncStatus);
   };
 
   const handleSaveMaintenanceLogs = (updated: MaintenanceLog[]) => {
+    if (user) {
+      const remainingIds = new Set(updated.map(log => log.id));
+      maintenanceLogs
+        .filter(log => !remainingIds.has(log.id))
+        .forEach(log => queueSharedCloudDelete('maintenance_logs', log.id));
+    }
     setMaintenanceLogs(updated);
     localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(updated));
     if (syncOwnerId) pushMaintenanceLogs(updated, syncOwnerId, setSyncStatus);
   };
 
   const handleSaveChecklistTemplates = (updated: ChecklistTemplate[]) => {
+    if (user) {
+      const remainingIds = new Set(updated.map(template => template.id));
+      checklistTemplates
+        .filter(template => !remainingIds.has(template.id))
+        .forEach(template => queueSharedCloudDelete('checklist_templates', template.id));
+    }
     setChecklistTemplates(updated);
     localStorage.setItem('race_notes_checklist_templates', JSON.stringify(updated));
     if (syncOwnerId) pushChecklistTemplates(updated, syncOwnerId, setSyncStatus);
   };
 
   const handleSaveWeekendChecklists = (updated: WeekendChecklist[]) => {
+    if (user) {
+      const remainingIds = new Set(updated.map(checklist => checklist.id));
+      weekendChecklists
+        .filter(checklist => !remainingIds.has(checklist.id))
+        .forEach(checklist => queueSharedCloudDelete('weekend_checklists', checklist.id));
+    }
     setWeekendChecklists(updated);
     localStorage.setItem('race_notes_weekend_checklists', JSON.stringify(updated));
     if (syncOwnerId) pushWeekendChecklists(updated, syncOwnerId, setSyncStatus);
@@ -307,7 +361,6 @@ export default function App() {
     }
     const updated = cars.filter(c => c.id !== carId);
     handleSaveCars(updated);
-    deleteCarFromCloud(carId);
     if (activeCarId === carId) {
       const next = updated[0] ?? null;
       if (next) handleSelectCar(next.id);
@@ -317,6 +370,35 @@ export default function App() {
 
   // ── Clear All Data ────────────────────────────────────────────────────────────
   const handleClearAllData = async () => {
+    // Clearing a device must not erase team data. When membership is unresolved,
+    // retain solo-only intents until resolution proves the account is solo.
+    if (user && (!teamResolved || !team)) {
+      const sharedRows: Array<[TeamSharedSyncTable, string[]]> = [
+        ['setups', savedSetups.map(item => item.id)],
+        ['race_weekends', weekends.map(item => item.id)],
+        ['todos', todos.map(item => item.id)],
+        ['cars', cars.map(item => item.id)],
+        ['shock_sessions', shockSessions.map(item => item.id)],
+        ['maintenance_components', maintenance.map(item => item.id)],
+        ['maintenance_logs', maintenanceLogs.map(item => item.id)],
+        ['checklist_templates', checklistTemplates.map(item => item.id)],
+        ['weekend_checklists', weekendChecklists.map(item => item.id)],
+      ];
+      sharedRows.forEach(([table, ids]) => {
+        ids.forEach(id => queueSharedCloudDelete(table, id, true));
+      });
+    }
+    if (user) {
+      tireInventory.forEach(item => {
+        enqueuePendingPersonalTireDelete(window.localStorage, {
+          accountId: user.id,
+          tireId: item.id,
+          queuedAt: new Date().toISOString(),
+        });
+      });
+      setDeleteReplayVersion(version => version + 1);
+    }
+
     const LOCAL_KEYS = [
       'race_notes_setup', 'race_notes_saved_setups', 'race_notes_weekends',
       'race_notes_active_session', 'race_notes_todos', 'race_notes_tires',
@@ -327,23 +409,6 @@ export default function App() {
       ACTIVE_WEEKEND_KEY,
     ];
     LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
-
-    // Team records remain shared when clearing this device. Account deletion
-    // owns intentional team-data succession; this control only wipes solo cloud data.
-    if (user && !team) {
-      try {
-        await Promise.all([
-          supabase.from('race_weekends').delete().eq('user_id', user.id),
-          supabase.from('setups').delete().eq('user_id', user.id),
-          supabase.from('tire_inventory').delete().eq('user_id', user.id),
-          supabase.from('cars').delete().eq('user_id', user.id),
-          supabase.from('shock_sessions').delete().eq('user_id', user.id),
-          supabase.from('todos').delete().eq('user_id', user.id),
-      ]);
-      } catch (e) { console.warn('Clear cloud data error:', e); }
-    } else if (user && team) {
-      setSyncStatus('Team data remains shared in cloud.');
-    }
 
     // Reset all in-memory state
     setSavedSetups([]);
@@ -361,7 +426,9 @@ export default function App() {
     setMaintenanceLogs([]);
     setChecklistTemplates([]);
     setWeekendChecklists([]);
-    setSyncStatus('All data cleared');
+    setSyncStatus(user && teamResolved && team
+      ? 'Device data cleared. Team data remains shared in cloud.'
+      : 'All data cleared');
   };
 
   const handleDeleteAccount = async () => {
@@ -438,26 +505,61 @@ export default function App() {
   const [hasLocalAcct, setHasLocalAcct] = useState<boolean>(() => hasLocalAccount());
   const [syncStatus, setSyncStatus] = useState('');
   const [pullDone, setPullDone] = useState(false); // initial cloud pull resolved — gates [4]
+  const [authGeneration, setAuthGeneration] = useState(0);
+  const [deleteReplayVersion, setDeleteReplayVersion] = useState(0);
+  const authGenerationRef = useRef(0);
+  const authIdentityRef = useRef<string | null>(null);
   const syncOwnerId = resolveSyncOwnerId(user?.id, team?.id, teamMembers, teamResolved);
   const sharedOwnerCatchupRef = useRef<string | null>(null);
+  const advanceAuthIdentity = (nextUser: User | null): number => {
+    const nextId = nextUser?.id ?? null;
+    authIdentityRef.current = nextId;
+    authGenerationRef.current += 1;
+    setAuthGeneration(authGenerationRef.current);
+    sharedOwnerCatchupRef.current = null;
+    return authGenerationRef.current;
+  };
+  const queueSharedCloudDelete = (
+    table: TeamSharedSyncTable,
+    recordId: string,
+    soloOnly = false,
+  ) => {
+    if (!user) return;
+    enqueuePendingTeamDelete(window.localStorage, {
+      accountId: user.id,
+      table,
+      recordId,
+      queuedAt: new Date().toISOString(),
+      soloOnly,
+    });
+    setDeleteReplayVersion(version => version + 1);
+  };
+  const handleAuthViewChange = (nextUser: User | null) => {
+    advanceAuthIdentity(nextUser);
+    setPullDone(false);
+    setTeam(null);
+    setTeamMembers(null);
+    setTeamResolved(false);
+    setUser(nextUser);
+  };
   const wasOnlineRef = useRef(isOnline);
   useEffect(() => {
     const reconnected = !wasOnlineRef.current && isOnline;
     wasOnlineRef.current = isOnline;
     if (!reconnected || !user || !pullDone) return;
-    if (syncOwnerId) {
-      pushSetups(savedSetupsRef.current, syncOwnerId, setSyncStatus);
-      pushWeekends(weekendsRef.current, syncOwnerId, setSyncStatus);
-    }
     pushActiveSession(activeSessionRef.current, user.id, setSyncStatus);
-  }, [isOnline, pullDone, syncOwnerId, user]);
+  }, [isOnline, pullDone, user]);
   const pullGenerationRef = useRef(0);
 
   // A team member can edit before membership/profile loading completes. Keep the
   // local write, then flush every shared dataset once its canonical owner is known.
   useEffect(() => {
+    if (!isOnline) {
+      sharedOwnerCatchupRef.current = null;
+      return;
+    }
     if (!user || !teamResolved || !syncOwnerId || !pullDone) return;
-    const key = `${team?.id ?? 'solo'}:${syncOwnerId}`;
+    const key = buildOwnerCatchupKey(user.id, authGeneration, team?.id, syncOwnerId);
     if (sharedOwnerCatchupRef.current === key) return;
     sharedOwnerCatchupRef.current = key;
     pushSetups(savedSetupsRef.current, syncOwnerId, setSyncStatus);
@@ -469,7 +571,86 @@ export default function App() {
     pushMaintenanceLogs(maintenanceLogs, syncOwnerId, setSyncStatus);
     pushChecklistTemplates(checklistTemplates, syncOwnerId, setSyncStatus);
     pushWeekendChecklists(weekendChecklists, syncOwnerId, setSyncStatus);
-  }, [cars, checklistTemplates, maintenance, maintenanceLogs, pullDone, shockSessions, syncOwnerId, team?.id, teamResolved, todos, user, weekendChecklists]);
+  }, [authGeneration, cars, checklistTemplates, isOnline, maintenance, maintenanceLogs, pullDone, shockSessions, syncOwnerId, team?.id, teamResolved, todos, user, weekendChecklists]);
+
+  // Shared deletes are local-first. Replay only after owner metadata resolves,
+  // while the exact signed-in account/auth generation still owns this flush.
+  useEffect(() => {
+    if (!user || !teamResolved || !syncOwnerId || !isOnline) return;
+    const accountId = user.id;
+    const generation = authGeneration;
+    if (team) discardSoloOnlyTeamDeletes(window.localStorage, accountId);
+    const pending = pendingTeamDeletesForAccount(
+      window.localStorage,
+      accountId,
+      true,
+      !!team,
+    );
+    if (pending.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      let retryNeeded = false;
+      for (const intent of pending) {
+        if (cancelled
+          || authIdentityRef.current !== accountId
+          || authGenerationRef.current !== generation) return;
+        const deleted = await deleteTeamSharedRecordFromCloud(intent.table, intent.recordId);
+        if (deleted) removePendingTeamDelete(window.localStorage, intent);
+        else retryNeeded = true;
+      }
+      if (retryNeeded
+        && !cancelled
+        && authIdentityRef.current === accountId
+        && authGenerationRef.current === generation) {
+        setSyncStatus('Cloud delete deferred — retrying online');
+        window.setTimeout(() => {
+          if (authIdentityRef.current === accountId
+            && authGenerationRef.current === generation) {
+            setDeleteReplayVersion(version => version + 1);
+          }
+        }, 5000);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authGeneration, deleteReplayVersion, isOnline, syncOwnerId, team, teamResolved, user]);
+
+  // Tires stay personal. Their retry queue is account-scoped and deliberately
+  // independent from team-owner metadata and the shared-table whitelist.
+  useEffect(() => {
+    if (!user || !isOnline) return;
+    const accountId = user.id;
+    const generation = authGeneration;
+    const pending = readPendingPersonalTireDeletes(window.localStorage)
+      .filter(intent => intent.accountId === accountId);
+    if (pending.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      let retryNeeded = false;
+      for (const intent of pending) {
+        if (cancelled
+          || authIdentityRef.current !== accountId
+          || authGenerationRef.current !== generation) return;
+        const deleted = await deleteTireFromCloud(intent.tireId);
+        if (deleted) removePendingPersonalTireDelete(window.localStorage, intent);
+        else retryNeeded = true;
+      }
+      if (retryNeeded
+        && !cancelled
+        && authIdentityRef.current === accountId
+        && authGenerationRef.current === generation) {
+        setSyncStatus('Personal tire delete deferred — retrying online');
+        window.setTimeout(() => {
+          if (authIdentityRef.current === accountId
+            && authGenerationRef.current === generation) {
+            setDeleteReplayVersion(version => version + 1);
+          }
+        }, 5000);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authGeneration, deleteReplayVersion, isOnline, user]);
 
   // Wait for auth restoration and, when signed in, the settled cloud merge.
   // This prevents transient local starter seeds from racing team-visible data.
@@ -481,7 +662,7 @@ export default function App() {
     localStorage.setItem('race_notes_checklist_templates', JSON.stringify(reconciled.templates));
     if (user) {
       if (reconciled.seeded.length > 0 && syncOwnerId) pushChecklistTemplates(reconciled.seeded, syncOwnerId, setSyncStatus);
-      reconciled.discardedIds.forEach(id => { void deleteChecklistTemplateFromCloud(id); });
+      reconciled.discardedIds.forEach(id => queueSharedCloudDelete('checklist_templates', id));
     }
   }, [authReady, checklistTemplates, pullDone, syncOwnerId, user]);
 
@@ -706,6 +887,7 @@ export default function App() {
         const { data } = await supabase.auth.getSession();
         const currentUser = data.session?.user ?? null;
         setPullDone(false);
+        const identityGeneration = advanceAuthIdentity(currentUser);
         setUser(currentUser);
         setTeamMembers(null);
         setTeamResolved(false);
@@ -714,11 +896,17 @@ export default function App() {
           setHasLocalAcct(true);
           void registerForPush(currentUser.id);
           const p = await fetchProfile(currentUser.id);
+          if (authIdentityRef.current !== currentUser.id
+            || authGenerationRef.current !== identityGeneration) return;
           setProfile(p);
           const t = await getUserTeam(currentUser.id, { throwOnError: true });
+          if (authIdentityRef.current !== currentUser.id
+            || authGenerationRef.current !== identityGeneration) return;
           setTeam(t);
           if (t) {
             const members = await getTeamMembers(t.id);
+            if (authIdentityRef.current !== currentUser.id
+              || authGenerationRef.current !== identityGeneration) return;
             if (members.length > 0) {
               setTeamMembers(members);
               setTeamResolved(true);
@@ -732,13 +920,15 @@ export default function App() {
         // Supabase unreachable (offline) – fall back to the local "registered
         // on this device" flag so the user isn't kicked out of a working
         // offline session. hasLocalAcct already reflects this from initial state.
+      } finally {
+        setAuthReady(true);
       }
-      setAuthReady(true);
     };
     initAuth();
 
     const unsub = onAuthChange(async (newUser) => {
       setPullDone(false);
+      const identityGeneration = advanceAuthIdentity(newUser);
       setUser(newUser);
       setTeamMembers(null);
       setTeamResolved(false);
@@ -751,11 +941,17 @@ export default function App() {
         setHasLocalAcct(true);
         void registerForPush(newUser.id);
         const p = await fetchProfile(newUser.id);
+        if (authIdentityRef.current !== newUser.id
+          || authGenerationRef.current !== identityGeneration) return;
         setProfile(p);
         const t = await getUserTeam(newUser.id, { throwOnError: true });
+        if (authIdentityRef.current !== newUser.id
+          || authGenerationRef.current !== identityGeneration) return;
         setTeam(t);
         if (t) {
           const members = await getTeamMembers(t.id);
+          if (authIdentityRef.current !== newUser.id
+            || authGenerationRef.current !== identityGeneration) return;
           if (members.length > 0) {
             setTeamMembers(members);
             setTeamResolved(true);
@@ -801,8 +997,32 @@ export default function App() {
     const doPull = async () => {
       suppressPullRef.current = true; // don't show "Saved" for cloud-pull state updates
       setSyncStatus('Syncing...');
+      const queuedAtPullStart = new Set(
+        readPendingTeamDeletes(window.localStorage)
+          .filter(intent => intent.accountId === pullUserId)
+          .map(intent => `${intent.table}:${intent.recordId}`),
+      );
+      const queuedTiresAtPullStart = new Set(
+        readPendingPersonalTireDeletes(window.localStorage)
+          .filter(intent => intent.accountId === pullUserId)
+          .map(intent => intent.tireId),
+      );
+      const omitQueuedDeletes = <T extends { id: string }>(
+        table: TeamSharedSyncTable,
+        rows: T[],
+      ): T[] => rows.filter(row => {
+        const key = `${table}:${row.id}`;
+        if (queuedAtPullStart.has(key)) return false;
+        return !readPendingTeamDeletes(window.localStorage).some(intent => (
+          intent.accountId === pullUserId
+          && intent.table === table
+          && intent.recordId === row.id
+        ));
+      });
       const data = await pullAllData(pullUserId, setSyncStatus);
       if (!isCurrentPull()) return;
+      data.setups = omitQueuedDeletes('setups', data.setups);
+      data.weekends = omitQueuedDeletes('race_weekends', data.weekends);
 
       if (data.setups.length > 0) {
         setSavedSetups(prev => {
@@ -846,7 +1066,7 @@ export default function App() {
         if (!cloudWins) pushActiveSession(merged, pullUserId, setSyncStatus);
       } else if (activeSessionRef.current.updatedAt) pushActiveSession(activeSessionRef.current, pullUserId, setSyncStatus);
 
-      const cloudTodos = await pullTodos(setSyncStatus);
+      const cloudTodos = omitQueuedDeletes('todos', await pullTodos(setSyncStatus));
       if (!isCurrentPull()) return;
       if (cloudTodos.length > 0) {
         setTodos(prev => {
@@ -872,14 +1092,19 @@ export default function App() {
         if (syncOwnerId) pushTodos(materializeMainChecklist(todos), syncOwnerId, setSyncStatus);
       }
 
-      const cloudTires = await pullTires(pullUserId, setSyncStatus);
+      const cloudTires = (await pullTires(pullUserId, setSyncStatus)).filter(tire => (
+        !queuedTiresAtPullStart.has(tire.id)
+        && !readPendingPersonalTireDeletes(window.localStorage).some(intent => (
+          intent.accountId === pullUserId && intent.tireId === tire.id
+        ))
+      ));
       if (!isCurrentPull()) return;
       if (cloudTires.length > 0) {
         setTireInventory(cloudTires);
         localStorage.setItem('race_notes_tires', JSON.stringify(cloudTires));
       }
 
-      const cloudCars = await pullCars(pullUserId, setSyncStatus);
+      const cloudCars = omitQueuedDeletes('cars', await pullCars(pullUserId, setSyncStatus));
       if (!isCurrentPull()) return;
       if (cloudCars.length > 0) {
         setCars(cloudCars);
@@ -891,27 +1116,27 @@ export default function App() {
         }
       }
 
-      const cloudShock = await pullShockSessions(pullUserId, setSyncStatus);
+      const cloudShock = omitQueuedDeletes('shock_sessions', await pullShockSessions(pullUserId, setSyncStatus));
       if (!isCurrentPull()) return;
       if (cloudShock.length > 0) {
         setShockSessions(cloudShock);
         localStorage.setItem('race_notes_shock_graphs', JSON.stringify(cloudShock));
       }
 
-      const cloudMaint = await pullMaintenanceComponents(setSyncStatus);
+      const cloudMaint = omitQueuedDeletes('maintenance_components', await pullMaintenanceComponents(setSyncStatus));
       if (!isCurrentPull()) return;
       if (cloudMaint.length > 0) {
         setMaintenance(cloudMaint);
         localStorage.setItem('race_notes_maintenance', JSON.stringify(cloudMaint));
       }
-      const cloudMaintLogs = await pullMaintenanceLogs(setSyncStatus);
+      const cloudMaintLogs = omitQueuedDeletes('maintenance_logs', await pullMaintenanceLogs(setSyncStatus));
       if (!isCurrentPull()) return;
       if (cloudMaintLogs.length > 0) {
         setMaintenanceLogs(cloudMaintLogs);
         localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(cloudMaintLogs));
       }
 
-      const cloudClTemplates = await pullChecklistTemplates(setSyncStatus);
+      const cloudClTemplates = omitQueuedDeletes('checklist_templates', await pullChecklistTemplates(setSyncStatus));
       if (!isCurrentPull()) return;
       if (cloudClTemplates.length > 0) {
         setChecklistTemplates(prev => {
@@ -925,7 +1150,7 @@ export default function App() {
           return merged;
         });
       }
-      const cloudWkndChecklists = await pullWeekendChecklists(setSyncStatus);
+      const cloudWkndChecklists = omitQueuedDeletes('weekend_checklists', await pullWeekendChecklists(setSyncStatus));
       if (!isCurrentPull()) return;
       if (cloudWkndChecklists.length > 0) {
         setWeekendChecklists(cloudWkndChecklists);
@@ -948,7 +1173,7 @@ export default function App() {
       setTimeout(() => { if (isCurrentPull()) suppressPullRef.current = false; }, 800);
     });
     return () => { if (pullGenerationRef.current === generation) pullGenerationRef.current += 1; };
-  }, [user]);
+  }, [authGeneration, user]);
 
   // ── One-time backfill: assign legacy data to a default car ────────────────
   // Runs once after the first login pull (or on initial local load if no user).
@@ -1066,6 +1291,11 @@ export default function App() {
       }
     }
     if (blockedMutation) setInfoToast('Historical setups are view-only. Finish the Race Day before editing Current Setup.');
+
+    const remainingSetupIds = new Set(safeSetups.map(item => item.id));
+    priorSetups
+      .filter(item => !remainingSetupIds.has(item.id))
+      .forEach(item => queueSharedCloudDelete('setups', item.id));
 
     const requestedActiveId = eventSetupId || activeId;
     const requested = requestedActiveId ? safeSetups.find(item => item.id === requestedActiveId) : null;
@@ -1213,25 +1443,13 @@ export default function App() {
   };
 
   const handleDeleteMaintenanceComponent = (componentId: string) => {
-    const deletedLogIds = maintenanceLogs.filter(log => log.componentId === componentId).map(log => log.id);
     handleSaveMaintenance(maintenance.filter(component => component.id !== componentId));
     handleSaveMaintenanceLogs(maintenanceLogs.filter(log => log.componentId !== componentId));
-    if (user) {
-      void Promise.all([
-        deleteMaintenanceComponentFromCloud(componentId),
-        ...deletedLogIds.map(deleteMaintenanceLogFromCloud),
-      ]).then(results => {
-        if (results.some(ok => !ok)) setSyncStatus('Cloud delete failed — retry online');
-      });
-    }
   };
 
   const handleDeleteChecklistTemplate = (templateId: string) => {
     const updated = checklistTemplates.filter(template => template.id !== templateId);
     handleSaveChecklistTemplates(updated);
-    if (user) void deleteChecklistTemplateFromCloud(templateId).then(ok => {
-      if (!ok) setSyncStatus('Cloud delete failed — retry online');
-    });
   };
 
   // ── Create weekend ([15]: form lives in RaceWeekendView, data arrives here) ──
@@ -1476,7 +1694,7 @@ export default function App() {
     setWeekends(updated);
     localStorage.setItem('race_notes_weekends', JSON.stringify(updated));
     // Hard-delete from cloud so it doesn't come back on next sync pull
-    deleteWeekendFromCloud(weekendId);
+    queueSharedCloudDelete('race_weekends', weekendId);
     if (syncOwnerId) pushWeekends(updated, syncOwnerId);
     if (activeWeekendId === weekendId) {
       const nextId = updated.find(item => !isWeekendFinished(item))?.id ?? null;
@@ -1531,9 +1749,6 @@ export default function App() {
   const handleUndoQuickService = ({ result, prevComponent }: QuickServiceOutcome) => {
     handleSaveMaintenance(maintenance.map(c => (c.id === prevComponent.id ? prevComponent : c)));
     handleSaveMaintenanceLogs(maintenanceLogs.filter(l => l.id !== result.log.id));
-    if (user) void deleteMaintenanceLogFromCloud(result.log.id).then(ok => {
-      if (!ok) setSyncStatus('Cloud undo failed — retry online');
-    });
     if (result.accountingEntry) {
       const entryId = result.accountingEntry.id;
       const updated = accounting.filter(e => e.id !== entryId);
@@ -1745,7 +1960,7 @@ export default function App() {
                   Once you've signed in on this device, the app keeps working with no signal.
                 </span>
               </p>
-              <AuthView user={null} profile={null} onAuthChange={(u) => setUser(u)} />
+              <AuthView user={null} profile={null} onAuthChange={handleAuthViewChange} />
             </div>
           </main>
         </div>
@@ -1951,7 +2166,7 @@ export default function App() {
                 <SettingsView
                   user={user}
                   profile={profile}
-                  onAuthChange={(u) => setUser(u)}
+                  onAuthChange={handleAuthViewChange}
                   setup={setup}
                   savedSetups={savedSetups}
                   activeSession={activeSession}

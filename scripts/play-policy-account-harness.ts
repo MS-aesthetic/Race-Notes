@@ -91,9 +91,11 @@ const activeUserInvoker = read('supabase/migrations/20260715161637_make_active_u
 assert.match(activeUserInvoker, /security invoker/);
 
 const canonicalOwnerPolicies = read('supabase/migrations/20260715180000_team_data_owner_write_policies.sql');
-assert.match(canonicalOwnerPolicies, /Team can insert canonical owner rows/);
-assert.match(canonicalOwnerPolicies, /Team can delete canonical owner rows/);
-assert.match(canonicalOwnerPolicies, /can_manage_team_owned_data/);
+assert.match(canonicalOwnerPolicies, /Canonical team-owner insert/);
+assert.match(canonicalOwnerPolicies, /Canonical team-owner update/);
+assert.match(canonicalOwnerPolicies, /Canonical team-owner delete/);
+assert.match(canonicalOwnerPolicies, /private\.can_write_canonical_team_owner/);
+assert.match(canonicalOwnerPolicies, /cmd <> 'SELECT'/);
 
 const privacy = read('public/privacy/index.html');
 assert.match(privacy, /Effective July 15, 2026/);
