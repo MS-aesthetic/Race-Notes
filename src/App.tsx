@@ -24,6 +24,7 @@ import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue,
 import { applyQuickAdjust, resolveQuickAdjustTarget, type QuickAdjustCommand } from './lib/quickAdjust';
 import { materializeMainChecklist } from './lib/mainChecklist';
 import { KEEP_ADDED_ITEMS_KEY, reconcileMaintenanceChecklist, resetMainChecklist } from './lib/checklistMaintenance';
+import { shouldPullOnResume } from './lib/resumePull';
 import { reconcileStarterTemplates } from './lib/checklists';
 import { deriveReadableLightAccent, readableOnColor } from './lib/colorContrast';
 
@@ -531,6 +532,7 @@ export default function App() {
   const [pullDone, setPullDone] = useState(false); // initial cloud pull resolved — gates [4]
   const [authGeneration, setAuthGeneration] = useState(0);
   const [deleteReplayVersion, setDeleteReplayVersion] = useState(0);
+  const [resumePullVersion, setResumePullVersion] = useState(0);
   const authGenerationRef = useRef(0);
   const authIdentityRef = useRef<string | null>(null);
   const syncOwnerId = resolveSyncOwnerId(user?.id, team?.id, teamMembers, teamResolved);
@@ -574,6 +576,7 @@ export default function App() {
     pushActiveSession(activeSessionRef.current, user.id, setSyncStatus);
   }, [isOnline, pullDone, user]);
   const pullGenerationRef = useRef(0);
+  const lastPullStartedAtRef = useRef<number | null>(null);
 
   // A team member can edit before membership/profile loading completes. Keep the
   // local write, then flush every shared dataset once its canonical owner is known.
@@ -1015,6 +1018,7 @@ export default function App() {
     }
     const pullUserId = user.id;
     const isCurrentPull = () => pullGenerationRef.current === generation;
+    lastPullStartedAtRef.current = Date.now();
     setPullDone(false);
 
     // Pull cloud data and merge into localStorage
@@ -1198,7 +1202,31 @@ export default function App() {
       setTimeout(() => { if (isCurrentPull()) suppressPullRef.current = false; }, 800);
     });
     return () => { if (pullGenerationRef.current === generation) pullGenerationRef.current += 1; };
-  }, [authGeneration, user]);
+  }, [authGeneration, resumePullVersion, user]);
+
+  // Resume gets a fresh pull-effect closure, so current team-owner metadata is used.
+  useEffect(() => {
+    if (!user) return;
+    const requestResumePull = () => {
+      const now = Date.now();
+      if (!shouldPullOnResume(lastPullStartedAtRef.current, now)) return;
+      lastPullStartedAtRef.current = now;
+      setResumePullVersion(version => version + 1);
+    };
+
+    if (Capacitor.isNativePlatform()) {
+      const listenerPromise = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) requestResumePull();
+      });
+      return () => { listenerPromise.then(listener => listener.remove()); };
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') requestResumePull();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [user]);
 
   // ── One-time backfill: assign legacy data to a default car ────────────────
   // Runs once after the first login pull (or on initial local load if no user).

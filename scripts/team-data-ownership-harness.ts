@@ -138,7 +138,7 @@ assert.match(app, /resolveSyncOwnerId\(user\?\.id, team\?\.id, teamMembers, team
 assert.match(app, /buildOwnerCatchupKey\(user\.id, authGeneration, team\?\.id, syncOwnerId\)/);
 assert.match(app, /advanceAuthIdentity\(newUser\)/);
 assert.match(app, /if \(!isOnline\) \{\s*sharedOwnerCatchupRef\.current = null;/);
-assert.match(app, /\}, \[authGeneration, user\]\);/);
+assert.match(app, /\}, \[authGeneration, resumePullVersion, user\]\);/);
 assert.match(app, /authIdentityRef\.current !== accountId/);
 assert.match(app, /authGenerationRef\.current !== generation/);
 assert.match(app, /pendingTeamDeletesForAccount/);
