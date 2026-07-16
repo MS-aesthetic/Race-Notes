@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Car, CAR_TYPES } from '../types';
+import EmptyState from './ui/EmptyState';
 
 interface GarageViewProps {
   cars: Car[];
@@ -28,8 +29,14 @@ export default function GarageView({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
+  const addCarInputRef = useRef<HTMLInputElement>(null);
 
   const genId = () => `car-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const focusAddCarForm = () => {
+    setShowAddForm(true);
+    window.setTimeout(() => addCarInputRef.current?.focus(), 0);
+  };
 
   const handleAdd = () => {
     if (!form.chassis.trim()) return;
@@ -82,10 +89,7 @@ export default function GarageView({
 
       {/* Car list */}
       {cars.length === 0 ? (
-        <div className="bg-surface-container border border-outline-variant rounded-lg p-6 text-center">
-          <span className="material-symbols-outlined text-3xl text-on-surface-variant/40 block mb-2">directions_car</span>
-          <p className="text-xs font-mono text-on-surface-variant uppercase tracking-wider">No cars yet — add one below.</p>
-        </div>
+        <EmptyState icon="directions_car" title="No cars yet" cta={{ label: 'Add Car', onClick: focusAddCarForm, icon: 'add' }} />
       ) : (
         <div className="space-y-2">
           {cars.map(car => {
@@ -223,6 +227,7 @@ export default function GarageView({
             </select>
           </div>
           <input
+            ref={addCarInputRef}
             placeholder="Chassis *"
             value={form.chassis}
             onChange={e => setForm(f => ({ ...f, chassis: e.target.value }))}
@@ -258,7 +263,7 @@ export default function GarageView({
         </div>
       ) : (
         <button
-          onClick={() => setShowAddForm(true)}
+          onClick={focusAddCarForm}
           className="w-full py-3 border border-dashed border-outline-variant/60 text-on-surface-variant/70 font-mono text-xs uppercase rounded-lg hover:border-primary/60 hover:text-primary transition-colors flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined text-base">add</span>
