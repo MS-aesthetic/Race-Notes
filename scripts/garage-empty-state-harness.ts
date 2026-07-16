@@ -16,7 +16,7 @@ assert.equal((garage.match(/focusAddCarForm/g) ?? []).length, 3, 'one helper plu
 assert.equal((garage.match(/addCarInputRef/g) ?? []).length, 3, 'one ref declaration, focus, and input attachment');
 
 assert.match(garage, /flex items-center gap-2 flex-shrink-0/);
-assert.match(garage, /className="tap-target p-1\.5 text-on-surface-variant\/60/);
+assert.match(garage, /className="tap-target p-1\.5 text-on-surface-muted/);
 assert.match(garage, /className=\{`tap-target p-1\.5 rounded transition-colors/);
 assert.match(garage, /onClick=\{e => e\.stopPropagation\(\)\}/);
 assert.match(garage, /disabled=\{totalData\(car\.id\) > 0\}/);

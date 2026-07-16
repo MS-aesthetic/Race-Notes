@@ -128,9 +128,9 @@ export default function ExportView({
             <span className="font-mono text-xs uppercase text-on-surface-variant tracking-wider">Cloud Sync Active</span>
           </div>
         ) : (
-          <div className="flex items-center gap-2 bg-surface-container p-3 border border-outline-variant rounded text-on-surface-variant/70">
+          <div className="flex items-center gap-2 bg-surface-container p-3 border border-outline-variant rounded text-on-surface-muted">
             <span className="w-2 h-2 rounded-full bg-error"></span>
-            <span className="font-mono text-xs uppercase text-on-surface-variant/80 tracking-wider">Sync Disabled: Offline mode active</span>
+            <span className="font-mono text-xs uppercase text-on-surface-muted tracking-wider">Sync Disabled: Offline mode active</span>
           </div>
         )}
       </div>

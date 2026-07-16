@@ -388,15 +388,15 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
                     </span>
                   )}
                 </div>
-                {e.description && <p className="font-mono text-xs text-on-surface-variant/70 italic">{e.description}</p>}
+                {e.description && <p className="font-mono text-xs text-on-surface-muted italic">{e.description}</p>}
                 {(e.payer || e.payee) && (
-                  <p className="font-mono text-[10px] text-on-surface-variant/50">
+                  <p className="font-mono text-[10px] text-on-surface-muted">
                     {e.payer && <span>From: <span className="text-on-surface-variant">{e.payer}</span></span>}
                     {e.payer && e.payee && <span className="mx-1">·</span>}
                     {e.payee && <span>To: <span className="text-on-surface-variant">{e.payee}</span></span>}
                   </p>
                 )}
-                <p className="font-mono text-[10px] text-on-surface-variant/40">
+                <p className="font-mono text-[10px] text-on-surface-muted">
                   {new Date(e.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                 </p>
               </div>
@@ -406,7 +406,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
 
               <button
                 onClick={() => del(e.id)}
-                className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-error shrink-0"
+                className="material-symbols-outlined text-[16px] text-on-surface-muted hover:text-error shrink-0"
               >
                 close
               </button>
@@ -583,7 +583,7 @@ function ServiceTab({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-sm text-on-surface font-semibold">{c.name}</span>
             <span className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${chipCls}`}>{chipLabel}</span>
-            <span className="font-mono text-[10px] text-on-surface-variant/50">{c.category}</span>
+            <span className="font-mono text-[10px] text-on-surface-muted">{c.category}</span>
           </div>
           <div className="flex items-center gap-2 mt-1.5">
             <div className="flex-1 h-1.5 bg-surface-variant rounded-full overflow-hidden">
@@ -607,7 +607,7 @@ function ServiceTab({
         </button>
         <button
           onClick={() => deleteComp(c.id)}
-          className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-error shrink-0"
+          className="material-symbols-outlined text-[16px] text-on-surface-muted hover:text-error shrink-0"
         >close</button>
       </div>
     );
@@ -915,13 +915,13 @@ function TemplatesTab({
                 <span className="material-symbols-outlined text-primary text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>fact_check</span>
                 <div className="flex-1 min-w-0">
                   <span className="font-mono text-sm font-semibold text-on-surface block truncate">{tmpl.name}</span>
-                  <span className="font-mono text-[10px] text-on-surface-variant/50">{tmpl.category} · {tmpl.items.length} jobs</span>
+                  <span className="font-mono text-[10px] text-on-surface-muted">{tmpl.category} · {tmpl.items.length} jobs</span>
                 </div>
-                <span className="material-symbols-outlined text-on-surface-variant/50 text-[16px] transition-transform duration-200"
+                <span className="material-symbols-outlined text-on-surface-muted text-[16px] transition-transform duration-200"
                   style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>expand_more</span>
                 <button
                   onClick={e => { e.stopPropagation(); deleteTemplate(tmpl.id); }}
-                  className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-error shrink-0"
+                  className="material-symbols-outlined text-[16px] text-on-surface-muted hover:text-error shrink-0"
                 >close</button>
               </button>
               {isExpanded && (
@@ -929,7 +929,7 @@ function TemplatesTab({
                   {/* Items list */}
                   <div className="divide-y divide-outline-variant/20">
                     {tmpl.items.length === 0 && (
-                      <p className="px-4 py-2 font-mono text-[10px] text-on-surface-variant/40 italic">No jobs yet. Add one below.</p>
+                      <p className="px-4 py-2 font-mono text-[10px] text-on-surface-muted italic">No jobs yet. Add one below.</p>
                     )}
                     {tmpl.items.map(item => (
                       <div key={item.id} className="flex items-center gap-2 px-4 py-2">
@@ -937,7 +937,7 @@ function TemplatesTab({
                         <span className="flex-1 font-mono text-xs text-on-surface">{item.text}</span>
                         <button
                           onClick={() => removeItem(tmpl.id, item.id)}
-                          className="material-symbols-outlined text-[14px] text-on-surface-variant/30 hover:text-error"
+                          className="material-symbols-outlined text-[14px] text-on-surface-muted hover:text-error"
                         >close</button>
                       </div>
                     ))}
@@ -1008,7 +1008,7 @@ export default function TrackersView({
             key={t.id}
             onClick={() => { setSubTab(t.id); setShowTemplateManager(false); }}
             className={`min-h-11 flex items-center justify-center gap-1 py-2.5 px-1 rounded-md transition-all ${
-              subTab === t.id ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60 hover:text-on-surface'
+              subTab === t.id ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-muted hover:text-on-surface'
             }`}
           >
             <span

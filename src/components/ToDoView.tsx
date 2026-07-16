@@ -477,7 +477,7 @@ export default function ToDoView({
                   {item.desc && <p className="font-mono text-[11px] text-on-surface-variant">{item.desc}</p>}
                   {item.completionNote && <p className="font-mono text-[11px] text-on-surface-variant">{item.completionNote}</p>}
                   {item.completedAt && (
-                    <p className="font-mono text-[10px] text-on-surface-variant/70">
+                    <p className="font-mono text-[10px] text-on-surface-muted">
                       Completed {new Date(item.completedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </p>
                   )}

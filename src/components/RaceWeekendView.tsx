@@ -748,14 +748,14 @@ export default function RaceWeekendView({
                   className={`py-2 px-1 rounded border font-mono text-[10px] font-bold uppercase transition-all text-center leading-tight ${
                     nsType === key
                       ? 'bg-primary/20 border-primary text-primary'
-                      : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                      : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
                   }`}
                 >{code}</button>
               ))}
             </div>
-            <p className="font-mono text-[10px] text-on-surface-variant/50 mt-1">
+            <p className="font-mono text-[10px] text-on-surface-muted mt-1">
               Will be named: <span className="text-primary font-bold">{buildSessionNameFrom(currentWeekend.sessions, nsType)}</span>
-              {nsSuggestedType === nsType && <span className="ml-1 text-on-surface-variant/40">(suggested)</span>}
+              {nsSuggestedType === nsType && <span className="ml-1 text-on-surface-muted">(suggested)</span>}
             </p>
           </div>
 
@@ -771,7 +771,7 @@ export default function RaceWeekendView({
                   className={`py-2 px-1 rounded border font-mono text-[10px] font-bold transition-all text-center leading-tight ${
                     nsTrackCondition === preset
                       ? 'bg-primary/20 border-primary text-primary'
-                      : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                      : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
                   }`}
                 >{preset}</button>
               ))}
@@ -792,7 +792,7 @@ export default function RaceWeekendView({
 
           {/* [11] Carry-over hint */}
           {(nsPrefill.pressures || nsPrefill.tires) && (
-            <p className="font-mono text-[10px] text-on-surface-variant/50 flex items-center gap-1">
+            <p className="font-mono text-[10px] text-on-surface-muted flex items-center gap-1">
               <span className="material-symbols-outlined text-[13px] text-primary">history</span>
               Pressures and tires carried over from the last run.
             </p>
@@ -815,7 +815,7 @@ export default function RaceWeekendView({
                   className={`py-2 px-1 rounded border font-mono text-[9px] font-bold uppercase transition-all text-center leading-tight ${
                     nsTimeOfDay === opt.value
                       ? 'bg-primary/20 border-primary text-primary'
-                      : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                      : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
                   }`}
                 >{opt.label}</button>
               ))}
@@ -844,7 +844,7 @@ export default function RaceWeekendView({
                 Zip
               </button>
               {nsWxStr && (
-                <button type="button" onClick={() => { setNsWxStr(''); setNsWxError(''); }} className="ml-auto text-[10px] font-mono text-on-surface-variant/50 hover:text-error">clear</button>
+                <button type="button" onClick={() => { setNsWxStr(''); setNsWxError(''); }} className="ml-auto text-[10px] font-mono text-on-surface-muted hover:text-error">clear</button>
               )}
             </div>
             {nsShowZip && (
@@ -871,7 +871,7 @@ export default function RaceWeekendView({
                 {nsWxStr}
               </div>
             ) : (
-              <p className="font-mono text-[10px] text-on-surface-variant/40 italic">No weather fetched — run will save without it.</p>
+              <p className="font-mono text-[10px] text-on-surface-muted italic">No weather fetched — run will save without it.</p>
             )}
           </div>
 
@@ -990,7 +990,7 @@ export default function RaceWeekendView({
               <h2 className="font-display font-bold uppercase text-base text-on-surface tracking-wide leading-tight">{currentWeekend.name}</h2>
               <p className="font-mono text-xs text-on-surface-variant mt-0.5">{currentWeekend.track} · {currentWeekend.date}</p>
               {(activeSetup?.versionLabel || currentWeekend.setupName) && (
-                <p className="font-mono text-[10px] text-on-surface-variant/70 mt-0.5 flex items-center gap-1">
+                <p className="font-mono text-[10px] text-on-surface-muted mt-0.5 flex items-center gap-1">
                   <span className="material-symbols-outlined text-[12px]">settings_input_component</span>
                   {activeSetup ? displayVersionLabel(activeSetup) : displayStoredVersionLabel(currentWeekend.setupName)}
                 </p>
@@ -1071,14 +1071,14 @@ export default function RaceWeekendView({
                     </div>
                   ))}
                 </div>
-                <p className="font-mono text-[9px] text-on-surface-variant/40">
+                <p className="font-mono text-[9px] text-on-surface-muted">
                   Fetched {new Date(currentWeekend.weather.fetchedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   {' · '}
                   <button className="underline hover:text-primary" onClick={() => { setShowZipInput(false); handleGPSWeather(); }}>Refresh</button>
                 </p>
               </div>
             ) : (
-              <p className="font-mono text-[11px] text-on-surface-variant/40 italic">No weather data yet. Use GPS or enter a zip code above.</p>
+              <p className="font-mono text-[11px] text-on-surface-muted italic">No weather data yet. Use GPS or enter a zip code above.</p>
             )}
           </div>
 
@@ -1101,7 +1101,7 @@ export default function RaceWeekendView({
           onClick={openNewSession}
           disabled={activeWeekendMissingSetup}
           className={`w-full flex items-center justify-center gap-2 py-3 min-h-12 rounded-xl border-2 border-dashed transition-all font-display font-bold uppercase tracking-wider text-sm ${activeWeekendMissingSetup
-            ? 'border-outline-variant/50 text-on-surface-variant/50 cursor-not-allowed'
+            ? 'border-outline-variant/50 text-on-surface-muted opacity-50 cursor-not-allowed'
             : 'border-primary/50 hover:border-primary hover:bg-primary/10 active:scale-[0.98] text-primary'}`}
         >
           <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
@@ -1138,7 +1138,7 @@ export default function RaceWeekendView({
 
         {/* 1 ── Identity */}
         <div className="mb-6">
-          <p className="font-mono text-[10px] text-on-surface-variant/70 mb-2">
+          <p className="font-mono text-[10px] text-on-surface-muted mb-2">
             {session.track}{session.time ? ` · ${session.time}` : ''}{session.setupUsed ? ` · ${displayLifecycleText(session.setupUsed)}` : ''}
           </p>
           <label className="flex flex-col gap-1">
@@ -1164,7 +1164,7 @@ export default function RaceWeekendView({
                 className={`py-2 px-1 min-h-12 rounded border font-mono text-[10px] font-bold transition-all text-center leading-tight ${
                   session.trackConditionPreset === preset
                     ? 'bg-primary/20 border-primary text-primary'
-                    : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                    : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
                 }`}
               >{preset}</button>
             ))}
@@ -1307,7 +1307,7 @@ export default function RaceWeekendView({
                   {selectedTireId && (() => {
                     const t = scopedTireInventory.find(x => x.id === selectedTireId);
                     return t ? (
-                      <p className="font-mono text-[9px] text-on-surface-variant/60">{t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS</p>
+                      <p className="font-mono text-[9px] text-on-surface-muted">{t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS</p>
                     ) : null;
                   })()}
                   <NumberStepper
@@ -1591,7 +1591,7 @@ export default function RaceWeekendView({
                 setMenuSession(null);
               }}
               disabled={!getSessionDiffPair(menuSession.session, menuSession.weekendId)}
-              className={`tap-target-block w-full gap-3 rounded-xl px-3 text-left ${getSessionDiffPair(menuSession.session, menuSession.weekendId) ? 'text-on-surface hover:bg-surface-container-high' : 'text-on-surface-variant/40 cursor-not-allowed'}`}
+              className={`tap-target-block w-full gap-3 rounded-xl px-3 text-left ${getSessionDiffPair(menuSession.session, menuSession.weekendId) ? 'text-on-surface hover:bg-surface-container-high' : 'text-on-surface-muted opacity-40 cursor-not-allowed'}`}
             >
               <span className="material-symbols-outlined text-primary">compare_arrows</span>
               Compare setup

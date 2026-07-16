@@ -409,7 +409,7 @@ export default function SetupView({
     <button
       onClick={() => setSubTab(tab)}
       className={`min-w-0 flex flex-col items-center justify-center gap-1 px-1 sm:px-2 py-3 rounded-lg font-mono text-[11px] uppercase font-bold border-2 transition-all min-h-[60px] ${
-        subTab === tab ? 'bg-primary/15 text-primary border-primary/50' : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+        subTab === tab ? 'bg-primary/15 text-primary border-primary/50' : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
       }`}
     >
       <span className="material-symbols-outlined text-[26px] leading-none" style={{ fontVariationSettings: subTab === tab ? "'FILL' 1" : "'FILL' 0" }}>{icon}</span>
@@ -465,8 +465,8 @@ export default function SetupView({
             disabled={displayedSetups.length < 2}
             className={`min-w-0 flex flex-col items-center justify-center gap-1 px-1 sm:px-2 py-3 rounded-lg font-mono text-[11px] uppercase font-bold border-2 transition-all min-h-[60px] ${
               displayedSetups.length < 2
-                ? 'border-outline-variant/30 text-on-surface-variant/30 cursor-not-allowed'
-                : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                ? 'border-outline-variant/30 text-on-surface-muted opacity-30 cursor-not-allowed'
+                : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
             }`}
           >
             <span className="material-symbols-outlined text-[26px] leading-none">compare_arrows</span>
@@ -527,7 +527,7 @@ export default function SetupView({
                       <div className="mt-1 shrink-0">
                         {isActive
                           ? <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>stars</span>
-                          : <span className="material-symbols-outlined text-on-surface-variant/50">settings_input_component</span>}
+                          : <span className="material-symbols-outlined text-on-surface-muted">settings_input_component</span>}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -566,11 +566,11 @@ export default function SetupView({
                           setCompareIds({ a: prior.id, b: setupItem.id });
                           setShowCompare(true);
                         }}
-                          className={`p-1.5 rounded ${priorSetup(setupItem) ? 'text-on-surface-variant hover:text-primary' : 'text-on-surface-variant/30 cursor-not-allowed'}`}>
+                          className={`p-1.5 rounded ${priorSetup(setupItem) ? 'text-on-surface-variant hover:text-primary' : 'text-on-surface-muted opacity-30 cursor-not-allowed'}`}>
                           <span className="material-symbols-outlined text-[18px]">compare_arrows</span>
                         </button>
                         <button type="button" title="Delete setup permanently" disabled={isReadOnly} onClick={(e) => { e.stopPropagation(); handleDeleteSetup(setupItem.id); }}
-                          className="p-1.5 text-on-surface-variant hover:text-red-400 transition-colors rounded">
+                          className="p-1.5 text-on-surface-variant hover:text-red-400 transition-colors rounded disabled:text-on-surface-muted disabled:opacity-40">
                           <span className="material-symbols-outlined text-[18px]">delete</span>
                         </button>
                       </div>
@@ -670,8 +670,8 @@ export default function SetupView({
                             { label: 'Rear Stagger (RR − LR)', value: setupItem.rearStagger || computeStagger(setupItem.rr.tireSize, setupItem.lr.tireSize) },
                           ].map(({ label, value }) => (
                             <div key={label} className="bg-surface-container border border-outline-variant/40 rounded p-2.5">
-                              <span className="text-[9px] font-mono uppercase font-bold text-on-surface-variant/70 block">{label}</span>
-                              <span className="font-mono text-lg font-black text-primary tracking-tight">{value || <span className="text-on-surface-variant/40 text-xs font-normal">— enter tire sizes</span>}</span>
+                              <span className="text-[9px] font-mono uppercase font-bold text-on-surface-muted block">{label}</span>
+                              <span className="font-mono text-lg font-black text-primary tracking-tight">{value || <span className="text-on-surface-muted text-xs font-normal">— enter tire sizes</span>}</span>
                             </div>
                           ))}
                         </div>
@@ -692,8 +692,8 @@ export default function SetupView({
                             <div>
                               <div className="flex items-center gap-1.5 mb-2">
                                 <span className="material-symbols-outlined text-primary text-[14px]">calculate</span>
-                                <span className="text-[9px] font-mono uppercase font-bold text-on-surface-variant/70 tracking-wider">Weight Calculations</span>
-                                {!hasAll && <span className="text-[9px] font-mono text-on-surface-variant/30 italic">— enter all 4 scale weights</span>}
+                                <span className="text-[9px] font-mono uppercase font-bold text-on-surface-muted tracking-wider">Weight Calculations</span>
+                                {!hasAll && <span className="text-[9px] font-mono text-on-surface-muted italic">— enter all 4 scale weights</span>}
                               </div>
                               <div className="grid grid-cols-2 gap-2">
                                 {[
@@ -703,15 +703,15 @@ export default function SetupView({
                                   { label: 'LR Split', value: lrSplit, hint: 'LR − RR' },
                                 ].map(({ label, value, hint }) => (
                                   <div key={label} className="bg-surface-container border border-outline-variant/40 rounded p-2.5">
-                                    <span className="text-[9px] font-mono uppercase font-bold text-on-surface-variant/70 block">{label}</span>
+                                    <span className="text-[9px] font-mono uppercase font-bold text-on-surface-muted block">{label}</span>
                                     <span className="font-mono text-lg font-black text-primary tracking-tight">{value}</span>
-                                    <span className="text-[8px] font-mono text-on-surface-variant/30 block mt-0.5">{hint}</span>
+                                    <span className="text-[8px] font-mono text-on-surface-muted block mt-0.5">{hint}</span>
                                   </div>
                                 ))}
                               </div>
                               {hasAll && (
                                 <div className="mt-2 bg-surface-container border border-outline-variant/30 rounded px-3 py-1.5 flex items-center justify-between">
-                                  <span className="text-[9px] font-mono uppercase text-on-surface-variant/60">Total Scale Weight</span>
+                                  <span className="text-[9px] font-mono uppercase text-on-surface-muted">Total Scale Weight</span>
                                   <span className="font-mono text-sm font-black text-on-surface">{total.toFixed(0)} lb</span>
                                 </div>
                               )}
@@ -777,15 +777,15 @@ export default function SetupView({
                             <span className="material-symbols-outlined text-primary text-[18px]">photo_library</span>
                             <h4 className="font-label-sm text-xs font-bold uppercase text-on-surface tracking-wider">Attachments / Photos</h4>
                           </div>
-                          <label className={`text-[10px] uppercase font-mono font-bold transition-colors ${user && uploadingSetupId !== setupItem.id ? 'text-primary hover:underline cursor-pointer' : 'text-on-surface-variant/40 cursor-not-allowed'}`}>
+                          <label className={`text-[10px] uppercase font-mono font-bold transition-colors ${user && uploadingSetupId !== setupItem.id ? 'text-primary hover:underline cursor-pointer' : 'text-on-surface-muted cursor-not-allowed'}`}>
                             {uploadingSetupId === setupItem.id
-                              ? <span className="flex items-center gap-1 text-on-surface-variant/60"><span className="material-symbols-outlined text-[14px]">sync</span>Uploading...</span>
+                              ? <span className="flex items-center gap-1 text-on-surface-muted"><span className="material-symbols-outlined text-[14px]">sync</span>Uploading...</span>
                               : <>+ Add File<input type="file" multiple accept="image/*,application/pdf" className="hidden"
                                   disabled={!user || uploadingSetupId === setupItem.id}
                                   onChange={e => { if (!e.target.files) return; (Array.from(e.target.files) as File[]).forEach(f => handleUploadAttachment(setupItem.id, f)); e.target.value = ''; }} /></>}
                           </label>
                         </div>
-                        {!user && <p className="text-[10px] text-on-surface-variant/50 font-mono italic mb-2">Sign in to attach files.</p>}
+                        {!user && <p className="text-[10px] text-on-surface-muted font-mono italic mb-2">Sign in to attach files.</p>}
                         {setupItem.screenshots && setupItem.screenshots.length > 0 ? (
                           <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar">
                             {setupItem.screenshots.map((src, i) => (
@@ -806,7 +806,7 @@ export default function SetupView({
                             ))}
                           </div>
                         ) : user ? (
-                          <p className="text-[10px] text-on-surface-variant/30 font-mono italic">No attachments yet. Add photos, data sheets, or time slips.</p>
+                          <p className="text-[10px] text-on-surface-muted font-mono italic">No attachments yet. Add photos, data sheets, or time slips.</p>
                         ) : null}
                       </div>
                       </fieldset>

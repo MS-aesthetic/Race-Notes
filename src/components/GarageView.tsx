@@ -169,7 +169,7 @@ export default function GarageView({
                           {car.division && (
                             <span className="text-[10px] font-mono text-on-surface-variant uppercase">{car.division}</span>
                           )}
-                          <span className="text-[10px] font-mono text-on-surface-variant/60 uppercase">
+                          <span className="text-[10px] font-mono text-on-surface-muted uppercase">
                             {sc} setup{sc !== 1 ? 's' : ''} · {tc} tire{tc !== 1 ? 's' : ''} · {shc} shock{shc !== 1 ? 's' : ''}
                           </span>
                         </div>
@@ -177,7 +177,7 @@ export default function GarageView({
                       <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => startEdit(car)}
-                          className="tap-target p-1.5 text-on-surface-variant/60 hover:text-on-surface rounded transition-colors"
+                          className="tap-target p-1.5 text-on-surface-muted hover:text-on-surface rounded transition-colors"
                           title="Edit"
                         >
                           <span className="material-symbols-outlined text-base">edit</span>
@@ -187,8 +187,8 @@ export default function GarageView({
                           disabled={totalData(car.id) > 0}
                           className={`tap-target p-1.5 rounded transition-colors ${
                             totalData(car.id) > 0
-                              ? 'text-on-surface-variant/20 cursor-not-allowed'
-                              : 'text-on-surface-variant/60 hover:text-red-400'
+                              ? 'text-on-surface-muted opacity-20 cursor-not-allowed'
+                              : 'text-on-surface-muted hover:text-red-400'
                           }`}
                           title={totalData(car.id) > 0 ? 'Reassign or delete this car\'s data first' : 'Delete car'}
                         >
@@ -264,7 +264,7 @@ export default function GarageView({
       ) : (
         <button
           onClick={focusAddCarForm}
-          className="w-full py-3 border border-dashed border-outline-variant/60 text-on-surface-variant/70 font-mono text-xs uppercase rounded-lg hover:border-primary/60 hover:text-primary transition-colors flex items-center justify-center gap-2"
+          className="w-full py-3 border border-dashed border-outline-variant/60 text-on-surface-muted font-mono text-xs uppercase rounded-lg hover:border-primary/60 hover:text-primary transition-colors flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined text-base">add</span>
           Add Car

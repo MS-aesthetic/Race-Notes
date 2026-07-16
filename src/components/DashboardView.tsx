@@ -238,7 +238,7 @@ export default function DashboardView({
               Last run: <span className="text-on-surface font-bold">{lastRun.session.name}</span>
               {lastRun.session.bestLap ? <> · <span className="text-primary font-bold">{lastRun.session.bestLap}</span></> : null}
             </span>
-            <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant/50 text-[18px] shrink-0">arrow_forward</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-on-surface-muted text-[18px] shrink-0">arrow_forward</span>
           </button>
         )}
       </section>
@@ -274,7 +274,7 @@ export default function DashboardView({
             <span className="font-mono text-xs text-on-surface-variant">
               No active Race Day — pick one in <span className="text-primary font-bold">Runs</span>
             </span>
-            <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant/50 text-[18px]">arrow_forward</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-on-surface-muted text-[18px]">arrow_forward</span>
           </button>
         ) : (
           <div className="bg-surface-container border border-primary/60 rounded-lg overflow-hidden">
@@ -372,7 +372,7 @@ export default function DashboardView({
                       <span className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${chipCls}`}>
                         {st.state === 'overdue' ? 'Overdue' : 'Due'}
                       </span>
-                      <span className="font-mono text-[10px] text-on-surface-variant/50">{c.category}</span>
+                      <span className="font-mono text-[10px] text-on-surface-muted">{c.category}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <div className="flex-1 h-1 bg-surface-variant rounded-full overflow-hidden">
@@ -386,7 +386,7 @@ export default function DashboardView({
                       </span>
                     </div>
                   </div>
-                  <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary text-[16px] transition-colors">chevron_right</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-on-surface-muted group-hover:text-primary text-[16px] transition-colors">chevron_right</span>
                 </button>
               );
             })}

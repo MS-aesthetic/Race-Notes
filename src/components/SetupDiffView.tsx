@@ -90,8 +90,8 @@ export default function SetupDiffView({ setups, onClose, initialAId, initialBId,
                       r.changed ? 'bg-primary/5 border-l-2 border-primary' : 'bg-surface-container'
                     }`}
                   >
-                    <span className="text-on-surface-variant/70 w-24 shrink-0 truncate">{r.label}</span>
-                    <span className={`text-on-surface-variant/50 ${r.changed ? 'line-through' : ''}`}>{r.aValue}</span>
+                    <span className="text-on-surface-muted w-24 shrink-0 truncate">{r.label}</span>
+                    <span className={`text-on-surface-muted ${r.changed ? 'line-through' : ''}`}>{r.aValue}</span>
                     {r.changed && (
                       <>
                         <span className="text-primary font-bold">→</span>

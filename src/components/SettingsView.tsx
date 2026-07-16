@@ -88,31 +88,31 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
       <div className="flex bg-surface rounded-lg p-0.5 border border-outline-variant/30 text-xs font-mono uppercase tracking-wide overflow-x-auto">
         <button
           onClick={() => setSubTab('garage')}
-          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'garage' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'garage' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-muted'}`}
         >
           Garage
         </button>
         <button
           onClick={() => setSubTab('account')}
-          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'account' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'account' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-muted'}`}
         >
           Account
         </button>
         <button
           onClick={() => setSubTab('appearance')}
-          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'appearance' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'appearance' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-muted'}`}
         >
           Style
         </button>
         <button
           onClick={() => setSubTab('export')}
-          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'export' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'export' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-muted'}`}
         >
           Export
         </button>
         <button
           onClick={() => setSubTab('guide')}
-          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'guide' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60'}`}
+          className={`flex-1 min-w-0 py-3 min-h-[44px] rounded-md transition-all whitespace-nowrap px-1 ${subTab === 'guide' ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-muted'}`}
         >
           Guide
         </button>
@@ -304,7 +304,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
             <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
               <div>
                 <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Font Size</label>
-                <p className="text-[10px] font-mono text-on-surface-variant/60 mt-0.5">Scales all text and UI elements throughout the app.</p>
+                <p className="text-[10px] font-mono text-on-surface-muted mt-0.5">Scales all text and UI elements throughout the app.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {([

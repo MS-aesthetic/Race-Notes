@@ -11,6 +11,9 @@ const read = (path: string) => readFileSync(join(root, path), 'utf8');
 const readParent = (path: string) => execFileSync(
   'git', ['show', `${parentCommit}:${path}`], { cwd: root, encoding: 'utf8' },
 );
+const readCommit = (commit: string, path: string) => execFileSync(
+  'git', ['show', `${commit}:${path}`], { cwd: root, encoding: 'utf8' },
+);
 const normalizeEol = (value: string) => value.replace(/\r\n/g, '\n');
 const normalizeSpace = (value: string) => value.replace(/\s+/g, ' ').trim();
 const countExact = (source: string, value: string) => source.split(value).length - 1;
@@ -36,6 +39,7 @@ const replaceRegionFromParent = (source: string, parent: string, start: string, 
 
 const setupSource = read(setupPath);
 const parentSetupSource = readParent(setupPath);
+const uxp17ParentSetupSource = readCommit('a68731a', setupPath);
 const stepperSource = read(stepperPath);
 const parentStepperSource = readParent(stepperPath);
 
@@ -56,6 +60,36 @@ assert.ok(setupSource.includes(currentInp), 'shared INP owns min-h-12 text-sm co
 assert.equal((setupSource.match(/className=\{INP\}/g) ?? []).length, 5, 'exact five shared INP uses');
 
 let revertedSetup = setupSource;
+// UXP-17 is a later class-only muted-text sweep; reverse its exact SetupView subset first.
+revertedSetup = replaceExact(
+  revertedSetup,
+  'border-outline-variant/30 text-on-surface-muted opacity-30 cursor-not-allowed',
+  'border-outline-variant/30 text-on-surface-muted cursor-not-allowed',
+  1,
+  'later global compare opacity',
+);
+revertedSetup = replaceExact(
+  revertedSetup,
+  "'text-on-surface-muted opacity-30 cursor-not-allowed'",
+  "'text-on-surface-muted cursor-not-allowed'",
+  1,
+  'later card compare opacity',
+);
+revertedSetup = replaceExact(
+  revertedSetup,
+  'text-on-surface-variant hover:text-red-400 transition-colors rounded disabled:text-on-surface-muted disabled:opacity-40',
+  'text-on-surface-variant hover:text-red-400 transition-colors rounded',
+  1,
+  'later disabled delete token',
+);
+const uxp17ParentTokens = [...uxp17ParentSetupSource.matchAll(/text-on-surface-variant\/(20|30|40|50|60|70|80)\b/g)].map(match => match[0]);
+assert.equal(uxp17ParentTokens.length, 16, 'later muted sweep parent inventory');
+assert.equal((revertedSetup.match(/text-on-surface-muted\b/g) ?? []).length, 16, 'later muted sweep current inventory after exception normalization');
+let uxp17TokenIndex = 0;
+revertedSetup = revertedSetup.replace(/text-on-surface-muted\b/g, () => uxp17ParentTokens[uxp17TokenIndex++]);
+assert.equal(uxp17TokenIndex, uxp17ParentTokens.length, 'later muted sweep restores every original alpha token');
+assert.equal(normalizeEol(revertedSetup), normalizeEol(uxp17ParentSetupSource), 'UXP-17 SetupView changes are exact class-only muted sweep');
+const setupSourceWithoutUxp17 = revertedSetup;
 revertedSetup = replaceExact(revertedSetup, currentInp, parentInp, 1, 'shared INP');
 revertedSetup = replaceExact(revertedSetup, currentSelectClass, parentSelectClass, 2, 'CornerForm selects');
 revertedSetup = replaceExact(revertedSetup, currentInputClass, parentInputClass, 11, 'expanded text inputs');
@@ -172,8 +206,9 @@ const sliceBetween = (source: string, startMarker: string, endMarker: string) =>
   return source.slice(start, end);
 };
 const computed = sliceBetween(setupSource, '{/* Computed stagger display */}', '{/* 4 Corner forms */}');
-const parentComputed = sliceBetween(parentSetupSource, '{/* Computed stagger display */}', '{/* 4 Corner forms */}');
-assert.equal(normalizeEol(computed), normalizeEol(parentComputed), 'stagger/weight formulas and read-only markup stay byte-identical');
+const normalizedComputed = sliceBetween(setupSourceWithoutUxp17, '{/* Computed stagger display */}', '{/* 4 Corner forms */}');
+const parentComputed = sliceBetween(uxp17ParentSetupSource, '{/* Computed stagger display */}', '{/* 4 Corner forms */}');
+assert.equal(normalizeEol(normalizedComputed), normalizeEol(parentComputed), 'stagger/weight formulas and read-only markup stay byte-identical outside UXP-17 class tokens');
 assert.equal(countExact(computed, 'grid grid-cols-2 gap-3'), 1, 'stagger read-only grid stays two columns');
 assert.equal(countExact(computed, 'grid grid-cols-2 gap-2'), 1, 'weight read-only grid stays two columns');
 for (const formula of [

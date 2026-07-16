@@ -309,7 +309,7 @@ export default function TeamView({ user }: TeamViewProps) {
               <div key={m.id} className="flex items-center justify-between bg-surface-container-lowest p-2 rounded border border-outline-variant/30">
                 <div className="flex flex-col">
                   <span className="text-xs font-mono text-on-surface">{m.displayName || m.email}</span>
-                  <span className="text-[9px] uppercase font-mono text-on-surface-variant/60">{m.role}</span>
+                  <span className="text-[9px] uppercase font-mono text-on-surface-muted">{m.role}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {m.id === user.id && (
@@ -319,7 +319,7 @@ export default function TeamView({ user }: TeamViewProps) {
                     <button
                       onClick={() => handleRemoveMember(m.id, m.displayName || m.email || 'member')}
                       title="Remove member"
-                      className="material-symbols-outlined text-[16px] text-on-surface-variant/60 hover:text-red-400"
+                      className="material-symbols-outlined text-[16px] text-on-surface-muted hover:text-red-400"
                     >
                       person_remove
                     </button>
@@ -338,7 +338,7 @@ export default function TeamView({ user }: TeamViewProps) {
               placeholder="Invite by email"
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}
-              className="flex-1 bg-surface border border-outline-variant/50 p-2 text-xs font-mono rounded text-on-surface placeholder:text-on-surface-variant/40"
+              className="flex-1 bg-surface border border-outline-variant/50 p-2 text-xs font-mono rounded text-on-surface placeholder:text-on-surface-muted"
             />
             <button
               type="submit"
@@ -379,7 +379,7 @@ export default function TeamView({ user }: TeamViewProps) {
                 { key: 'racePassUrl',    label: 'MyRacePass URL',   placeholder: 'https://www.myracepass.com/drivers/...' },
               ] as { key: keyof TeamProfile; label: string; placeholder: string }[]).map(({ key, label, placeholder }) => (
                 <div key={key}>
-                  <label className="block text-[9px] font-mono uppercase text-on-surface-variant/70 mb-0.5 tracking-wider">{label}</label>
+                  <label className="block text-[9px] font-mono uppercase text-on-surface-muted mb-0.5 tracking-wider">{label}</label>
                   <input
                     type="text"
                     placeholder={placeholder}
@@ -454,7 +454,7 @@ export default function TeamView({ user }: TeamViewProps) {
                   )}
                 </>
               ) : (
-                <p className="text-[10px] font-mono text-on-surface-variant/40 italic">
+                <p className="text-[10px] font-mono text-on-surface-muted italic">
                   {isOwner ? 'No profile info yet — tap Edit to add details.' : 'No profile info set.'}
                 </p>
               )}

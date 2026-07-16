@@ -2087,7 +2087,7 @@ export default function App() {
               <p className="text-center text-on-surface-variant text-xs leading-relaxed mb-6">
                 Register or sign in to start tracking setups, runs, and Race Days.
                 <br />
-                <span className="text-on-surface-variant/50">
+                <span className="text-on-surface-muted">
                   Once you've signed in on this device, the app keeps working with no signal.
                 </span>
               </p>
@@ -2377,7 +2377,7 @@ export default function App() {
             id="tab-btn-dashboard"
             aria-current={activeTab === 'dashboard' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
-              activeTab === 'dashboard' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+              activeTab === 'dashboard' ? 'text-primary scale-105' : 'text-on-surface-muted hover:text-on-surface'
             }`}
           >
             <span
@@ -2398,7 +2398,7 @@ export default function App() {
             id="tab-btn-setups"
             aria-current={activeTab === 'setups' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
-              activeTab === 'setups' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+              activeTab === 'setups' ? 'text-primary scale-105' : 'text-on-surface-muted hover:text-on-surface'
             }`}
           >
             <span
@@ -2419,7 +2419,7 @@ export default function App() {
             id="tab-btn-raceweekend"
             aria-current={activeTab === 'raceweekend' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
-              activeTab === 'raceweekend' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+              activeTab === 'raceweekend' ? 'text-primary scale-105' : 'text-on-surface-muted hover:text-on-surface'
             }`}
           >
             <span
@@ -2439,7 +2439,7 @@ export default function App() {
             id="tab-btn-trackers"
             aria-current={activeTab === 'trackers' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
-              activeTab === 'trackers' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+              activeTab === 'trackers' ? 'text-primary scale-105' : 'text-on-surface-muted hover:text-on-surface'
             }`}>
             <span className="material-symbols-outlined text-[20px]"
                   aria-hidden="true"
@@ -2459,7 +2459,7 @@ export default function App() {
             id="tab-btn-settings"
             aria-current={activeTab === 'settings' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
-              activeTab === 'settings' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
+              activeTab === 'settings' ? 'text-primary scale-105' : 'text-on-surface-muted hover:text-on-surface'
             }`}
           >
             <span
