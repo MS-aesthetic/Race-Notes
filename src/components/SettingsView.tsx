@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import AuthView from './AuthView';
 import ExportView from './ExportView';
 import GarageView from './GarageView';
@@ -53,7 +53,6 @@ const ACCENT_PRESETS = [
 export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, subTabRequestKey = 0, onClearAllData, onDeleteAccount, tireInventory = [], onStartWeekend }: SettingsViewProps) {
   const [subTab, setSubTab] = useState<SettingsSubTab>(initialSubTab ?? 'garage');
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0); // 0=idle, 1=confirm, 2=clearing
-  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePhrase, setDeletePhrase] = useState('');
@@ -166,12 +165,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
 
               {clearStep === 0 && (
                 <button
-                  onClick={() => {
-                    setClearStep(1);
-                    // auto-reset after 5 s if not confirmed
-                    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
-                    clearTimerRef.current = setTimeout(() => setClearStep(0), 5000);
-                  }}
+                  onClick={() => setClearStep(1)}
                   className="w-full py-2 rounded-lg border border-red-500/50 text-red-400 font-mono text-xs uppercase tracking-wider hover:bg-red-500/10 transition-colors"
                 >
                   Clear Racing Data
@@ -183,14 +177,13 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                   <p className="text-xs font-mono text-red-400 text-center font-bold">Clear racing records but keep this account?</p>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => { setClearStep(0); if (clearTimerRef.current) clearTimeout(clearTimerRef.current); }}
+                      onClick={() => setClearStep(0)}
                       className="flex-1 py-2 rounded-lg border border-outline-variant text-on-surface-variant font-mono text-xs uppercase tracking-wider hover:bg-surface transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={async () => {
-                        if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
                         setClearStep(2);
                         await onClearAllData?.();
                         setClearStep(0);
