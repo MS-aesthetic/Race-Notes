@@ -33,7 +33,7 @@ import SetupView from './components/SetupView';
 import RaceWeekendView from './components/RaceWeekendView';
 import type { NewSessionData, NewWeekendData } from './components/RaceWeekendView';
 import { buildSessionNameFrom } from './lib/sessionSequence';
-import SettingsView from './components/SettingsView';
+import SettingsView, { type SettingsSubTab } from './components/SettingsView';
 import QuickReferenceView from './components/QuickReferenceView';
 import GuideView from './components/GuideView';
 import TrackersView from './components/TrackersView';
@@ -551,9 +551,7 @@ export default function App() {
   const carTireCount = (carId: string) => tireInventory.filter(t => t.carId === carId).length;
   const carShockCount = (carId: string) => shockSessions.filter(s => s.carId === carId).length;
 
-  // Initial Settings sub-tab (former header chip deep-links now live in the
-  // ContextStrip / HelpSheet, so nothing sets this at runtime anymore)
-  const [settingsSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>('garage');
+  const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('garage');
   const [settingsViewKey, setSettingsViewKey] = useState(0);
   // Deep-link into SetupView sub-tabs from Dashboard
   const [setupSubTab, setSetupSubTab] = useState<'setups' | 'smasherloads' | 'tires'>('setups');
@@ -859,10 +857,13 @@ export default function App() {
   // This one-shot action tells the Sessions tab to open a modal on arrival.
   const [rwInitialAction, setRwInitialAction] = useState<'new-session' | 'new-weekend' | null>(null);
   const continueToRunAfterWeekendRef = useRef(false);
-  const openGarage = () => {
+  // Future Settings deep links use one request path and remain repeatable.
+  const openSettingsTab = (tab: SettingsSubTab) => {
+    setSettingsSubTab(tab);
     setSettingsViewKey(value => value + 1);
     setActiveTab('settings');
   };
+  const openGarage = () => openSettingsTab('garage');
   const openRaceWeekendAction = (action: 'new-session' | 'new-weekend') => {
     const target = resolveRaceDayCreationTarget(activeCarId, action);
     setRwInitialAction(target.initialAction);
@@ -2328,7 +2329,7 @@ export default function App() {
                   shockCount={carShockCount}
                   onStartWeekend={() => openRaceWeekendAction('new-weekend')}
                   initialSubTab={settingsSubTab}
-                  garageRequestKey={settingsViewKey}
+                  subTabRequestKey={settingsViewKey}
                   onClearAllData={handleClearAllData}
                   onDeleteAccount={handleDeleteAccount}
                   tireInventory={tireInventory}
@@ -2448,7 +2449,7 @@ export default function App() {
 
           {/* Settings Button */}
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => openSettingsTab('garage')}
             id="tab-btn-settings"
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
               activeTab === 'settings' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'

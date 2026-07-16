@@ -10,6 +10,8 @@ import { AppUser } from '../lib/supabase';
 import { DELETE_ACCOUNT_CONFIRMATION, isDeleteAccountConfirmed } from '../lib/accountDeletion';
 import { Setup, ActiveSession, AppTheme, RaceWeekend, AccountingEntry, Todo, Car, TireInventoryItem } from '../types';
 
+export type SettingsSubTab = 'garage' | 'account' | 'appearance' | 'export' | 'guide';
+
 interface SettingsViewProps {
   user: User | null;
   profile: AppUser | null;
@@ -31,8 +33,8 @@ interface SettingsViewProps {
   setupCount: (carId: string) => number;
   tireCount: (carId: string) => number;
   shockCount: (carId: string) => number;
-  initialSubTab?: 'account' | 'appearance' | 'export' | 'garage' | 'guide';
-  garageRequestKey?: number;
+  initialSubTab?: SettingsSubTab;
+  subTabRequestKey?: number;
   onClearAllData?: () => Promise<void>;
   onDeleteAccount: () => Promise<void>;
   tireInventory?: TireInventoryItem[];
@@ -48,8 +50,8 @@ const ACCENT_PRESETS = [
   { label: 'Cyan',        hex: '#7de8e8' },
 ];
 
-export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, garageRequestKey = 0, onClearAllData, onDeleteAccount, tireInventory = [], onStartWeekend }: SettingsViewProps) {
-  const [subTab, setSubTab] = useState<'account' | 'appearance' | 'export' | 'garage' | 'guide'>(initialSubTab ?? 'garage');
+export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, subTabRequestKey = 0, onClearAllData, onDeleteAccount, tireInventory = [], onStartWeekend }: SettingsViewProps) {
+  const [subTab, setSubTab] = useState<SettingsSubTab>(initialSubTab ?? 'garage');
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0); // 0=idle, 1=confirm, 2=clearing
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [privacyOpen, setPrivacyOpen] = useState(false);
@@ -78,8 +80,8 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
   };
 
   useEffect(() => {
-    if (garageRequestKey > 0) setSubTab('garage');
-  }, [garageRequestKey]);
+    setSubTab(initialSubTab ?? 'garage');
+  }, [initialSubTab, subTabRequestKey]);
 
   return (
     <div className="flex flex-col gap-4 h-full">

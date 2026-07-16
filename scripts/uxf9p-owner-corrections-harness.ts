@@ -33,13 +33,22 @@ const guide = source('src/components/GuideView.tsx');
 const exportView = source('src/components/ExportView.tsx');
 const todoView = source('src/components/ToDoView.tsx');
 const trackersView = source('src/components/TrackersView.tsx');
+const settingsView = source('src/components/SettingsView.tsx');
 
 assert.match(app, /resolveRaceDayCreationTarget\(activeCarId, action\)/);
 assert.match(app, /if \(!activeCarId\)[\s\S]{0,180}continueToRunAfterWeekendRef\.current = false/);
 assert.match(app, /const handleQuickStartWeekend = \(\) => \{[\s\S]{0,120}if \(!activeCarId\)/);
-assert.match(app, /const openGarage = \(\) => \{[\s\S]{0,140}setActiveTab\('settings'\)/);
-assert.match(app, /garageRequestKey=\{settingsViewKey\}/);
-assert.match(source('src/components/SettingsView.tsx'), /if \(garageRequestKey > 0\) setSubTab\('garage'\)/);
+assert.match(settingsView, /export type SettingsSubTab = 'garage' \| 'account' \| 'appearance' \| 'export' \| 'guide';/);
+assert.match(app, /const \[settingsSubTab, setSettingsSubTab\] = useState<SettingsSubTab>\('garage'\)/);
+assert.match(app, /const openSettingsTab = \(tab: SettingsSubTab\) => \{[\s\S]{0,180}setSettingsSubTab\(tab\);[\s\S]{0,180}setSettingsViewKey\(value => value \+ 1\);[\s\S]{0,180}setActiveTab\('settings'\)/);
+assert.match(app, /const openGarage = \(\) => openSettingsTab\('garage'\);/);
+assert.match(app, /subTabRequestKey=\{settingsViewKey\}/);
+assert.doesNotMatch(`${app}\n${settingsView}`, /garageRequestKey/);
+assert.match(settingsView, /useEffect\(\(\) => \{\s*setSubTab\(initialSubTab \?\? 'garage'\);\s*\}, \[initialSubTab, subTabRequestKey\]\);/);
+assert.match(app, /onClick=\{\(\) => openSettingsTab\('garage'\)\}[\s\S]{0,100}id="tab-btn-settings"/);
+for (const tab of ['garage', 'account', 'appearance', 'export', 'guide']) {
+  assert.match(settingsView, new RegExp(`onClick=\\{\\(\\) => setSubTab\\('${tab}'\\)\\}`));
+}
 assert.match(app, /const handleCreateNewSession[\s\S]{0,140}if \(!activeCarId\)[\s\S]{0,80}openGarage/);
 assert.match(setupView, /<CarRequiredPrompt onAddCar=/);
 assert.match(raceDayView, /if \(!editing && !activeCarId\)/);
