@@ -272,7 +272,7 @@ export default function DashboardView({
             className="w-full min-h-12 px-4 py-3 flex items-center justify-between gap-2 bg-surface-container border border-outline-variant rounded-lg text-left hover:bg-surface-container-high transition-colors"
           >
             <span className="font-mono text-xs text-on-surface-variant">
-              No active Race Day — pick one in <span className="text-primary font-bold">Sessions</span>
+              No active Race Day — pick one in <span className="text-primary font-bold">Runs</span>
             </span>
             <span className="material-symbols-outlined text-on-surface-variant/50 text-[18px]">arrow_forward</span>
           </button>
@@ -484,7 +484,7 @@ export default function DashboardView({
             className="tap-target-block gap-3 rounded-xl px-3 text-left text-on-surface hover:bg-surface-container-high transition-colors"
           >
             <span className="material-symbols-outlined text-on-surface-variant">sports_score</span>
-            Open in Sessions
+            Open in Runs
           </button>
           <button
             onClick={() => activeWeekend && requestWeekendDelete(activeWeekend)}

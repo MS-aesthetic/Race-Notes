@@ -877,7 +877,7 @@ export default function RaceWeekendView({
               type="submit"
               className="px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
             >
-              START SESSION
+              START RUN
             </button>
           </div>
         </form>

@@ -312,7 +312,7 @@ export default function App() {
       const nextCar = currentCars.find(c => c.id === carId);
       if (nextCar) {
         const label = nextCar.name || `${nextCar.chassis} · ${nextCar.carType}`;
-        setInfoToast(`Now viewing ${label} — setups, sessions & trackers switched.`);
+        setInfoToast(`Now viewing ${label} — setups, runs & trackers switched.`);
       }
     }
     activeCarIdRef.current = carId;
@@ -2096,7 +2096,7 @@ export default function App() {
           <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto">
             <div className="w-full max-w-sm">
               <p className="text-center text-on-surface-variant text-xs leading-relaxed mb-6">
-                Register or sign in to start tracking setups, sessions, and Race Days.
+                Register or sign in to start tracking setups, runs, and Race Days.
                 <br />
                 <span className="text-on-surface-variant/50">
                   Once you've signed in on this device, the app keeps working with no signal.
@@ -2424,7 +2424,7 @@ export default function App() {
               timer
             </span>
             <span className="w-full min-w-0 text-center font-semibold text-[10px] uppercase font-mono mt-0.5 tracking-tight leading-none break-words whitespace-normal">
-              Sessions
+              Runs
             </span>
           </button>
 
