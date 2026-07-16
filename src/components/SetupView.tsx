@@ -588,7 +588,7 @@ export default function SetupView({
                       <fieldset disabled={isReadOnly} className="min-w-0 space-y-6 disabled:opacity-75">
 
                       {/* Metadata grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Chassis</label>
                           <input type="text" value={setupItem.chassis} onChange={(e) => handleMetadataChange(setupItem.id, 'chassis', e.target.value)}
@@ -609,7 +609,7 @@ export default function SetupView({
                           <input type="text" placeholder="e.g. USMTS Late Model" value={setupItem.carType} onChange={(e) => handleMetadataChange(setupItem.id, 'carType', e.target.value)}
                             className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
-                        <div className="sm:col-span-2">
+                        <div className="min-[360px]:col-span-2">
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Toe</label>
                           <input type="text" placeholder='e.g. 1/8" Total Toe-Out' value={setupItem.toe || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'toe', e.target.value)}
                             className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
@@ -630,7 +630,7 @@ export default function SetupView({
                           <h4 className="font-label-sm text-xs font-bold uppercase text-on-surface tracking-wider">Car Setup Details</h4>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Gear</label>
                             <input type="text" placeholder="e.g. 6.14" value={setupItem.gear || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'gear', e.target.value)}
@@ -721,7 +721,7 @@ export default function SetupView({
                       </div>
 
                       {/* 4 Corner forms */}
-                      <div className="min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-3">
+                      <div className="min-w-0 grid grid-cols-1 min-[360px]:grid-cols-2 gap-1.5 min-[360px]:gap-3">
                         {(['lf', 'rf', 'lr', 'rr'] as const).map((corner, _, all) => {
                           const usedTireIds = all
                             .filter(c => c !== corner)

@@ -51,15 +51,25 @@ const currentInputClass = 'w-full min-h-12 bg-surface border border-outline-vari
 const parentInputClass = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded';
 const currentNotesClass = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded min-h-[60px] resize-y';
 const parentNotesClass = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded min-h-[60px] resize-y';
-const currentDetailsGrid = 'grid grid-cols-1 sm:grid-cols-2 gap-4';
+const phoneDetailsGrid = 'grid grid-cols-1 min-[360px]:grid-cols-2 gap-4';
+const prePhoneDetailsGrid = 'grid grid-cols-1 sm:grid-cols-2 gap-4';
+const phoneToeSpan = 'min-[360px]:col-span-2';
+const prePhoneToeSpan = 'sm:col-span-2';
+const currentDetailsGrid = prePhoneDetailsGrid;
 const parentDetailsGrid = 'grid grid-cols-2 gap-4';
-const currentCornerGrid = 'min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-3';
+const phoneCornerGrid = 'min-w-0 grid grid-cols-1 min-[360px]:grid-cols-2 gap-1.5 min-[360px]:gap-3';
+const prePhoneCornerGrid = 'min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-3';
+const currentCornerGrid = prePhoneCornerGrid;
 const parentCornerGrid = 'min-w-0 grid grid-cols-2 gap-1.5 sm:gap-3';
 
 assert.ok(setupSource.includes(currentInp), 'shared INP owns min-h-12 text-sm contract');
 assert.equal((setupSource.match(/className=\{INP\}/g) ?? []).length, 5, 'exact five shared INP uses');
 
 let revertedSetup = setupSource;
+// Later phone-layout refinement: peel its breakpoint-only changes before proving UXP-17/14.
+revertedSetup = replaceExact(revertedSetup, phoneDetailsGrid, prePhoneDetailsGrid, 2, 'phone metadata/detail grids');
+revertedSetup = replaceExact(revertedSetup, phoneToeSpan, prePhoneToeSpan, 1, 'phone Toe span');
+revertedSetup = replaceExact(revertedSetup, phoneCornerGrid, prePhoneCornerGrid, 1, 'phone corner grid');
 // UXP-17 is a later class-only muted-text sweep; reverse its exact SetupView subset first.
 revertedSetup = replaceExact(
   revertedSetup,
@@ -226,8 +236,13 @@ assert.equal(normalizeEol(currentFormulaHelpers), normalizeEol(parentFormulaHelp
 
 const narrowStepperWrapper = 'min-w-0 [&_[role=group]]:flex-wrap [&_[role=group]]:overflow-visible [&_[role=group]>button]:basis-full [&_[role=group]>button]:w-full [&_[role=group]>div]:basis-full [&_[role=group]>div]:border-x-0 [&_[role=group]>div]:border-y';
 assert.equal(countExact(setupSource, narrowStepperWrapper), 1, 'SetupView keeps exact forced narrow NumberStepper wrapping');
-assert.ok(sliceBetween(setupSource, '{/* Car setup details */}', '{/* Computed stagger display */}').includes(currentDetailsGrid), 'editable car-detail grid stacks at base width');
-assert.equal(countExact(setupSource, currentCornerGrid), 1, 'editable four-corner grid stacks at base width');
+const metadataSection = sliceBetween(setupSource, '{/* Metadata grid */}', '{/* Notes */}');
+const carDetailsSection = sliceBetween(setupSource, '{/* Car setup details */}', '{/* Computed stagger display */}');
+assert.equal(countExact(setupSource, phoneDetailsGrid), 2, 'metadata and car details activate two columns at 360px');
+assert.ok(metadataSection.includes(phoneToeSpan), 'Toe spans both phone columns');
+assert.ok(carDetailsSection.includes(phoneDetailsGrid), 'editable car-detail grid activates at typical phone width');
+assert.equal(countExact(setupSource, phoneCornerGrid), 1, 'four corner cards activate two columns at 360px');
+assert.doesNotMatch(metadataSection + carDetailsSection, /sm:grid-cols-2/, 'editable details no longer wait for 640px');
 
 assert.equal(normalizeEol(stepperSource), normalizeEol(parentStepperSource), 'NumberStepper stays byte-identical to parent');
 const normalizedStepper = normalizeSpace(stepperSource);

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const PARENT = '89845e8';
+const UXP18_COMMIT = '38e9828';
 const APP_PATH = 'src/App.tsx';
 const HARNESS_PATH = 'scripts/saved-flash-harness.ts';
 const UXP17_ASSERTION_PATH = 'scripts/muted-text-color-harness.ts';
@@ -42,12 +43,10 @@ const persistenceBeforeLastFlash = (source: string, label: string): void => {
 };
 
 // Exact feature files plus one necessary assertion-only prior-harness compatibility edit.
-const tracked = execFileSync('git', ['diff', '--name-only', PARENT, '--', 'src', 'scripts'], { cwd: root, encoding: 'utf8' })
-  .split(/\r?\n/).filter(Boolean);
-const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '--', 'src', 'scripts'], { cwd: root, encoding: 'utf8' })
+const tracked = execFileSync('git', ['diff', '--name-only', PARENT, UXP18_COMMIT, '--', 'src', 'scripts'], { cwd: root, encoding: 'utf8' })
   .split(/\r?\n/).filter(Boolean);
 assert.deepEqual(
-  [...new Set([...tracked, ...untracked])].sort(),
+  tracked.sort(),
   [APP_PATH, HARNESS_PATH, UXP17_ASSERTION_PATH].sort(),
   'UXP-18 changes App/focused harness plus only the required UXP-17 assertion compatibility file',
 );

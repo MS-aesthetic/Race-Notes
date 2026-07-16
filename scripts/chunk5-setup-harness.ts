@@ -150,7 +150,7 @@ assert.match(setupSource, /min-w-0 break-words font-label-sm/);
 assert.match(setupSource, /min-w-0 p-1\.5 sm:p-4 grid grid-cols-1/);
 assert.match(setupSource, /w-full min-w-0 flex flex-wrap items-center justify-end gap-2/);
 assert.match(setupSource, /w-full min-w-0 flex flex-wrap items-center justify-end gap-1 border-t/);
-assert.match(setupSource, /min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-1\.5 sm:gap-3/);
+assert.match(setupSource, /min-w-0 grid grid-cols-1 min-\[360px\]:grid-cols-2 gap-1\.5 min-\[360px\]:gap-3/);
 assert.ok(setupSource.indexOf("(['lf', 'rf', 'lr', 'rr'] as const)") >= 0);
 const smasherSource = readFileSync(new URL('../src/components/SmasherLoadsView.tsx', import.meta.url), 'utf8');
 assert.match(smasherSource, /if \(!activeCarId\) return;/);
@@ -165,5 +165,8 @@ assert.match(fourBarSource, /bottomBarAngRH/);
 assert.match(fourBarSource, /bottomBarAngFD/);
 assert.match(fourBarSource, /Legacy bottom angle/);
 assert.match(fourBarSource, /\[&_\[role=group\]\]:flex-wrap/);
+assert.equal((fourBarSource.match(/grid grid-cols-1 gap-2 min-\[360px\]:grid-cols-3/g) ?? []).length, 1, 'four-bar measurements use three columns on typical phones');
+assert.equal((fourBarSource.match(/grid grid-cols-1 gap-2 min-\[360px\]:grid-cols-2/g) ?? []).length, 1, 'four-bar angles use two columns on typical phones');
+assert.doesNotMatch(fourBarSource, /sm:grid-cols-[23]/, 'four-bar no longer waits for the 640px breakpoint');
 
 console.log('CHUNK5_SETUP_HARNESS PASS');

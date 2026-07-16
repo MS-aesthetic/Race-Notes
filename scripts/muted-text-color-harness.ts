@@ -6,6 +6,7 @@ import { join } from 'node:path';
 const root = process.cwd();
 const parentCommit = 'a68731a';
 const uxp17Commit = '89845e8';
+const phoneLayoutParentCommit = '38e9828';
 const cssPath = 'src/index.css';
 const expectedCounts = new Map<string, number>([
   ['src/App.tsx', 6],
@@ -128,6 +129,11 @@ for (const [path, expectedCount] of expectedCounts) {
   const parent = readParent(path);
   const parentTokens = [...parent.matchAll(oldAlpha)].map(match => match[0]);
   let normalized = path === 'src/App.tsx' ? readCommit(uxp17Commit, path) : read(path);
+  if (path === 'src/components/SetupView.tsx') {
+    normalized = replaceExact(normalized, 'grid grid-cols-1 min-[360px]:grid-cols-2 gap-4', 'grid grid-cols-1 sm:grid-cols-2 gap-4', 2, `${path}: later phone detail grids`);
+    normalized = replaceExact(normalized, 'min-[360px]:col-span-2', 'sm:col-span-2', 1, `${path}: later phone Toe span`);
+    normalized = replaceExact(normalized, 'min-w-0 grid grid-cols-1 min-[360px]:grid-cols-2 gap-1.5 min-[360px]:gap-3', 'min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-3', 1, `${path}: later phone corner grid`);
+  }
   for (const [current, replacement] of exceptionNormalizations.get(path) ?? []) {
     normalized = replaceExact(normalized, current, replacement, 1, `${path}: opacity exception`);
   }
@@ -138,9 +144,15 @@ for (const [path, expectedCount] of expectedCounts) {
   assert.equal(normalizeEol(normalized), normalizeEol(parent), `${path}: only authorized muted/opacity class changes`);
 }
 
+const fourBarPath = 'src/components/FourBarQuickAdjust.tsx';
+let normalizedFourBar = read(fourBarPath);
+normalizedFourBar = replaceExact(normalizedFourBar, 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-3', 'grid grid-cols-1 gap-2 sm:grid-cols-3', 1, `${fourBarPath}: later phone measurement grid`);
+normalizedFourBar = replaceExact(normalizedFourBar, 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-2', 'grid grid-cols-1 gap-2 sm:grid-cols-2', 1, `${fourBarPath}: later phone angle grid`);
+assert.equal(normalizeEol(normalizedFourBar), normalizeEol(readCommit(phoneLayoutParentCommit, fourBarPath)), `${fourBarPath}: only authorized phone breakpoint changes`);
+
 const currentSrcDiff = execFileSync('git', ['diff', '--name-only', parentCommit, '--', 'src'], { cwd: root, encoding: 'utf8' })
   .trim().split(/\r?\n/).filter(Boolean).sort();
-assert.deepEqual(currentSrcDiff, [cssPath, ...expectedCounts.keys()].sort(), 'no unrelated source-file drift');
+assert.deepEqual(currentSrcDiff, [cssPath, fourBarPath, ...expectedCounts.keys()].sort(), 'no unrelated source-file drift');
 
 const css = read(cssPath);
 const parentCss = readParent(cssPath);
