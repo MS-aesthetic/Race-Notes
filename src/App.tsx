@@ -2364,12 +2364,14 @@ export default function App() {
           <button
             onClick={() => setActiveTab('dashboard')}
             id="tab-btn-dashboard"
+            aria-current={activeTab === 'dashboard' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
               activeTab === 'dashboard' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
             <span
               className="material-symbols-outlined text-[20px]"
+              aria-hidden="true"
               style={{ fontVariationSettings: activeTab === 'dashboard' ? "'FILL' 1" : "'FILL' 0" }}
             >
               dashboard
@@ -2383,12 +2385,14 @@ export default function App() {
           <button
             onClick={() => setActiveTab('setups')}
             id="tab-btn-setups"
+            aria-current={activeTab === 'setups' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
               activeTab === 'setups' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
             <span
               className="material-symbols-outlined text-[20px]"
+              aria-hidden="true"
               style={{ fontVariationSettings: activeTab === 'setups' ? "'FILL' 1" : "'FILL' 0" }}
             >
               settings_input_component
@@ -2402,12 +2406,14 @@ export default function App() {
           <button
             onClick={() => setActiveTab('raceweekend')}
             id="tab-btn-raceweekend"
+            aria-current={activeTab === 'raceweekend' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
               activeTab === 'raceweekend' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
             <span
               className="material-symbols-outlined text-[20px]"
+              aria-hidden="true"
               style={{ fontVariationSettings: activeTab === 'raceweekend' ? "'FILL' 1" : "'FILL' 0" }}
             >
               timer
@@ -2420,10 +2426,12 @@ export default function App() {
           {/* Trackers Button */}
           <button onClick={() => setActiveTab('trackers')}
             id="tab-btn-trackers"
+            aria-current={activeTab === 'trackers' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
               activeTab === 'trackers' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}>
             <span className="material-symbols-outlined text-[20px]"
+                  aria-hidden="true"
                   style={{ fontVariationSettings: activeTab === 'trackers' ? "'FILL' 1" : "'FILL' 0" }}>
               monitoring
             </span>
@@ -2438,12 +2446,14 @@ export default function App() {
           <button
             onClick={() => openSettingsTab('garage')}
             id="tab-btn-settings"
+            aria-current={activeTab === 'settings' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
               activeTab === 'settings' ? 'text-primary scale-105' : 'text-on-surface-variant/80 hover:text-on-surface'
             }`}
           >
             <span
               className="material-symbols-outlined text-[20px]"
+              aria-hidden="true"
               style={{ fontVariationSettings: activeTab === 'settings' ? "'FILL' 1" : "'FILL' 0" }}
             >
               settings

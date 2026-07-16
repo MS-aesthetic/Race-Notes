@@ -238,7 +238,7 @@ export default function DashboardView({
               Last run: <span className="text-on-surface font-bold">{lastRun.session.name}</span>
               {lastRun.session.bestLap ? <> · <span className="text-primary font-bold">{lastRun.session.bestLap}</span></> : null}
             </span>
-            <span className="material-symbols-outlined text-on-surface-variant/50 text-[18px] shrink-0">arrow_forward</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant/50 text-[18px] shrink-0">arrow_forward</span>
           </button>
         )}
       </section>
@@ -274,7 +274,7 @@ export default function DashboardView({
             <span className="font-mono text-xs text-on-surface-variant">
               No active Race Day — pick one in <span className="text-primary font-bold">Runs</span>
             </span>
-            <span className="material-symbols-outlined text-on-surface-variant/50 text-[18px]">arrow_forward</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant/50 text-[18px]">arrow_forward</span>
           </button>
         ) : (
           <div className="bg-surface-container border border-primary/60 rounded-lg overflow-hidden">
@@ -386,7 +386,7 @@ export default function DashboardView({
                       </span>
                     </div>
                   </div>
-                  <span className="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary text-[16px] transition-colors">chevron_right</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary text-[16px] transition-colors">chevron_right</span>
                 </button>
               );
             })}
@@ -405,7 +405,7 @@ export default function DashboardView({
             ? 'Checklist clear'
             : `Checklist · ${openTaskCount} open${assignedTaskCount > 0 ? ` · ${assignedTaskCount} mine` : ''}`}
         </span>
-        <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+        <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
       </button>
 
       {/* [9] SETUPS / TIRES — one-line link-outs (full lists live in the Setups tab) */}
@@ -420,7 +420,7 @@ export default function DashboardView({
               Setups ({displayedSetups.length})
             </span>
           </span>
-          <span className="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_right</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_right</span>
         </button>
         <button
           onClick={() => onGoToTires?.()}
@@ -432,7 +432,7 @@ export default function DashboardView({
               Tires ({displayedTires.length})
             </span>
           </span>
-          <span className="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_right</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_right</span>
         </button>
       </section>
 
