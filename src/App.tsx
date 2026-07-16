@@ -274,6 +274,20 @@ export default function App() {
     if (currentSyncOwnerId) pushCars(updated, currentSyncOwnerId, teamRef.current?.id ?? null, setSyncStatus);
   };
 
+  const handleSaveGarageCars = (visibleUpdated: Car[]) => {
+    if (!pendingCarId) {
+      handleSaveCars(visibleUpdated);
+      return;
+    }
+    const canonicalCars = carsRef.current;
+    const visibleById = new Map(visibleUpdated.map(car => [car.id, car]));
+    const canonicalIds = new Set(canonicalCars.map(car => car.id));
+    const reconciled = canonicalCars
+      .map(car => car.id === pendingCarId ? car : visibleById.get(car.id) ?? car)
+      .concat(visibleUpdated.filter(car => !canonicalIds.has(car.id)));
+    handleSaveCars(reconciled);
+  };
+
   const handleSelectCar = (carId: string) => {
     // [37] Confirm the scope switch when the user actually changes car
     const currentActiveCarId = activeCarIdRef.current;
@@ -399,8 +413,6 @@ export default function App() {
     const car = carsRef.current.find(item => item.id === carId);
     if (!car) return;
     const accountId = userRef.current?.id ?? null;
-    const ownerId = syncOwnerIdRef.current;
-    const generation = authGenerationRef.current;
     const label = car.name || `${car.chassis} · ${car.carType}`;
     carUndo.requestDelete({
       id: car.id,
@@ -411,9 +423,7 @@ export default function App() {
       restoreToState: () => {},
       commit: () => {
         // A delayed delete must never apply a prior account's intent to new account data.
-        if (userRef.current?.id !== accountId
-          || syncOwnerIdRef.current !== ownerId
-          || authGenerationRef.current !== generation) return;
+        if (userRef.current?.id !== accountId) return;
         const latestCars = carsRef.current;
         const updated = latestCars.filter(item => item.id !== carId);
         if (updated.length === latestCars.length) return;
@@ -434,6 +444,8 @@ export default function App() {
 
   // ── Clear All Data ────────────────────────────────────────────────────────────
   const handleClearAllData = async () => {
+    // Clear All owns deletion now; cancel the render-only car slot without committing it.
+    carUndo.undo();
     // Clearing a device must not erase team data. When membership is unresolved,
     // retain solo-only intents until resolution proves the account is solo.
     if (user && (!teamResolved || !team)) {
@@ -475,6 +487,8 @@ export default function App() {
     LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
 
     // Reset all in-memory state
+    carsRef.current = [];
+    activeCarIdRef.current = null;
     setSavedSetups([]);
     setWeekends([]);
     setActiveWeekendId(null);
@@ -2282,7 +2296,7 @@ export default function App() {
                   cars={pendingCarId ? cars.filter(car => car.id !== pendingCarId) : cars}
                   activeCarId={activeCarId}
                   onSelectCar={handleSelectCar}
-                  onSaveCars={handleSaveCars}
+                  onSaveCars={handleSaveGarageCars}
                   onDeleteCar={handleDeleteCar}
                   setupCount={carSetupCount}
                   tireCount={carTireCount}
