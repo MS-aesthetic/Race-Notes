@@ -1031,7 +1031,7 @@ export default function RaceWeekendView({
                   placeholder="Enter ZIP code (e.g. 47421)"
                   value={zipCode}
                   onChange={e => setZipCode(e.target.value)}
-                  className="flex-1 bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-sm text-on-surface outline-none"
+                  className="flex-1 bg-surface border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-sm text-on-surface outline-none"
                 />
                 <button type="submit" disabled={weatherLoading} className="bg-primary text-on-primary px-4 py-2 rounded font-mono text-xs font-bold uppercase disabled:opacity-50">
                   {weatherLoading ? '…' : 'Get'}
@@ -1076,7 +1076,7 @@ export default function RaceWeekendView({
           <div className="p-4">
             <label className="font-mono text-[10px] uppercase font-bold text-on-surface-variant tracking-wider block mb-2">Race Day Notes</label>
             <textarea
-              className="w-full bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded p-3 text-sm text-on-surface font-mono min-h-[72px] outline-none resize-none"
+              className="w-full bg-surface border border-outline-variant focus:border-primary rounded p-3 text-sm text-on-surface font-mono min-h-[72px] outline-none resize-none"
               placeholder="Overall notes for this Race Day — goals, track conditions, key takeaways…"
               value={currentWeekend.notes || ''}
               onChange={e => handleWeekendNotes(e.target.value)}
@@ -1135,7 +1135,7 @@ export default function RaceWeekendView({
             <span className="text-[10px] uppercase font-mono text-on-surface-variant">Weather</span>
             <input
               type="text"
-              className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+              className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
               value={session.weather || ''}
               onChange={e => onUpdateSession({ ...session, weather: e.target.value })}
             />
@@ -1163,7 +1163,7 @@ export default function RaceWeekendView({
             <span className="text-[10px] uppercase font-mono text-on-surface-variant">Condition (free text)</span>
             <input
               type="text"
-              className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+              className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
               value={session.condition || ''}
               onChange={e => onUpdateSession({ ...session, condition: e.target.value })}
             />
@@ -1182,7 +1182,7 @@ export default function RaceWeekendView({
                 inputMode="none"
                 readOnly
                 placeholder="--.---"
-                className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono cursor-pointer"
+                className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono cursor-pointer"
                 value={session.bestLap || ''}
                 onFocus={() => setLapPadOpen(true)}
                 onClick={() => setLapPadOpen(true)}
@@ -1197,7 +1197,7 @@ export default function RaceWeekendView({
                 <span className="text-[10px] uppercase font-mono text-on-surface-variant">{label}</span>
                 <input
                   type="text"
-                  className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+                  className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
                   value={(session as any)[key] || ''}
                   onChange={e => onUpdateSession({ ...session, [key]: e.target.value })}
                 />
@@ -1277,7 +1277,7 @@ export default function RaceWeekendView({
                 .filter(Boolean) as string[];
               const availableTires = sortBySize(scopedTireInventory.filter(t => !usedByOthers.includes(t.id) || t.id === selectedTireId));
               return (
-                <div key={corner} className="bg-[#0e0e0e] border border-outline-variant rounded p-2 space-y-2">
+                <div key={corner} className="bg-surface-container-lowest border border-outline-variant rounded p-2 space-y-2">
                   <span className="text-[10px] font-bold text-primary uppercase block">{corner.toUpperCase()}</span>
                   {scopedTireInventory.length > 0 && (
                     <div className="relative">
@@ -1342,7 +1342,7 @@ export default function RaceWeekendView({
         <div className="pt-4 border-t border-outline-variant/60 mb-6">
           <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Competition Notes</h3>
           <textarea
-            className="w-full bg-[#0e0e0e] border border-outline-variant rounded p-3 text-sm text-on-surface font-mono min-h-[80px]"
+            className="w-full bg-surface border border-outline-variant rounded p-3 text-sm text-on-surface font-mono min-h-[80px]"
             placeholder="What did the driver feel on this run?"
             value={session.competitionNotes || ''}
             onChange={e => onUpdateSession({ ...session, competitionNotes: e.target.value })}
@@ -1480,7 +1480,7 @@ export default function RaceWeekendView({
                             </button>
 
                             {expandedSessionId === sx.id && (
-                              <div className="p-3 bg-[#0e0e0e] border-t border-outline-variant/30 text-xs font-mono text-on-surface-variant space-y-2">
+                              <div className="p-3 bg-surface-container-lowest border-t border-outline-variant/30 text-xs font-mono text-on-surface-variant space-y-2">
                                 <div className="flex justify-between items-center mb-2">
                                   <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Run Details</span>
                                   <div className="flex items-center gap-2">

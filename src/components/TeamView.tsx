@@ -190,14 +190,14 @@ export default function TeamView({ user }: TeamViewProps) {
               placeholder="Team Name (e.g. Smith Racing)"
               value={newTeamName}
               onChange={e => setNewTeamName(e.target.value)}
-              className="bg-[#0e0e0e] border border-outline-variant/50 p-2 text-sm font-mono rounded w-full text-on-surface"
+              className="bg-surface border border-outline-variant/50 p-2 text-sm font-mono rounded w-full text-on-surface"
             />
             {error && <span className="text-red-400 text-[10px] uppercase font-mono">{error}</span>}
             {success && <span className="text-green-400 text-[10px] uppercase font-mono">{success}</span>}
             <button
               type="submit"
               disabled={loading || !newTeamName.trim()}
-              className="bg-primary text-[#0e0e0e] font-bold text-xs uppercase font-mono py-2 rounded mt-1 disabled:opacity-50"
+              className="bg-primary text-on-primary font-bold text-xs uppercase font-mono py-2 rounded mt-1 disabled:opacity-50"
             >
               Create Team
             </button>
@@ -225,7 +225,7 @@ export default function TeamView({ user }: TeamViewProps) {
 
         {isOwner && (
           <div className="flex items-center gap-2">
-            <label className="bg-[#0e0e0e] text-on-surface-variant hover:text-primary text-[10px] uppercase font-mono px-3 py-1.5 rounded border border-outline-variant/30 cursor-pointer">
+            <label className="bg-surface text-on-surface-variant hover:text-primary text-[10px] uppercase font-mono px-3 py-1.5 rounded border border-outline-variant/30 cursor-pointer">
               <input type="file" className="hidden" accept="image/*" onChange={handleUploadBanner} />
               Upload Team Banner
             </label>
@@ -237,7 +237,7 @@ export default function TeamView({ user }: TeamViewProps) {
           <p className="text-[10px] text-on-surface-variant uppercase font-mono tracking-wider mb-2 mt-2">Roster ({members.length})</p>
           <div className="flex flex-col gap-2">
             {members.map(m => (
-              <div key={m.id} className="flex items-center justify-between bg-[#0e0e0e] p-2 rounded border border-outline-variant/30">
+              <div key={m.id} className="flex items-center justify-between bg-surface-container-lowest p-2 rounded border border-outline-variant/30">
                 <div className="flex flex-col">
                   <span className="text-xs font-mono text-on-surface">{m.displayName || m.email}</span>
                   <span className="text-[9px] uppercase font-mono text-on-surface-variant/60">{m.role}</span>
@@ -269,12 +269,12 @@ export default function TeamView({ user }: TeamViewProps) {
               placeholder="Invite by email"
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}
-              className="flex-1 bg-[#0e0e0e] border border-outline-variant/50 p-2 text-xs font-mono rounded text-on-surface placeholder:text-on-surface-variant/40"
+              className="flex-1 bg-surface border border-outline-variant/50 p-2 text-xs font-mono rounded text-on-surface placeholder:text-on-surface-variant/40"
             />
             <button
               type="submit"
               disabled={loading || !inviteEmail.trim()}
-              className="bg-primary text-[#0e0e0e] font-bold text-xs uppercase px-3 rounded disabled:opacity-50"
+              className="bg-primary text-on-primary font-bold text-xs uppercase px-3 rounded disabled:opacity-50"
             >
               Add
             </button>
@@ -316,7 +316,7 @@ export default function TeamView({ user }: TeamViewProps) {
                     placeholder={placeholder}
                     value={profileDraft[key] || ''}
                     onChange={e => setProfileDraft(prev => ({ ...prev, [key]: e.target.value }))}
-                    className="w-full bg-[#0e0e0e] border border-outline-variant/50 focus:border-primary p-2 text-xs font-mono rounded text-on-surface outline-none"
+                    className="w-full bg-surface border border-outline-variant/50 focus:border-primary p-2 text-xs font-mono rounded text-on-surface outline-none"
                   />
                 </div>
               ))}
