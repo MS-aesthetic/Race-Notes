@@ -39,11 +39,12 @@ import GuideView from './components/GuideView';
 import TrackersView from './components/TrackersView';
 import ContextStrip from './components/ContextStrip';
 import HelpSheet from './components/ui/HelpSheet';
-import { InfoToast } from './components/ui/UndoToast';
+import UndoToast, { InfoToast } from './components/ui/UndoToast';
 import { pickAutoWeekend, sortWeekends } from './lib/scope';
 import { buildQuickServiceRecords, type QuickServiceOutcome, type QuickServiceRequest } from './lib/serviceLog';
 import { useOnlineStatus } from './lib/saveStatus';
 import { hasOpenSheets, isPopSuppressed } from './lib/backStack';
+import { useUndoableDelete } from './lib/undo';
 import { isAppGuideSection } from './lib/helpRouting';
 import { resolveRaceDayCreationTarget } from './lib/raceDayGate';
 import { clearCrewChiefLocalData } from './lib/accountDeletion';
@@ -176,10 +177,15 @@ export default function App() {
     try { const s = localStorage.getItem('race_notes_cars'); return s ? JSON.parse(s) : INITIAL_CARS; }
     catch { return INITIAL_CARS; }
   });
+  const carsRef = useRef(cars);
+  useEffect(() => { carsRef.current = cars; }, [cars]);
 
   const [activeCarId, setActiveCarId] = useState<string | null>(() => {
     return localStorage.getItem('race_notes_active_car');
   });
+  const activeCarIdRef = useRef(activeCarId);
+  useEffect(() => { activeCarIdRef.current = activeCarId; }, [activeCarId]);
+  const carUndo = useUndoableDelete<Car>();
 
   // ── Checklists (WS-R) ────────────────────────────────────────────────
   const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(() => {
@@ -205,6 +211,7 @@ export default function App() {
   });
 
   const activeCar = cars.find(c => c.id === activeCarId) ?? null;
+  const pendingCarId = carUndo.pending?.id ?? null;
   const selectedWeekend = activeWeekendId ? weekends.find(item => item.id === activeWeekendId) ?? null : null;
   const activeWeekend = selectedWeekend && !isWeekendFinished(selectedWeekend) ? selectedWeekend : null;
   const resolveWeekendSetup = (weekend: RaceWeekend | null | undefined): Setup | null => {
@@ -251,30 +258,37 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cars, activeCarId]);
 
-  const handleSaveCars = (updated: Car[]) => {
-    if (user) {
+  const handleSaveCars = (updated: Car[], expectedAccountId?: string | null) => {
+    const currentAccountId = userRef.current?.id ?? null;
+    if (expectedAccountId !== undefined && currentAccountId !== expectedAccountId) return;
+    if (currentAccountId) {
       const remainingIds = new Set(updated.map(car => car.id));
-      cars
+      carsRef.current
         .filter(car => !remainingIds.has(car.id))
-        .forEach(car => queueSharedCloudDelete('cars', car.id));
+        .forEach(car => queueSharedCloudDelete('cars', car.id, false, currentAccountId));
     }
+    carsRef.current = updated;
     setCars(updated);
     localStorage.setItem('race_notes_cars', JSON.stringify(updated));
-    if (syncOwnerId) pushCars(updated, syncOwnerId, team?.id ?? null, setSyncStatus);
+    const currentSyncOwnerId = syncOwnerIdRef.current;
+    if (currentSyncOwnerId) pushCars(updated, currentSyncOwnerId, teamRef.current?.id ?? null, setSyncStatus);
   };
 
   const handleSelectCar = (carId: string) => {
     // [37] Confirm the scope switch when the user actually changes car
-    if (activeCarId && carId !== activeCarId && cars.length > 1) {
-      const nextCar = cars.find(c => c.id === carId);
+    const currentActiveCarId = activeCarIdRef.current;
+    const currentCars = carsRef.current;
+    if (currentActiveCarId && carId !== currentActiveCarId && currentCars.length > 1) {
+      const nextCar = currentCars.find(c => c.id === carId);
       if (nextCar) {
         const label = nextCar.name || `${nextCar.chassis} · ${nextCar.carType}`;
         setInfoToast(`Now viewing ${label} — setups, sessions & trackers switched.`);
       }
     }
+    activeCarIdRef.current = carId;
     setActiveCarId(carId);
     localStorage.setItem('race_notes_active_car', carId);
-    const nextSetup = pickLatestSetupForCar(savedSetups, carId);
+    const nextSetup = pickLatestSetupForCar(savedSetupsRef.current, carId);
     if (nextSetup) {
       setSetup(nextSetup);
       localStorage.setItem('race_notes_setup', JSON.stringify(nextSetup));
@@ -374,7 +388,6 @@ export default function App() {
     if (syncOwnerId) pushWeekendChecklists(updated, syncOwnerId, setSyncStatus);
   };
 
-  // handleDeleteCar implemented in Phase 7 — stub here
   const handleDeleteCar = (carId: string) => {
     const sc = savedSetups.filter(s => s.carId === carId).length;
     const tc = tireInventory.filter(t => t.carId === carId).length;
@@ -383,13 +396,40 @@ export default function App() {
       alert('Reassign or delete this car\'s data first.');
       return;
     }
-    const updated = cars.filter(c => c.id !== carId);
-    handleSaveCars(updated);
-    if (activeCarId === carId) {
-      const next = updated[0] ?? null;
-      if (next) handleSelectCar(next.id);
-      else { setActiveCarId(null); localStorage.removeItem('race_notes_active_car'); }
-    }
+    const car = carsRef.current.find(item => item.id === carId);
+    if (!car) return;
+    const accountId = userRef.current?.id ?? null;
+    const ownerId = syncOwnerIdRef.current;
+    const generation = authGenerationRef.current;
+    const label = car.name || `${car.chassis} · ${car.carType}`;
+    carUndo.requestDelete({
+      id: car.id,
+      label,
+      item: car,
+      // Pending deletes are Garage-render-only. Undo restores visibility with no writes.
+      removeFromState: () => {},
+      restoreToState: () => {},
+      commit: () => {
+        // A delayed delete must never apply a prior account's intent to new account data.
+        if (userRef.current?.id !== accountId
+          || syncOwnerIdRef.current !== ownerId
+          || authGenerationRef.current !== generation) return;
+        const latestCars = carsRef.current;
+        const updated = latestCars.filter(item => item.id !== carId);
+        if (updated.length === latestCars.length) return;
+        handleSaveCars(updated, accountId);
+        // Keep the active car through Undo; choose a replacement only at commit.
+        if (activeCarIdRef.current === carId) {
+          const next = updated[0] ?? null;
+          if (next) handleSelectCar(next.id);
+          else {
+            activeCarIdRef.current = null;
+            setActiveCarId(null);
+            localStorage.removeItem('race_notes_active_car');
+          }
+        }
+      },
+    });
   };
 
   // ── Clear All Data ────────────────────────────────────────────────────────────
@@ -536,9 +576,16 @@ export default function App() {
   const authGenerationRef = useRef(0);
   const authIdentityRef = useRef<string | null>(null);
   const syncOwnerId = resolveSyncOwnerId(user?.id, team?.id, teamMembers, teamResolved);
+  const userRef = useRef<User | null>(user);
+  const teamRef = useRef(team);
+  const syncOwnerIdRef = useRef(syncOwnerId);
+  useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { teamRef.current = team; }, [team]);
+  useEffect(() => { syncOwnerIdRef.current = syncOwnerId; }, [syncOwnerId]);
   const sharedOwnerCatchupRef = useRef<string | null>(null);
   const advanceAuthIdentity = (nextUser: User | null): number => {
     const nextId = nextUser?.id ?? null;
+    userRef.current = nextUser;
     authIdentityRef.current = nextId;
     authGenerationRef.current += 1;
     setAuthGeneration(authGenerationRef.current);
@@ -549,10 +596,14 @@ export default function App() {
     table: TeamSharedSyncTable,
     recordId: string,
     soloOnly = false,
+    expectedAccountId?: string | null,
   ) => {
-    if (!user) return;
+    const accountId = expectedAccountId === undefined
+      ? userRef.current?.id ?? null
+      : expectedAccountId;
+    if (!accountId) return;
     enqueuePendingTeamDelete(window.localStorage, {
-      accountId: user.id,
+      accountId,
       table,
       recordId,
       queuedAt: new Date().toISOString(),
@@ -2228,7 +2279,7 @@ export default function App() {
                   weekends={weekends}
                   todos={todos}
                   accounting={accounting}
-                  cars={cars}
+                  cars={pendingCarId ? cars.filter(car => car.id !== pendingCarId) : cars}
                   activeCarId={activeCarId}
                   onSelectCar={handleSelectCar}
                   onSaveCars={handleSaveCars}
@@ -2393,6 +2444,7 @@ export default function App() {
         title={infoToast ?? ''}
         onClose={() => setInfoToast(null)}
       />
+      <UndoToast pending={carUndo.pending} onUndo={carUndo.undo} onDismiss={carUndo.dismiss} />
 
     </div>
   );
