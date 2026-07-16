@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Todo, AccountingEntry, RaceWeekend, MaintenanceComponent, MaintenanceLog, Setup, MaintenanceCategory, MAINTENANCE_CATEGORIES, MaintenanceIntervalType, ChecklistTemplate, CHECKLIST_CATEGORIES } from '../types';
 import { AppUser } from '../lib/supabase';
 import { getComponentStatus, applyServiceLog, DEFAULT_COMPONENTS } from '../lib/maintenance';
@@ -124,6 +124,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
   const [weekendFilter, setWeekendFilter] = useState('');
   const [category, setCategory] = useState(() => restoredDraft?.category ?? lastAccountingCategory(entries));
   const [entryDate, setEntryDate] = useState(() => restoredDraft?.entryDate ?? localDateValue());
+  const receiptRequestGenerationRef = useRef(0);
 
   const filtered = weekendFilter ? entries.filter(e => e.weekendId === weekendFilter) : entries;
   const totalIncome  = filtered.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
@@ -133,7 +134,12 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
   const sorted = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const recentRepeats = recentAccountingRepeats(entries);
 
+  const invalidateReceiptWork = () => {
+    receiptRequestGenerationRef.current += 1;
+  };
+
   const resetForm = () => {
+    invalidateReceiptWork();
     setName(''); setDesc(''); setAmount(''); setPayer(''); setPayee('');
     setWeekendId(''); setWeekendName(''); setReceiptPhoto(undefined);
     setType('expense'); setCategory(lastAccountingCategory(entries)); setEntryDate(localDateValue());
@@ -150,6 +156,10 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
     resetForm();
     setShowForm(false);
   };
+
+  useEffect(() => () => {
+    invalidateReceiptWork();
+  }, []);
 
   useEffect(() => {
     if (!showForm) return;
@@ -186,9 +196,21 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
   const handleReceiptPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const compressed = await compressImage(file, 800, 0.7);
-    setReceiptPhoto(compressed);
     e.target.value = '';
+    const requestGeneration = ++receiptRequestGenerationRef.current;
+    try {
+      const compressed = await compressImage(file, 800, 0.7);
+      if (receiptRequestGenerationRef.current === requestGeneration) {
+        setReceiptPhoto(compressed);
+      }
+    } catch {
+      // Receipt photos are optional; failed or stale compression must not break the draft.
+    }
+  };
+
+  const removeReceiptPhoto = () => {
+    invalidateReceiptWork();
+    setReceiptPhoto(undefined);
   };
 
   const del = (id: string) => {
@@ -309,7 +331,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
             {receiptPhoto && (
               <div className="relative">
                 <img src={receiptPhoto} alt="receipt" className="h-12 rounded border border-outline-variant object-cover" />
-                <button type="button" onClick={() => setReceiptPhoto(undefined)} className="absolute -top-1 -right-1 bg-black/70 rounded-full w-4 h-4 flex items-center justify-center">
+                <button type="button" onClick={removeReceiptPhoto} className="absolute -top-1 -right-1 bg-black/70 rounded-full w-4 h-4 flex items-center justify-center">
                   <span className="material-symbols-outlined text-[10px] text-white">close</span>
                 </button>
               </div>
