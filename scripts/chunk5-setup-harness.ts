@@ -144,13 +144,13 @@ const setupSource = readFileSync(new URL('../src/components/SetupView.tsx', impo
 assert.match(setupSource, /activeCarId \? byActiveCar<Setup>/);
 assert.match(setupSource, /preserveInfoToast/);
 assert.match(setupSource, /pressureSourceNote: value\.trim\(\) \? 'Adjusted in Setups' : undefined/);
-assert.match(setupSource, /className="w-full min-w-0 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded"/);
+assert.match(setupSource, /className="w-full min-w-0 min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 outline-none rounded"/);
 assert.match(setupSource, /grid grid-cols-2 sm:grid-cols-4 gap-2/);
 assert.match(setupSource, /min-w-0 break-words font-label-sm/);
 assert.match(setupSource, /min-w-0 p-1\.5 sm:p-4 grid grid-cols-1/);
 assert.match(setupSource, /w-full min-w-0 flex flex-wrap items-center justify-end gap-2/);
 assert.match(setupSource, /w-full min-w-0 flex flex-wrap items-center justify-end gap-1 border-t/);
-assert.match(setupSource, /min-w-0 grid grid-cols-2 gap-1\.5 sm:gap-3/);
+assert.match(setupSource, /min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-1\.5 sm:gap-3/);
 assert.ok(setupSource.indexOf("(['lf', 'rf', 'lr', 'rr'] as const)") >= 0);
 const smasherSource = readFileSync(new URL('../src/components/SmasherLoadsView.tsx', import.meta.url), 'utf8');
 assert.match(smasherSource, /if \(!activeCarId\) return;/);

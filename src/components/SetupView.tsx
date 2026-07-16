@@ -56,7 +56,7 @@ const computeStagger = (rightSize: string, leftSize: string): string => {
   return value === null ? '' : `${value.toFixed(2)}"`;
 };
 
-const INP = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-1.5 outline-none rounded';
+const INP = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-1.5 min-h-12 outline-none rounded';
 const LBL = 'text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1';
 
 // ─── Corner Form Sub-component ────────────────────────────────────────────────
@@ -129,7 +129,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
               }
               onFieldChange('tireInventoryId', tireId);
             }}
-            className="w-full min-w-0 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded"
+            className="w-full min-w-0 min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 outline-none rounded"
           >
             <option value="">-- Select from Inventory --</option>
             {sortBySize(tireInventory.filter(t => !usedTireIds.includes(t.id) || t.id === (data.tireInventoryId || ''))).map(t => (
@@ -142,7 +142,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         <div className="col-span-1 lg:col-span-2 min-w-0 bg-surface-container p-2 rounded border border-outline-variant/30 flex flex-wrap items-center justify-between gap-2">
           <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant">Bound Load Graph</label>
           <select value={data.boundGraphId || ''} onChange={(e) => onFieldChange('boundGraphId', e.target.value)}
-            className="w-full min-w-0 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-2 py-1 outline-none rounded">
+            className="w-full min-w-0 min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 outline-none rounded">
             <option value="">-- None --</option>
             {data.boundGraphId && !loadSessions.some(session => session.id === data.boundGraphId) && (
               <option value={data.boundGraphId}>Saved Load Session (unavailable)</option>
@@ -572,27 +572,27 @@ export default function SetupView({
                         <div>
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Chassis</label>
                           <input type="text" value={setupItem.chassis} onChange={(e) => handleMetadataChange(setupItem.id, 'chassis', e.target.value)}
-                            className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                            className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
                         <div>
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Track</label>
                           <input type="text" placeholder="e.g. Eldora Speedway" value={setupItem.track} onChange={(e) => handleMetadataChange(setupItem.id, 'track', e.target.value)}
-                            className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                            className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
                         <div>
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Last Updated</label>
                           <input type="text" value={setupItem.date} onChange={(e) => handleMetadataChange(setupItem.id, 'date', e.target.value)}
-                            className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                            className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
                         <div>
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Car Class / Series</label>
                           <input type="text" placeholder="e.g. USMTS Late Model" value={setupItem.carType} onChange={(e) => handleMetadataChange(setupItem.id, 'carType', e.target.value)}
-                            className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                            className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
                         <div className="sm:col-span-2">
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Toe</label>
                           <input type="text" placeholder='e.g. 1/8" Total Toe-Out' value={setupItem.toe || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'toe', e.target.value)}
-                            className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                            className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
                       </div>
 
@@ -600,7 +600,7 @@ export default function SetupView({
                       <div>
                         <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Additional Notes</label>
                         <textarea placeholder="Enter setup notes..." value={setupItem.notes || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'notes', e.target.value)}
-                          className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded min-h-[60px] resize-y" />
+                          className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded min-h-[60px] resize-y" />
                       </div>
 
                       {/* Car setup details */}
@@ -610,36 +610,36 @@ export default function SetupView({
                           <h4 className="font-label-sm text-xs font-bold uppercase text-on-surface tracking-wider">Car Setup Details</h4>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Gear</label>
                             <input type="text" placeholder="e.g. 6.14" value={setupItem.gear || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'gear', e.target.value)}
-                              className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">JBar Length</label>
                             <input type="text" placeholder="e.g. #3" value={setupItem.jbar || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'jbar', e.target.value)}
-                              className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">J-Bar Frame Height</label>
                             <input type="text" placeholder='e.g. 9.5"' value={setupItem.jbarFrameHeight || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'jbarFrameHeight', e.target.value)}
-                              className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">J-Bar Pinion Height</label>
                             <input type="text" placeholder='e.g. 8.0"' value={setupItem.jbarPinionHeight || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'jbarPinionHeight', e.target.value)}
-                              className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Pull Bar Frame Hole</label>
                             <input type="text" placeholder="e.g. Top" value={setupItem.pullBarFrameHole || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'pullBarFrameHole', e.target.value)}
-                              className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Pull Bar Rear Hole</label>
                             <input type="text" placeholder="e.g. Middle" value={setupItem.pullBarRearHole || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'pullBarRearHole', e.target.value)}
-                              className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-xs font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                         </div>
 
@@ -701,7 +701,7 @@ export default function SetupView({
                       </div>
 
                       {/* 4 Corner forms */}
-                      <div className="min-w-0 grid grid-cols-2 gap-1.5 sm:gap-3">
+                      <div className="min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-3">
                         {(['lf', 'rf', 'lr', 'rr'] as const).map((corner, _, all) => {
                           const usedTireIds = all
                             .filter(c => c !== corner)
