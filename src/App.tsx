@@ -2118,6 +2118,17 @@ export default function App() {
             </div>
             
             <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1">
+              {!isOnline && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-label="Offline — saved on device"
+                  className="status-chip shrink-0 border-outline-variant bg-surface-container text-on-surface-variant"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">cloud_off</span>
+                  <span className="hidden min-[360px]:inline">OFFLINE</span>
+                </div>
+              )}
               {/* Tuning Guide sheet ([27]) */}
               <button
                 onClick={() => openHelp()}
