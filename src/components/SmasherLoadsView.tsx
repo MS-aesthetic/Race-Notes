@@ -411,7 +411,7 @@ function ShockCompareChart({ sessions }: CompareChartProps) {
 
 function exportCsv(session: ShockSession) {
   const rows = [
-    ['Race Notes — Shock Load Graph Export'],
+    ['CREW CHIEF — Shock Load Graph Export'],
     [`Corner: ${session.corner}`, `Spring Rate: ${session.springRate} lb/in`, `Shock: ${session.shock}`],
     [`Label: ${session.label}`, `Date: ${session.date}`],
     [],

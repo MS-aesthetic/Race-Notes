@@ -20,9 +20,9 @@ export default defineConfig(() => {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
         manifest: {
-          name: 'Race Notes',
-          short_name: 'RaceNotes',
-          description: 'Professional motorsport logbook and telemetry application',
+          name: 'CREW CHIEF',
+          short_name: 'Crew Chief',
+          description: 'CREW CHIEF — dirt track setup notes, run logging, and pit checklists for race weekends.',
           theme_color: '#131313',
           background_color: '#131313',
           display: 'standalone',
