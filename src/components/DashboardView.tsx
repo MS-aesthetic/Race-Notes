@@ -332,7 +332,7 @@ export default function DashboardView({
           >
             <span className="status-chip min-w-0">
               <span
-                className={`material-symbols-outlined ${worst.status.state === 'overdue' ? 'text-red-400' : 'text-amber-400'}`}
+                className={`material-symbols-outlined ${worst.status.state === 'overdue' ? 'text-error' : 'text-warning'}`}
                 aria-hidden="true"
               >warning</span>
               <span className="truncate">
@@ -351,15 +351,15 @@ export default function DashboardView({
           storageKey="race_notes_dash_service_open"
           defaultOpen={false}
           badge={dueItems.some(c => getComponentStatus(c, weekends, savedSetups).state === 'overdue') ? (
-            <span className="bg-red-500/20 text-red-400 text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded shrink-0">Overdue</span>
+            <span className="bg-error/20 text-error text-[9px] font-bold font-mono uppercase px-1.5 py-0.5 rounded shrink-0">Overdue</span>
           ) : undefined}
         >
           <div className="border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant/40">
             {dueItems.map(c => {
               const st = getComponentStatus(c, weekends, savedSetups);
               const chipCls = st.state === 'overdue'
-                ? 'bg-red-500/15 text-red-400 border-red-500/30'
-                : 'bg-amber-500/15 text-amber-400 border-amber-500/30';
+                ? 'bg-error/15 text-error border-error/30'
+                : 'bg-warning/15 text-warning border-warning/30';
               return (
                 <button
                   key={c.id}
@@ -377,7 +377,7 @@ export default function DashboardView({
                     <div className="flex items-center gap-2 mt-1">
                       <div className="flex-1 h-1 bg-surface-variant rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${st.state === 'overdue' ? 'bg-red-500' : 'bg-amber-400'}`}
+                          className={`h-full rounded-full ${st.state === 'overdue' ? 'bg-error' : 'bg-warning'}`}
                           style={{ width: `${Math.min(st.pct * 100, 100)}%` }}
                         />
                       </div>
@@ -488,7 +488,7 @@ export default function DashboardView({
           </button>
           <button
             onClick={() => activeWeekend && requestWeekendDelete(activeWeekend)}
-            className="tap-target-block gap-3 rounded-xl px-3 text-left text-red-400 hover:bg-surface-container-high transition-colors"
+            className="tap-target-block gap-3 rounded-xl px-3 text-left text-error hover:bg-surface-container-high transition-colors"
           >
             <span className="material-symbols-outlined">delete</span>
             Delete Race Day
@@ -520,7 +520,7 @@ export default function DashboardView({
             )}
             <span className="status-chip">
               <span
-                className={`material-symbols-outlined ${selectedServiceStatus.state === 'overdue' ? 'text-red-400' : 'text-amber-400'}`}
+                className={`material-symbols-outlined ${selectedServiceStatus.state === 'overdue' ? 'text-error' : 'text-warning'}`}
                 aria-hidden="true"
               >warning</span>
               <span>{describeServiceStatus(selectedServiceComponent, selectedServiceStatus)}</span>

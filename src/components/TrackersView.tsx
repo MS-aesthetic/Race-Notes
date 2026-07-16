@@ -189,9 +189,9 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
       {/* Summary strip */}
       <div className="grid grid-cols-3 gap-2">
         {[
-          { label: 'Income',   value: totalIncome,  color: 'text-green-400' },
-          { label: 'Expenses', value: totalExpense,  color: 'text-red-400'  },
-          { label: 'Net',      value: net,           color: net >= 0 ? 'text-green-400' : 'text-red-400' },
+          { label: 'Income',   value: totalIncome,  color: 'text-success' },
+          { label: 'Expenses', value: totalExpense,  color: 'text-error'  },
+          { label: 'Net',      value: net,           color: net >= 0 ? 'text-success' : 'text-error' },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-surface-container border border-outline-variant rounded-lg p-3 text-center">
             <p className="font-mono text-[10px] uppercase text-on-surface-variant tracking-wider mb-1">{label}</p>
@@ -221,7 +221,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
               <button key={t} type="button" onClick={() => setType(t)}
                 className={`py-2.5 rounded-lg border-2 font-mono text-xs uppercase font-bold transition-all ${
                   type === t
-                    ? t === 'income' ? 'border-green-500 bg-green-500/10 text-green-400' : 'border-red-400 bg-red-400/10 text-red-400'
+                    ? t === 'income' ? 'border-success bg-success/10 text-success' : 'border-error bg-error/10 text-error'
                     : 'border-outline-variant text-on-surface-variant'
                 }`}
               >{t === 'income' ? '+ Income' : '− Expense'}</button>
@@ -318,18 +318,18 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
             <div
               key={e.id}
               className={`relative bg-surface-container border rounded-lg p-3 flex items-start gap-3 ${
-                e.type === 'income' ? 'border-green-800/40' : 'border-red-900/40'
+                e.type === 'income' ? 'border-success/40' : 'border-error/40'
               }`}
             >
               {/* Color stripe */}
-              <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg ${e.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg ${e.type === 'income' ? 'bg-success' : 'bg-error'}`} />
 
               <div className="flex-1 min-w-0 pl-1 space-y-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono text-sm font-bold text-on-surface">{e.name}</span>
                   {e.category && <span className="font-mono text-[9px] text-on-surface-variant border border-outline-variant px-1.5 py-0.5 rounded">{e.category}</span>}
                   <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                    e.type === 'income' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
+                    e.type === 'income' ? 'bg-success/15 text-success' : 'bg-error/15 text-error'
                   }`}>
                     {e.type === 'income' ? '+' : '−'}{fmt(e.amount)}
                   </span>
@@ -358,7 +358,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
 
               <button
                 onClick={() => del(e.id)}
-                className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-red-400 shrink-0"
+                className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-error shrink-0"
               >
                 close
               </button>
@@ -502,11 +502,11 @@ function ServiceTab({
   const renderRow = (c: MaintenanceComponent) => {
     const status = getComponentStatus(c, weekends, savedSetups);
     const remaining = Math.max(0, status.limit - status.used);
-    const barColor = status.state === 'overdue' ? 'bg-red-500' : status.state === 'due' ? 'bg-amber-400' : 'bg-green-500';
+    const barColor = status.state === 'overdue' ? 'bg-error' : status.state === 'due' ? 'bg-warning' : 'bg-success';
     const chipCls = {
-      ok:      'bg-green-500/15 text-green-400 border-green-500/30',
-      due:     'bg-amber-500/15 text-amber-400 border-amber-500/30',
-      overdue: 'bg-red-500/15 text-red-400 border-red-500/30',
+      ok:      'bg-success/15 text-success border-success/30',
+      due:     'bg-warning/15 text-warning border-warning/30',
+      overdue: 'bg-error/15 text-error border-error/30',
     }[status.state];
     const chipLabel = { ok: 'OK', due: 'DUE', overdue: 'OVERDUE' }[status.state];
     return (
@@ -539,7 +539,7 @@ function ServiceTab({
         </button>
         <button
           onClick={() => deleteComp(c.id)}
-          className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-red-400 shrink-0"
+          className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-error shrink-0"
         >close</button>
       </div>
     );
@@ -836,7 +836,7 @@ function TemplatesTab({
                   style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>expand_more</span>
                 <button
                   onClick={e => { e.stopPropagation(); deleteTemplate(tmpl.id); }}
-                  className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-red-400 shrink-0"
+                  className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-error shrink-0"
                 >close</button>
               </button>
               {isExpanded && (
@@ -852,7 +852,7 @@ function TemplatesTab({
                         <span className="flex-1 font-mono text-xs text-on-surface">{item.text}</span>
                         <button
                           onClick={() => removeItem(tmpl.id, item.id)}
-                          className="material-symbols-outlined text-[14px] text-on-surface-variant/30 hover:text-red-400"
+                          className="material-symbols-outlined text-[14px] text-on-surface-variant/30 hover:text-error"
                         >close</button>
                       </div>
                     ))}
