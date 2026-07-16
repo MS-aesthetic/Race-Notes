@@ -16,7 +16,7 @@ import {
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, deleteAccount as deleteCloudAccount, AppUser } from './lib/supabase';
 import AuthView from './components/AuthView';
 import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pushTodos, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, pushMaintenanceLogs, pullMaintenanceLogs, pushChecklistTemplates, pullChecklistTemplates, pushWeekendChecklists, pullWeekendChecklists, deleteTeamSharedRecordFromCloud } from './lib/sync';
-import { registerForPush } from './lib/push';
+import { registerForPush, sendPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
 import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
 import { displayVersionLabel, finishWeekendLifecycle, isSetupLocked, isWeekendFinished, lifecycleLabel, mergeTimestampedRecords, selectRaceWeekendSetupForSelection, startWeekendLifecycle, withSetupDiffLog } from './lib/setupLifecycle';
@@ -60,6 +60,7 @@ import {
   type TeamSharedSyncTable,
 } from './lib/teamDataOwnership';
 import { Todo } from './types';
+import { detectAssignmentChanges } from './lib/assignmentNotify';
 
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
 
@@ -138,6 +139,7 @@ export default function App() {
     localStorage.setItem('race_notes_todos', JSON.stringify(materialized));
     return materialized;
   });
+  const prevTodosForNotifyRef = useRef<Todo[]>(todos);
 
   const [accounting, setAccounting] = useState<AccountingEntry[]>(() => {
     try { const s = localStorage.getItem('race_notes_accounting'); return s ? JSON.parse(s) : []; } catch { return []; }
@@ -303,6 +305,8 @@ export default function App() {
   };
 
   const handleSaveTodos = (updated: Todo[]) => {
+    const previousTodos = prevTodosForNotifyRef.current;
+    prevTodosForNotifyRef.current = updated;
     if (user) {
       const remainingIds = new Set(updated.map(todo => todo.id));
       todos
@@ -312,6 +316,25 @@ export default function App() {
     setTodos(updated);
     localStorage.setItem('race_notes_todos', JSON.stringify(updated));
     if (syncOwnerId) pushTodos(updated, syncOwnerId, setSyncStatus);
+    if (user && teamMembers && teamMembers.length > 1) {
+      for (const change of detectAssignmentChanges(previousTodos, updated)) {
+        if (change.assignedTo === user.id) continue;
+        if (!teamMembers.some(member => member.id === change.assignedTo)) continue;
+        const body = change.taskDesc
+          ? `${change.taskText} — ${change.taskDesc}`.slice(0, 160)
+          : change.taskText.slice(0, 160);
+        void sendPush({ toUserId: change.assignedTo }, {
+          title: `${profile?.displayName || 'A teammate'} assigned you a task`,
+          body,
+          data: {
+            type: 'task_assigned',
+            todoId: change.todoId,
+            itemId: change.itemId,
+            route: 'trackers/checklist',
+          },
+        });
+      }
+    }
   };
 
   const handleSaveMaintenanceLogs = (updated: MaintenanceLog[]) => {
@@ -419,6 +442,7 @@ export default function App() {
     setShockSessions([]);
     setActiveCarId(null);
     setActiveSession(INITIAL_ACTIVE_SESSION);
+    prevTodosForNotifyRef.current = [];
     setTodos([]);
     setAccounting([]);
     setShopping([]);
@@ -1082,6 +1106,7 @@ export default function App() {
             else if ((cloud.updated_at || '') >= (merged[index].updated_at || '')) merged[index] = cloud;
           }
           const materialized = materializeMainChecklist(merged);
+          prevTodosForNotifyRef.current = materialized;
           localStorage.setItem('race_notes_todos', JSON.stringify(materialized));
           if (hasNewerLocal || JSON.stringify(materialized) !== JSON.stringify(merged)) {
             if (syncOwnerId) pushTodos(materialized, syncOwnerId, setSyncStatus);
