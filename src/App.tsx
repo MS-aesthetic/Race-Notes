@@ -186,6 +186,7 @@ export default function App() {
   const activeCarIdRef = useRef(activeCarId);
   useEffect(() => { activeCarIdRef.current = activeCarId; }, [activeCarId]);
   const carUndo = useUndoableDelete<Car>();
+  const garageAutoSelectSuppressionRef = useRef<string | null>(null);
 
   // ── Checklists (WS-R) ────────────────────────────────────────────────
   const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(() => {
@@ -282,6 +283,21 @@ export default function App() {
     const canonicalCars = carsRef.current;
     const visibleById = new Map(visibleUpdated.map(car => [car.id, car]));
     const canonicalIds = new Set(canonicalCars.map(car => car.id));
+    const addedCar = visibleUpdated.find(car => !canonicalIds.has(car.id)) ?? null;
+    if (canonicalCars.length === 1
+      && canonicalCars[0].id === pendingCarId
+      && activeCarIdRef.current === pendingCarId
+      && visibleUpdated.length === 1
+      && addedCar) {
+      // Garage Add auto-selects when its filtered list was empty. Suppress only
+      // that same-stack callback; a later deliberate selection must still work.
+      garageAutoSelectSuppressionRef.current = addedCar.id;
+      queueMicrotask(() => {
+        if (garageAutoSelectSuppressionRef.current === addedCar.id) {
+          garageAutoSelectSuppressionRef.current = null;
+        }
+      });
+    }
     const reconciled = canonicalCars
       .map(car => car.id === pendingCarId ? car : visibleById.get(car.id) ?? car)
       .concat(visibleUpdated.filter(car => !canonicalIds.has(car.id)));
@@ -364,6 +380,14 @@ export default function App() {
         });
       }
     }
+  };
+
+  const handleSelectGarageCar = (carId: string) => {
+    if (garageAutoSelectSuppressionRef.current === carId) {
+      garageAutoSelectSuppressionRef.current = null;
+      return;
+    }
+    handleSelectCar(carId);
   };
 
   const handleSaveMaintenanceLogs = (updated: MaintenanceLog[]) => {
@@ -2295,7 +2319,7 @@ export default function App() {
                   accounting={accounting}
                   cars={pendingCarId ? cars.filter(car => car.id !== pendingCarId) : cars}
                   activeCarId={activeCarId}
-                  onSelectCar={handleSelectCar}
+                  onSelectCar={handleSelectGarageCar}
                   onSaveCars={handleSaveGarageCars}
                   onDeleteCar={handleDeleteCar}
                   setupCount={carSetupCount}

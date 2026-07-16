@@ -12,7 +12,9 @@ assert.match(app, /const carUndo = useUndoableDelete<Car>\(\);/);
 assert.match(app, /const pendingCarId = carUndo\.pending\?\.id \?\? null;/);
 assert.match(app, /cars=\{pendingCarId \? cars\.filter\(car => car\.id !== pendingCarId\) : cars\}/);
 assert.match(app, /onSaveCars=\{handleSaveGarageCars\}/);
+assert.match(app, /onSelectCar=\{handleSelectGarageCar\}/);
 assert.match(app, /<UndoToast pending=\{carUndo\.pending\} onUndo=\{carUndo\.undo\} onDismiss=\{carUndo\.dismiss\}/);
+assert.match(app, /const garageAutoSelectSuppressionRef = useRef<string \| null>\(null\);/);
 
 const garageSaveStart = app.indexOf('const handleSaveGarageCars = (visibleUpdated: Car[]) => {');
 const garageSaveEnd = app.indexOf('const handleSelectCar', garageSaveStart);
@@ -20,9 +22,18 @@ assert.ok(garageSaveStart >= 0 && garageSaveEnd > garageSaveStart, 'Garage save 
 const garageSave = app.slice(garageSaveStart, garageSaveEnd);
 assert.match(garageSave, /const canonicalCars = carsRef\.current;/);
 assert.match(garageSave, /const visibleById = new Map\(visibleUpdated\.map\(car => \[car\.id, car\]\)\);/);
+assert.match(garageSave, /canonicalCars\.length === 1[\s\S]*canonicalCars\[0\]\.id === pendingCarId[\s\S]*activeCarIdRef\.current === pendingCarId[\s\S]*visibleUpdated\.length === 1[\s\S]*addedCar/s);
+assert.match(garageSave, /garageAutoSelectSuppressionRef\.current = addedCar\.id;[\s\S]*queueMicrotask/s);
 assert.match(garageSave, /car\.id === pendingCarId \? car : visibleById\.get\(car\.id\) \?\? car/);
 assert.match(garageSave, /concat\(visibleUpdated\.filter\(car => !canonicalIds\.has\(car\.id\)\)\)/);
 assert.match(garageSave, /handleSaveCars\(reconciled\);/);
+
+const garageSelectStart = app.indexOf('const handleSelectGarageCar = (carId: string) => {');
+const garageSelectEnd = app.indexOf('const handleSaveMaintenanceLogs', garageSelectStart);
+assert.ok(garageSelectStart >= 0 && garageSelectEnd > garageSelectStart, 'Garage select adapter must remain isolated');
+const garageSelect = app.slice(garageSelectStart, garageSelectEnd);
+assert.match(garageSelect, /if \(garageAutoSelectSuppressionRef\.current === carId\) \{\s*garageAutoSelectSuppressionRef\.current = null;\s*return;/s);
+assert.match(garageSelect, /handleSelectCar\(carId\);/);
 
 const deleteStart = app.indexOf('const handleDeleteCar = (carId: string) => {');
 const deleteEnd = app.indexOf('// ── Clear All Data', deleteStart);
@@ -87,6 +98,8 @@ const reconcileVisibleGarageSave = (
     .concat(visibleUpdated.filter(item => !canonicalIds.has(item.id)));
 };
 
+type CommitTrigger = 'forced' | 'timeout' | 'dismiss' | 'pagehide' | 'unmount';
+
 class CarDeleteSimulation {
   carsRef: SimCar[];
   stateCars: SimCar[];
@@ -99,6 +112,8 @@ class CarDeleteSimulation {
   pending: { carId: string; accountId: string | null } | null = null;
   deleteIntents: DeleteIntent[] = [];
   pushes: Array<{ ownerId: string; ids: string[] }> = [];
+  commitTriggers: CommitTrigger[] = [];
+  garageAutoSelectSuppression: string | null = null;
   saveCount = 0;
 
   constructor(cars: SimCar[], accountId: string | null = 'account-a', ownerId: string | null = 'owner-a') {
@@ -116,6 +131,7 @@ class CarDeleteSimulation {
   }
 
   requestDelete(carId: string) {
+    if (this.pending) this.consumePending('forced');
     assert.ok(this.carsRef.some(item => item.id === carId));
     this.pending = { carId, accountId: this.accountId };
   }
@@ -136,17 +152,51 @@ class CarDeleteSimulation {
   }
 
   saveFromGarage(visibleUpdated: SimCar[]) {
-    this.saveCars(reconcileVisibleGarageSave(this.carsRef, visibleUpdated, this.pending?.carId ?? null));
+    const canonicalCars = this.carsRef;
+    const pendingCarId = this.pending?.carId ?? null;
+    const canonicalIds = new Set(canonicalCars.map(item => item.id));
+    const addedCar = visibleUpdated.find(item => !canonicalIds.has(item.id)) ?? null;
+    if (canonicalCars.length === 1
+      && canonicalCars[0].id === pendingCarId
+      && this.activeCarId === pendingCarId
+      && visibleUpdated.length === 1
+      && addedCar) {
+      this.garageAutoSelectSuppression = addedCar.id;
+    }
+    this.saveCars(reconcileVisibleGarageSave(canonicalCars, visibleUpdated, pendingCarId));
+  }
+
+  selectCar(carId: string) {
+    assert.ok(this.carsRef.some(item => item.id === carId));
+    this.activeCarId = carId;
+    this.activeStorage = carId;
+  }
+
+  selectFromGarage(carId: string) {
+    if (this.garageAutoSelectSuppression === carId) {
+      this.garageAutoSelectSuppression = null;
+      return;
+    }
+    this.selectCar(carId);
+  }
+
+  addFromGarage(newCar: SimCar) {
+    const renderedCars = this.visibleCars();
+    this.saveFromGarage([...renderedCars, newCar]);
+    if (renderedCars.length === 0) this.selectFromGarage(newCar.id);
+    this.garageAutoSelectSuppression = null; // queueMicrotask boundary
   }
 
   undo() {
     this.pending = null;
   }
 
-  commitPending() {
+  private consumePending(trigger: CommitTrigger) {
     const pending = this.pending;
     this.pending = null;
-    if (!pending || this.accountId !== pending.accountId) return;
+    if (!pending) return;
+    this.commitTriggers.push(trigger);
+    if (this.accountId !== pending.accountId) return;
     const updated = this.carsRef.filter(item => item.id !== pending.carId);
     if (updated.length === this.carsRef.length) return;
     this.saveCars(updated, pending.accountId);
@@ -155,6 +205,11 @@ class CarDeleteSimulation {
       this.activeStorage = this.activeCarId;
     }
   }
+
+  timeout() { this.consumePending('timeout'); }
+  dismiss() { this.consumePending('dismiss'); }
+  pagehide() { this.consumePending('pagehide'); }
+  unmount() { this.consumePending('unmount'); }
 
   clearAll() {
     this.undo();
@@ -165,6 +220,27 @@ class CarDeleteSimulation {
     this.activeStorage = null;
   }
 }
+
+// Sole active pending car makes Garage look empty. Add's synchronous auto-select is suppressed only once.
+const solePending = car('sole-pending');
+const soleAddSim = new CarDeleteSimulation([solePending]);
+soleAddSim.requestDelete(solePending.id);
+soleAddSim.addFromGarage(car('sole-new'));
+assert.equal(soleAddSim.activeCarId, solePending.id);
+assert.equal(soleAddSim.activeStorage, solePending.id);
+assert.deepEqual(soleAddSim.stateCars.map(item => item.id), ['sole-pending', 'sole-new']);
+assert.deepEqual(soleAddSim.deleteIntents, []);
+soleAddSim.undo();
+assert.equal(soleAddSim.activeCarId, solePending.id);
+assert.deepEqual(soleAddSim.stateCars.map(item => item.id), ['sole-pending', 'sole-new']);
+soleAddSim.selectFromGarage('sole-new');
+assert.equal(soleAddSim.activeCarId, 'sole-new', 'later deliberate selection must work');
+
+// A true zero-car Add has no pending suppression and still auto-selects normally.
+const trueZeroSim = new CarDeleteSimulation([]);
+trueZeroSim.addFromGarage(car('first-real-car'));
+assert.equal(trueZeroSim.activeCarId, 'first-real-car');
+assert.equal(trueZeroSim.activeStorage, 'first-real-car');
 
 // Delete + add + Undo: hidden car stays byte-identical and never becomes a delete intent.
 const pendingAdd = car('pending-add');
@@ -197,47 +273,88 @@ const clearSim = new CarDeleteSimulation([car('pending-clear'), car('other-clear
 clearSim.requestDelete('pending-clear');
 clearSim.clearAll();
 const savesAfterClear = clearSim.saveCount;
-clearSim.commitPending(); // timeout
-clearSim.commitPending(); // pagehide/unmount
+clearSim.timeout();
+clearSim.pagehide();
+clearSim.unmount();
+clearSim.dismiss();
 assert.deepEqual(clearSim.carsRef, []);
 assert.deepEqual(clearSim.stateCars, []);
 assert.deepEqual(clearSim.storageCars, []);
 assert.equal(clearSim.activeCarId, null);
 assert.equal(clearSim.activeStorage, null);
 assert.equal(clearSim.saveCount, savesAfterClear);
+assert.deepEqual(clearSim.commitTriggers, []);
 
-// Normal timeout/dismiss/pagehide commit uses latest state, queues once, and defers active fallback.
-const normalSim = new CarDeleteSimulation([car('pending-normal'), car('fallback')]);
-normalSim.requestDelete('pending-normal');
-assert.equal(normalSim.activeCarId, 'pending-normal');
-normalSim.commitPending(); // timeout/dismiss/pagehide share one slot
-normalSim.commitPending();
-normalSim.commitPending();
-assert.deepEqual(normalSim.stateCars.map(item => item.id), ['fallback']);
-assert.deepEqual(normalSim.deleteIntents, [{ accountId: 'account-a', carId: 'pending-normal' }]);
-assert.equal(normalSim.saveCount, 1);
-assert.equal(normalSim.pushes.length, 1);
-assert.equal(normalSim.activeCarId, 'fallback');
+// Each lifecycle trigger consumes one slot exactly once; later triggers cannot duplicate queue/push.
+const lifecycleActions: Record<Exclude<CommitTrigger, 'forced'>, (sim: CarDeleteSimulation) => void> = {
+  timeout: sim => sim.timeout(),
+  dismiss: sim => sim.dismiss(),
+  pagehide: sim => sim.pagehide(),
+  unmount: sim => sim.unmount(),
+};
+for (const [trigger, consume] of Object.entries(lifecycleActions) as Array<[Exclude<CommitTrigger, 'forced'>, (sim: CarDeleteSimulation) => void]>) {
+  const lifecycleSim = new CarDeleteSimulation([car(`pending-${trigger}`), car(`fallback-${trigger}`)]);
+  lifecycleSim.requestDelete(`pending-${trigger}`);
+  consume(lifecycleSim);
+  lifecycleSim.timeout();
+  lifecycleSim.dismiss();
+  lifecycleSim.pagehide();
+  lifecycleSim.unmount();
+  assert.deepEqual(lifecycleSim.commitTriggers, [trigger]);
+  assert.deepEqual(lifecycleSim.deleteIntents, [{ accountId: 'account-a', carId: `pending-${trigger}` }]);
+  assert.equal(lifecycleSim.saveCount, 1);
+  assert.equal(lifecycleSim.pushes.length, 1);
+  assert.equal(lifecycleSim.activeCarId, `fallback-${trigger}`);
+}
+
+// A deliberate newer active selection survives delayed commit of the pending car.
+const newerSelectionSim = new CarDeleteSimulation([car('pending-selection'), car('newer-selection')]);
+newerSelectionSim.requestDelete('pending-selection');
+newerSelectionSim.selectFromGarage('newer-selection');
+newerSelectionSim.timeout();
+assert.equal(newerSelectionSim.activeCarId, 'newer-selection');
+assert.equal(newerSelectionSim.activeStorage, 'newer-selection');
+
+// Second request force-commits first exactly once, then remains independently undoable/committable.
+const sequentialSim = new CarDeleteSimulation([car('sequential-first'), car('sequential-second'), car('sequential-third')]);
+sequentialSim.requestDelete('sequential-first');
+sequentialSim.requestDelete('sequential-second');
+assert.deepEqual(sequentialSim.commitTriggers, ['forced']);
+assert.deepEqual(sequentialSim.deleteIntents, [{ accountId: 'account-a', carId: 'sequential-first' }]);
+assert.equal(sequentialSim.pending?.carId, 'sequential-second');
+sequentialSim.undo();
+assert.deepEqual(sequentialSim.stateCars.map(item => item.id), ['sequential-second', 'sequential-third']);
+assert.equal(sequentialSim.saveCount, 1);
+sequentialSim.requestDelete('sequential-second');
+sequentialSim.dismiss();
+assert.deepEqual(sequentialSim.commitTriggers, ['forced', 'dismiss']);
+assert.deepEqual(sequentialSim.deleteIntents, [
+  { accountId: 'account-a', carId: 'sequential-first' },
+  { accountId: 'account-a', carId: 'sequential-second' },
+]);
+assert.deepEqual(sequentialSim.stateCars.map(item => item.id), ['sequential-third']);
+assert.equal(sequentialSim.saveCount, 2);
+assert.equal(sequentialSim.pushes.length, 2);
 
 // Owner resolution and same-account auth refresh must not cancel valid pending work.
 const ownerResolveSim = new CarDeleteSimulation([car('pending-owner'), car('owner-fallback')], 'account-a', null);
 ownerResolveSim.requestDelete('pending-owner');
 ownerResolveSim.ownerId = 'resolved-owner';
-ownerResolveSim.commitPending();
+ownerResolveSim.timeout();
 assert.deepEqual(ownerResolveSim.deleteIntents, [{ accountId: 'account-a', carId: 'pending-owner' }]);
 assert.deepEqual(ownerResolveSim.pushes, [{ ownerId: 'resolved-owner', ids: ['owner-fallback'] }]);
 
 const refreshSim = new CarDeleteSimulation([car('pending-refresh')]);
 refreshSim.requestDelete('pending-refresh');
 refreshSim.authGeneration += 1;
-refreshSim.commitPending();
+refreshSim.dismiss();
 assert.deepEqual(refreshSim.stateCars, []);
 assert.deepEqual(refreshSim.deleteIntents, [{ accountId: 'account-a', carId: 'pending-refresh' }]);
 
 // Unresolved owner still records the account-scoped retry intent; cloud upsert waits.
 const retrySim = new CarDeleteSimulation([car('pending-retry')], 'account-a', null);
 retrySim.requestDelete('pending-retry');
-retrySim.commitPending();
+retrySim.pagehide();
 assert.deepEqual(retrySim.deleteIntents, [{ accountId: 'account-a', carId: 'pending-retry' }]);
 assert.deepEqual(retrySim.pushes, []);
 
@@ -251,7 +368,7 @@ accountSim.carsRef = accountBCars;
 accountSim.stateCars = accountBCars;
 accountSim.storageCars = accountBCars;
 const accountBBytes = bytes(accountBCars);
-accountSim.commitPending();
+accountSim.unmount();
 assert.equal(bytes(accountSim.stateCars), accountBBytes);
 assert.equal(bytes(accountSim.storageCars), accountBBytes);
 assert.deepEqual(accountSim.deleteIntents, []);
