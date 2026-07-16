@@ -39,7 +39,7 @@ const deleteStart = app.indexOf('const handleDeleteCar = (carId: string) => {');
 const deleteEnd = app.indexOf('// ── Clear All Data', deleteStart);
 assert.ok(deleteStart >= 0 && deleteEnd > deleteStart, 'car delete handler must remain isolated');
 const deleteHandler = app.slice(deleteStart, deleteEnd);
-assert.ok(deleteHandler.indexOf("alert('Reassign or delete this car\\'s data first.')") < deleteHandler.indexOf('carUndo.requestDelete'), 'data guard must run before undo request');
+assert.ok(deleteHandler.indexOf("setInfoToast('Reassign or delete this car\\'s data first.')") < deleteHandler.indexOf('carUndo.requestDelete'), 'info guard must run before undo request');
 assert.match(deleteHandler, /removeFromState: \(\) => \{\},\s*restoreToState: \(\) => \{\}/s);
 assert.match(deleteHandler, /const accountId = userRef\.current\?\.id \?\? null;/);
 assert.match(deleteHandler, /if \(userRef\.current\?\.id !== accountId\) return;/);

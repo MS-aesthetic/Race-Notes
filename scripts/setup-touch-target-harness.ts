@@ -24,6 +24,15 @@ const replaceExactAfter = (source: string, marker: string, current: string, pare
   assert.ok(markerAt >= 0 && currentAt > markerAt, `${label}: current contract follows marker`);
   return source.slice(0, currentAt) + parent + source.slice(currentAt + current.length);
 };
+const replaceRegionFromParent = (source: string, parent: string, start: string, end: string, label: string) => {
+  const sourceStart = source.indexOf(start);
+  const sourceEnd = source.indexOf(end, sourceStart + start.length);
+  const parentStart = parent.indexOf(start);
+  const parentEnd = parent.indexOf(end, parentStart + start.length);
+  assert.ok(sourceStart >= 0 && sourceEnd > sourceStart, `${label}: current region exists`);
+  assert.ok(parentStart >= 0 && parentEnd > parentStart, `${label}: parent region exists`);
+  return source.slice(0, sourceStart) + parent.slice(parentStart, parentEnd) + source.slice(sourceEnd);
+};
 
 const setupSource = read(setupPath);
 const parentSetupSource = readParent(setupPath);
@@ -53,6 +62,22 @@ revertedSetup = replaceExact(revertedSetup, currentInputClass, parentInputClass,
 revertedSetup = replaceExact(revertedSetup, currentNotesClass, parentNotesClass, 1, 'notes textarea');
 revertedSetup = replaceExactAfter(revertedSetup, '{/* Car setup details */}', currentDetailsGrid, parentDetailsGrid, 'car-detail grid');
 revertedSetup = replaceExact(revertedSetup, currentCornerGrid, parentCornerGrid, 1, 'four-corner grid');
+// UXP-16 legitimately adds confirmation/info behavior outside this harness's UXP-14 touch-target scope.
+revertedSetup = replaceExact(revertedSetup, "import ConfirmSheet from './ui/ConfirmSheet';\n", '', 1, 'later ConfirmSheet import');
+revertedSetup = replaceExact(revertedSetup, '  const [pendingDeleteSetupId, setPendingDeleteSetupId] = useState<string | null>(null);\n', '', 1, 'later pending-delete state');
+revertedSetup = replaceRegionFromParent(revertedSetup, parentSetupSource, '  const handleDeleteSetup =', '  const handleCloneSetup =', 'later setup-delete flow');
+revertedSetup = replaceRegionFromParent(revertedSetup, parentSetupSource, '  const handleUploadAttachment =', '  const handleDeleteSetupAttachment =', 'later attachment alerts');
+revertedSetup = replaceExact(revertedSetup, `      <ConfirmSheet
+        open={!!pendingDeleteSetupId}
+        title="Delete setup?"
+        body="Are you sure you want to delete this setup?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={confirmDeleteSetup}
+        onCancel={() => setPendingDeleteSetupId(null)}
+      />
+`, '', 1, 'later confirmation render');
 assert.equal(
   normalizeEol(revertedSetup),
   normalizeEol(parentSetupSource),

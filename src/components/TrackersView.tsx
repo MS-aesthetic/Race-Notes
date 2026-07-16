@@ -7,6 +7,7 @@ import ToDoView from './ToDoView';
 import EmptyState from './ui/EmptyState';
 import { lastAccountingCategory, localDateValue, recentAccountingRepeats } from '../lib/accountingDefaults';
 import { clearAccountingDraft, readAccountingDraft, writeAccountingDraft } from '../lib/accountingDraft';
+import ConfirmSheet from './ui/ConfirmSheet';
 
 // ── Sub-tab type (declared early; used in Props and component) ───────────────
 
@@ -124,6 +125,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
   const [weekendFilter, setWeekendFilter] = useState('');
   const [category, setCategory] = useState(() => restoredDraft?.category ?? lastAccountingCategory(entries));
   const [entryDate, setEntryDate] = useState(() => restoredDraft?.entryDate ?? localDateValue());
+  const [pendingDeleteEntryId, setPendingDeleteEntryId] = useState<string | null>(null);
   const receiptRequestGenerationRef = useRef(0);
 
   const filtered = weekendFilter ? entries.filter(e => e.weekendId === weekendFilter) : entries;
@@ -214,8 +216,14 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
   };
 
   const del = (id: string) => {
-    if (!window.confirm('Delete this entry?')) return;
-    onSave(entries.filter(e => e.id !== id));
+    setPendingDeleteEntryId(id);
+  };
+
+  const confirmDeleteEntry = () => {
+    const id = pendingDeleteEntryId;
+    setPendingDeleteEntryId(null);
+    if (!id || !entries.some(entry => entry.id === id)) return;
+    onSave(entries.filter(entry => entry.id !== id));
   };
 
   const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -406,6 +414,16 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
           ))}
         </div>
       )}
+      <ConfirmSheet
+        open={!!pendingDeleteEntryId}
+        title="Delete accounting entry?"
+        body="Delete this entry?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={confirmDeleteEntry}
+        onCancel={() => setPendingDeleteEntryId(null)}
+      />
     </div>
   );
 }
@@ -432,6 +450,7 @@ function ServiceTab({
 }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [logModalComp, setLogModalComp] = useState<MaintenanceComponent | null>(null);
+  const [pendingDeleteComponentId, setPendingDeleteComponentId] = useState<string | null>(null);
 
   // Add form state
   const [addName, setAddName] = useState('');
@@ -471,7 +490,16 @@ function ServiceTab({
   };
 
   const deleteComp = (id: string) => {
-    if (!window.confirm('Delete this item and all its maintenance logs?')) return;
+    setPendingDeleteComponentId(id);
+  };
+
+  const confirmDeleteComponent = () => {
+    const id = pendingDeleteComponentId;
+    setPendingDeleteComponentId(null);
+    if (!id) return;
+    const target = components.find(component => component.id === id);
+    if (!target) return;
+    if (target.scope === 'car' && (!activeCarId || target.carId !== activeCarId)) return;
     onDeleteComponent(id);
   };
 
@@ -732,6 +760,16 @@ function ServiceTab({
           </form>
         </div>
       )}
+      <ConfirmSheet
+        open={!!pendingDeleteComponentId}
+        title="Delete maintenance item?"
+        body="Delete this item and all its maintenance logs?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={confirmDeleteComponent}
+        onCancel={() => setPendingDeleteComponentId(null)}
+      />
     </div>
   );
 }
@@ -753,6 +791,7 @@ function TemplatesTab({
   const [addName, setAddName] = useState('');
   const [addCategory, setAddCategory] = useState<string>('Custom');
   const [newItemText, setNewItemText] = useState<Record<string, string>>({});
+  const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState<string | null>(null);
 
   const addStarterTemplates = () => {
     if (!starterTemplatesReady) return;
@@ -780,7 +819,13 @@ function TemplatesTab({
   };
 
   const deleteTemplate = (id: string) => {
-    if (!window.confirm('Delete this template?')) return;
+    setPendingDeleteTemplateId(id);
+  };
+
+  const confirmDeleteTemplate = () => {
+    const id = pendingDeleteTemplateId;
+    setPendingDeleteTemplateId(null);
+    if (!id || !templates.some(template => template.id === id)) return;
     onDeleteTemplate(id);
     if (expandedId === id) setExpandedId(null);
   };
@@ -917,6 +962,16 @@ function TemplatesTab({
           );
         })}
       </div>
+      <ConfirmSheet
+        open={!!pendingDeleteTemplateId}
+        title="Delete checklist template?"
+        body="Delete this template?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={confirmDeleteTemplate}
+        onCancel={() => setPendingDeleteTemplateId(null)}
+      />
     </div>
   );
 }

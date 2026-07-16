@@ -433,7 +433,7 @@ export default function App() {
     const tc = tireInventory.filter(t => t.carId === carId).length;
     const shc = shockSessions.filter(s => s.carId === carId).length;
     if (sc + tc + shc > 0) {
-      alert('Reassign or delete this car\'s data first.');
+      setInfoToast('Reassign or delete this car\'s data first.');
       return;
     }
     const car = carsRef.current.find(item => item.id === carId);

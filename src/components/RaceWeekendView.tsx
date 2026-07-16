@@ -11,6 +11,7 @@ import EmptyState from './ui/EmptyState';
 import LapTimeKeypad from './ui/LapTimeKeypad';
 import UndoToast from './ui/UndoToast';
 import BottomSheet from './ui/BottomSheet';
+import ConfirmSheet from './ui/ConfirmSheet';
 import FourBarQuickAdjust from './FourBarQuickAdjust';
 import SetupDiffView from './SetupDiffView';
 import QuickAdjustPanel from './QuickAdjustPanel';
@@ -182,6 +183,7 @@ export default function RaceWeekendView({
   const [fourBarOpen, setFourBarOpen] = useState(false);
   const [sessionDiff, setSessionDiff] = useState<{ a: string; b: string } | null>(null);
   const [sharingWeekendId, setSharingWeekendId] = useState<string | null>(null);
+  const [pendingFinish, setPendingFinish] = useState<{ weekendId: string; name: string; finalLabel: string } | null>(null);
 
   // Android hardware back closes these modals first ([29])
   useBackClosable(wkFormOpen, () => setWkFormOpen(false));
@@ -202,6 +204,14 @@ export default function RaceWeekendView({
   const sortedWeekends = sortWeekends(visibleWeekends, activeWeekendId);
   const scopedTireInventory = activeCarId ? tireInventory.filter(tire => tire.carId === activeCarId) : [];
   const scopedSetups = activeCarId ? savedSetups.filter(setup => setup.carId === activeCarId) : [];
+  const confirmFinishWeekend = () => {
+    const pending = pendingFinish;
+    setPendingFinish(null);
+    if (!pending) return;
+    const target = visibleWeekends.find(weekend => weekend.id === pending.weekendId);
+    if (!target || target.id !== activeWeekendId || isWeekendFinished(target)) return;
+    onFinishWeekend(target.id);
+  };
   const getSessionDiffPair = (record: SessionRecord, weekendId: string): { a: string; b: string } | null => {
     const weekend = weekends.find(item => item.id === weekendId);
     const byWeekend = scopedSetups.find(setup => setup.id === lifecycleSetupId(weekend));
@@ -1533,11 +1543,11 @@ export default function RaceWeekendView({
           </div>
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm(`Finish ${currentWeekend.name}? ${lifecycleLabel('final', currentWeekend)} will be saved and this Race Day will move to history.`)) {
-                onFinishWeekend(currentWeekend.id);
-              }
-            }}
+            onClick={() => setPendingFinish({
+              weekendId: currentWeekend.id,
+              name: currentWeekend.name,
+              finalLabel: lifecycleLabel('final', currentWeekend),
+            })}
             className="w-full min-h-12 rounded-xl border-2 border-primary bg-primary text-on-primary font-display font-bold uppercase tracking-wide"
           >
             Finish Race Day
@@ -1651,6 +1661,15 @@ export default function RaceWeekendView({
       {weekendFormModal}
       {sessionFormModal}
       {undoToastEl}
+      <ConfirmSheet
+        open={!!pendingFinish}
+        title={`Finish ${pendingFinish?.name ?? 'Race Day'}?`}
+        body={`${pendingFinish?.finalLabel ?? 'Final setup'} will be saved and this Race Day will move to history.`}
+        confirmLabel="Finish"
+        cancelLabel="Keep"
+        onConfirm={confirmFinishWeekend}
+        onCancel={() => setPendingFinish(null)}
+      />
     </div>
   );
 }

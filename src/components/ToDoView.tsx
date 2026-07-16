@@ -21,6 +21,7 @@ import {
   type ChecklistCompletionUndo,
 } from '../lib/checklistMaintenance';
 import BottomSheet from './ui/BottomSheet';
+import ConfirmSheet from './ui/ConfirmSheet';
 import CollapsibleSection from './ui/CollapsibleSection';
 import EmptyState from './ui/EmptyState';
 import { InfoToast } from './ui/UndoToast';
@@ -36,6 +37,11 @@ interface ToDoViewProps {
   weekends?: RaceWeekend[];
   savedSetups?: Setup[];
 }
+
+type PendingChecklistAction =
+  | { kind: 'reset' }
+  | { kind: 'clear-current' }
+  | { kind: 'clear-completed' };
 
 export default function ToDoView({
   todos,
@@ -69,6 +75,7 @@ export default function ToDoView({
   const [noteItemId, setNoteItemId] = useState<string | null>(null);
   const [completionNote, setCompletionNote] = useState('');
   const [completionUndo, setCompletionUndo] = useState<ChecklistCompletionUndo | null>(null);
+  const [pendingChecklistAction, setPendingChecklistAction] = useState<PendingChecklistAction | null>(null);
   const [keepAddedItems, setKeepAddedItems] = useState(
     () => localStorage.getItem(KEEP_ADDED_ITEMS_KEY) !== 'false',
   );
@@ -226,30 +233,61 @@ export default function ToDoView({
   };
 
   const resetForWeekend = () => {
-    if (!window.confirm('Reset for a new Race Day? Completed work moves to History. Eligible recurring jobs return. Unfinished added jobs follow your carry setting.')) return;
-    setCompletionUndo(null);
-    commitTodos(resetMainChecklist(
-      todosRef.current,
-      keepAddedItems,
-      new Date().toISOString(),
-      templates,
-      { components: maintenance, weekends, setups: savedSetups },
-    ));
-    setManageOpen(false);
+    setPendingChecklistAction({ kind: 'reset' });
   };
 
   const clearCurrentList = () => {
-    if (!window.confirm('Clear current checklist? Completed work moves to History, recurring jobs stay hidden until reset, and unfinished added jobs are removed.')) return;
-    setCompletionUndo(null);
-    commitTodos(clearMainChecklist(todosRef.current));
-    setManageOpen(false);
+    setPendingChecklistAction({ kind: 'clear-current' });
   };
 
   const clearCompleted = () => {
-    if (!window.confirm('Move completed work to History? Open jobs stay unchanged.')) return;
+    setPendingChecklistAction({ kind: 'clear-completed' });
+  };
+
+  const confirmChecklistAction = () => {
+    const pending = pendingChecklistAction;
+    setPendingChecklistAction(null);
+    if (!pending) return;
     setCompletionUndo(null);
+    if (pending.kind === 'reset') {
+      commitTodos(resetMainChecklist(
+        todosRef.current,
+        keepAddedItems,
+        new Date().toISOString(),
+        templates,
+        { components: maintenance, weekends, setups: savedSetups },
+      ));
+      window.setTimeout(() => setManageOpen(false), 0);
+      return;
+    }
+    if (pending.kind === 'clear-current') {
+      commitTodos(clearMainChecklist(todosRef.current));
+      window.setTimeout(() => setManageOpen(false), 0);
+      return;
+    }
     commitTodos(archiveCompletedMainChecklist(todosRef.current));
   };
+
+  const pendingChecklistCopy = pendingChecklistAction?.kind === 'reset'
+    ? {
+        title: 'Reset for a new Race Day?',
+        body: 'Completed work moves to History. Eligible recurring jobs return. Unfinished added jobs follow your carry setting.',
+        confirmLabel: 'Reset',
+        destructive: false,
+      }
+    : pendingChecklistAction?.kind === 'clear-current'
+      ? {
+          title: 'Clear current checklist?',
+          body: 'Completed work moves to History, recurring jobs stay hidden until reset, and unfinished added jobs are removed.',
+          confirmLabel: 'Clear',
+          destructive: true,
+        }
+      : {
+          title: 'Move completed work to History?',
+          body: 'Open jobs stay unchanged.',
+          confirmLabel: 'Move',
+          destructive: false,
+        };
 
   const focusAddTask = () => {
     setManageOpen(false);
@@ -577,6 +615,17 @@ export default function ToDoView({
           </form>
         )}
       </BottomSheet>
+
+      <ConfirmSheet
+        open={!!pendingChecklistAction}
+        title={pendingChecklistCopy.title}
+        body={pendingChecklistCopy.body}
+        confirmLabel={pendingChecklistCopy.confirmLabel}
+        cancelLabel="Keep"
+        destructive={pendingChecklistCopy.destructive}
+        onConfirm={confirmChecklistAction}
+        onCancel={() => setPendingChecklistAction(null)}
+      />
 
       <InfoToast
         open={!!completionUndo}

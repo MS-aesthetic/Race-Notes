@@ -3,6 +3,7 @@ import { ShockSession, ShockCorner, ShockDataPoint } from '../types';
 import { byActiveCar } from '../lib/scope';
 import { buildComparisonRows, downloadComparisonCsv } from '../lib/shockCompare';
 import EmptyState from './ui/EmptyState';
+import ConfirmSheet from './ui/ConfirmSheet';
 
 // ─── Local type aliases (for readability within this file) ────────────────────
 
@@ -494,6 +495,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
   // Compare / overlay mode
   const [compareMode, setCompareMode] = useState(false);
   const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -585,7 +587,13 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
   // ── Delete session ────────────────────────────────────────────────────────
 
   const handleDeleteSession = (id: string) => {
-    if (!window.confirm('Delete this load session and all its data points?')) return;
+    setPendingDeleteSessionId(id);
+  };
+
+  const confirmDeleteSession = () => {
+    const id = pendingDeleteSessionId;
+    setPendingDeleteSessionId(null);
+    if (!id || !displayedSessions.some(session => session.id === id)) return;
     const next = sessions.filter(s => s.id !== id);
     persist(next);
     setActiveSessionId(next[0]?.id ?? null);
@@ -1171,6 +1179,16 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
           </div>
         </div>
       )}
+      <ConfirmSheet
+        open={!!pendingDeleteSessionId}
+        title="Delete load session?"
+        body="Delete this load session and all its data points?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={confirmDeleteSession}
+        onCancel={() => setPendingDeleteSessionId(null)}
+      />
     </div>
   );
 }

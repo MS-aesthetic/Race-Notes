@@ -17,6 +17,7 @@ import { displayLifecycleText, displayVersionLabel, isSetupLocked, lifecycleLabe
 import { applyExplicitCornerField } from '../lib/quickAdjust';
 import { buildSetupReport, createPdfFile } from '../lib/exportPdf';
 import { shareOrDownloadReport } from '../lib/reportShare';
+import ConfirmSheet from './ui/ConfirmSheet';
 
 interface SetupViewProps {
   savedSetups: Setup[];
@@ -227,6 +228,7 @@ export default function SetupView({
   const [newSetupName, setNewSetupName] = useState('');
   const [uploadingSetupId, setUploadingSetupId] = useState<string | null>(null);
   const [sharingSetupId, setSharingSetupId] = useState<string | null>(null);
+  const [pendingDeleteSetupId, setPendingDeleteSetupId] = useState<string | null>(null);
 
   const [showCompare, setShowCompare] = useState(false);
   const [compareIds, setCompareIds] = useState<{ a?: string; b?: string }>({});
@@ -329,12 +331,30 @@ export default function SetupView({
 
   const handleDeleteSetup = (setupId: string) => {
     const target = setups.find((setupItem) => setupItem.id === setupId);
+    if (!target) return;
     if (isSetupLocked(target, weekends)) {
       onInfo?.('Historical setups are view-only. Clone this setup to make an editable copy.');
       return;
     }
-    if (setups.length <= 1) { alert('You must keep at least one setup configuration.'); return; }
-    if (!window.confirm('Are you sure you want to delete this setup?')) return;
+    if (setups.length <= 1) { onInfo?.('You must keep at least one setup configuration.'); return; }
+    setPendingDeleteSetupId(setupId);
+  };
+
+  const confirmDeleteSetup = () => {
+    const setupId = pendingDeleteSetupId;
+    setPendingDeleteSetupId(null);
+    if (!setupId) return;
+    const target = setups.find((setupItem) => setupItem.id === setupId);
+    if (!target) return;
+    if (!activeCarId || target.carId !== activeCarId) return;
+    if (isSetupLocked(target, weekends)) {
+      onInfo?.('Historical setups are view-only. Clone this setup to make an editable copy.');
+      return;
+    }
+    if (setups.length <= 1) {
+      onInfo?.('You must keep at least one setup configuration.');
+      return;
+    }
     const filtered = setups.filter((s) => s.id !== setupId);
     let nextActiveId = activeId;
     if (activeId === setupId) {
@@ -368,13 +388,13 @@ export default function SetupView({
   };
 
   const handleUploadAttachment = async (setupId: string, file: File) => {
-    if (!user) { alert('Please sign in to attach files.'); return; }
+    if (!user) { onInfo?.('Please sign in to attach files.'); return; }
     setUploadingSetupId(setupId);
     try {
       const url = await uploadAttachment(file, user.id, 'setups', setupId);
       const updated = setups.map(s => s.id === setupId ? { ...s, screenshots: [...(s.screenshots || []), url] } : s);
       updateAndSaveSetups(updated, activeId);
-    } catch { alert('Upload failed.'); } finally { setUploadingSetupId(null); }
+    } catch { onInfo?.('Upload failed.'); } finally { setUploadingSetupId(null); }
   };
 
   const handleDeleteSetupAttachment = async (setupId: string, url: string) => {
@@ -834,6 +854,16 @@ export default function SetupView({
             onHelp={onHelp}
         />
       )}
+      <ConfirmSheet
+        open={!!pendingDeleteSetupId}
+        title="Delete setup?"
+        body="Are you sure you want to delete this setup?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={confirmDeleteSetup}
+        onCancel={() => setPendingDeleteSetupId(null)}
+      />
     </div>
   );
 }
