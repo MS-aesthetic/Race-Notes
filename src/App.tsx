@@ -952,8 +952,6 @@ export default function App() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekends, activeWeekendId]);
-  // Clock state matching real timing context
-  const [timeStr, setTimeStr] = useState('11:20 AM');
 
   useEffect(() => {
     // Attempt load from localStorage for state durability if available
@@ -985,18 +983,6 @@ export default function App() {
       try { setActiveSession(JSON.parse(savedActive)); } catch { /* ignore */ }
     }
 
-    // Set interactive clock
-    const updateTime = () => {
-      const now = new Date();
-      let hrs = now.getHours();
-      const mins = String(now.getMinutes()).padStart(2, '0');
-      const ampm = hrs >= 12 ? 'PM' : 'AM';
-      hrs = hrs % 12 || 12;
-      setTimeStr(`${hrs}:${mins} ${ampm}`);
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 10000);
-    return () => clearInterval(interval);
   }, []);
 
   // ---- Auth: restore session + subscribe to changes ----
