@@ -68,10 +68,11 @@ import { detectAssignmentChanges } from './lib/assignmentNotify';
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
 
 const normalizeTheme = (value: unknown): AppTheme => {
-  const saved = (value && typeof value === 'object' ? value : {}) as Partial<AppTheme>;
-  const fontSize: AppTheme['fontSize'] = saved.fontSize === 'xlarge' || saved.fontSize === 'xxlarge'
+  const saved = (value && typeof value === 'object' ? value : {}) as { mode?: unknown; accent?: unknown; fontSize?: unknown };
+  const rawFontSize = saved.fontSize;
+  const fontSize: AppTheme['fontSize'] = rawFontSize === 'xlarge' || rawFontSize === 'xxlarge'
     ? 'xlarge'
-    : 'large';
+    : rawFontSize === 'large' || rawFontSize === 'standard' ? 'large' : 'large';
   return {
     mode: saved.mode === 'light' ? 'light' : 'dark',
     accent: typeof saved.accent === 'string' && saved.accent ? saved.accent : '#ffb3ac',
@@ -592,8 +593,8 @@ export default function App() {
     // installed PWA (Chrome) vs the Capacitor APK (Android WebView) — both
     // Chromium, both respect `zoom` the same way.
     root.style.fontSize = '16px';
-    const ZOOM: Record<AppTheme['fontSize'], number> = { standard: 1.15, large: 1.15, xlarge: 1.45, xxlarge: 1.45 };
-    const zoom = ZOOM[theme.fontSize] ?? 1.15;
+    const ZOOM: Record<AppTheme['fontSize'], number> = { large: 1.15, xlarge: 1.45 };
+    const zoom = ZOOM[theme.fontSize];
     root.style.setProperty('--ui-zoom', String(zoom));
   }, [theme]);
 

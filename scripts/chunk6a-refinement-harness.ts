@@ -14,8 +14,24 @@ const sync = source('../src/lib/sync.ts');
 const types = source('../src/types.ts');
 const migration = source('../supabase/migrations/20260714010630_add_load_session_ride_height.sql');
 
-assert.match(app, /saved\.fontSize === 'xlarge' \|\| saved\.fontSize === 'xxlarge'/);
-assert.match(app, /standard: 1\.15, large: 1\.15, xlarge: 1\.45, xxlarge: 1\.45/);
+assert.match(types, /fontSize: 'large' \| 'xlarge';/);
+assert.doesNotMatch(types, /standard|xxlarge/);
+assert.match(app, /const rawFontSize = saved\.fontSize;/);
+assert.match(app, /rawFontSize === 'xlarge' \|\| rawFontSize === 'xxlarge'/);
+assert.match(app, /rawFontSize === 'large' \|\| rawFontSize === 'standard'/);
+assert.match(app, /const ZOOM: Record<AppTheme\['fontSize'\], number> = \{ large: 1\.15, xlarge: 1\.45 \};/);
+assert.doesNotMatch(app.slice(app.indexOf('const ZOOM:'), app.indexOf('const zoom =')), /standard|xxlarge/);
+const normalizeFontSize = (rawFontSize: unknown): 'large' | 'xlarge' => (
+  rawFontSize === 'xlarge' || rawFontSize === 'xxlarge'
+    ? 'xlarge'
+    : rawFontSize === 'large' || rawFontSize === 'standard' ? 'large' : 'large'
+);
+assert.equal(normalizeFontSize('large'), 'large');
+assert.equal(normalizeFontSize('xlarge'), 'xlarge');
+assert.equal(normalizeFontSize('standard'), 'large');
+assert.equal(normalizeFontSize('xxlarge'), 'xlarge');
+assert.equal(normalizeFontSize(undefined), 'large');
+assert.equal(normalizeFontSize({ broken: true }), 'large');
 assert.match(settings, /value: 'large'.*label: 'Default'/);
 assert.match(settings, /value: 'xlarge'.*label: 'Large'/);
 assert.doesNotMatch(settings, /1\.15x|1\.45x|1\.7x|1x scale|XX-Large|X-Large/);
