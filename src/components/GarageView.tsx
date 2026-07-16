@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Car, CAR_TYPES } from '../types';
+import EmptyState from './ui/EmptyState';
 
 interface GarageViewProps {
   cars: Car[];
@@ -28,8 +29,14 @@ export default function GarageView({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
+  const addCarInputRef = useRef<HTMLInputElement>(null);
 
   const genId = () => `car-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const focusAddCarForm = () => {
+    setShowAddForm(true);
+    window.setTimeout(() => addCarInputRef.current?.focus(), 0);
+  };
 
   const handleAdd = () => {
     if (!form.chassis.trim()) return;
@@ -82,10 +89,7 @@ export default function GarageView({
 
       {/* Car list */}
       {cars.length === 0 ? (
-        <div className="bg-surface-container border border-outline-variant rounded-lg p-6 text-center">
-          <span className="material-symbols-outlined text-3xl text-on-surface-variant/40 block mb-2">directions_car</span>
-          <p className="text-xs font-mono text-on-surface-variant uppercase tracking-wider">No cars yet — add one below.</p>
-        </div>
+        <EmptyState icon="directions_car" title="No cars yet" cta={{ label: 'Add Car', onClick: focusAddCarForm, icon: 'add' }} />
       ) : (
         <div className="space-y-2">
           {cars.map(car => {
@@ -165,15 +169,15 @@ export default function GarageView({
                           {car.division && (
                             <span className="text-[10px] font-mono text-on-surface-variant uppercase">{car.division}</span>
                           )}
-                          <span className="text-[10px] font-mono text-on-surface-variant/60 uppercase">
+                          <span className="text-[10px] font-mono text-on-surface-muted uppercase">
                             {sc} setup{sc !== 1 ? 's' : ''} · {tc} tire{tc !== 1 ? 's' : ''} · {shc} shock{shc !== 1 ? 's' : ''}
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => startEdit(car)}
-                          className="p-1.5 text-on-surface-variant/60 hover:text-on-surface rounded transition-colors"
+                          className="tap-target p-1.5 text-on-surface-muted hover:text-on-surface rounded transition-colors"
                           title="Edit"
                         >
                           <span className="material-symbols-outlined text-base">edit</span>
@@ -181,10 +185,10 @@ export default function GarageView({
                         <button
                           onClick={() => onDeleteCar(car.id)}
                           disabled={totalData(car.id) > 0}
-                          className={`p-1.5 rounded transition-colors ${
+                          className={`tap-target p-1.5 rounded transition-colors ${
                             totalData(car.id) > 0
-                              ? 'text-on-surface-variant/20 cursor-not-allowed'
-                              : 'text-on-surface-variant/60 hover:text-red-400'
+                              ? 'text-on-surface-muted opacity-20 cursor-not-allowed'
+                              : 'text-on-surface-muted hover:text-red-400'
                           }`}
                           title={totalData(car.id) > 0 ? 'Reassign or delete this car\'s data first' : 'Delete car'}
                         >
@@ -223,6 +227,7 @@ export default function GarageView({
             </select>
           </div>
           <input
+            ref={addCarInputRef}
             placeholder="Chassis *"
             value={form.chassis}
             onChange={e => setForm(f => ({ ...f, chassis: e.target.value }))}
@@ -258,8 +263,8 @@ export default function GarageView({
         </div>
       ) : (
         <button
-          onClick={() => setShowAddForm(true)}
-          className="w-full py-3 border border-dashed border-outline-variant/60 text-on-surface-variant/70 font-mono text-xs uppercase rounded-lg hover:border-primary/60 hover:text-primary transition-colors flex items-center justify-center gap-2"
+          onClick={focusAddCarForm}
+          className="w-full py-3 border border-dashed border-outline-variant/60 text-on-surface-muted font-mono text-xs uppercase rounded-lg hover:border-primary/60 hover:text-primary transition-colors flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined text-base">add</span>
           Add Car

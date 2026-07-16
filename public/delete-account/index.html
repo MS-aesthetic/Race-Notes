@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Delete a CREW CHIEF Account</title>
+  <meta name="description" content="Delete a CREW CHIEF account and associated data." />
+  <link rel="stylesheet" href="/legal.css" />
+</head>
+<body>
+<main>
+  <div class="eyebrow">CREW CHIEF</div>
+  <h1>Delete your account</h1>
+  <p class="fine">CREW CHIEF is provided by Nimbus Engineering.</p>
+  <p>The fastest option is in the app: sign in, open <strong>Settings → Account</strong>, choose <strong>Delete Account</strong>, and type DELETE. The account, owned cloud records, owned uploads, and CREW CHIEF data on that device are permanently removed.</p>
+  <p>Shared team history may remain without your identity so another team member's records still make sense. If you own a shared team, ownership passes to another member.</p>
+
+  <section class="card">
+    <h2>Cannot sign in?</h2>
+    <p>Submit a deletion request using the email address on the account. You can also use this form for another privacy question. We will verify ownership before deletion. Do not include passwords or sensitive racing information.</p>
+    <form name="account-deletion-request" method="POST" action="/request-received/" data-netlify="true" netlify-honeypot="bot-field">
+      <input type="hidden" name="form-name" value="account-deletion-request" />
+      <p class="hidden" aria-hidden="true"><label>Do not fill this out: <input name="bot-field" tabindex="-1" autocomplete="off" /></label></p>
+      <label for="request-type">Request type</label>
+      <select id="request-type" name="request-type" required>
+        <option value="account-deletion">Account deletion</option>
+        <option value="privacy-question">Privacy question</option>
+      </select>
+      <label for="email">Account email</label>
+      <input id="email" name="email" type="email" autocomplete="email" required />
+      <label for="details">Details (optional)</label>
+      <textarea id="details" name="details" maxlength="1000" placeholder="Anything needed to identify the account"></textarea>
+      <button type="submit">Send request</button>
+    </form>
+  </section>
+
+  <p class="fine">Deletion is permanent. If verification cannot be completed, the request may be refused to protect the account.</p>
+  <a href="/privacy/">Read the Privacy Policy</a>
+</main>
+</body>
+</html>

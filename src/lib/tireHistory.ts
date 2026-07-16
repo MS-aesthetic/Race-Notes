@@ -272,12 +272,10 @@ export function buildTireUsageReportHtml(tires: TireInventoryItem[], weekends: R
     </html>`;
 }
 
-export function printTireUsageReport(tires: TireInventoryItem[], weekends: RaceWeekend[]) {
+export function printTireUsageReport(tires: TireInventoryItem[], weekends: RaceWeekend[]): boolean {
   const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert('Allow popups in your browser to view the report.');
-    return;
-  }
+  if (!printWindow) return false;
   printWindow.document.write(buildTireUsageReportHtml(tires, weekends));
   printWindow.document.close();
+  return true;
 }

@@ -4,6 +4,7 @@ import { mergeTimestampedRecords } from './setupLifecycle';
 import { setupFromCloudRow, setupToCloudRow } from './setupSync';
 import { todoFromCloudRow, todoToCloudRow } from './todoSync';
 import { maintenanceComponentFromCloudRow, maintenanceComponentToCloudRow } from './maintenanceSync';
+import type { TeamSharedSyncTable } from './teamDataOwnership';
 export { setupFromCloudRow, setupToCloudRow } from './setupSync';
 export { maintenanceComponentFromCloudRow, maintenanceComponentToCloudRow } from './maintenanceSync';
 
@@ -19,15 +20,33 @@ export { maintenanceComponentFromCloudRow, maintenanceComponentToCloudRow } from
 
 type SyncCallback = (message: string) => void;
 
+/** Delete one exact shared row. Callers retain failed intents for retry. */
+export async function deleteTeamSharedRecordFromCloud(
+  table: TeamSharedSyncTable,
+  recordId: string,
+): Promise<boolean> {
+  try {
+    const { error } = await supabase.from(table).delete().eq('id', recordId);
+    if (error) {
+      console.warn(`Sync: shared delete ${table}/${recordId} error:`, error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.warn(`Sync: shared delete ${table}/${recordId} failed`, error);
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Push: local → cloud
 // ---------------------------------------------------------------------------
 
 const pushDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-export const weekendToCloudRow = (w: RaceWeekend, userId: string): Record<string, unknown> => ({
+export const weekendToCloudRow = (w: RaceWeekend, ownerUserId: string): Record<string, unknown> => ({
   id: w.id,
-  user_id: userId,
+  user_id: ownerUserId,
   name: w.name,
   track: w.track,
   date: w.date,
@@ -268,10 +287,7 @@ export function mergeIntoLocalStorage(
 
 /** Hard-delete a single race weekend row from Supabase */
 export async function deleteWeekendFromCloud(weekendId: string): Promise<void> {
-  try {
-    const { error } = await supabase.from('race_weekends').delete().eq('id', weekendId);
-    if (error) console.warn('Sync: deleteWeekendFromCloud error:', error.message);
-  } catch (e) { console.warn('Sync: deleteWeekendFromCloud failed', e); }
+  await deleteTeamSharedRecordFromCloud('race_weekends', weekendId);
 }
 
 export function pushTires(tires: TireInventoryItem[], userId: string, onStatus?: SyncCallback) {
@@ -334,11 +350,12 @@ export async function pullTires(userId: string, onStatus?: SyncCallback): Promis
   }
 }
 
-export async function deleteTireFromCloud(tireId: string): Promise<void> {
+export async function deleteTireFromCloud(tireId: string): Promise<boolean> {
   try {
     const { error } = await supabase.from('tire_inventory').delete().eq('id', tireId);
-    if (error) console.warn('Sync: deleteTireFromCloud error:', error.message);
-  } catch (e) { console.warn('Sync: deleteTireFromCloud failed', e); }
+    if (error) { console.warn('Sync: deleteTireFromCloud error:', error.message); return false; }
+    return true;
+  } catch (e) { console.warn('Sync: deleteTireFromCloud failed', e); return false; }
 }
 
 // ---------------------------------------------------------------------------
@@ -395,10 +412,7 @@ export async function pullCars(userId: string, onStatus?: SyncCallback): Promise
 }
 
 export async function deleteCarFromCloud(carId: string): Promise<void> {
-  try {
-    const { error } = await supabase.from('cars').delete().eq('id', carId);
-    if (error) console.warn('Sync: deleteCarFromCloud error:', error.message);
-  } catch (e) { console.warn('Sync: deleteCarFromCloud failed', e); }
+  await deleteTeamSharedRecordFromCloud('cars', carId);
 }
 
 // ---------------------------------------------------------------------------
@@ -459,10 +473,7 @@ export async function pullShockSessions(userId: string, onStatus?: SyncCallback)
 }
 
 export async function deleteShockSessionFromCloud(sessionId: string): Promise<void> {
-  try {
-    const { error } = await supabase.from('shock_sessions').delete().eq('id', sessionId);
-    if (error) console.warn('Sync: deleteShockSessionFromCloud error:', error.message);
-  } catch (e) { console.warn('Sync: deleteShockSessionFromCloud failed', e); }
+  await deleteTeamSharedRecordFromCloud('shock_sessions', sessionId);
 }
 
 export function pushTodos(todos: Todo[], userId: string, onStatus?: SyncCallback) {
@@ -521,11 +532,7 @@ export async function pullMaintenanceComponents(onStatus?: SyncCallback): Promis
 }
 
 export async function deleteMaintenanceComponentFromCloud(componentId: string): Promise<boolean> {
-  try {
-    const { error } = await supabase.from('maintenance_components').delete().eq('id', componentId);
-    if (error) { console.warn('Sync: deleteMaintenanceComponentFromCloud error:', error.message); return false; }
-    return true;
-  } catch (e) { console.warn('Sync: deleteMaintenanceComponentFromCloud failed', e); return false; }
+  return deleteTeamSharedRecordFromCloud('maintenance_components', componentId);
 }
 
 // ---------------------------------------------------------------------------
@@ -586,11 +593,7 @@ export async function pullMaintenanceLogs(onStatus?: SyncCallback): Promise<Main
 }
 
 export async function deleteMaintenanceLogFromCloud(logId: string): Promise<boolean> {
-  try {
-    const { error } = await supabase.from('maintenance_logs').delete().eq('id', logId);
-    if (error) { console.warn('Sync: deleteMaintenanceLogFromCloud error:', error.message); return false; }
-    return true;
-  } catch (e) { console.warn('Sync: deleteMaintenanceLogFromCloud failed', e); return false; }
+  return deleteTeamSharedRecordFromCloud('maintenance_logs', logId);
 }
 
 // ---------------------------------------------------------------------------
@@ -640,11 +643,7 @@ export async function pullChecklistTemplates(onStatus?: SyncCallback): Promise<C
 }
 
 export async function deleteChecklistTemplateFromCloud(templateId: string): Promise<boolean> {
-  try {
-    const { error } = await supabase.from('checklist_templates').delete().eq('id', templateId);
-    if (error) { console.warn('Sync: deleteChecklistTemplateFromCloud error:', error.message); return false; }
-    return true;
-  } catch (e) { console.warn('Sync: deleteChecklistTemplateFromCloud failed', e); return false; }
+  return deleteTeamSharedRecordFromCloud('checklist_templates', templateId);
 }
 
 // ---------------------------------------------------------------------------
@@ -700,10 +699,7 @@ export async function pullWeekendChecklists(onStatus?: SyncCallback): Promise<We
 }
 
 export async function deleteWeekendChecklistFromCloud(checklistId: string): Promise<void> {
-  try {
-    const { error } = await supabase.from('weekend_checklists').delete().eq('id', checklistId);
-    if (error) console.warn('Sync: deleteWeekendChecklistFromCloud error:', error.message);
-  } catch (e) { console.warn('Sync: deleteWeekendChecklistFromCloud failed', e); }
+  await deleteTeamSharedRecordFromCloud('weekend_checklists', checklistId);
 }
 
 // ---------------------------------------------------------------------------

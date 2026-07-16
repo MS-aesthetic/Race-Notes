@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Todo, AccountingEntry, RaceWeekend, MaintenanceComponent, MaintenanceLog, Setup, MaintenanceCategory, MAINTENANCE_CATEGORIES, MaintenanceIntervalType, ChecklistTemplate, CHECKLIST_CATEGORIES } from '../types';
 import { AppUser } from '../lib/supabase';
 import { getComponentStatus, applyServiceLog, DEFAULT_COMPONENTS } from '../lib/maintenance';
@@ -6,6 +6,8 @@ import { STARTER_TEMPLATES, isUntouchedStarterTemplate, materializeStarterTempla
 import ToDoView from './ToDoView';
 import EmptyState from './ui/EmptyState';
 import { lastAccountingCategory, localDateValue, recentAccountingRepeats } from '../lib/accountingDefaults';
+import { clearAccountingDraft, readAccountingDraft, writeAccountingDraft } from '../lib/accountingDraft';
+import ConfirmSheet from './ui/ConfirmSheet';
 
 // ── Sub-tab type (declared early; used in Props and component) ───────────────
 
@@ -109,19 +111,22 @@ function WeekendFilter({ weekends, value, onChange }: { weekends: RaceWeekend[];
 // ── Accounting Tab ────────────────────────────────────────────────────────────
 
 function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry[]; onSave: (a: AccountingEntry[]) => void; weekends: RaceWeekend[] }) {
-  const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState('');
-  const [desc, setDesc] = useState('');
-  const [amount, setAmount] = useState('');
-  const [type, setType] = useState<'income' | 'expense'>('expense');
-  const [payer, setPayer] = useState('');
-  const [payee, setPayee] = useState('');
-  const [weekendId, setWeekendId] = useState('');
-  const [weekendName, setWeekendName] = useState('');
-  const [receiptPhoto, setReceiptPhoto] = useState<string | undefined>();
+  const [restoredDraft] = useState(() => readAccountingDraft());
+  const [showForm, setShowForm] = useState(() => restoredDraft !== null);
+  const [name, setName] = useState(() => restoredDraft?.name ?? '');
+  const [desc, setDesc] = useState(() => restoredDraft?.desc ?? '');
+  const [amount, setAmount] = useState(() => restoredDraft?.amount ?? '');
+  const [type, setType] = useState<'income' | 'expense'>(() => restoredDraft?.type ?? 'expense');
+  const [payer, setPayer] = useState(() => restoredDraft?.payer ?? '');
+  const [payee, setPayee] = useState(() => restoredDraft?.payee ?? '');
+  const [weekendId, setWeekendId] = useState(() => restoredDraft?.weekendId ?? '');
+  const [weekendName, setWeekendName] = useState(() => restoredDraft?.weekendName ?? '');
+  const [receiptPhoto, setReceiptPhoto] = useState<string | undefined>(() => restoredDraft?.receiptPhoto || undefined);
   const [weekendFilter, setWeekendFilter] = useState('');
-  const [category, setCategory] = useState(() => lastAccountingCategory(entries));
-  const [entryDate, setEntryDate] = useState(() => localDateValue());
+  const [category, setCategory] = useState(() => restoredDraft?.category ?? lastAccountingCategory(entries));
+  const [entryDate, setEntryDate] = useState(() => restoredDraft?.entryDate ?? localDateValue());
+  const [pendingDeleteEntryId, setPendingDeleteEntryId] = useState<string | null>(null);
+  const receiptRequestGenerationRef = useRef(0);
 
   const filtered = weekendFilter ? entries.filter(e => e.weekendId === weekendFilter) : entries;
   const totalIncome  = filtered.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
@@ -131,15 +136,40 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
   const sorted = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const recentRepeats = recentAccountingRepeats(entries);
 
-  const toggleForm = () => {
-    setShowForm(value => {
-      if (!value) {
-        setEntryDate(localDateValue());
-        setCategory(lastAccountingCategory(entries));
-      }
-      return !value;
-    });
+  const invalidateReceiptWork = () => {
+    receiptRequestGenerationRef.current += 1;
   };
+
+  const resetForm = () => {
+    invalidateReceiptWork();
+    setName(''); setDesc(''); setAmount(''); setPayer(''); setPayee('');
+    setWeekendId(''); setWeekendName(''); setReceiptPhoto(undefined);
+    setType('expense'); setCategory(lastAccountingCategory(entries)); setEntryDate(localDateValue());
+  };
+
+  const openForm = () => {
+    setCategory(lastAccountingCategory(entries));
+    setEntryDate(localDateValue());
+    setShowForm(true);
+  };
+
+  const cancelForm = () => {
+    clearAccountingDraft();
+    resetForm();
+    setShowForm(false);
+  };
+
+  useEffect(() => () => {
+    invalidateReceiptWork();
+  }, []);
+
+  useEffect(() => {
+    if (!showForm) return;
+    writeAccountingDraft({
+      name, desc, amount, type, payer, payee, weekendId, weekendName,
+      receiptPhoto: receiptPhoto ?? '', category, entryDate,
+    });
+  }, [showForm, name, desc, amount, type, payer, payee, weekendId, weekendName, receiptPhoto, category, entryDate]);
 
   const handleAdd = (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -160,22 +190,40 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
       receiptPhoto,
     };
     onSave([entry, ...entries]);
-    setName(''); setDesc(''); setAmount(''); setPayer(''); setPayee('');
-    setWeekendId(''); setWeekendName(''); setReceiptPhoto(undefined);
-    setType('expense'); setShowForm(false);
+    clearAccountingDraft();
+    resetForm();
+    setShowForm(false);
   };
 
   const handleReceiptPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const compressed = await compressImage(file, 800, 0.7);
-    setReceiptPhoto(compressed);
     e.target.value = '';
+    const requestGeneration = ++receiptRequestGenerationRef.current;
+    try {
+      const compressed = await compressImage(file, 800, 0.7);
+      if (receiptRequestGenerationRef.current === requestGeneration) {
+        setReceiptPhoto(compressed);
+      }
+    } catch {
+      // Receipt photos are optional; failed or stale compression must not break the draft.
+    }
+  };
+
+  const removeReceiptPhoto = () => {
+    invalidateReceiptWork();
+    setReceiptPhoto(undefined);
   };
 
   const del = (id: string) => {
-    if (!window.confirm('Delete this entry?')) return;
-    onSave(entries.filter(e => e.id !== id));
+    setPendingDeleteEntryId(id);
+  };
+
+  const confirmDeleteEntry = () => {
+    const id = pendingDeleteEntryId;
+    setPendingDeleteEntryId(null);
+    if (!id || !entries.some(entry => entry.id === id)) return;
+    onSave(entries.filter(entry => entry.id !== id));
   };
 
   const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -189,9 +237,9 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
       {/* Summary strip */}
       <div className="grid grid-cols-3 gap-2">
         {[
-          { label: 'Income',   value: totalIncome,  color: 'text-green-400' },
-          { label: 'Expenses', value: totalExpense,  color: 'text-red-400'  },
-          { label: 'Net',      value: net,           color: net >= 0 ? 'text-green-400' : 'text-red-400' },
+          { label: 'Income',   value: totalIncome,  color: 'text-success' },
+          { label: 'Expenses', value: totalExpense,  color: 'text-error'  },
+          { label: 'Net',      value: net,           color: net >= 0 ? 'text-success' : 'text-error' },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-surface-container border border-outline-variant rounded-lg p-3 text-center">
             <p className="font-mono text-[10px] uppercase text-on-surface-variant tracking-wider mb-1">{label}</p>
@@ -202,7 +250,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
 
       {/* Add button */}
       <button
-        onClick={toggleForm}
+        onClick={showForm ? cancelForm : openForm}
         className="flex items-center justify-center gap-2 w-full py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80"
       >
         <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -221,7 +269,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
               <button key={t} type="button" onClick={() => setType(t)}
                 className={`py-2.5 rounded-lg border-2 font-mono text-xs uppercase font-bold transition-all ${
                   type === t
-                    ? t === 'income' ? 'border-green-500 bg-green-500/10 text-green-400' : 'border-red-400 bg-red-400/10 text-red-400'
+                    ? t === 'income' ? 'border-success bg-success/10 text-success' : 'border-error bg-error/10 text-error'
                     : 'border-outline-variant text-on-surface-variant'
                 }`}
               >{t === 'income' ? '+ Income' : '− Expense'}</button>
@@ -291,7 +339,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
             {receiptPhoto && (
               <div className="relative">
                 <img src={receiptPhoto} alt="receipt" className="h-12 rounded border border-outline-variant object-cover" />
-                <button type="button" onClick={() => setReceiptPhoto(undefined)} className="absolute -top-1 -right-1 bg-black/70 rounded-full w-4 h-4 flex items-center justify-center">
+                <button type="button" onClick={removeReceiptPhoto} className="absolute -top-1 -right-1 bg-black/70 rounded-full w-4 h-4 flex items-center justify-center">
                   <span className="material-symbols-outlined text-[10px] text-white">close</span>
                 </button>
               </div>
@@ -310,7 +358,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
           icon="account_balance"
           title="No money logged yet"
           body="Track race-night income and expenses from one ledger."
-          cta={{ label: 'Log first charge', onClick: () => setShowForm(true) }}
+          cta={{ label: 'Log first charge', onClick: openForm }}
         />
       ) : (
         <div className="space-y-2">
@@ -318,18 +366,18 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
             <div
               key={e.id}
               className={`relative bg-surface-container border rounded-lg p-3 flex items-start gap-3 ${
-                e.type === 'income' ? 'border-green-800/40' : 'border-red-900/40'
+                e.type === 'income' ? 'border-success/40' : 'border-error/40'
               }`}
             >
               {/* Color stripe */}
-              <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg ${e.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg ${e.type === 'income' ? 'bg-success' : 'bg-error'}`} />
 
               <div className="flex-1 min-w-0 pl-1 space-y-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono text-sm font-bold text-on-surface">{e.name}</span>
                   {e.category && <span className="font-mono text-[9px] text-on-surface-variant border border-outline-variant px-1.5 py-0.5 rounded">{e.category}</span>}
                   <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                    e.type === 'income' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
+                    e.type === 'income' ? 'bg-success/15 text-success' : 'bg-error/15 text-error'
                   }`}>
                     {e.type === 'income' ? '+' : '−'}{fmt(e.amount)}
                   </span>
@@ -340,15 +388,15 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
                     </span>
                   )}
                 </div>
-                {e.description && <p className="font-mono text-xs text-on-surface-variant/70 italic">{e.description}</p>}
+                {e.description && <p className="font-mono text-xs text-on-surface-muted italic">{e.description}</p>}
                 {(e.payer || e.payee) && (
-                  <p className="font-mono text-[10px] text-on-surface-variant/50">
+                  <p className="font-mono text-[10px] text-on-surface-muted">
                     {e.payer && <span>From: <span className="text-on-surface-variant">{e.payer}</span></span>}
                     {e.payer && e.payee && <span className="mx-1">·</span>}
                     {e.payee && <span>To: <span className="text-on-surface-variant">{e.payee}</span></span>}
                   </p>
                 )}
-                <p className="font-mono text-[10px] text-on-surface-variant/40">
+                <p className="font-mono text-[10px] text-on-surface-muted">
                   {new Date(e.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                 </p>
               </div>
@@ -358,7 +406,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
 
               <button
                 onClick={() => del(e.id)}
-                className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-red-400 shrink-0"
+                className="material-symbols-outlined text-[16px] text-on-surface-muted hover:text-error shrink-0"
               >
                 close
               </button>
@@ -366,6 +414,16 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
           ))}
         </div>
       )}
+      <ConfirmSheet
+        open={!!pendingDeleteEntryId}
+        title="Delete accounting entry?"
+        body="Delete this entry?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={confirmDeleteEntry}
+        onCancel={() => setPendingDeleteEntryId(null)}
+      />
     </div>
   );
 }
@@ -392,6 +450,7 @@ function ServiceTab({
 }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [logModalComp, setLogModalComp] = useState<MaintenanceComponent | null>(null);
+  const [pendingDeleteComponentId, setPendingDeleteComponentId] = useState<string | null>(null);
 
   // Add form state
   const [addName, setAddName] = useState('');
@@ -431,7 +490,16 @@ function ServiceTab({
   };
 
   const deleteComp = (id: string) => {
-    if (!window.confirm('Delete this item and all its maintenance logs?')) return;
+    setPendingDeleteComponentId(id);
+  };
+
+  const confirmDeleteComponent = () => {
+    const id = pendingDeleteComponentId;
+    setPendingDeleteComponentId(null);
+    if (!id) return;
+    const target = components.find(component => component.id === id);
+    if (!target) return;
+    if (target.scope === 'car' && (!activeCarId || target.carId !== activeCarId)) return;
     onDeleteComponent(id);
   };
 
@@ -502,11 +570,11 @@ function ServiceTab({
   const renderRow = (c: MaintenanceComponent) => {
     const status = getComponentStatus(c, weekends, savedSetups);
     const remaining = Math.max(0, status.limit - status.used);
-    const barColor = status.state === 'overdue' ? 'bg-red-500' : status.state === 'due' ? 'bg-amber-400' : 'bg-green-500';
+    const barColor = status.state === 'overdue' ? 'bg-error' : status.state === 'due' ? 'bg-warning' : 'bg-success';
     const chipCls = {
-      ok:      'bg-green-500/15 text-green-400 border-green-500/30',
-      due:     'bg-amber-500/15 text-amber-400 border-amber-500/30',
-      overdue: 'bg-red-500/15 text-red-400 border-red-500/30',
+      ok:      'bg-success/15 text-success border-success/30',
+      due:     'bg-warning/15 text-warning border-warning/30',
+      overdue: 'bg-error/15 text-error border-error/30',
     }[status.state];
     const chipLabel = { ok: 'OK', due: 'DUE', overdue: 'OVERDUE' }[status.state];
     return (
@@ -515,7 +583,7 @@ function ServiceTab({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-sm text-on-surface font-semibold">{c.name}</span>
             <span className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${chipCls}`}>{chipLabel}</span>
-            <span className="font-mono text-[10px] text-on-surface-variant/50">{c.category}</span>
+            <span className="font-mono text-[10px] text-on-surface-muted">{c.category}</span>
           </div>
           <div className="flex items-center gap-2 mt-1.5">
             <div className="flex-1 h-1.5 bg-surface-variant rounded-full overflow-hidden">
@@ -539,7 +607,7 @@ function ServiceTab({
         </button>
         <button
           onClick={() => deleteComp(c.id)}
-          className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-red-400 shrink-0"
+          className="material-symbols-outlined text-[16px] text-on-surface-muted hover:text-error shrink-0"
         >close</button>
       </div>
     );
@@ -692,6 +760,16 @@ function ServiceTab({
           </form>
         </div>
       )}
+      <ConfirmSheet
+        open={!!pendingDeleteComponentId}
+        title="Delete maintenance item?"
+        body="Delete this item and all its maintenance logs?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={confirmDeleteComponent}
+        onCancel={() => setPendingDeleteComponentId(null)}
+      />
     </div>
   );
 }
@@ -713,6 +791,7 @@ function TemplatesTab({
   const [addName, setAddName] = useState('');
   const [addCategory, setAddCategory] = useState<string>('Custom');
   const [newItemText, setNewItemText] = useState<Record<string, string>>({});
+  const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState<string | null>(null);
 
   const addStarterTemplates = () => {
     if (!starterTemplatesReady) return;
@@ -740,7 +819,13 @@ function TemplatesTab({
   };
 
   const deleteTemplate = (id: string) => {
-    if (!window.confirm('Delete this template?')) return;
+    setPendingDeleteTemplateId(id);
+  };
+
+  const confirmDeleteTemplate = () => {
+    const id = pendingDeleteTemplateId;
+    setPendingDeleteTemplateId(null);
+    if (!id || !templates.some(template => template.id === id)) return;
     onDeleteTemplate(id);
     if (expandedId === id) setExpandedId(null);
   };
@@ -830,13 +915,13 @@ function TemplatesTab({
                 <span className="material-symbols-outlined text-primary text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>fact_check</span>
                 <div className="flex-1 min-w-0">
                   <span className="font-mono text-sm font-semibold text-on-surface block truncate">{tmpl.name}</span>
-                  <span className="font-mono text-[10px] text-on-surface-variant/50">{tmpl.category} · {tmpl.items.length} jobs</span>
+                  <span className="font-mono text-[10px] text-on-surface-muted">{tmpl.category} · {tmpl.items.length} jobs</span>
                 </div>
-                <span className="material-symbols-outlined text-on-surface-variant/50 text-[16px] transition-transform duration-200"
+                <span className="material-symbols-outlined text-on-surface-muted text-[16px] transition-transform duration-200"
                   style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>expand_more</span>
                 <button
                   onClick={e => { e.stopPropagation(); deleteTemplate(tmpl.id); }}
-                  className="material-symbols-outlined text-[16px] text-on-surface-variant/30 hover:text-red-400 shrink-0"
+                  className="material-symbols-outlined text-[16px] text-on-surface-muted hover:text-error shrink-0"
                 >close</button>
               </button>
               {isExpanded && (
@@ -844,7 +929,7 @@ function TemplatesTab({
                   {/* Items list */}
                   <div className="divide-y divide-outline-variant/20">
                     {tmpl.items.length === 0 && (
-                      <p className="px-4 py-2 font-mono text-[10px] text-on-surface-variant/40 italic">No jobs yet. Add one below.</p>
+                      <p className="px-4 py-2 font-mono text-[10px] text-on-surface-muted italic">No jobs yet. Add one below.</p>
                     )}
                     {tmpl.items.map(item => (
                       <div key={item.id} className="flex items-center gap-2 px-4 py-2">
@@ -852,7 +937,7 @@ function TemplatesTab({
                         <span className="flex-1 font-mono text-xs text-on-surface">{item.text}</span>
                         <button
                           onClick={() => removeItem(tmpl.id, item.id)}
-                          className="material-symbols-outlined text-[14px] text-on-surface-variant/30 hover:text-red-400"
+                          className="material-symbols-outlined text-[14px] text-on-surface-muted hover:text-error"
                         >close</button>
                       </div>
                     ))}
@@ -877,6 +962,16 @@ function TemplatesTab({
           );
         })}
       </div>
+      <ConfirmSheet
+        open={!!pendingDeleteTemplateId}
+        title="Delete checklist template?"
+        body="Delete this template?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={confirmDeleteTemplate}
+        onCancel={() => setPendingDeleteTemplateId(null)}
+      />
     </div>
   );
 }
@@ -913,7 +1008,7 @@ export default function TrackersView({
             key={t.id}
             onClick={() => { setSubTab(t.id); setShowTemplateManager(false); }}
             className={`min-h-11 flex items-center justify-center gap-1 py-2.5 px-1 rounded-md transition-all ${
-              subTab === t.id ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-variant/60 hover:text-on-surface'
+              subTab === t.id ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface-muted hover:text-on-surface'
             }`}
           >
             <span

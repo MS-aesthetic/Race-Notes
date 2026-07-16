@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
 import { Team, TeamProfile } from '../types';
 import {
@@ -13,10 +13,16 @@ import {
   uploadTeamBanner,
   updateTeamProfile,
 } from '../lib/supabase';
+import ConfirmSheet from './ui/ConfirmSheet';
 
 interface TeamViewProps {
   user: User;
 }
+
+type PendingTeamAction =
+  | { kind: 'leave'; userId: string; teamId: string; teamName: string }
+  | { kind: 'delete'; userId: string; teamId: string; teamName: string }
+  | { kind: 'remove'; userId: string; teamId: string; memberId: string; memberName: string };
 
 export default function TeamView({ user }: TeamViewProps) {
   const [team, setTeam] = useState<Team | null>(null);
@@ -26,6 +32,14 @@ export default function TeamView({ user }: TeamViewProps) {
   const [inviteEmail, setInviteEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [pendingTeamAction, setPendingTeamAction] = useState<PendingTeamAction | null>(null);
+  const userIdRef = useRef(user.id);
+  const teamIdRef = useRef<string | null>(team?.id ?? null);
+  const membersRef = useRef(members);
+  const loadGenerationRef = useRef(0);
+  userIdRef.current = user.id;
+  teamIdRef.current = team?.id ?? null;
+  membersRef.current = members;
 
   // Team profile state
   const [profileDraft, setProfileDraft] = useState<TeamProfile>({});
@@ -36,28 +50,38 @@ export default function TeamView({ user }: TeamViewProps) {
   const myMembership = members.find(m => m.id === user.id);
   const isOwner = myMembership?.role === 'owner';
 
-  useEffect(() => {
-    loadTeam();
-  }, [user.id]);
-
-  const loadTeam = async () => {
+  const loadTeam = async (expectedUserId = user.id) => {
+    const generation = ++loadGenerationRef.current;
+    const stillCurrentLoad = () => userIdRef.current === expectedUserId && loadGenerationRef.current === generation;
     setLoading(true);
     setError('');
     try {
-      const userTeam = await getUserTeam(user.id);
+      const userTeam = await getUserTeam(expectedUserId);
+      if (!stillCurrentLoad()) return;
       setTeam(userTeam);
       if (userTeam) {
         const teamMbrs = await getTeamMembers(userTeam.id);
+        if (!stillCurrentLoad() || teamIdRef.current !== userTeam.id) return;
         setMembers(teamMbrs);
         setProfileDraft(userTeam.profile || {});
       } else {
         setMembers([]);
       }
     } catch (err: any) {
+      if (!stillCurrentLoad()) return;
       setError(err.message || 'Failed to load team.');
+    } finally {
+      if (stillCurrentLoad()) setLoading(false);
     }
-    setLoading(false);
   };
+
+  useEffect(() => {
+    void loadTeam(user.id);
+  }, [user.id]);
+
+  useEffect(() => {
+    setPendingTeamAction(null);
+  }, [user.id, team?.id]);
 
   const handleSaveProfile = async () => {
     if (!team) return;
@@ -109,49 +133,94 @@ export default function TeamView({ user }: TeamViewProps) {
     }
   };
 
-  const handleLeaveTeam = async () => {
+  const handleLeaveTeam = () => {
     if (!team) return;
-    if (!window.confirm(`Are you sure you want to leave ${team.name}?`)) return;
-    setLoading(true);
-    const ok = await leaveTeam(team.id, user.id);
-    if (ok) {
-      setTeam(null);
-      setMembers([]);
-      setSuccess('You left the team.');
-    } else {
-      setError('Failed to leave team.');
-    }
-    setLoading(false);
+    setPendingTeamAction({ kind: 'leave', userId: user.id, teamId: team.id, teamName: team.name });
   };
 
-  const handleDeleteTeam = async () => {
+  const handleDeleteTeam = () => {
     if (!team) return;
-    if (!window.confirm(`Permanently DELETE "${team.name}"? This removes the team for ALL members and cannot be undone.`)) return;
-    setLoading(true);
-    const ok = await deleteTeam(team.id);
-    if (ok) {
-      setTeam(null);
-      setMembers([]);
-      setSuccess('Team deleted.');
-    } else {
-      setError('Failed to delete team. Only the owner can delete it.');
-    }
-    setLoading(false);
+    setPendingTeamAction({ kind: 'delete', userId: user.id, teamId: team.id, teamName: team.name });
   };
 
-  const handleRemoveMember = async (memberId: string, name: string) => {
+  const handleRemoveMember = (memberId: string, name: string) => {
     if (!team) return;
-    if (!window.confirm(`Remove ${name} from the team?`)) return;
+    setPendingTeamAction({ kind: 'remove', userId: user.id, teamId: team.id, memberId, memberName: name });
+  };
+
+  const confirmTeamAction = async () => {
+    const pending = pendingTeamAction;
+    setPendingTeamAction(null);
+    if (!pending) return;
+    if (userIdRef.current !== pending.userId || teamIdRef.current !== pending.teamId) return;
+    if (pending.kind === 'remove' && !membersRef.current.some(member => member.id === pending.memberId)) return;
     setLoading(true);
-    const ok = await removeTeamMember(team.id, memberId);
-    if (ok) {
-      setSuccess(`${name} removed.`);
-      await loadTeam();
-    } else {
-      setError('Failed to remove member.');
-      setLoading(false);
+    const stillCurrent = () => userIdRef.current === pending.userId && teamIdRef.current === pending.teamId;
+    try {
+      if (pending.kind === 'leave') {
+        const ok = await leaveTeam(pending.teamId, pending.userId);
+        if (!stillCurrent()) return;
+        if (ok) {
+          setTeam(null);
+          setMembers([]);
+          setSuccess('You left the team.');
+        } else {
+          setError('Failed to leave team.');
+        }
+        return;
+      }
+      if (pending.kind === 'delete') {
+        const ok = await deleteTeam(pending.teamId);
+        if (!stillCurrent()) return;
+        if (ok) {
+          setTeam(null);
+          setMembers([]);
+          setSuccess('Team deleted.');
+        } else {
+          setError('Failed to delete team. Only the owner can delete it.');
+        }
+        return;
+      }
+      const ok = await removeTeamMember(pending.teamId, pending.memberId);
+      if (!stillCurrent()) return;
+      if (ok) {
+        setSuccess(`${pending.memberName} removed.`);
+        await loadTeam(pending.userId);
+      } else {
+        setError('Failed to remove member.');
+      }
+    } catch {
+      if (!stillCurrent()) return;
+      setError(pending.kind === 'leave'
+        ? 'Failed to leave team.'
+        : pending.kind === 'delete'
+          ? 'Failed to delete team. Only the owner can delete it.'
+          : 'Failed to remove member.');
+    } finally {
+      if (stillCurrent()) setLoading(false);
     }
   };
+
+  const pendingTeamCopy = pendingTeamAction?.kind === 'leave'
+    ? {
+        title: `Leave ${pendingTeamAction.teamName}?`,
+        body: `Are you sure you want to leave ${pendingTeamAction.teamName}?`,
+        confirmLabel: 'Leave',
+        destructive: false,
+      }
+    : pendingTeamAction?.kind === 'delete'
+      ? {
+          title: `Delete ${pendingTeamAction.teamName}?`,
+          body: `Permanently DELETE "${pendingTeamAction.teamName}"? This removes the team for ALL members and cannot be undone.`,
+          confirmLabel: 'Delete',
+          destructive: true,
+        }
+      : {
+          title: `Remove ${pendingTeamAction?.memberName ?? 'member'}?`,
+          body: `Remove ${pendingTeamAction?.memberName ?? 'member'} from the team?`,
+          confirmLabel: 'Remove',
+          destructive: false,
+        };
 
   const handleUploadBanner = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!team) return;
@@ -190,14 +259,14 @@ export default function TeamView({ user }: TeamViewProps) {
               placeholder="Team Name (e.g. Smith Racing)"
               value={newTeamName}
               onChange={e => setNewTeamName(e.target.value)}
-              className="bg-[#0e0e0e] border border-outline-variant/50 p-2 text-sm font-mono rounded w-full text-on-surface"
+              className="bg-surface border border-outline-variant/50 p-2 text-sm font-mono rounded w-full text-on-surface"
             />
             {error && <span className="text-red-400 text-[10px] uppercase font-mono">{error}</span>}
             {success && <span className="text-green-400 text-[10px] uppercase font-mono">{success}</span>}
             <button
               type="submit"
               disabled={loading || !newTeamName.trim()}
-              className="bg-primary text-[#0e0e0e] font-bold text-xs uppercase font-mono py-2 rounded mt-1 disabled:opacity-50"
+              className="bg-primary text-on-primary font-bold text-xs uppercase font-mono py-2 rounded mt-1 disabled:opacity-50"
             >
               Create Team
             </button>
@@ -225,7 +294,7 @@ export default function TeamView({ user }: TeamViewProps) {
 
         {isOwner && (
           <div className="flex items-center gap-2">
-            <label className="bg-[#0e0e0e] text-on-surface-variant hover:text-primary text-[10px] uppercase font-mono px-3 py-1.5 rounded border border-outline-variant/30 cursor-pointer">
+            <label className="bg-surface text-on-surface-variant hover:text-primary text-[10px] uppercase font-mono px-3 py-1.5 rounded border border-outline-variant/30 cursor-pointer">
               <input type="file" className="hidden" accept="image/*" onChange={handleUploadBanner} />
               Upload Team Banner
             </label>
@@ -237,10 +306,10 @@ export default function TeamView({ user }: TeamViewProps) {
           <p className="text-[10px] text-on-surface-variant uppercase font-mono tracking-wider mb-2 mt-2">Roster ({members.length})</p>
           <div className="flex flex-col gap-2">
             {members.map(m => (
-              <div key={m.id} className="flex items-center justify-between bg-[#0e0e0e] p-2 rounded border border-outline-variant/30">
+              <div key={m.id} className="flex items-center justify-between bg-surface-container-lowest p-2 rounded border border-outline-variant/30">
                 <div className="flex flex-col">
                   <span className="text-xs font-mono text-on-surface">{m.displayName || m.email}</span>
-                  <span className="text-[9px] uppercase font-mono text-on-surface-variant/60">{m.role}</span>
+                  <span className="text-[9px] uppercase font-mono text-on-surface-muted">{m.role}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {m.id === user.id && (
@@ -250,7 +319,7 @@ export default function TeamView({ user }: TeamViewProps) {
                     <button
                       onClick={() => handleRemoveMember(m.id, m.displayName || m.email || 'member')}
                       title="Remove member"
-                      className="material-symbols-outlined text-[16px] text-on-surface-variant/60 hover:text-red-400"
+                      className="material-symbols-outlined text-[16px] text-on-surface-muted hover:text-red-400"
                     >
                       person_remove
                     </button>
@@ -269,12 +338,12 @@ export default function TeamView({ user }: TeamViewProps) {
               placeholder="Invite by email"
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}
-              className="flex-1 bg-[#0e0e0e] border border-outline-variant/50 p-2 text-xs font-mono rounded text-on-surface placeholder:text-on-surface-variant/40"
+              className="flex-1 bg-surface border border-outline-variant/50 p-2 text-xs font-mono rounded text-on-surface placeholder:text-on-surface-muted"
             />
             <button
               type="submit"
               disabled={loading || !inviteEmail.trim()}
-              className="bg-primary text-[#0e0e0e] font-bold text-xs uppercase px-3 rounded disabled:opacity-50"
+              className="bg-primary text-on-primary font-bold text-xs uppercase px-3 rounded disabled:opacity-50"
             >
               Add
             </button>
@@ -310,13 +379,13 @@ export default function TeamView({ user }: TeamViewProps) {
                 { key: 'racePassUrl',    label: 'MyRacePass URL',   placeholder: 'https://www.myracepass.com/drivers/...' },
               ] as { key: keyof TeamProfile; label: string; placeholder: string }[]).map(({ key, label, placeholder }) => (
                 <div key={key}>
-                  <label className="block text-[9px] font-mono uppercase text-on-surface-variant/70 mb-0.5 tracking-wider">{label}</label>
+                  <label className="block text-[9px] font-mono uppercase text-on-surface-muted mb-0.5 tracking-wider">{label}</label>
                   <input
                     type="text"
                     placeholder={placeholder}
                     value={profileDraft[key] || ''}
                     onChange={e => setProfileDraft(prev => ({ ...prev, [key]: e.target.value }))}
-                    className="w-full bg-[#0e0e0e] border border-outline-variant/50 focus:border-primary p-2 text-xs font-mono rounded text-on-surface outline-none"
+                    className="w-full bg-surface border border-outline-variant/50 focus:border-primary p-2 text-xs font-mono rounded text-on-surface outline-none"
                   />
                 </div>
               ))}
@@ -385,7 +454,7 @@ export default function TeamView({ user }: TeamViewProps) {
                   )}
                 </>
               ) : (
-                <p className="text-[10px] font-mono text-on-surface-variant/40 italic">
+                <p className="text-[10px] font-mono text-on-surface-muted italic">
                   {isOwner ? 'No profile info yet — tap Edit to add details.' : 'No profile info set.'}
                 </p>
               )}
@@ -413,6 +482,16 @@ export default function TeamView({ user }: TeamViewProps) {
           )}
         </div>
       </div>
+      <ConfirmSheet
+        open={!!pendingTeamAction}
+        title={pendingTeamCopy.title}
+        body={pendingTeamCopy.body}
+        confirmLabel={pendingTeamCopy.confirmLabel}
+        cancelLabel="Keep"
+        destructive={pendingTeamCopy.destructive}
+        onConfirm={confirmTeamAction}
+        onCancel={() => setPendingTeamAction(null)}
+      />
     </div>
   );
 }

@@ -15,6 +15,13 @@ import { supabase } from './supabase';
 
 const DEVICE_ID_KEY = 'race_notes_device_id';
 
+export interface PushNotificationInput {
+  title: string;
+  body: string;
+  /** FCM v1 notification data values must be strings. */
+  data?: Record<string, string>;
+}
+
 function getDeviceId(): string {
   if (typeof localStorage === 'undefined') return 'server';
   let id = localStorage.getItem(DEVICE_ID_KEY);
@@ -106,6 +113,21 @@ async function registerWeb(userId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+/** Send a team-targeted notification without ever blocking a local save. */
+export async function sendPush(
+  target: { toUserId: string } | { toTeamId: string },
+  notification: PushNotificationInput,
+): Promise<void> {
+  try {
+    const { error } = await supabase.functions.invoke('send-push', {
+      body: { ...target, notification },
+    });
+    if (error) console.warn('[push] send-push failed:', error.message);
+  } catch (error) {
+    console.warn('[push] send-push failed (non-fatal):', (error as Error).message);
+  }
+}
 
 /** Register this device for push and store its token. Safe to call repeatedly;
  *  all failure paths (unsupported, denied, offline) resolve as silent no-ops. */

@@ -121,7 +121,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
             className={`flex-1 py-1.5 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
               authMode === 'profile'
                 ? 'bg-primary/10 text-primary font-bold'
-                : 'text-on-surface-variant/60 hover:text-on-surface-variant'
+                : 'text-on-surface-muted hover:text-on-surface-variant'
             }`}
           >
             Account
@@ -131,7 +131,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
             className={`flex-1 py-1.5 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
               authMode === 'team'
                 ? 'bg-primary/10 text-primary font-bold'
-                : 'text-on-surface-variant/60 hover:text-on-surface-variant'
+                : 'text-on-surface-muted hover:text-on-surface-variant'
             }`}
           >
             Team
@@ -168,7 +168,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
                   Cloud Storage Active
                 </span>
               </div>
-              <p className="text-[11px] text-on-surface-variant/70 leading-relaxed">
+              <p className="text-[11px] text-on-surface-muted leading-relaxed">
                 Your setups, run logs, and Race Day data sync automatically
                 across all your devices. Data stays available offline.
               </p>
@@ -206,7 +206,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
           className={`flex-1 py-2 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
             mode === 'login'
               ? 'bg-primary/10 text-primary font-bold'
-              : 'text-on-surface-variant/60 hover:text-on-surface-variant'
+              : 'text-on-surface-muted hover:text-on-surface-variant'
           }`}
         >
           Sign In
@@ -216,7 +216,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
           className={`flex-1 py-2 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
             mode === 'register'
               ? 'bg-primary/10 text-primary font-bold'
-              : 'text-on-surface-variant/60 hover:text-on-surface-variant'
+              : 'text-on-surface-muted hover:text-on-surface-variant'
           }`}
         >
           Register
@@ -236,7 +236,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
               onChange={e => setDisplayName(e.target.value)}
               placeholder="Your racing name"
               className="w-full bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
-                         text-sm text-on-surface placeholder:text-on-surface-variant/40
+                         text-sm text-on-surface placeholder:text-on-surface-muted
                          focus:border-primary/50 focus:outline-none font-mono"
               autoComplete="name"
             />
@@ -254,7 +254,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
             placeholder="racer@example.com"
             required
             className="w-full bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
-                       text-sm text-on-surface placeholder:text-on-surface-variant/40
+                       text-sm text-on-surface placeholder:text-on-surface-muted
                        focus:border-primary/50 focus:outline-none font-mono"
             autoComplete="email"
           />
@@ -272,7 +272,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
             required
             minLength={6}
             className="w-full bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
-                       text-sm text-on-surface placeholder:text-on-surface-variant/40
+                       text-sm text-on-surface placeholder:text-on-surface-muted
                        focus:border-primary/50 focus:outline-none font-mono"
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           />
@@ -311,7 +311,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
       {/* Divider */}
       <div className="flex items-center gap-2">
         <div className="flex-1 h-px bg-outline-variant/30" />
-        <span className="text-[10px] font-mono uppercase text-on-surface-variant/50 tracking-wider">or</span>
+        <span className="text-[10px] font-mono uppercase text-on-surface-muted tracking-wider">or</span>
         <div className="flex-1 h-px bg-outline-variant/30" />
       </div>
 
@@ -336,7 +336,7 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
       </button>
 
       {/* Skip / offline notice */}
-      <p className="text-[10px] text-on-surface-variant/50 text-center leading-relaxed font-mono">
+      <p className="text-[10px] text-on-surface-muted text-center leading-relaxed font-mono">
         Your data stays on your device until you sign in.
         <br />
         Sign in to sync setups across all your devices.

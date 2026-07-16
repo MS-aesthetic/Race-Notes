@@ -12,6 +12,7 @@ import {
   type TrackerReportKind,
 } from '../lib/exportPdf';
 import EmptyState from './ui/EmptyState';
+import { InfoToast } from './ui/UndoToast';
 
 interface ExportViewProps {
   user?: User | null;
@@ -43,6 +44,7 @@ export default function ExportView({
   const [sharedSetups, setSharedSetups] = useState<Setup[]>([]);
   const [sharedWeekends, setSharedWeekends] = useState<RaceWeekend[]>([]);
   const [loadingShared, setLoadingShared] = useState(false);
+  const [infoToast, setInfoToast] = useState<string | null>(null);
 
   // The active setup is always selectable, plus any saved setups (deduped).
   const setupOptions: Setup[] = [setup, ...savedSetups.filter((s) => s.id !== setup.id)];
@@ -78,7 +80,7 @@ export default function ExportView({
   const selectedSetup = setupOptions.find((s) => s.id === selectedSetupId) ?? setup;
 
   const print = (report: ReturnType<typeof buildSetupReport>) => {
-    if (!openPrintReport(report)) alert('Allow popups to print the report.');
+    if (!openPrintReport(report)) setInfoToast('Allow popups to print the report.');
   };
 
   const exportSetup = () => print(buildSetupReport(selectedSetup, activeSession));
@@ -86,7 +88,7 @@ export default function ExportView({
   const exportWeekend = () => {
     const w = weekends.find((x) => x.id === selectedWeekendId);
     if (!w) {
-      alert('Select a Race Day first.');
+      setInfoToast('Select a Race Day first.');
       return;
     }
     print(buildWeekendReport(w, accounting));
@@ -126,9 +128,9 @@ export default function ExportView({
             <span className="font-mono text-xs uppercase text-on-surface-variant tracking-wider">Cloud Sync Active</span>
           </div>
         ) : (
-          <div className="flex items-center gap-2 bg-surface-container p-3 border border-outline-variant rounded text-on-surface-variant/70">
+          <div className="flex items-center gap-2 bg-surface-container p-3 border border-outline-variant rounded text-on-surface-muted">
             <span className="w-2 h-2 rounded-full bg-error"></span>
-            <span className="font-mono text-xs uppercase text-on-surface-variant/80 tracking-wider">Sync Disabled: Offline mode active</span>
+            <span className="font-mono text-xs uppercase text-on-surface-muted tracking-wider">Sync Disabled: Offline mode active</span>
           </div>
         )}
       </div>
@@ -337,6 +339,7 @@ export default function ExportView({
           </div>
         )}
       </div>
+      <InfoToast open={!!infoToast} title={infoToast ?? ''} onClose={() => setInfoToast(null)} />
     </div>
   );
 }

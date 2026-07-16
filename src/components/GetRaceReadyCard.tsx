@@ -114,7 +114,7 @@ export default function GetRaceReadyCard({
         <div className="px-2 pb-2">
           {steps.map(step =>
             step.done ? (
-              <div key={step.key} className="flex min-h-12 items-center gap-3 px-2 text-on-surface-variant/70">
+              <div key={step.key} className="flex min-h-12 items-center gap-3 px-2 text-on-surface-muted">
                 <span
                   className="material-symbols-outlined text-primary"
                   style={{ fontVariationSettings: "'FILL' 1" }}

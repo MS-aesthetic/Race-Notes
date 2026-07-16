@@ -858,7 +858,7 @@ export default function QuickReferenceView() {
 
           {adjustments.length === 0 ? (
             <div className="bg-surface-container border border-outline-variant rounded-lg p-8 text-center">
-              <span className="material-symbols-outlined text-on-surface-variant/40 text-3xl">search_off</span>
+              <span className="material-symbols-outlined text-on-surface-muted opacity-40 text-3xl">search_off</span>
               <p className="font-mono text-xs text-on-surface-variant uppercase font-bold mt-2">No matches</p>
             </div>
           ) : (
@@ -1445,7 +1445,7 @@ export default function QuickReferenceView() {
               <div className="bg-surface-container border border-primary/30 rounded-lg p-4 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-mono uppercase text-on-surface-variant font-bold">Calculated Gear Ratio</p>
-                  <p className="text-[11px] font-mono text-on-surface-variant/70 mt-0.5">
+                  <p className="text-[11px] font-mono text-on-surface-muted mt-0.5">
                     ({topGear} ÷ {bottomGear}) × {driveRatio === 'custom' ? (customDrive || '?') : driveRatio}
                   </p>
                 </div>
@@ -1453,7 +1453,7 @@ export default function QuickReferenceView() {
               </div>
             ) : (
               <div className="bg-surface-container border border-outline-variant/40 rounded-lg p-4 text-center">
-                <p className="font-mono text-xs text-on-surface-variant/50">Enter Top Gear and Bottom Gear values to calculate</p>
+                <p className="font-mono text-xs text-on-surface-muted">Enter Top Gear and Bottom Gear values to calculate</p>
               </div>
             )}
           </div>

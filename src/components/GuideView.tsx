@@ -240,7 +240,7 @@ const GuideAccordionItem: React.FC<{ section: GuideSection; active: boolean }> =
         </span>
         <span className="flex-1 min-w-0">
           <span className="block font-display font-bold text-sm text-on-surface uppercase tracking-wide">{section.title}</span>
-          {!shownOpen && <span className="block text-[11px] font-mono text-on-surface-variant/70 mt-0.5">{section.summary}</span>}
+          {!shownOpen && <span className="block text-[11px] font-mono text-on-surface-muted mt-0.5">{section.summary}</span>}
         </span>
         <span className="material-symbols-outlined text-on-surface-variant text-lg shrink-0 transition-transform" style={{ transform: shownOpen ? 'rotate(180deg)' : 'none' }}>
           expand_more

@@ -5,6 +5,9 @@
 **Branch:** `preview-v3`  
 **Owner-preflight feature commit:** `0361278`  
 **Final draft:** https://6a56d1d228995bd1cef8c421--crew-chief-race-notes.netlify.app/  
+
+> **2026-07-15 release addendum:** Also verify Settings → Account privacy policy and typed account deletion, public `/privacy/` and `/delete-account/` pages, Netlify request form detection, server-failure local-data preservation, and a disposable authenticated account deletion covering owned uploads plus team-owner transfer. Never use an owner/production account for the destructive test.
+> **Policy/deletion draft:** https://6a57b47b1712493e1f563ff9--crew-chief-race-notes.netlify.app/
 **Production:** unchanged
 
 ## 1. Mission and boundaries

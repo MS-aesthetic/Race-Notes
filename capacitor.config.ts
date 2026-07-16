@@ -10,6 +10,7 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false,
+    zoomEnabled: true,
   },
 
   // Server configuration for development

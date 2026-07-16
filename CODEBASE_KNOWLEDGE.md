@@ -1,10 +1,20 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-14 (Release 5.0 promoted to `master`)
+> Last updated: 2026-07-15 (Play privacy/account deletion follow-up)
 > Branch at time of writing: `master` (release baseline; future work branches from here)
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
 > ⚠️ **2026-07-14:** UX Chunks 1–9 and correction Sprint 1 were owner-approved and released to **`master`** as 5.0. Start with `SPRINT_INDEX.md`, then use `HANDOFF.md`, `ralph/CURRENT_TASK.md`, and `ralph/STATE.md` for current authority. This file remains the deep technical reference.
+
+## 2026-07-15 Play privacy/account deletion override
+
+- In-app policy: `src/components/PrivacyPolicyView.tsx`; public policy: `public/privacy/index.html`.
+- Public deletion path: `public/delete-account/index.html`, backed by Netlify Forms for users who cannot sign in.
+- Client deletion: `src/lib/supabase.ts::deleteAccount`; local purge: `src/lib/accountDeletion.ts`. Device racing data clears only after server success.
+- Server deletion: `supabase/functions/delete-account/index.ts`, JWT required. Never move service-role logic into the client.
+- Applied live migrations: `20260715161026_account_deletion_support`, `20260715161241_account_deletion_storage_hardening`, `20260715161505_remove_public_banner_listing`, `20260715161637_make_active_user_check_invoker`.
+- Uploaded attachments use public-link URLs. Policy discloses this; Storage listing/writes require an active profile, and banner listing is blocked.
+- Stable Play URLs are `https://crew-chief-race-notes.netlify.app/privacy/` and `/delete-account/` after production deployment.
 
 ## 2026-07-12 UX Chunk 4 override
 

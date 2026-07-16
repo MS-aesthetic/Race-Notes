@@ -3,6 +3,7 @@ import { ShockSession, ShockCorner, ShockDataPoint } from '../types';
 import { byActiveCar } from '../lib/scope';
 import { buildComparisonRows, downloadComparisonCsv } from '../lib/shockCompare';
 import EmptyState from './ui/EmptyState';
+import ConfirmSheet from './ui/ConfirmSheet';
 
 // ─── Local type aliases (for readability within this file) ────────────────────
 
@@ -411,7 +412,7 @@ function ShockCompareChart({ sessions }: CompareChartProps) {
 
 function exportCsv(session: ShockSession) {
   const rows = [
-    ['Race Notes — Shock Load Graph Export'],
+    ['CREW CHIEF — Shock Load Graph Export'],
     [`Corner: ${session.corner}`, `Spring Rate: ${session.springRate} lb/in`, `Shock: ${session.shock}`],
     [`Label: ${session.label}`, `Date: ${session.date}`],
     [],
@@ -494,6 +495,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
   // Compare / overlay mode
   const [compareMode, setCompareMode] = useState(false);
   const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -585,7 +587,13 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
   // ── Delete session ────────────────────────────────────────────────────────
 
   const handleDeleteSession = (id: string) => {
-    if (!window.confirm('Delete this load session and all its data points?')) return;
+    setPendingDeleteSessionId(id);
+  };
+
+  const confirmDeleteSession = () => {
+    const id = pendingDeleteSessionId;
+    setPendingDeleteSessionId(null);
+    if (!id || !displayedSessions.some(session => session.id === id)) return;
     const next = sessions.filter(s => s.id !== id);
     persist(next);
     setActiveSessionId(next[0]?.id ?? null);
@@ -645,7 +653,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
               <button
                 onClick={() => setCompareMode(prev => !prev)}
                 className={`h-9 px-3 font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 border ${
-                  compareMode ? 'bg-primary/15 text-primary border-primary/40' : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                  compareMode ? 'bg-primary/15 text-primary border-primary/40' : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
                 }`}
               >
                 <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: compareMode ? "'FILL' 1" : "'FILL' 0" }}>compare_arrows</span>
@@ -676,7 +684,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
                   className={`flex-shrink-0 px-3 py-1.5 rounded border font-mono text-[10px] uppercase font-bold transition-all ${
                     isActive
                       ? `${c.badge} shadow-sm`
-                      : 'border-outline-variant/50 text-on-surface-variant/60 hover:border-outline-variant'
+                      : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
                   }`}
                 >
                   {s.corner} — {s.label || s.shock}
@@ -726,7 +734,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
                     <span className="font-mono text-xs text-on-surface truncate flex-1">
                       {s.label || s.shock} {s.springRate && `· ${s.springRate} lb/in`}
                     </span>
-                    <span className="font-mono text-[10px] text-on-surface-variant/60 flex-shrink-0">{s.date}</span>
+                    <span className="font-mono text-[10px] text-on-surface-muted flex-shrink-0">{s.date}</span>
                   </label>
                 );
               })}
@@ -734,7 +742,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
           </div>
 
           {compareSessions.length < 2 ? (
-            <p className="text-center text-xs font-mono text-on-surface-variant/50 py-6">Select at least 2 sessions above to overlay them.</p>
+            <p className="text-center text-xs font-mono text-on-surface-muted py-6">Select at least 2 sessions above to overlay them.</p>
           ) : (
             <>
               {/* Overlay chart */}
@@ -784,10 +792,10 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
                     <tbody>
                       {comparisonRows.map((row, r) => (
                         <tr key={row.height} className={`border-b border-outline-variant/20 last:border-none ${r % 2 === 0 ? 'bg-transparent' : 'bg-white/[0.02]'}`}>
-                          <td className="px-3 py-1.5 text-on-surface-variant/70">{row.height}"</td>
+                          <td className="px-3 py-1.5 text-on-surface-muted">{row.height}"</td>
                           {row.values.map((v, i) => (
                             <td key={i} className="px-3 py-1.5 text-right text-on-surface">
-                              {v === null ? <span className="text-on-surface-variant/30">—</span> : `${v.toFixed(1)} lb`}
+                              {v === null ? <span className="text-on-surface-muted">—</span> : `${v.toFixed(1)} lb`}
                             </td>
                           ))}
                         </tr>
@@ -795,7 +803,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
                     </tbody>
                   </table>
                 </div>
-                <p className="px-4 py-2 text-[9px] font-mono text-on-surface-variant/50 border-t border-outline-variant/30">
+                <p className="px-4 py-2 text-[9px] font-mono text-on-surface-muted border-t border-outline-variant/30">
                   Values are linearly interpolated between each session's own measured points — "—" means that height is outside what was measured for that session.
                 </p>
               </div>
@@ -807,9 +815,9 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
       {/* ── Empty state ── */}
       {activeCarId && !compareMode && displayedSessions.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
-          <span className="material-symbols-outlined text-5xl text-on-surface-variant/30">show_chart</span>
+          <span className="material-symbols-outlined text-5xl text-on-surface-muted opacity-30">show_chart</span>
           <p className="text-on-surface-variant text-sm font-mono uppercase">No load sessions yet</p>
-          <p className="text-on-surface-variant/60 text-xs max-w-[260px]">
+          <p className="text-on-surface-muted text-xs max-w-[260px]">
             Create a load session for a corner, enter height and load measurements, and the graph builds automatically.
           </p>
           <button
@@ -836,7 +844,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
               </div>
               <button
                 onClick={() => handleDeleteSession(activeSession.id)}
-                className="p-1 text-on-surface-variant/50 hover:text-error transition-colors"
+                className="p-1 text-on-surface-muted hover:text-error transition-colors"
                 title="Delete load session"
               >
                 <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -989,7 +997,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
                 <span className="font-mono text-[10px] font-bold uppercase text-on-surface">
                   Data Points ({activeSession.points.length})
                 </span>
-                <span className="font-mono text-[9px] text-on-surface-variant/60">tap row to delete</span>
+                <span className="font-mono text-[9px] text-on-surface-muted">tap row to delete</span>
               </div>
               <table className="w-full text-xs font-mono">
                 <thead>
@@ -1011,13 +1019,13 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
                           row % 2 === 0 ? 'bg-transparent' : 'bg-white/[0.02]'
                         }`}
                       >
-                        <td className="px-4 py-2 text-on-surface-variant/60">{row + 1}</td>
+                        <td className="px-4 py-2 text-on-surface-muted">{row + 1}</td>
                         <td className="px-4 py-2 text-right" style={{ color: col.line }}>{p.height}"</td>
                         <td className="px-4 py-2 text-right text-on-surface">{p.load} lb</td>
                         <td className="px-3 py-1.5 text-right">
                           <button
                             onClick={() => handleDeletePoint(p.origIdx)}
-                            className="text-on-surface-variant/30 hover:text-error transition-colors"
+                            className="text-on-surface-muted hover:text-error transition-colors"
                             title="Delete point"
                           >
                             <span className="material-symbols-outlined text-[14px]">close</span>
@@ -1045,7 +1053,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
             </div>
 
             {(!activeSession.photos || activeSession.photos.length === 0) ? (
-              <p className="text-on-surface-variant/40 font-mono text-[11px] italic text-center py-4">
+              <p className="text-on-surface-muted font-mono text-[11px] italic text-center py-4">
                 No photos yet — attach dyno graph images or printouts here.
               </p>
             ) : (
@@ -1096,7 +1104,7 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
                         type="button"
                         onClick={() => setFormCorner(c)}
                         className={`py-1.5 rounded border font-mono text-xs font-bold uppercase transition-all ${
-                          formCorner === c ? `${cc.badge} shadow-sm` : 'border-outline-variant/50 text-on-surface-variant/60 hover:border-outline-variant'
+                          formCorner === c ? `${cc.badge} shadow-sm` : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
                         }`}
                       >
                         {c}
@@ -1171,6 +1179,16 @@ export default function SmasherLoadsView({ activeCarId = null, sessions: session
           </div>
         </div>
       )}
+      <ConfirmSheet
+        open={!!pendingDeleteSessionId}
+        title="Delete load session?"
+        body="Delete this load session and all its data points?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={confirmDeleteSession}
+        onCancel={() => setPendingDeleteSessionId(null)}
+      />
     </div>
   );
 }

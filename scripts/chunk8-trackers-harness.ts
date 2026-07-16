@@ -280,10 +280,10 @@ const todoCloudSource: Todo = {
     assignedTo: 'u1', assignedToName: 'Alex', sourceType: 'template', sourceId: 'template:t1:a', sourceCycle: 'cycle-1',
   }],
 };
-const todoCloudRow = todoToCloudRow(todoCloudSource, 'cloud-user', '2026-07-14T13:00:00Z');
+const todoCloudRow = todoToCloudRow(todoCloudSource, 'owner-user', '2026-07-14T13:00:00Z');
 const todoCloudResult = todoFromCloudRow(todoCloudRow);
 assert.deepEqual(todoCloudResult.items, todoCloudSource.items);
-assert.equal(todoCloudResult.user_id, 'cloud-user');
+assert.equal(todoCloudResult.user_id, 'owner-user');
 assert.equal(todoCloudResult.updated_at, '2026-07-14T13:00:00Z');
 
 const entries: AccountingEntry[] = [

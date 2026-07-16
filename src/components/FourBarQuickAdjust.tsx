@@ -97,10 +97,10 @@ function BarSection({ corner, data, bar, onFieldChange }: {
   return (
     <section className="space-y-3 rounded-xl border border-outline-variant bg-surface-container p-3">
       <h5 className="font-display text-sm font-bold uppercase text-on-surface">{bar.label}</h5>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-3">
         {bar.measurements.map(spec => <FourBarField key={spec.field} corner={corner} data={data} spec={spec} barLabel={bar.label} onFieldChange={onFieldChange} />)}
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
         {bar.angles.map(spec => <FourBarField key={spec.field} corner={corner} data={data} spec={spec} barLabel={bar.label} onFieldChange={onFieldChange} />)}
       </div>
     </section>

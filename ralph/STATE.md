@@ -21,6 +21,12 @@ messages/tool results may carry transient coordination.
 
 ## Workstream status
 
+### Release 5.0 Play-policy follow-up
+
+| Item | Status | Branch | Evidence |
+|---|---|---|---|
+| Privacy policy + account deletion | complete | `codex/play-policy-delete-account` | Local/full regression, live Supabase, Netlify Forms, 390px draft, and cavecrew security review PASS. |
+
 | WS | Title | Status | Attempts | Score | Commit | Notes |
 |----|-------|--------|----------|-------|--------|-------|
 | WS-N | Data model & migrations foundation | complete | 1 | 96 | e0ecbbf | Types + migrations 011-013 + sync.ts mappers (push/pull/delete) + data.ts defaults for maintenance/checklists/trips. Migrations still need owner approval before apply (human gate 4). |

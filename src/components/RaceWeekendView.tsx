@@ -11,6 +11,7 @@ import EmptyState from './ui/EmptyState';
 import LapTimeKeypad from './ui/LapTimeKeypad';
 import UndoToast from './ui/UndoToast';
 import BottomSheet from './ui/BottomSheet';
+import ConfirmSheet from './ui/ConfirmSheet';
 import FourBarQuickAdjust from './FourBarQuickAdjust';
 import SetupDiffView from './SetupDiffView';
 import QuickAdjustPanel from './QuickAdjustPanel';
@@ -182,6 +183,7 @@ export default function RaceWeekendView({
   const [fourBarOpen, setFourBarOpen] = useState(false);
   const [sessionDiff, setSessionDiff] = useState<{ a: string; b: string } | null>(null);
   const [sharingWeekendId, setSharingWeekendId] = useState<string | null>(null);
+  const [pendingFinish, setPendingFinish] = useState<{ weekendId: string; name: string; finalLabel: string } | null>(null);
 
   // Android hardware back closes these modals first ([29])
   useBackClosable(wkFormOpen, () => setWkFormOpen(false));
@@ -202,6 +204,14 @@ export default function RaceWeekendView({
   const sortedWeekends = sortWeekends(visibleWeekends, activeWeekendId);
   const scopedTireInventory = activeCarId ? tireInventory.filter(tire => tire.carId === activeCarId) : [];
   const scopedSetups = activeCarId ? savedSetups.filter(setup => setup.carId === activeCarId) : [];
+  const confirmFinishWeekend = () => {
+    const pending = pendingFinish;
+    setPendingFinish(null);
+    if (!pending) return;
+    const target = visibleWeekends.find(weekend => weekend.id === pending.weekendId);
+    if (!target || target.id !== activeWeekendId || isWeekendFinished(target)) return;
+    onFinishWeekend(target.id);
+  };
   const getSessionDiffPair = (record: SessionRecord, weekendId: string): { a: string; b: string } | null => {
     const weekend = weekends.find(item => item.id === weekendId);
     const byWeekend = scopedSetups.find(setup => setup.id === lifecycleSetupId(weekend));
@@ -738,14 +748,14 @@ export default function RaceWeekendView({
                   className={`py-2 px-1 rounded border font-mono text-[10px] font-bold uppercase transition-all text-center leading-tight ${
                     nsType === key
                       ? 'bg-primary/20 border-primary text-primary'
-                      : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                      : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
                   }`}
                 >{code}</button>
               ))}
             </div>
-            <p className="font-mono text-[10px] text-on-surface-variant/50 mt-1">
+            <p className="font-mono text-[10px] text-on-surface-muted mt-1">
               Will be named: <span className="text-primary font-bold">{buildSessionNameFrom(currentWeekend.sessions, nsType)}</span>
-              {nsSuggestedType === nsType && <span className="ml-1 text-on-surface-variant/40">(suggested)</span>}
+              {nsSuggestedType === nsType && <span className="ml-1 text-on-surface-muted">(suggested)</span>}
             </p>
           </div>
 
@@ -761,7 +771,7 @@ export default function RaceWeekendView({
                   className={`py-2 px-1 rounded border font-mono text-[10px] font-bold transition-all text-center leading-tight ${
                     nsTrackCondition === preset
                       ? 'bg-primary/20 border-primary text-primary'
-                      : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                      : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
                   }`}
                 >{preset}</button>
               ))}
@@ -782,7 +792,7 @@ export default function RaceWeekendView({
 
           {/* [11] Carry-over hint */}
           {(nsPrefill.pressures || nsPrefill.tires) && (
-            <p className="font-mono text-[10px] text-on-surface-variant/50 flex items-center gap-1">
+            <p className="font-mono text-[10px] text-on-surface-muted flex items-center gap-1">
               <span className="material-symbols-outlined text-[13px] text-primary">history</span>
               Pressures and tires carried over from the last run.
             </p>
@@ -805,7 +815,7 @@ export default function RaceWeekendView({
                   className={`py-2 px-1 rounded border font-mono text-[9px] font-bold uppercase transition-all text-center leading-tight ${
                     nsTimeOfDay === opt.value
                       ? 'bg-primary/20 border-primary text-primary'
-                      : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                      : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
                   }`}
                 >{opt.label}</button>
               ))}
@@ -834,7 +844,7 @@ export default function RaceWeekendView({
                 Zip
               </button>
               {nsWxStr && (
-                <button type="button" onClick={() => { setNsWxStr(''); setNsWxError(''); }} className="ml-auto text-[10px] font-mono text-on-surface-variant/50 hover:text-error">clear</button>
+                <button type="button" onClick={() => { setNsWxStr(''); setNsWxError(''); }} className="ml-auto text-[10px] font-mono text-on-surface-muted hover:text-error">clear</button>
               )}
             </div>
             {nsShowZip && (
@@ -861,7 +871,7 @@ export default function RaceWeekendView({
                 {nsWxStr}
               </div>
             ) : (
-              <p className="font-mono text-[10px] text-on-surface-variant/40 italic">No weather fetched — run will save without it.</p>
+              <p className="font-mono text-[10px] text-on-surface-muted italic">No weather fetched — run will save without it.</p>
             )}
           </div>
 
@@ -877,7 +887,7 @@ export default function RaceWeekendView({
               type="submit"
               className="px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
             >
-              START SESSION
+              START RUN
             </button>
           </div>
         </form>
@@ -980,7 +990,7 @@ export default function RaceWeekendView({
               <h2 className="font-display font-bold uppercase text-base text-on-surface tracking-wide leading-tight">{currentWeekend.name}</h2>
               <p className="font-mono text-xs text-on-surface-variant mt-0.5">{currentWeekend.track} · {currentWeekend.date}</p>
               {(activeSetup?.versionLabel || currentWeekend.setupName) && (
-                <p className="font-mono text-[10px] text-on-surface-variant/70 mt-0.5 flex items-center gap-1">
+                <p className="font-mono text-[10px] text-on-surface-muted mt-0.5 flex items-center gap-1">
                   <span className="material-symbols-outlined text-[12px]">settings_input_component</span>
                   {activeSetup ? displayVersionLabel(activeSetup) : displayStoredVersionLabel(currentWeekend.setupName)}
                 </p>
@@ -1031,7 +1041,7 @@ export default function RaceWeekendView({
                   placeholder="Enter ZIP code (e.g. 47421)"
                   value={zipCode}
                   onChange={e => setZipCode(e.target.value)}
-                  className="flex-1 bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-sm text-on-surface outline-none"
+                  className="flex-1 bg-surface border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-sm text-on-surface outline-none"
                 />
                 <button type="submit" disabled={weatherLoading} className="bg-primary text-on-primary px-4 py-2 rounded font-mono text-xs font-bold uppercase disabled:opacity-50">
                   {weatherLoading ? '…' : 'Get'}
@@ -1061,14 +1071,14 @@ export default function RaceWeekendView({
                     </div>
                   ))}
                 </div>
-                <p className="font-mono text-[9px] text-on-surface-variant/40">
+                <p className="font-mono text-[9px] text-on-surface-muted">
                   Fetched {new Date(currentWeekend.weather.fetchedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   {' · '}
                   <button className="underline hover:text-primary" onClick={() => { setShowZipInput(false); handleGPSWeather(); }}>Refresh</button>
                 </p>
               </div>
             ) : (
-              <p className="font-mono text-[11px] text-on-surface-variant/40 italic">No weather data yet. Use GPS or enter a zip code above.</p>
+              <p className="font-mono text-[11px] text-on-surface-muted italic">No weather data yet. Use GPS or enter a zip code above.</p>
             )}
           </div>
 
@@ -1076,7 +1086,7 @@ export default function RaceWeekendView({
           <div className="p-4">
             <label className="font-mono text-[10px] uppercase font-bold text-on-surface-variant tracking-wider block mb-2">Race Day Notes</label>
             <textarea
-              className="w-full bg-[#0e0e0e] border border-outline-variant focus:border-primary rounded p-3 text-sm text-on-surface font-mono min-h-[72px] outline-none resize-none"
+              className="w-full bg-surface border border-outline-variant focus:border-primary rounded p-3 text-sm text-on-surface font-mono min-h-[72px] outline-none resize-none"
               placeholder="Overall notes for this Race Day — goals, track conditions, key takeaways…"
               value={currentWeekend.notes || ''}
               onChange={e => handleWeekendNotes(e.target.value)}
@@ -1091,7 +1101,7 @@ export default function RaceWeekendView({
           onClick={openNewSession}
           disabled={activeWeekendMissingSetup}
           className={`w-full flex items-center justify-center gap-2 py-3 min-h-12 rounded-xl border-2 border-dashed transition-all font-display font-bold uppercase tracking-wider text-sm ${activeWeekendMissingSetup
-            ? 'border-outline-variant/50 text-on-surface-variant/50 cursor-not-allowed'
+            ? 'border-outline-variant/50 text-on-surface-muted opacity-50 cursor-not-allowed'
             : 'border-primary/50 hover:border-primary hover:bg-primary/10 active:scale-[0.98] text-primary'}`}
         >
           <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
@@ -1128,14 +1138,14 @@ export default function RaceWeekendView({
 
         {/* 1 ── Identity */}
         <div className="mb-6">
-          <p className="font-mono text-[10px] text-on-surface-variant/70 mb-2">
+          <p className="font-mono text-[10px] text-on-surface-muted mb-2">
             {session.track}{session.time ? ` · ${session.time}` : ''}{session.setupUsed ? ` · ${displayLifecycleText(session.setupUsed)}` : ''}
           </p>
           <label className="flex flex-col gap-1">
             <span className="text-[10px] uppercase font-mono text-on-surface-variant">Weather</span>
             <input
               type="text"
-              className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+              className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
               value={session.weather || ''}
               onChange={e => onUpdateSession({ ...session, weather: e.target.value })}
             />
@@ -1154,7 +1164,7 @@ export default function RaceWeekendView({
                 className={`py-2 px-1 min-h-12 rounded border font-mono text-[10px] font-bold transition-all text-center leading-tight ${
                   session.trackConditionPreset === preset
                     ? 'bg-primary/20 border-primary text-primary'
-                    : 'border-outline-variant/50 text-on-surface-variant/70 hover:border-outline-variant'
+                    : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
                 }`}
               >{preset}</button>
             ))}
@@ -1163,7 +1173,7 @@ export default function RaceWeekendView({
             <span className="text-[10px] uppercase font-mono text-on-surface-variant">Condition (free text)</span>
             <input
               type="text"
-              className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+              className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
               value={session.condition || ''}
               onChange={e => onUpdateSession({ ...session, condition: e.target.value })}
             />
@@ -1182,7 +1192,7 @@ export default function RaceWeekendView({
                 inputMode="none"
                 readOnly
                 placeholder="--.---"
-                className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono cursor-pointer"
+                className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono cursor-pointer"
                 value={session.bestLap || ''}
                 onFocus={() => setLapPadOpen(true)}
                 onClick={() => setLapPadOpen(true)}
@@ -1197,7 +1207,7 @@ export default function RaceWeekendView({
                 <span className="text-[10px] uppercase font-mono text-on-surface-variant">{label}</span>
                 <input
                   type="text"
-                  className="bg-[#0e0e0e] border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+                  className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
                   value={(session as any)[key] || ''}
                   onChange={e => onUpdateSession({ ...session, [key]: e.target.value })}
                 />
@@ -1277,7 +1287,7 @@ export default function RaceWeekendView({
                 .filter(Boolean) as string[];
               const availableTires = sortBySize(scopedTireInventory.filter(t => !usedByOthers.includes(t.id) || t.id === selectedTireId));
               return (
-                <div key={corner} className="bg-[#0e0e0e] border border-outline-variant rounded p-2 space-y-2">
+                <div key={corner} className="bg-surface-container-lowest border border-outline-variant rounded p-2 space-y-2">
                   <span className="text-[10px] font-bold text-primary uppercase block">{corner.toUpperCase()}</span>
                   {scopedTireInventory.length > 0 && (
                     <div className="relative">
@@ -1297,7 +1307,7 @@ export default function RaceWeekendView({
                   {selectedTireId && (() => {
                     const t = scopedTireInventory.find(x => x.id === selectedTireId);
                     return t ? (
-                      <p className="font-mono text-[9px] text-on-surface-variant/60">{t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS</p>
+                      <p className="font-mono text-[9px] text-on-surface-muted">{t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS</p>
                     ) : null;
                   })()}
                   <NumberStepper
@@ -1342,7 +1352,7 @@ export default function RaceWeekendView({
         <div className="pt-4 border-t border-outline-variant/60 mb-6">
           <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Competition Notes</h3>
           <textarea
-            className="w-full bg-[#0e0e0e] border border-outline-variant rounded p-3 text-sm text-on-surface font-mono min-h-[80px]"
+            className="w-full bg-surface border border-outline-variant rounded p-3 text-sm text-on-surface font-mono min-h-[80px]"
             placeholder="What did the driver feel on this run?"
             value={session.competitionNotes || ''}
             onChange={e => onUpdateSession({ ...session, competitionNotes: e.target.value })}
@@ -1480,7 +1490,7 @@ export default function RaceWeekendView({
                             </button>
 
                             {expandedSessionId === sx.id && (
-                              <div className="p-3 bg-[#0e0e0e] border-t border-outline-variant/30 text-xs font-mono text-on-surface-variant space-y-2">
+                              <div className="p-3 bg-surface-container-lowest border-t border-outline-variant/30 text-xs font-mono text-on-surface-variant space-y-2">
                                 <div className="flex justify-between items-center mb-2">
                                   <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Run Details</span>
                                   <div className="flex items-center gap-2">
@@ -1533,11 +1543,11 @@ export default function RaceWeekendView({
           </div>
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm(`Finish ${currentWeekend.name}? ${lifecycleLabel('final', currentWeekend)} will be saved and this Race Day will move to history.`)) {
-                onFinishWeekend(currentWeekend.id);
-              }
-            }}
+            onClick={() => setPendingFinish({
+              weekendId: currentWeekend.id,
+              name: currentWeekend.name,
+              finalLabel: lifecycleLabel('final', currentWeekend),
+            })}
             className="w-full min-h-12 rounded-xl border-2 border-primary bg-primary text-on-primary font-display font-bold uppercase tracking-wide"
           >
             Finish Race Day
@@ -1581,7 +1591,7 @@ export default function RaceWeekendView({
                 setMenuSession(null);
               }}
               disabled={!getSessionDiffPair(menuSession.session, menuSession.weekendId)}
-              className={`tap-target-block w-full gap-3 rounded-xl px-3 text-left ${getSessionDiffPair(menuSession.session, menuSession.weekendId) ? 'text-on-surface hover:bg-surface-container-high' : 'text-on-surface-variant/40 cursor-not-allowed'}`}
+              className={`tap-target-block w-full gap-3 rounded-xl px-3 text-left ${getSessionDiffPair(menuSession.session, menuSession.weekendId) ? 'text-on-surface hover:bg-surface-container-high' : 'text-on-surface-muted opacity-40 cursor-not-allowed'}`}
             >
               <span className="material-symbols-outlined text-primary">compare_arrows</span>
               Compare setup
@@ -1651,6 +1661,15 @@ export default function RaceWeekendView({
       {weekendFormModal}
       {sessionFormModal}
       {undoToastEl}
+      <ConfirmSheet
+        open={!!pendingFinish}
+        title={`Finish ${pendingFinish?.name ?? 'Race Day'}?`}
+        body={`${pendingFinish?.finalLabel ?? 'Final setup'} will be saved and this Race Day will move to history.`}
+        confirmLabel="Finish"
+        cancelLabel="Keep"
+        onConfirm={confirmFinishWeekend}
+        onCancel={() => setPendingFinish(null)}
+      />
     </div>
   );
 }

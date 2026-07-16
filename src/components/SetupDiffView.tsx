@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Setup } from '../types';
 import { diffSetups, groupDiffRows, SetupDiffRow } from '../lib/setupDiff';
+import { useBackClosable } from '../lib/backStack';
 
 interface SetupDiffViewProps {
   setups: Setup[];
@@ -11,6 +12,7 @@ interface SetupDiffViewProps {
 }
 
 export default function SetupDiffView({ setups, onClose, initialAId, initialBId, onHelp }: SetupDiffViewProps) {
+  useBackClosable(true, onClose);
   const valid = (id: string | undefined) => !!id && setups.some(s => s.id === id);
   const [setupAId, setSetupAId] = useState<string>(() => valid(initialAId) ? initialAId! : (setups[0]?.id || ''));
   const [setupBId, setSetupBId] = useState<string>(() => valid(initialBId) ? initialBId! : (setups[1]?.id || setups[0]?.id || ''));
@@ -88,8 +90,8 @@ export default function SetupDiffView({ setups, onClose, initialAId, initialBId,
                       r.changed ? 'bg-primary/5 border-l-2 border-primary' : 'bg-surface-container'
                     }`}
                   >
-                    <span className="text-on-surface-variant/70 w-24 shrink-0 truncate">{r.label}</span>
-                    <span className={`text-on-surface-variant/50 ${r.changed ? 'line-through' : ''}`}>{r.aValue}</span>
+                    <span className="text-on-surface-muted w-24 shrink-0 truncate">{r.label}</span>
+                    <span className={`text-on-surface-muted ${r.changed ? 'line-through' : ''}`}>{r.aValue}</span>
                     {r.changed && (
                       <>
                         <span className="text-primary font-bold">→</span>

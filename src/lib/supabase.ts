@@ -156,6 +156,33 @@ export async function signOut() {
   rememberLocalAccount(null);
 }
 
+/** Permanently delete the signed-in cloud account through the authenticated
+ * server function. Local app data must be cleared by the caller only after
+ * this resolves successfully. */
+export async function deleteAccount(): Promise<void> {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData.session) {
+    throw new Error('Sign in again before deleting your account.');
+  }
+
+  const { data, error } = await supabase.functions.invoke('delete-account', {
+    body: { confirmation: 'DELETE' },
+  });
+  if (data?.code === 'reauth_required') {
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+    rememberLocalAccount(null);
+    throw new Error('The final account removal did not finish. Sign in again and retry. Device racing data was kept; some cloud cleanup may already be complete.');
+  }
+  if (error || !data?.ok) {
+    throw new Error('Account deletion did not finish. Device data was kept, but some cloud cleanup may have completed. Sign in again and retry with a reliable connection.');
+  }
+
+  // The server already revoked all sessions. This only drops cached auth bytes
+  // from the current device and is intentionally best-effort.
+  await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+  rememberLocalAccount(null);
+}
+
 /** Get the current session (returns null if not logged in) */
 export async function getSession(): Promise<Session | null> {
   const { data } = await supabase.auth.getSession();
@@ -319,7 +346,10 @@ export async function uploadTeamBanner(teamId: string, file: File): Promise<stri
   return data.publicUrl;
 }
 
-export async function getUserTeam(userId: string): Promise<Team | null> {
+export async function getUserTeam(
+  userId: string,
+  options?: { throwOnError?: boolean },
+): Promise<Team | null> {
   const { data, error } = await supabase
     .from('team_members')
     .select('team_id, teams(*)')
@@ -327,6 +357,7 @@ export async function getUserTeam(userId: string): Promise<Team | null> {
     
   if (error) {
     console.warn('getUserTeam error:', error);
+    if (options?.throwOnError) throw error;
     return null;
   }
   if (!data || data.length === 0) return null;

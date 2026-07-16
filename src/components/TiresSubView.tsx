@@ -5,6 +5,8 @@ import { compareTireSize, parseTireSize } from '../lib/tireSize';
 import { formatPsiValue, resolveLinkedTireSizes } from '../lib/setupSteps';
 import { downloadTireUsageCsv, getRecentPressureHistory, getTireTotalLaps, getTireUsageHistory, printTireUsageReport } from '../lib/tireHistory';
 import EmptyState from './ui/EmptyState';
+import ConfirmSheet from './ui/ConfirmSheet';
+import { InfoToast } from './ui/UndoToast';
 
 interface TiresSubViewProps {
   tires: TireInventoryItem[];
@@ -37,6 +39,8 @@ export default function TiresSubView({
   const [sort, setSort] = useState<'newest' | 'oldest' | 'size-asc' | 'size-desc'>('newest');
   const [compoundFilter, setCompoundFilter] = useState('all');
   const [expandedTireId, setExpandedTireId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [infoToast, setInfoToast] = useState<string | null>(null);
   const noCar = !activeCarId;
   const displayedTires = activeCarId ? byActiveCar<TireInventoryItem>(tires, activeCarId) : [];
   const resolvedSizes = activeSetup ? resolveLinkedTireSizes(activeSetup, displayedTires) : null;
@@ -83,9 +87,19 @@ export default function TiresSubView({
   };
 
   const handleDelete = (id: string) => {
-    if (!window.confirm('Delete this tire from inventory?')) return;
+    setPendingDeleteId(id);
+  };
+  const confirmDelete = () => {
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
+    if (!id || !activeCarId || !tires.some(tire => tire.id === id && tire.carId === activeCarId)) return;
     saveTires(tires.filter(tire => tire.id !== id));
     onDeleteTireFromCloud?.(id);
+  };
+  const handlePrintReport = () => {
+    if (!printTireUsageReport(displayedTires, weekends)) {
+      setInfoToast('Allow popups in your browser to view the report.');
+    }
   };
   const findTire = (id: string | undefined) => displayedTires.find(tire => tire.id === id);
 
@@ -112,7 +126,7 @@ export default function TiresSubView({
       </> : <p className="font-mono text-xs text-on-surface-variant">{noCar ? 'Select or add a car to view its tire set.' : 'Select a setup for this car to view linked tires.'}</p>}
     </section>
 
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-display text-lg font-bold uppercase text-on-surface">Tire Inventory</h3><p className="font-mono text-xs text-on-surface-variant">{displayedTires.length} tire{displayedTires.length === 1 ? '' : 's'} logged</p></div><div className="flex flex-wrap items-center gap-2">{displayedTires.length > 0 && <><button onClick={() => downloadTireUsageCsv(displayedTires, weekends)} className="h-9 px-3 border border-outline-variant font-mono text-xs font-bold uppercase text-on-surface-variant rounded">CSV</button><button onClick={() => printTireUsageReport(displayedTires, weekends)} className="h-9 px-3 border border-outline-variant font-mono text-xs font-bold uppercase text-on-surface-variant rounded">Report</button></>}<button onClick={() => noCar ? onGoToGarage?.() : openAdd()} className="h-9 px-3 rounded bg-primary font-mono text-xs font-bold uppercase text-on-primary">{noCar ? 'Go to Garage' : 'Add Tire'}</button></div></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-display text-lg font-bold uppercase text-on-surface">Tire Inventory</h3><p className="font-mono text-xs text-on-surface-variant">{displayedTires.length} tire{displayedTires.length === 1 ? '' : 's'} logged</p></div><div className="flex flex-wrap items-center gap-2">{displayedTires.length > 0 && <><button onClick={() => downloadTireUsageCsv(displayedTires, weekends)} className="h-9 px-3 border border-outline-variant font-mono text-xs font-bold uppercase text-on-surface-variant rounded">CSV</button><button onClick={handlePrintReport} className="h-9 px-3 border border-outline-variant font-mono text-xs font-bold uppercase text-on-surface-variant rounded">Report</button></>}<button onClick={() => noCar ? onGoToGarage?.() : openAdd()} className="h-9 px-3 rounded bg-primary font-mono text-xs font-bold uppercase text-on-primary">{noCar ? 'Go to Garage' : 'Add Tire'}</button></div></div>
 
     {displayedTires.length === 0 ? <EmptyState icon="tire_repair" title={noCar ? 'Add a car before adding tires' : 'No tires in inventory'} body={noCar ? 'Tires stay tied to one car so setup links never cross cars.' : 'Add tires to assign them to setup corners and track their usage.'} cta={{ label: noCar ? 'Go to Garage' : 'Add First Tire', onClick: () => noCar ? onGoToGarage?.() : openAdd() }} /> : <>
       <div className="flex flex-wrap gap-2"><select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className="min-w-0 flex-1 rounded border border-outline-variant bg-surface-container px-2 py-1.5 font-mono text-xs text-on-surface"><option value="newest">Sort: Newest</option><option value="oldest">Sort: Oldest</option><option value="size-asc">Sort: Size ↑</option><option value="size-desc">Sort: Size ↓</option></select><select value={compoundFilter} onChange={event => setCompoundFilter(event.target.value)} className="min-w-0 flex-1 rounded border border-outline-variant bg-surface-container px-2 py-1.5 font-mono text-xs text-on-surface"><option value="all">Compound: All</option>{compounds.map(compound => <option key={compound} value={compound}>{compound}</option>)}</select></div>
@@ -126,5 +140,7 @@ export default function TiresSubView({
     </>}
 
     {showForm && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="relative max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-sm space-y-3 overflow-y-auto rounded-lg border-2 border-outline bg-surface p-5 text-on-surface"><button type="button" onClick={closeForm} className="absolute right-3 top-3 text-on-surface-variant"><span className="material-symbols-outlined">close</span></button><h3 className="pr-10 font-display text-base font-bold uppercase">{editingId ? 'Edit Tire' : 'Add Tire to Inventory'}</h3><form onSubmit={handleSubmit} className="min-w-0 space-y-3"><div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2"><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Tire #<input required value={draft.tireNumber || ''} onChange={event => setDraft(current => ({ ...current, tireNumber: event.target.value }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 font-mono text-on-surface" /></label><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Size<input required value={draft.size || ''} onChange={event => setDraft(current => ({ ...current, size: event.target.value }))} onBlur={event => setDraft(current => ({ ...current, size: normalizeSize(event.target.value) }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 font-mono text-on-surface" /></label></div><label className="block min-w-0 font-mono text-xs uppercase text-on-surface-variant">Compound<div className="my-2 flex min-w-0 flex-wrap gap-1">{compounds.map(compound => <button key={compound} type="button" onClick={() => setDraft(current => ({ ...current, compound }))} className="max-w-full break-words rounded border border-outline-variant px-2 py-1 font-mono text-xs text-on-surface-variant">{compound}</button>)}</div><input required value={draft.compound || ''} onChange={event => setDraft(current => ({ ...current, compound: event.target.value }))} className="w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface" /></label><div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2"><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Backspacing<select value={draft.wheelBackspacing || '2'} onChange={event => setDraft(current => ({ ...current, wheelBackspacing: event.target.value as '2' | '3' | '4' }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface"><option value="2">2&quot;</option><option value="3">3&quot;</option><option value="4">4&quot;</option></select></label><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Durometer<input value={draft.durometer || ''} onChange={event => setDraft(current => ({ ...current, durometer: event.target.value }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface" /></label><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Air pressure<input value={draft.airPressure || ''} onChange={event => setDraft(current => ({ ...current, airPressure: event.target.value }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface" /></label><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Age days<input type="number" min="0" value={draft.initialAgeDays ?? ''} onChange={event => setDraft(current => ({ ...current, initialAgeDays: Number(event.target.value) || 0 }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface" /></label></div><div className="flex min-w-0 flex-wrap justify-end gap-2"><button type="button" onClick={closeForm} className="rounded border border-outline-variant px-3 py-2 font-mono text-xs uppercase">Cancel</button><button type="submit" className="rounded bg-primary px-3 py-2 font-mono text-xs font-bold uppercase text-on-primary">{editingId ? 'Save Tire' : 'Add Tire'}</button></div></form></div></div>}
+    <ConfirmSheet open={!!pendingDeleteId} title="Delete tire?" body="Delete this tire from inventory?" confirmLabel="Delete" cancelLabel="Keep" destructive onConfirm={confirmDelete} onCancel={() => setPendingDeleteId(null)} />
+    <InfoToast open={!!infoToast} title={infoToast ?? ''} onClose={() => setInfoToast(null)} />
   </div>;
 }
