@@ -170,10 +170,10 @@ export default function GarageView({
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => startEdit(car)}
-                          className="p-1.5 text-on-surface-variant/60 hover:text-on-surface rounded transition-colors"
+                          className="tap-target p-1.5 text-on-surface-variant/60 hover:text-on-surface rounded transition-colors"
                           title="Edit"
                         >
                           <span className="material-symbols-outlined text-base">edit</span>
@@ -181,7 +181,7 @@ export default function GarageView({
                         <button
                           onClick={() => onDeleteCar(car.id)}
                           disabled={totalData(car.id) > 0}
-                          className={`p-1.5 rounded transition-colors ${
+                          className={`tap-target p-1.5 rounded transition-colors ${
                             totalData(car.id) > 0
                               ? 'text-on-surface-variant/20 cursor-not-allowed'
                               : 'text-on-surface-variant/60 hover:text-red-400'
