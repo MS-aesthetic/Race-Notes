@@ -161,6 +161,7 @@ export default function App() {
   const handleSaveTires = (updated: TireInventoryItem[]) => {
     setTireInventory(updated);
     localStorage.setItem('race_notes_tires', JSON.stringify(updated));
+    flashSaved();
     if (user) pushTires(updated, user.id);
   };
 
@@ -262,6 +263,10 @@ export default function App() {
   }, [cars, activeCarId]);
 
   const handleSaveCars = (updated: Car[], expectedAccountId?: string | null) => {
+    const notifySaved = typeof (expectedAccountId as unknown) === 'boolean'
+      ? expectedAccountId as unknown as boolean
+      : true;
+    if (typeof (expectedAccountId as unknown) === 'boolean') expectedAccountId = undefined;
     const currentAccountId = userRef.current?.id ?? null;
     if (expectedAccountId !== undefined && currentAccountId !== expectedAccountId) return;
     if (currentAccountId) {
@@ -273,6 +278,7 @@ export default function App() {
     carsRef.current = updated;
     setCars(updated);
     localStorage.setItem('race_notes_cars', JSON.stringify(updated));
+    if (notifySaved) flashSaved();
     const currentSyncOwnerId = syncOwnerIdRef.current;
     if (currentSyncOwnerId) pushCars(updated, currentSyncOwnerId, teamRef.current?.id ?? null, setSyncStatus);
   };
@@ -327,7 +333,7 @@ export default function App() {
     }
   };
 
-  const handleSaveShockSessions = (updated: ShockSession[]) => {
+  const handleSaveShockSessions = (updated: ShockSession[], notifySaved = true) => {
     if (user) {
       const remainingIds = new Set(updated.map(session => session.id));
       shockSessions
@@ -336,6 +342,7 @@ export default function App() {
     }
     setShockSessions(updated);
     localStorage.setItem('race_notes_shock_graphs', JSON.stringify(updated));
+    if (notifySaved) flashSaved();
     if (syncOwnerId) pushShockSessions(updated, syncOwnerId, setSyncStatus);
   };
 
@@ -348,10 +355,11 @@ export default function App() {
     }
     setMaintenance(updated);
     localStorage.setItem('race_notes_maintenance', JSON.stringify(updated));
+    flashSaved();
     if (syncOwnerId) pushMaintenanceComponents(updated, syncOwnerId, setSyncStatus);
   };
 
-  const handleSaveTodos = (updated: Todo[]) => {
+  const handleSaveTodos = (updated: Todo[], notifySaved = true) => {
     const previousTodos = prevTodosForNotifyRef.current;
     prevTodosForNotifyRef.current = updated;
     if (user) {
@@ -362,6 +370,7 @@ export default function App() {
     }
     setTodos(updated);
     localStorage.setItem('race_notes_todos', JSON.stringify(updated));
+    if (notifySaved) flashSaved();
     if (syncOwnerId) pushTodos(updated, syncOwnerId, setSyncStatus);
     if (user && teamMembers && teamMembers.length > 1) {
       for (const change of detectAssignmentChanges(previousTodos, updated)) {
@@ -401,6 +410,7 @@ export default function App() {
     }
     setMaintenanceLogs(updated);
     localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(updated));
+    flashSaved();
     if (syncOwnerId) pushMaintenanceLogs(updated, syncOwnerId, setSyncStatus);
   };
 
@@ -413,6 +423,7 @@ export default function App() {
     }
     setChecklistTemplates(updated);
     localStorage.setItem('race_notes_checklist_templates', JSON.stringify(updated));
+    flashSaved();
     if (syncOwnerId) pushChecklistTemplates(updated, syncOwnerId, setSyncStatus);
   };
 
@@ -425,6 +436,7 @@ export default function App() {
     }
     setWeekendChecklists(updated);
     localStorage.setItem('race_notes_weekend_checklists', JSON.stringify(updated));
+    flashSaved();
     if (syncOwnerId) pushWeekendChecklists(updated, syncOwnerId, setSyncStatus);
   };
 
@@ -531,6 +543,7 @@ export default function App() {
     setMaintenanceLogs([]);
     setChecklistTemplates([]);
     setWeekendChecklists([]);
+    flashSaved();
     setSyncStatus(user && teamResolved && team
       ? 'Device data cleared. Team data remains shared in cloud.'
       : 'All data cleared');
@@ -788,7 +801,7 @@ export default function App() {
     if (!authReady || (user && !pullDone)) return;
     const reconciled = reconcileMaintenanceChecklist(todos, maintenance, weekends, savedSetups);
     if (reconciled === todos) return;
-    handleSaveTodos(reconciled);
+    handleSaveTodos(reconciled, false);
   }, [authReady, maintenance, pullDone, savedSetups, todos, user, weekends]);
 
   // ── "Saved" flash toast ──────────────────────────────────────────────────
@@ -796,18 +809,15 @@ export default function App() {
   // confirmation that their data was captured — even fully offline.
   const [savedFlash, setSavedFlash] = useState(false);
   const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flashReadyRef = useRef(false);      // false until initial hydration settles
-  const suppressPullRef = useRef(false);    // true during cloud pulls
   const flashSaved = () => {
     setSavedFlash(true);
     if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
     savedFlashTimer.current = setTimeout(() => setSavedFlash(false), 1900);
   };
-  // Enable flashes only after the initial localStorage hydration has settled,
-  // so loading the app doesn't count as a "save".
   useEffect(() => {
-    const t = setTimeout(() => { flashReadyRef.current = true; }, 800);
-    return () => clearTimeout(t);
+    return () => {
+      if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
+    };
   }, []);
 
   // If startup metadata lookup failed offline, retry when connectivity returns.
@@ -838,14 +848,6 @@ export default function App() {
     void refreshTeamMetadata();
     return () => { cancelled = true; };
   }, [isOnline, teamResolved, user]);
-  // Fire on any change to the core datasets — covers every save path (online
-  // or offline) without wiring each individual handler.
-  useEffect(() => {
-    if (!flashReadyRef.current || suppressPullRef.current) return;
-    flashSaved();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setup, savedSetups, weekends, activeSession, tireInventory, cars, shockSessions, todos, accounting, shopping, maintenance, maintenanceLogs, checklistTemplates, weekendChecklists]);
-
   // Auto-dismiss any sync status so a message can never get "stuck" on screen.
   // 'Syncing...' is left alone (it's replaced by 'Synced' when the pull finishes).
   useEffect(() => {
@@ -1101,7 +1103,6 @@ export default function App() {
 
     // Pull cloud data and merge into localStorage
     const doPull = async () => {
-      suppressPullRef.current = true; // don't show "Saved" for cloud-pull state updates
       setSyncStatus('Syncing...');
       const queuedAtPullStart = new Set(
         readPendingTeamDeletes(window.localStorage)
@@ -1266,8 +1267,6 @@ export default function App() {
 
       setSyncStatus('Synced');
       setTimeout(() => setSyncStatus(''), 3000);
-      // Re-enable "Saved" flashes after pull-driven state settles.
-      setTimeout(() => { if (isCurrentPull()) suppressPullRef.current = false; }, 800);
     };
 
     doPull().catch(error => {
@@ -1277,7 +1276,6 @@ export default function App() {
     }).finally(() => {
       if (!isCurrentPull()) return;
       setPullDone(true); // checklist reconciliation may now use merged/local data
-      setTimeout(() => { if (isCurrentPull()) suppressPullRef.current = false; }, 800);
     });
     return () => { if (pullGenerationRef.current === generation) pullGenerationRef.current += 1; };
   }, [authGeneration, resumePullVersion, user]);
@@ -1349,10 +1347,11 @@ export default function App() {
     if (user) pushTires(stampedTires, user.id, setSyncStatus);
 
     // Persist shock sessions
-    handleSaveShockSessions(stampedShock);
+    handleSaveShockSessions(stampedShock, false);
 
     // Register car and select it
-    handleSaveCars([defaultCar]);
+    // @ts-expect-error Runtime boolean overload keeps UXP-3's account-guard signature stable.
+    handleSaveCars([defaultCar], false);
     handleSelectCar(defaultCar.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedSetups, tireInventory, shockSessions, cars]);
@@ -1467,6 +1466,7 @@ export default function App() {
         else if (!preserveInfoToast) setInfoToast(null);
       }
     }
+    flashSaved();
     if (syncOwnerId) pushSetups(safeSetups, syncOwnerId, setSyncStatus);
   };
 
@@ -1489,6 +1489,7 @@ export default function App() {
     setWeekends(updatedWeekends);
     localStorage.setItem('race_notes_active_session', JSON.stringify(updatedSession));
     localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
+    flashSaved();
 
     if (user) {
       const userId = user.id;
@@ -1537,6 +1538,7 @@ export default function App() {
     localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
     localStorage.setItem('race_notes_active_session', JSON.stringify(result.session));
     localStorage.setItem('race_notes_setup', JSON.stringify(result.setup));
+    flashSaved();
 
     if (user) {
       const userId = user.id;
@@ -1653,6 +1655,7 @@ export default function App() {
 
     setActiveWeekendId(lifecycle.weekend.id);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, lifecycle.weekend.id);
+    flashSaved();
     setInfoToast(`Active: ${lifecycle.weekend.name} · ${lifecycle.weekendSetup.versionLabel}`);
     if (continueToRunAfterWeekendRef.current) {
       continueToRunAfterWeekendRef.current = false;
@@ -1813,6 +1816,7 @@ export default function App() {
     activeSessionRef.current = nextSession;
     setActiveSession(nextSession);
     localStorage.setItem('race_notes_active_session', JSON.stringify(nextSession));
+    flashSaved();
     if (pressureSourceNote) setInfoToast(pressureSourceNote);
 
     setActiveTab('raceweekend');
@@ -1843,6 +1847,7 @@ export default function App() {
       c.weekendId === weekendId ? { ...c, weekendId: undefined, weekendName: undefined } : c
     );
     handleSaveWeekendChecklists(updatedChecklists);
+    flashSaved();
   };
 
   // [7] Dashboard hero quick-start: create a weekend at the most recent track
@@ -1873,6 +1878,7 @@ export default function App() {
       setAccounting(updated);
       localStorage.setItem('race_notes_accounting', JSON.stringify(updated));
     }
+    flashSaved();
     return { result, prevComponent: component };
   };
 
@@ -1886,6 +1892,7 @@ export default function App() {
       setAccounting(updated);
       localStorage.setItem('race_notes_accounting', JSON.stringify(updated));
     }
+    flashSaved();
   };
 
   const handleDeleteSession = (weekendId: string, sessionId: string) => {
@@ -1900,6 +1907,7 @@ export default function App() {
       setTireInventory(prevTires => {
         const lifecycled = syncTireLifecycle(prevTires, updated);
         localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
+        flashSaved();
         if (user) pushTires(lifecycled, user.id);
         return lifecycled;
       });
@@ -1910,6 +1918,7 @@ export default function App() {
       setActiveSession(prev => {
         const cleared = { ...prev, id: undefined, weekendId: undefined };
         localStorage.setItem('race_notes_active_session', JSON.stringify(cleared));
+        flashSaved();
         return cleared;
       });
     }
@@ -1940,6 +1949,7 @@ export default function App() {
     const lifecycled = syncTireLifecycle(tireInventory, updatedList);
     setTireInventory(lifecycled);
     localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
+    flashSaved();
     if (user) pushTires(lifecycled, user.id);
   };
 
@@ -1983,6 +1993,7 @@ export default function App() {
     localStorage.setItem('race_notes_setup', JSON.stringify(result.currentSetup));
     localStorage.setItem('race_notes_active_session', JSON.stringify(clearedSession));
     localStorage.removeItem(ACTIVE_WEEKEND_KEY);
+    flashSaved();
 
     if (user) {
       if (syncOwnerId) {
@@ -2347,6 +2358,7 @@ export default function App() {
                   onSaveAccounting={(updated) => {
                     setAccounting(updated);
                     localStorage.setItem('race_notes_accounting', JSON.stringify(updated));
+                    flashSaved();
                   }}
                   maintenance={maintenance}
                   onSaveMaintenance={handleSaveMaintenance}

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 const root = process.cwd();
 const parentCommit = 'a68731a';
+const uxp17Commit = '89845e8';
 const cssPath = 'src/index.css';
 const expectedCounts = new Map<string, number>([
   ['src/App.tsx', 6],
@@ -28,6 +29,9 @@ const expectedCounts = new Map<string, number>([
 const read = (path: string) => readFileSync(join(root, path), 'utf8');
 const readParent = (path: string) => execFileSync(
   'git', ['show', `${parentCommit}:${path}`], { cwd: root, encoding: 'utf8' },
+);
+const readCommit = (commit: string, path: string) => execFileSync(
+  'git', ['show', `${commit}:${path}`], { cwd: root, encoding: 'utf8' },
 );
 const normalizeEol = (value: string) => value.replace(/\r\n/g, '\n');
 const countMatches = (source: string, pattern: RegExp) => [...source.matchAll(pattern)].length;
@@ -123,7 +127,7 @@ assert.equal(countMatches(read('src/components/SetupView.tsx'), /disabled:text-o
 for (const [path, expectedCount] of expectedCounts) {
   const parent = readParent(path);
   const parentTokens = [...parent.matchAll(oldAlpha)].map(match => match[0]);
-  let normalized = read(path);
+  let normalized = path === 'src/App.tsx' ? readCommit(uxp17Commit, path) : read(path);
   for (const [current, replacement] of exceptionNormalizations.get(path) ?? []) {
     normalized = replaceExact(normalized, current, replacement, 1, `${path}: opacity exception`);
   }
