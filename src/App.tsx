@@ -48,6 +48,7 @@ import { useUndoableDelete } from './lib/undo';
 import { isAppGuideSection } from './lib/helpRouting';
 import { resolveRaceDayCreationTarget } from './lib/raceDayGate';
 import { clearCrewChiefLocalData } from './lib/accountDeletion';
+import { ACCOUNTING_DRAFT_KEY } from './lib/accountingDraft';
 import {
   buildOwnerCatchupKey,
   discardSoloOnlyTeamDeletes,
@@ -502,7 +503,7 @@ export default function App() {
     const LOCAL_KEYS = [
       'race_notes_setup', 'race_notes_saved_setups', 'race_notes_weekends',
       'race_notes_active_session', 'race_notes_todos', 'race_notes_tires',
-      'race_notes_accounting', 'race_notes_shopping', 'race_notes_cars',
+      'race_notes_accounting', ACCOUNTING_DRAFT_KEY, 'race_notes_shopping', 'race_notes_cars',
       'race_notes_active_car', 'race_notes_shock_graphs',
       'race_notes_maintenance', 'race_notes_maintenance_logs',
       'race_notes_checklist_templates', 'race_notes_weekend_checklists',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Todo, AccountingEntry, RaceWeekend, MaintenanceComponent, MaintenanceLog, Setup, MaintenanceCategory, MAINTENANCE_CATEGORIES, MaintenanceIntervalType, ChecklistTemplate, CHECKLIST_CATEGORIES } from '../types';
 import { AppUser } from '../lib/supabase';
 import { getComponentStatus, applyServiceLog, DEFAULT_COMPONENTS } from '../lib/maintenance';
@@ -6,6 +6,7 @@ import { STARTER_TEMPLATES, isUntouchedStarterTemplate, materializeStarterTempla
 import ToDoView from './ToDoView';
 import EmptyState from './ui/EmptyState';
 import { lastAccountingCategory, localDateValue, recentAccountingRepeats } from '../lib/accountingDefaults';
+import { clearAccountingDraft, readAccountingDraft, writeAccountingDraft } from '../lib/accountingDraft';
 
 // ── Sub-tab type (declared early; used in Props and component) ───────────────
 
@@ -109,19 +110,20 @@ function WeekendFilter({ weekends, value, onChange }: { weekends: RaceWeekend[];
 // ── Accounting Tab ────────────────────────────────────────────────────────────
 
 function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry[]; onSave: (a: AccountingEntry[]) => void; weekends: RaceWeekend[] }) {
-  const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState('');
-  const [desc, setDesc] = useState('');
-  const [amount, setAmount] = useState('');
-  const [type, setType] = useState<'income' | 'expense'>('expense');
-  const [payer, setPayer] = useState('');
-  const [payee, setPayee] = useState('');
-  const [weekendId, setWeekendId] = useState('');
-  const [weekendName, setWeekendName] = useState('');
-  const [receiptPhoto, setReceiptPhoto] = useState<string | undefined>();
+  const [restoredDraft] = useState(() => readAccountingDraft());
+  const [showForm, setShowForm] = useState(() => restoredDraft !== null);
+  const [name, setName] = useState(() => restoredDraft?.name ?? '');
+  const [desc, setDesc] = useState(() => restoredDraft?.desc ?? '');
+  const [amount, setAmount] = useState(() => restoredDraft?.amount ?? '');
+  const [type, setType] = useState<'income' | 'expense'>(() => restoredDraft?.type ?? 'expense');
+  const [payer, setPayer] = useState(() => restoredDraft?.payer ?? '');
+  const [payee, setPayee] = useState(() => restoredDraft?.payee ?? '');
+  const [weekendId, setWeekendId] = useState(() => restoredDraft?.weekendId ?? '');
+  const [weekendName, setWeekendName] = useState(() => restoredDraft?.weekendName ?? '');
+  const [receiptPhoto, setReceiptPhoto] = useState<string | undefined>(() => restoredDraft?.receiptPhoto || undefined);
   const [weekendFilter, setWeekendFilter] = useState('');
-  const [category, setCategory] = useState(() => lastAccountingCategory(entries));
-  const [entryDate, setEntryDate] = useState(() => localDateValue());
+  const [category, setCategory] = useState(() => restoredDraft?.category ?? lastAccountingCategory(entries));
+  const [entryDate, setEntryDate] = useState(() => restoredDraft?.entryDate ?? localDateValue());
 
   const filtered = weekendFilter ? entries.filter(e => e.weekendId === weekendFilter) : entries;
   const totalIncome  = filtered.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
@@ -131,15 +133,31 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
   const sorted = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const recentRepeats = recentAccountingRepeats(entries);
 
-  const toggleForm = () => {
-    setShowForm(value => {
-      if (!value) {
-        setEntryDate(localDateValue());
-        setCategory(lastAccountingCategory(entries));
-      }
-      return !value;
-    });
+  const resetForm = () => {
+    setName(''); setDesc(''); setAmount(''); setPayer(''); setPayee('');
+    setWeekendId(''); setWeekendName(''); setReceiptPhoto(undefined);
+    setType('expense'); setCategory(lastAccountingCategory(entries)); setEntryDate(localDateValue());
   };
+
+  const openForm = () => {
+    setCategory(lastAccountingCategory(entries));
+    setEntryDate(localDateValue());
+    setShowForm(true);
+  };
+
+  const cancelForm = () => {
+    clearAccountingDraft();
+    resetForm();
+    setShowForm(false);
+  };
+
+  useEffect(() => {
+    if (!showForm) return;
+    writeAccountingDraft({
+      name, desc, amount, type, payer, payee, weekendId, weekendName,
+      receiptPhoto: receiptPhoto ?? '', category, entryDate,
+    });
+  }, [showForm, name, desc, amount, type, payer, payee, weekendId, weekendName, receiptPhoto, category, entryDate]);
 
   const handleAdd = (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -160,9 +178,9 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
       receiptPhoto,
     };
     onSave([entry, ...entries]);
-    setName(''); setDesc(''); setAmount(''); setPayer(''); setPayee('');
-    setWeekendId(''); setWeekendName(''); setReceiptPhoto(undefined);
-    setType('expense'); setShowForm(false);
+    clearAccountingDraft();
+    resetForm();
+    setShowForm(false);
   };
 
   const handleReceiptPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,7 +220,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
 
       {/* Add button */}
       <button
-        onClick={toggleForm}
+        onClick={showForm ? cancelForm : openForm}
         className="flex items-center justify-center gap-2 w-full py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80"
       >
         <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -310,7 +328,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
           icon="account_balance"
           title="No money logged yet"
           body="Track race-night income and expenses from one ledger."
-          cta={{ label: 'Log first charge', onClick: () => setShowForm(true) }}
+          cta={{ label: 'Log first charge', onClick: openForm }}
         />
       ) : (
         <div className="space-y-2">
