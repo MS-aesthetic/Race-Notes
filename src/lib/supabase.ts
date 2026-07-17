@@ -6,17 +6,25 @@ import { Team, TeamProfile } from '../types';
 // Supabase client singleton – reads keys from Vite env vars (VITE_ prefix)
 // ---------------------------------------------------------------------------
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const configuredSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const configuredSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+export const isSupabaseConfigured = Boolean(configuredSupabaseUrl && configuredSupabaseAnonKey);
+
+// createClient requires both values during module initialization. Keep the
+// local-first app renderable when a build intentionally omits cloud config;
+// network calls still fail normally and existing callers degrade offline.
+const supabaseUrl = configuredSupabaseUrl || 'https://offline.invalid';
+const supabaseAnonKey = configuredSupabaseAnonKey || 'offline-anon-key';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-    autoRefreshToken: true,
+    autoRefreshToken: isSupabaseConfigured,
     persistSession: true,
     // PKCE + detectSessionInUrl let the web build finish the Google OAuth
     // round-trip automatically when Supabase redirects back with ?code=...
-    detectSessionInUrl: true,
+    detectSessionInUrl: isSupabaseConfigured,
     flowType: 'pkce',
   },
 });
