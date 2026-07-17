@@ -1,71 +1,50 @@
-# Current Task — UX Overhaul v2 Task B2: Notification Arbiter, Unified Copy, Top Toast
+# Current Task — UX Overhaul v2 Task B2: SOL QA Failure Repair
 
-**Status:** READY — one Terra High initial build; SOL light QA next; B3 blocked
+**Status:** REPAIR — attempt 2 owned by SOL; independent SOL QA required after repair; B3 blocked
 **Branch:** `codex/ux-overhaul`
-**Dependency:** B1 final QA PASS 98/100 at repair commit `72c34ac`; Chunk A and B1 are closed
+**Failed build:** Terra commit `ba7e018`, independent QA FAIL 84/100
 **Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` Part 2 item 9 including N3, Part 5 Task B2/Chunk B, Part 6.1, and boundary statement 5.2
-**Runtime model:** Required builder role is Terra High. Verify from runtime metadata; report `unverified` only if metadata is absent.
+**Runtime:** SOL High fixer. Terra is not re-invoked after first QA failure.
 
-## Role and sequencing
+## Exact repair scope
 
-Terra receives one initial implementation pass. Implement B2 only, commit product and harness together, then stop for independent SOL light QA. Any QA failure transfers fixes to SOL; Terra is not re-invoked. Do not begin B3 or Chunk C.
+Modify only:
 
-## Permitted files
+- `src/App.tsx`
+- `scripts/saved-flash-harness.ts`
+- `scripts/car-delete-undo-harness.ts`
+- `scripts/chunk5-setup-harness.ts`
+- `scripts/confirm-sheet-harness.ts`
+- `scripts/offline-indicator-harness.ts`
 
-- `src/App.tsx` — notification state/arbiter and toast renderer only, centered on current `infoToast`, `savedFlash`, `flashSaved`, sync-display block near roadmap lines 1443 and 2213–2244 including 2221–2233, and final `InfoToast` render
-- `src/components/SetupView.tsx` — only roadmap notification/copy sites near lines 336, 351, and 584–586; setup editing, persistence, lifecycle, and layout otherwise frozen
-- `scripts/saved-flash-harness.ts` — B2 source/behavior/rendered geometry and mutation proof; retain B1 proof and stale-lock provenance/order
+`src/components/SetupView.tsx` product behavior is accepted and frozen. Four added regression harnesses receive assertion-only modernization for B2-obsoleted renderer/copy anchors; preserve every unrelated behavior assertion. No other file permitted after this Ralph-only work-order commit.
 
-No other file is permitted. Keep diff narrow inside these named concerns even within permitted files.
+## Required repairs
 
-## Required behavior
+1. Make every displayed success state use one deterministic approximately 1500ms lifetime. `Saved`, ordinary `Synced`, and pull-path `Synced` must share one constant/cleanup route; remove competing 2500ms/3000ms clear timers without changing pull, throttle, sync, or persistence behavior.
+2. Enforce one reason-keyed visible-copy source. `showInfo` must not accept caller-composed finished messages. Dynamic context may be passed as structured values to a central reason resolver, but final visible copy must be built only there. Historical Setup banner remains sole passive historical warning; SetupView stays frozen.
+3. Keep one arbiter slot: info suppresses/replaces Saved and sync success; simultaneous state renders exactly one notification; suppressed Saved never reappears.
+4. Replace synthetic toast geometry proof. Render production-derived header, notification, and bottom-nav markup using production classes and compiled production CSS. Test online and offline/wrapped header states, safe inset, real `--ui-zoom`, Standard and Large, at 360×800, 390×844, 412×915, and 1080×2118. Directly measure header/toast/nav bounds, containment, overlap, horizontal overflow, compact width, and actual info close button at least 44×44. Do not infer geometry from class-substring booleans or hardcoded header/toast sizes.
+5. Make simultaneous co-render and priority mutations compile-real and production-routed. Each mutation must alter real production source, survive extraction/render setup, produce the advertised bad behavior, and fail source/model/rendered gates. Retain real dedupe, timeout, bottom-position, oversized, duplicate-copy, B1 movement, and B1 pointercancel mutations.
+6. Modernize only obsolete B2 assertions in four added harnesses:
+   - `car-delete-undo`: assert reason-keyed `showInfo` guard ordering and unified renderer; retain undo/delete semantics.
+   - `chunk5-setup`: replace obsolete `setInfoToast(null)` lock with current `clearInfo`/arbiter preservation semantics; retain Setup lifecycle and Save Run assertions.
+   - `confirm-sheet`: replace obsolete App literal/`setInfoToast` expectations with keyed reasons; retain all confirm and non-App InfoToast assertions.
+   - `offline-indicator`: replace old bottom-toast byte lock with unified top arbiter plus exact offline-honest `Offline — saved on device`; retain online/offline detection semantics.
+7. Preserve B1 and A1–A4 behavior, keyboard/focus/ARIA, 44px floors, safe areas, pinch zoom, pressure/FourBar geometry, dirty-only Save Run, offline local persistence, and historical banner behavior.
 
-1. Create one notification arbiter for transient info and Saved/sync-success display. An active info notification replaces/suppresses Saved; both must never co-render.
-2. Use one visible-copy source keyed by reason for B2-targeted notifications. Remove duplicate historical-setup warning copy from transient channels; the historical setup card banner remains the only passive historical communication.
-3. Deduplicate identical info reasons for approximately 5 seconds. A duplicate inside the window produces no second visible notification or timer reset; a different reason still displays immediately.
-4. Render Saved/status as one compact top-center pill below the top safe area. Remove the large bottom-center confirmation treatment. It must clear sticky/header content, never overlap bottom navigation, and preserve `aria-live="polite"`/status semantics.
-5. Success/Saved auto-dismisses after approximately 1.5 seconds. Info replacement and its existing explicit close behavior remain accessible; timer cleanup must be leak-free and deterministic.
-6. Preserve offline-honest Saved copy already present: online local save says `Saved`; offline local save says `Offline — saved on device`. Do not implement B3's typed sync-error/deferred-retry states.
-7. Preserve B1 zero-write scroll behavior and all A1–A4 density, safe-area, focus, keyboard, pinch-zoom, pressure-grid, FourBar, and Save Run reservation behavior.
+## Required gates
 
-## Harness requirements
+1. Focused B1/B2 harness proof must reach both PASS markers before unchanged saved-flash stale whole-App lock.
+2. Run A1–A4, tire, Quick Adjust, offline, pull-on-resume, semantic-status, and all relevant notification regressions.
+3. Run all 24 harnesses captured. Required result: 22/24 PASS. Only unchanged `muted-text-color-harness.ts` AuthView byte lock and unchanged `saved-flash-harness.ts` whole-App reconstruction byte lock may fail.
+4. `npm run lint`: exact documented three-error baseline, zero new errors.
+5. `npm run build`: PASS.
+6. Signed-out shell at 360×800, 390×844, 412×915, 1080×2118: exact dimensions, no horizontal overflow, controls at least 44px, pinch zoom enabled, zero console errors. Do not create or use credentials.
+7. `git diff --check`; exact six-file repair diff after Ralph commit; protected paths clean; worktree clean after commit.
+8. Cavecrew review must pass notification priority, keyed copy, all success timers, actual rendered geometry/mutations, regression-harness modernization, B1/A1–A4 preservation, and scope.
+9. Commit repair code/harness separately with B2-identifying message. Do not advance Ralph after builder completion. Stop for independent SOL QA.
 
-1. Extend `scripts/saved-flash-harness.ts` with a production-source notification-arbiter contract and behavior model.
-2. Force info and Saved simultaneously; assert exactly one visible notification and that info wins.
-3. Assert identical-info dedupe inside about 5 seconds, expiry after the window, and immediate display for a different reason.
-4. Assert success lifetime is about 1.5 seconds and timer cleanup/replacement cannot reveal a suppressed stale Saved notification.
-5. Lock the single keyed copy source and historical-banner-only passive copy. Mutations that restore duplicate Setup transient copy or allow two render paths must fail.
-6. Add production-derived rendered toast geometry at 360×800, 390×844, 412×915, and 1080×2118 under Standard and Large: compact top-center placement, safe-area clearance, no sticky/header or bottom-nav overlap, no horizontal overflow, and at least 44px close target where an interactive close exists.
-7. Seed meaningful mutations for simultaneous co-render, info-loses priority, dedupe removal, 5-second window drift, success timeout drift, bottom positioning, oversized treatment, and duplicated copy. Every mutation must alter production-derived source/classes/model behavior and be rejected.
-8. Preserve every B1 production-source mutation and behavioral assertion. `B1 stepper behavior harness: PASS` must still execute before the unchanged documented stale whole-App reconstruction byte-lock. Do not weaken unrelated UXP-18 assertions.
+## Hard bans
 
-## Acceptance
-
-- Simultaneous info plus Saved fixture renders exactly one notification; info copy wins.
-- Repeated identical info within about 5 seconds is shown once; different reasons are not swallowed.
-- Saved/status pill is compact, top-center, safe-area aware, and clears sticky/header and nav at all required viewports/scales.
-- Success auto-dismisses around 1.5 seconds with no stale notification reappearing.
-- Historical-card banner is the only passive historical setup communication; copy comes from one keyed source.
-- Offline Saved honesty, B1 scroll safety, keyboard/focus/ARIA, A1–A4 geometry, and local persistence remain intact.
-
-## Required tests and evidence
-
-1. Run focused B2 arbiter/dedupe/timer/rendered mutation proof plus B1 focused proof.
-2. Run `setup-touch-target-harness.ts`, A1–A4, tire, Quick Adjust, offline, pull-on-resume, semantic-status, and relevant Saved/toast regressions.
-3. Run all 24 harnesses in one captured matrix. Only unchanged `muted-text-color-harness.ts` AuthView byte lock and unchanged `saved-flash-harness.ts` whole-App reconstruction byte lock may remain nonblocking; all new B1/B2 assertions must demonstrably pass before the saved-flash stale assertion.
-4. Run `npm run lint`; require exact documented three-error baseline and zero new errors.
-5. Run `npm run build`; require PASS.
-6. Run `git diff --check`, exact three-file task-range scope, clean status, and protected-path checks.
-7. Run authorized signed-out shell checks at 360×800, 390×844, 412×915, and 1080×2118 for safe area, pinch zoom, overflow, control floors, and console errors. Do not create or use credentials; production-derived fixtures cover auth-gated notification states.
-8. Use cavecrew reviewer for arbiter priority, dedupe/timer state, copy-source uniqueness, rendered mutation strength, B1/A1–A4 preservation, and exact scope.
-9. Commit code plus harness only with a B2-identifying message. Do not update Ralph state.
-
-## Hard boundaries
-
-- No B3 implementation: no typed four-state synced/offline-saved/deferred-retry/sync-error renderer, push-helper error callbacks, blocked-branch honesty expansion, `sync.ts` change, or `saveStatus.ts` deletion.
-- No NumberStepper, RaceWeekend, FourBar, ContextStrip, CSS, types, schema, RLS, migration, sync, delete, queue, pull, resume throttle, lifecycle, persistence semantics, package, config, native, Android, release, credential, branch-ref, push, deploy, merge, production, `master`, or Sprint 4 IA change.
-- Do not alter dual weekend-delete, team-owner canonical writes, account-scoped deferred delete queue, UXN-1 filtering, UXN-3 pull isolation/throttle, device-local active IDs, pinch zoom, keyboard/focus, or safe-area behavior.
-
-## Compressed execution contract
-
-Terra initial B2 only. Modify `src/App.tsx`, bounded notification/copy sites in `src/components/SetupView.tsx`, and `scripts/saved-flash-harness.ts`. One arbiter: info suppresses Saved; one reason-keyed copy source; ~5s identical-info dedupe; compact safe-area-aware top pill; ~1.5s success lifetime; historical banner only passive historical copy. Preserve offline honesty, B1, A1–A4. Add real source/model/rendered mutations, run focused/full/lint/build/shell/diff/cavecrew, commit code+harness, stop for SOL QA. B3 blocked. No sync/schema/native/release/push/deploy/merge.
+No B3 or Chunk C. No `SetupView.tsx`, NumberStepper, RaceWeekend, FourBar, CSS, types, `sync.ts`, `saveStatus.ts`, schema, RLS, migrations, native, Android, release, package/config, credentials, branch refs, push, deploy, merge, production, or `master` changes. Do not alter delete/queue/pull/resume-throttle/lifecycle/persistence meaning.
