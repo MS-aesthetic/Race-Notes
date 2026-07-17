@@ -171,20 +171,15 @@ header.bg-surface {
   padding-top: env(safe-area-inset-top, 0px) !important;
 }
 
-/* Custom scrollbars representing clean sheet metal mechanics */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Keep every app surface scrollable without showing browser/WebView chrome. */
+* {
+  scrollbar-width: none;
 }
-::-webkit-scrollbar-track {
-  background: #131313;
-}
-::-webkit-scrollbar-thumb {
-  background: #353534;
-  border-radius: 0px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #ffb3ac;
+
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* Scanline visual telemetry layout effect */
