@@ -631,7 +631,7 @@ export default function RaceWeekendView({
       <div className="bg-surface border-2 border-outline rounded-lg p-6 max-w-sm w-full space-y-4 shadow-2xl relative text-on-surface max-h-[85vh] overflow-y-auto">
         <button
           onClick={() => setWkFormOpen(false)}
-          className="absolute top-4 right-4 text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+          className="absolute top-4 right-4 flex min-h-11 min-w-11 items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
         >
           <span className="material-symbols-outlined text-sm">close</span>
         </button>
@@ -645,7 +645,7 @@ export default function RaceWeekendView({
 
         <form onSubmit={handleWeekendFormSubmit} className="space-y-3">
           <div>
-            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+            <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1">
               Race Day Name
             </label>
             <input
@@ -654,12 +654,12 @@ export default function RaceWeekendView({
               placeholder="e.g. Knoxville Nationals"
               value={wkName}
               onChange={(e) => setWkName(e.target.value)}
-              className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+              className="w-full min-h-11 bg-surface-container text-sm text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+            <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1">
               Track Name / Speedway
             </label>
             <input
@@ -668,12 +668,12 @@ export default function RaceWeekendView({
               placeholder="e.g. Knoxville Raceway"
               value={wkTrack}
               onChange={(e) => setWkTrack(e.target.value)}
-              className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+              className="w-full min-h-11 bg-surface-container text-sm text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+            <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1">
               Date Range
             </label>
             <input
@@ -682,20 +682,20 @@ export default function RaceWeekendView({
               placeholder="e.g. June 12-14, 2026"
               value={wkDate}
               onChange={(e) => setWkDate(e.target.value)}
-              className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
+              className="w-full min-h-11 bg-surface-container text-sm text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded"
             />
           </div>
 
           {!wkEditingId && scopedSetups.length > 0 && (
             <div>
-              <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">
+              <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1">
                 Starting Setup (optional)
               </label>
               <div className="relative">
                 <select
                   value={wkSetupId}
                   onChange={e => setWkSetupId(e.target.value)}
-                  className="w-full bg-surface-container text-xs text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
+                  className="w-full min-h-11 bg-surface-container text-sm text-on-surface p-2.5 outline-none border border-outline-variant focus:border-primary rounded appearance-none pr-7"
                 >
                   <option value="">-- No setup selected --</option>
                   {/* Decision 3: filter to active car's setups */}
@@ -712,13 +712,13 @@ export default function RaceWeekendView({
             <button
               type="button"
               onClick={() => setWkFormOpen(false)}
-              className="px-3 py-2 border border-outline-variant hover:bg-surface-container-high text-on-surface-variant uppercase cursor-pointer rounded"
+              className="min-h-11 px-3 py-2 border border-outline-variant hover:bg-surface-container-high text-on-surface-variant uppercase cursor-pointer rounded"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
+              className="min-h-11 px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
             >
               {wkEditingId ? 'SAVE CHANGES' : 'CREATE RACE DAY'}
             </button>
@@ -733,7 +733,7 @@ export default function RaceWeekendView({
       <div className="bg-surface border-2 border-outline rounded-lg p-6 max-w-sm w-full space-y-4 shadow-2xl relative text-on-surface">
         <button
           onClick={() => setNsOpen(false)}
-          className="absolute top-4 right-4 text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+          className="absolute top-4 right-4 flex min-h-11 min-w-11 items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
         >
           <span className="material-symbols-outlined text-sm">close</span>
         </button>
@@ -748,15 +748,15 @@ export default function RaceWeekendView({
         <form onSubmit={handleNewSessionSubmit} className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
           {/* Session always belongs to device-active weekend. */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Active Race Day</label>
-            <div className="w-full bg-surface-container text-xs text-on-surface p-2.5 border border-outline-variant rounded font-mono">
+            <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1">Active Race Day</label>
+            <div className="w-full bg-surface-container text-sm text-on-surface p-2.5 border border-outline-variant rounded font-mono">
               {currentWeekend.name} ({currentWeekend.track})
             </div>
           </div>
 
           {/* Session type — [11] pre-selected by suggestNextSession, one-tap editable */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Run Type</label>
+            <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1">Run Type</label>
             <div className="grid grid-cols-5 gap-1">
               {SESSION_TYPE_CHIPS.map(({ key, code }) => (
                 <button
@@ -764,7 +764,7 @@ export default function RaceWeekendView({
                   type="button"
                   title={key}
                   onClick={() => setNsType(key)}
-                  className={`py-2 px-1 rounded border font-mono text-[10px] font-bold uppercase transition-all text-center leading-tight ${
+                  className={`min-h-11 py-2 px-1 rounded border font-mono text-xs font-bold uppercase transition-all text-center leading-tight ${
                     nsType === key
                       ? 'bg-primary/20 border-primary text-primary'
                       : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
@@ -772,7 +772,7 @@ export default function RaceWeekendView({
                 >{code}</button>
               ))}
             </div>
-            <p className="font-mono text-[10px] text-on-surface-muted mt-1">
+            <p className="font-mono text-sm text-on-surface-muted mt-1">
               Will be named: <span className="text-primary font-bold">{buildSessionNameFrom(currentWeekend.sessions, nsType)}</span>
               {nsSuggestedType === nsType && <span className="ml-1 text-on-surface-muted">(suggested)</span>}
             </p>
@@ -780,14 +780,14 @@ export default function RaceWeekendView({
 
           {/* Track Condition Presets (WS-L) — prefilled from the last session */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Track Condition</label>
+            <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1">Track Condition</label>
             <div className="grid grid-cols-3 gap-1 mb-2">
               {TRACK_CONDITION_PRESETS.map(preset => (
                 <button
                   key={preset}
                   type="button"
                   onClick={() => setNsTrackCondition(p => p === preset ? '' : preset)}
-                  className={`py-2 px-1 rounded border font-mono text-[10px] font-bold transition-all text-center leading-tight ${
+                  className={`min-h-11 py-2 px-1 rounded border font-mono text-xs font-bold transition-all text-center leading-tight ${
                     nsTrackCondition === preset
                       ? 'bg-primary/20 border-primary text-primary'
                       : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
@@ -799,19 +799,19 @@ export default function RaceWeekendView({
 
           {/* Surface conditions / free-text notes */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Surface Notes (free text)</label>
+            <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1">Surface Notes (free text)</label>
             <input
               type="text"
               placeholder="e.g. Rough, Dusty, One Lane..."
               value={nsConditionNotes}
               onChange={(e) => setNsConditionNotes(e.target.value)}
-              className="w-full bg-surface-container text-xs text-on-surface p-2 border border-outline-variant focus:border-primary rounded"
+              className="w-full min-h-11 bg-surface-container text-sm text-on-surface p-2 border border-outline-variant focus:border-primary rounded"
             />
           </div>
 
           {/* [11] Carry-over hint */}
           {(nsPrefill.pressures || nsPrefill.tires) && (
-            <p className="font-mono text-[10px] text-on-surface-muted flex items-center gap-1">
+            <p className="font-mono text-sm text-on-surface-muted flex items-center gap-1">
               <span className="material-symbols-outlined text-[13px] text-primary">history</span>
               Pressures and tires carried over from the last run.
             </p>
@@ -819,8 +819,8 @@ export default function RaceWeekendView({
 
           {/* Time of Day */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Time of Day</label>
-            <div className="grid grid-cols-4 gap-1">
+            <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1">Time of Day</label>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))] gap-1">
               {([
                 { value: 'current', label: 'Current Time' },
                 { value: 'Afternoon', label: 'Afternoon' },
@@ -831,7 +831,7 @@ export default function RaceWeekendView({
                   key={opt.value}
                   type="button"
                   onClick={() => setNsTimeOfDay(opt.value)}
-                  className={`py-2 px-1 rounded border font-mono text-[9px] font-bold uppercase transition-all text-center leading-tight ${
+                  className={`min-h-11 py-2 px-1 rounded border font-mono text-xs font-bold uppercase transition-all text-center leading-tight ${
                     nsTimeOfDay === opt.value
                       ? 'bg-primary/20 border-primary text-primary'
                       : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
@@ -843,13 +843,13 @@ export default function RaceWeekendView({
 
           {/* Weather */}
           <div>
-            <label className="block text-[11px] font-mono uppercase text-on-surface-variant mb-1">Weather (optional)</label>
+            <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1">Weather (optional)</label>
             <div className="flex gap-2 mb-2">
               <button
                 type="button"
                 onClick={handleNsGPSWeather}
                 disabled={nsWxLoading}
-                className="flex items-center gap-1 text-[10px] font-mono font-bold uppercase px-2.5 py-1.5 rounded border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+                className="flex min-h-11 items-center gap-1 text-xs font-mono font-bold uppercase px-2.5 py-1.5 rounded border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[13px]">my_location</span>
                 {nsWxLoading ? 'Fetching…' : 'GPS'}
@@ -857,13 +857,13 @@ export default function RaceWeekendView({
               <button
                 type="button"
                 onClick={() => setNsShowZip(v => !v)}
-                className={`flex items-center gap-1 text-[10px] font-mono font-bold uppercase px-2.5 py-1.5 rounded border transition-colors ${nsShowZip ? 'border-primary text-primary bg-primary/10' : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'}`}
+                className={`flex min-h-11 items-center gap-1 text-xs font-mono font-bold uppercase px-2.5 py-1.5 rounded border transition-colors ${nsShowZip ? 'border-primary text-primary bg-primary/10' : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'}`}
               >
                 <span className="material-symbols-outlined text-[13px]">pin_drop</span>
                 Zip
               </button>
               {nsWxStr && (
-                <button type="button" onClick={() => { setNsWxStr(''); setNsWxError(''); }} className="ml-auto text-[10px] font-mono text-on-surface-muted hover:text-error">clear</button>
+                <button type="button" onClick={() => { setNsWxStr(''); setNsWxError(''); }} className="ml-auto flex min-h-11 min-w-11 items-center justify-center text-xs font-mono text-on-surface-muted hover:text-error">clear</button>
               )}
             </div>
             {nsShowZip && (
@@ -876,21 +876,21 @@ export default function RaceWeekendView({
                   value={nsZip}
                   onChange={e => setNsZip(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleNsZipWeather(); } }}
-                  className="flex-1 bg-surface-container border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-xs text-on-surface outline-none"
+                  className="flex-1 min-h-11 bg-surface-container border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-sm text-on-surface outline-none"
                 />
-                <button type="button" onClick={() => void handleNsZipWeather()} disabled={nsWxLoading} className="bg-primary text-on-primary px-3 py-2 rounded font-mono text-[10px] font-bold uppercase disabled:opacity-50">
+                <button type="button" onClick={() => void handleNsZipWeather()} disabled={nsWxLoading} className="min-h-11 min-w-11 bg-primary text-on-primary px-3 py-2 rounded font-mono text-xs font-bold uppercase disabled:opacity-50">
                   {nsWxLoading ? '…' : 'Get'}
                 </button>
               </div>
             )}
-            {nsWxError && <p className="font-mono text-[11px] text-red-400 mb-1">{nsWxError}</p>}
+            {nsWxError && <p className="font-mono text-sm text-red-400 mb-1">{nsWxError}</p>}
             {nsWxStr ? (
-              <div className="bg-surface-container border border-primary/30 rounded px-3 py-2 font-mono text-xs text-on-surface flex items-center gap-2">
+              <div className="bg-surface-container border border-primary/30 rounded px-3 py-2 font-mono text-sm text-on-surface flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>cloud</span>
                 {nsWxStr}
               </div>
             ) : (
-              <p className="font-mono text-[10px] text-on-surface-muted italic">No weather fetched — run will save without it.</p>
+              <p className="font-mono text-sm text-on-surface-muted italic">No weather fetched — run will save without it.</p>
             )}
           </div>
 
@@ -898,13 +898,13 @@ export default function RaceWeekendView({
             <button
               type="button"
               onClick={() => setNsOpen(false)}
-              className="px-3 py-2 border border-outline-variant hover:bg-surface-container-high text-on-surface-variant uppercase cursor-pointer rounded"
+              className="min-h-11 px-3 py-2 border border-outline-variant hover:bg-surface-container-high text-on-surface-variant uppercase cursor-pointer rounded"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
+              className="min-h-11 px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"
             >
               START RUN
             </button>
@@ -954,7 +954,7 @@ export default function RaceWeekendView({
         {!activeCarId ? <CarRequiredPrompt onAddCar={onGoToGarage} /> : (
           <section className="rounded-xl border border-outline-variant bg-surface-container p-3 text-center space-y-2">
             <p className="font-display text-base font-bold uppercase text-on-surface">No active Race Day</p>
-            <p className="font-mono text-xs text-on-surface-variant">Start a race night or test day. Finished Race Days stay below as history.</p>
+            <p className="font-mono text-sm text-on-surface-variant">Start a race night or test day. Finished Race Days stay below as history.</p>
             <button type="button" onClick={() => openWeekendForm()} className="min-h-12 px-4 rounded-xl bg-primary text-on-primary font-display font-bold uppercase">
               + New Race Day
             </button>
@@ -964,7 +964,7 @@ export default function RaceWeekendView({
           <h2 className="font-display text-sm font-bold uppercase text-on-surface">Open Race Days</h2>
           <div className="flex flex-wrap gap-2">
           {available.map(weekend => (
-            <button key={weekend.id} onClick={() => onActivateWeekend(weekend.id)} className="px-3 py-2 border border-primary/50 rounded text-primary font-mono text-xs font-bold uppercase">
+            <button key={weekend.id} onClick={() => onActivateWeekend(weekend.id)} className="min-h-11 px-3 py-2 border border-primary/50 rounded text-primary font-mono text-xs font-bold uppercase">
               {weekend.name}
             </button>
           ))}
@@ -977,12 +977,12 @@ export default function RaceWeekendView({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-display font-bold uppercase text-on-surface">{weekend.name}</h3>
-                  <p className="font-mono text-xs text-on-surface-variant">{weekend.track} · {weekend.date}</p>
+                  <p className="font-mono text-sm text-on-surface-variant">{weekend.track} · {weekend.date}</p>
                 </div>
-                <span className="rounded-full border border-outline-variant px-2 py-1 font-mono text-[10px] font-bold uppercase text-on-surface-variant">Finished</span>
+                <span className="rounded-full border border-outline-variant px-2 py-1 font-mono text-xs font-bold uppercase text-on-surface-variant">Finished</span>
               </div>
-              <p className="mt-2 font-mono text-xs text-on-surface-variant">{weekend.sessions.length} run{weekend.sessions.length === 1 ? '' : 's'} · {displayStoredVersionLabel(weekend.setupName) || 'Starting Setup saved'}</p>
-              {weekend.finalSetupId && <p className="mt-1 font-mono text-[10px] text-primary">{lifecycleLabel('final', weekend)} saved</p>}
+              <p className="mt-2 font-mono text-sm text-on-surface-variant">{weekend.sessions.length} run{weekend.sessions.length === 1 ? '' : 's'} · {displayStoredVersionLabel(weekend.setupName) || 'Starting Setup saved'}</p>
+              {weekend.finalSetupId && <p className="mt-1 font-mono text-sm text-primary">{lifecycleLabel('final', weekend)} saved</p>}
             </article>
           ))}
         </section>}
@@ -1007,14 +1007,14 @@ export default function RaceWeekendView({
             <span className="material-symbols-outlined text-primary text-2xl mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_today</span>
             <div className="flex-1 min-w-0">
               <h2 className="font-display font-bold uppercase text-base text-on-surface tracking-wide leading-tight">{currentWeekend.name}</h2>
-              <p className="font-mono text-xs text-on-surface-variant mt-0.5">{currentWeekend.track} · {currentWeekend.date}</p>
+              <p className="font-mono text-sm text-on-surface-variant mt-0.5">{currentWeekend.track} · {currentWeekend.date}</p>
               {(activeSetup?.versionLabel || currentWeekend.setupName) && (
-                <p className="font-mono text-[10px] text-on-surface-muted mt-0.5 flex items-center gap-1">
+                <p className="font-mono text-sm text-on-surface-muted mt-0.5 flex items-center gap-1">
                   <span className="material-symbols-outlined text-[12px]">settings_input_component</span>
                   {activeSetup ? displayVersionLabel(activeSetup) : displayStoredVersionLabel(currentWeekend.setupName)}
                 </p>
               )}
-              <p className="font-mono text-[10px] text-primary uppercase tracking-wider mt-1">
+              <p className="font-mono text-sm text-primary uppercase tracking-wider mt-1">
                 {currentWeekend.sessions.length} run{currentWeekend.sessions.length !== 1 ? 's' : ''} logged
               </p>
             </div>
@@ -1031,19 +1031,19 @@ export default function RaceWeekendView({
           {/* Weather */}
           <div className="p-3 border-b border-outline-variant/50 space-y-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="font-mono text-[10px] uppercase font-bold text-on-surface-variant tracking-wider">Location & Weather</span>
+              <span className="font-mono text-xs uppercase font-bold text-on-surface-variant tracking-wider">Location & Weather</span>
               <div className="flex gap-2">
                 <button
                   onClick={handleGPSWeather}
                   disabled={weatherLoading}
-                  className="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase px-2.5 py-1.5 rounded border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+                  className="flex min-h-11 items-center gap-1.5 text-xs font-mono font-bold uppercase px-2.5 py-1.5 rounded border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-[14px]">my_location</span>
                   {weatherLoading ? 'Fetching…' : 'GPS'}
                 </button>
                 <button
                   onClick={() => setShowZipInput(v => !v)}
-                  className={`flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase px-2.5 py-1.5 rounded border transition-colors ${showZipInput ? 'border-primary text-primary bg-primary/10' : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'}`}
+                  className={`flex min-h-11 items-center gap-1.5 text-xs font-mono font-bold uppercase px-2.5 py-1.5 rounded border transition-colors ${showZipInput ? 'border-primary text-primary bg-primary/10' : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'}`}
                 >
                   <span className="material-symbols-outlined text-[14px]">pin_drop</span>
                   Zip Code
@@ -1060,21 +1060,21 @@ export default function RaceWeekendView({
                   placeholder="Enter ZIP code (e.g. 47421)"
                   value={zipCode}
                   onChange={e => setZipCode(e.target.value)}
-                  className="flex-1 bg-surface border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-sm text-on-surface outline-none"
+                  className="flex-1 min-h-11 bg-surface border border-outline-variant focus:border-primary rounded px-3 py-2 font-mono text-sm text-on-surface outline-none"
                 />
-                <button type="submit" disabled={weatherLoading} className="bg-primary text-on-primary px-4 py-2 rounded font-mono text-xs font-bold uppercase disabled:opacity-50">
+                <button type="submit" disabled={weatherLoading} className="min-h-11 min-w-11 bg-primary text-on-primary px-4 py-2 rounded font-mono text-xs font-bold uppercase disabled:opacity-50">
                   {weatherLoading ? '…' : 'Get'}
                 </button>
               </form>
             )}
 
-            {weatherError && <p className="font-mono text-[11px] text-red-400">{weatherError}</p>}
+            {weatherError && <p className="font-mono text-sm text-red-400">{weatherError}</p>}
 
             {currentWeekend.weather ? (
               <div className="bg-surface rounded-lg border border-outline-variant/50 p-3 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>location_on</span>
-                  <span className="font-mono text-xs font-bold text-on-surface">{currentWeekend.weather.location}</span>
+                  <span className="font-mono text-sm font-bold text-on-surface">{currentWeekend.weather.location}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                   {[
@@ -1085,25 +1085,25 @@ export default function RaceWeekendView({
                   ].map(({ label, value, icon }) => (
                     <div key={label} className="flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-on-surface-variant text-[13px]">{icon}</span>
-                      <span className="font-mono text-[10px] text-on-surface-variant">{label}:</span>
-                      <span className="font-mono text-[10px] font-bold text-on-surface">{value}</span>
+                      <span className="font-mono text-xs text-on-surface-variant">{label}:</span>
+                      <span className="font-mono text-sm font-bold text-on-surface">{value}</span>
                     </div>
                   ))}
                 </div>
-                <p className="font-mono text-[9px] text-on-surface-muted">
+                <p className="font-mono text-xs text-on-surface-muted">
                   Fetched {new Date(currentWeekend.weather.fetchedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   {' · '}
-                  <button className="underline hover:text-primary" onClick={() => { setShowZipInput(false); handleGPSWeather(); }}>Refresh</button>
+                  <button className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 underline hover:text-primary" onClick={() => { setShowZipInput(false); handleGPSWeather(); }}>Refresh</button>
                 </p>
               </div>
             ) : (
-              <p className="font-mono text-[11px] text-on-surface-muted italic">No weather data yet. Use GPS or enter a zip code above.</p>
+              <p className="font-mono text-sm text-on-surface-muted italic">No weather data yet. Use GPS or enter a zip code above.</p>
             )}
           </div>
 
           {/* Weekend Notes */}
           <div className="p-3">
-            <label className="font-mono text-[10px] uppercase font-bold text-on-surface-variant tracking-wider block mb-2">Race Day Notes</label>
+            <label className="font-mono text-xs uppercase font-bold text-on-surface-variant tracking-wider block mb-2">Race Day Notes</label>
             <textarea
               className="w-full bg-surface border border-outline-variant focus:border-primary rounded p-3 text-sm text-on-surface font-mono min-h-[72px] outline-none resize-none"
               placeholder="Overall notes for this Race Day — goals, track conditions, key takeaways…"
@@ -1128,7 +1128,7 @@ export default function RaceWeekendView({
         </button>
       )}
       {activeWeekendMissingSetup && (
-        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-center font-mono text-xs text-on-surface">
+        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-center font-mono text-sm text-on-surface">
           {lifecycleLabel('weekend')} is missing. Restore it before logging or adjusting a run. You can still finish this Race Day.
         </p>
       )}
@@ -1157,11 +1157,11 @@ export default function RaceWeekendView({
 
         {/* 1 ── Identity */}
         <div className="mb-6">
-          <p className="font-mono text-[10px] text-on-surface-muted mb-2">
+          <p className="font-mono text-sm text-on-surface-muted mb-2">
             {session.track}{session.time ? ` · ${session.time}` : ''}{session.setupUsed ? ` · ${displayLifecycleText(session.setupUsed)}` : ''}
           </p>
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase font-mono text-on-surface-variant">Weather</span>
+            <span className="text-xs uppercase font-mono text-on-surface-variant">Weather</span>
             <input
               type="text"
               className="min-h-11 bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
@@ -1180,7 +1180,7 @@ export default function RaceWeekendView({
                 key={preset}
                 type="button"
                 onClick={() => updateRun({ ...session, trackConditionPreset: session.trackConditionPreset === preset ? undefined : preset })}
-                className={`py-2 px-1 min-h-12 rounded border font-mono text-[10px] font-bold transition-all text-center leading-tight ${
+                className={`py-2 px-1 min-h-12 rounded border font-mono text-xs font-bold transition-all text-center leading-tight ${
                   session.trackConditionPreset === preset
                     ? 'bg-primary/20 border-primary text-primary'
                     : 'border-outline-variant/50 text-on-surface-muted hover:border-outline-variant'
@@ -1189,7 +1189,7 @@ export default function RaceWeekendView({
             ))}
           </div>
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase font-mono text-on-surface-variant">Condition (free text)</span>
+            <span className="text-xs uppercase font-mono text-on-surface-variant">Condition (free text)</span>
             <input
               type="text"
               className="min-h-11 bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
@@ -1204,7 +1204,7 @@ export default function RaceWeekendView({
           <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Laps & Result</h3>
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase font-mono text-on-surface-variant">Best Lap</span>
+              <span className="text-xs uppercase font-mono text-on-surface-variant">Best Lap</span>
               {/* [13] Opens the lap-time keypad — OS keyboard suppressed */}
               <input
                 type="text"
@@ -1223,7 +1223,7 @@ export default function RaceWeekendView({
               { label: 'Max RPM', key: 'maxRpm' as const },
             ].map(({ label, key }) => (
               <label key={key} className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase font-mono text-on-surface-variant">{label}</span>
+                <span className="text-xs uppercase font-mono text-on-surface-variant">{label}</span>
                 <input
                   type="text"
                   className="min-h-11 bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
@@ -1287,14 +1287,14 @@ export default function RaceWeekendView({
               <button
                 type="button"
                 onClick={handleImportTiresFromSetup}
-                className="flex items-center gap-1 text-[10px] font-mono font-bold uppercase px-2 py-1 rounded border border-primary/50 text-primary hover:bg-primary/10 transition-colors"
+                className="flex min-h-11 items-center gap-1 text-xs font-mono font-bold uppercase px-2 py-1 rounded border border-primary/50 text-primary hover:bg-primary/10 transition-colors"
               >
                 <span className="material-symbols-outlined text-[13px]">download</span>
                 Import from Setup
               </button>
             )}
           </div>
-          {session.pressureSourceNote && <p className="mb-2 font-mono text-xs text-on-surface-variant">{displayLifecycleText(session.pressureSourceNote)}</p>}
+          {session.pressureSourceNote && <p className="mb-2 font-mono text-sm text-on-surface-variant">{displayLifecycleText(session.pressureSourceNote)}</p>}
           <div
             className="grid gap-2"
             style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(10.5rem, 1fr))' }}
@@ -1310,13 +1310,13 @@ export default function RaceWeekendView({
               const availableTires = sortBySize(scopedTireInventory.filter(t => !usedByOthers.includes(t.id) || t.id === selectedTireId));
               return (
                 <div key={corner} className="bg-surface-container-lowest border border-outline-variant rounded p-2 space-y-2">
-                  <span className="text-[10px] font-bold text-primary uppercase block">{corner.toUpperCase()}</span>
+                  <span className="text-xs font-bold text-primary uppercase block">{corner.toUpperCase()}</span>
                   {scopedTireInventory.length > 0 && (
                     <div className="relative">
                       <select
                         value={selectedTireId}
                         onChange={e => handleTireInventorySelect(corner, e.target.value)}
-                        className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-[10px] px-2 py-1.5 rounded outline-none appearance-none pr-5"
+                        className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 py-1.5 rounded outline-none appearance-none pr-5"
                       >
                         <option value="">-- Select Tire --</option>
                         {availableTires.map(t => (
@@ -1329,7 +1329,7 @@ export default function RaceWeekendView({
                   {selectedTireId && (() => {
                     const t = scopedTireInventory.find(x => x.id === selectedTireId);
                     return t ? (
-                      <p className="font-mono text-[9px] text-on-surface-muted">{t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS</p>
+                      <p className="font-mono text-sm text-on-surface-muted">{t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS</p>
                     ) : null;
                   })()}
                   <NumberStepper
@@ -1354,7 +1354,7 @@ export default function RaceWeekendView({
           <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Changes Made</h3>
           <div className="flex flex-col gap-1 mb-3">
             {session.adjustments?.map(adj => (
-              <div key={adj.id} className="flex justify-between bg-surface p-2 rounded text-xs font-mono">
+              <div key={adj.id} className="flex justify-between bg-surface p-2 rounded text-sm font-mono">
                 <span className="text-on-surface-variant">{adj.label}</span>
                 <span className="text-primary font-bold">{adj.value}</span>
               </div>
@@ -1384,7 +1384,7 @@ export default function RaceWeekendView({
         <div className="pt-4 border-t border-outline-variant/60">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-mono text-xs uppercase text-on-surface-variant">Attachments / Time Slips</h3>
-            <label className="text-[10px] uppercase font-mono text-primary font-bold cursor-pointer hover:underline">
+            <label className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-xs uppercase font-mono text-primary font-bold cursor-pointer hover:underline">
               + Add Image
               <input type="file" multiple accept="image/*" className="hidden" onChange={handleAddPhotos} />
             </label>
@@ -1394,7 +1394,7 @@ export default function RaceWeekendView({
               {session.screenshots!.map((src, i) => (
                 <div key={i} className="relative shrink-0">
                   <img src={src} alt="attachment" className="h-20 rounded border border-outline-variant object-cover" />
-                  <button onClick={() => handleDeletePhoto(i)} className="absolute top-1 right-1 bg-black/60 rounded-full w-5 h-5 flex items-center justify-center text-white hover:bg-black/90">
+                  <button onClick={() => handleDeletePhoto(i)} className="absolute top-1 right-1 bg-black/60 rounded-full min-w-11 min-h-11 flex items-center justify-center text-white hover:bg-black/90">
                     <span className="material-symbols-outlined text-[12px]">close</span>
                   </button>
                 </div>
@@ -1448,11 +1448,11 @@ export default function RaceWeekendView({
                   >
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-on-surface">{wk.name}</span>
-                        {isActiveWk && <span className="font-mono text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-bold">Active</span>}
-                        {isWeekendFinished(wk) && <span className="font-mono text-[9px] border border-outline-variant text-on-surface-variant px-1.5 py-0.5 rounded uppercase font-bold">Finished</span>}
+                        <span className="font-mono text-sm font-bold text-on-surface">{wk.name}</span>
+                        {isActiveWk && <span className="font-mono text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-bold">Active</span>}
+                        {isWeekendFinished(wk) && <span className="font-mono text-xs border border-outline-variant text-on-surface-variant px-1.5 py-0.5 rounded uppercase font-bold">Finished</span>}
                       </div>
-                      <span className="font-mono text-[10px] text-on-surface-variant">
+                      <span className="font-mono text-sm text-on-surface-variant">
                         {wk.track}{wk.date ? ` · ${wk.date}` : ''} · {wkSessions.length} run{wkSessions.length !== 1 ? 's' : ''}
                       </span>
                     </div>
@@ -1463,7 +1463,7 @@ export default function RaceWeekendView({
                           tabIndex={0}
                           onClick={event => { event.stopPropagation(); onActivateWeekend(wk.id); }}
                           onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onActivateWeekend(wk.id); } }}
-                          className="px-2 py-1 rounded border border-primary/40 text-primary font-mono text-[9px] font-bold uppercase"
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 py-1 rounded border border-primary/40 text-primary font-mono text-xs font-bold uppercase"
                         >Set Active</span>
                       )}
                       {/* ⋯ menu: edit / delete */}
@@ -1504,10 +1504,10 @@ export default function RaceWeekendView({
                             >
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-mono text-xs text-primary font-bold">{sx.name}</span>
-                                  {isActiveSx && <span className="font-mono text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-bold">Active</span>}
+                                  <span className="font-mono text-sm text-primary font-bold">{sx.name}</span>
+                                  {isActiveSx && <span className="font-mono text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-bold">Active</span>}
                                 </div>
-                                <span className="font-mono text-[10px] text-on-surface-variant">Best: {sx.bestLap || '--'} | Finish: {sx.finishPos || '--'}</span>
+                                <span className="font-mono text-sm text-on-surface-variant">Best: {sx.bestLap || '--'} | Finish: {sx.finishPos || '--'}</span>
                               </div>
                               <span className="material-symbols-outlined text-on-surface-variant">
                                 {expandedSessionId === sx.id ? 'expand_less' : 'expand_more'}
@@ -1515,13 +1515,13 @@ export default function RaceWeekendView({
                             </button>
 
                             {expandedSessionId === sx.id && (
-                              <div className="p-3 bg-surface-container-lowest border-t border-outline-variant/30 text-xs font-mono text-on-surface-variant space-y-2">
+                              <div className="p-3 bg-surface-container-lowest border-t border-outline-variant/30 text-sm font-mono text-on-surface-variant space-y-2">
                                 <div className="flex justify-between items-center mb-2">
-                                  <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Run Details</span>
+                                  <span className="text-xs uppercase font-bold text-primary tracking-wider">Run Details</span>
                                   <div className="flex items-center gap-2">
                                     {!isWeekendFinished(wk) && <button
                                       onClick={(e) => { e.stopPropagation(); onSelectSession(sx, wk.id); }}
-                                      className="flex items-center gap-1.5 px-3 py-1 bg-surface-bright hover:bg-surface-container-high border border-outline-variant rounded transition-colors text-[10px] font-bold uppercase font-mono text-on-surface cursor-pointer"
+                                      className="flex min-h-11 items-center gap-1.5 px-3 py-1 bg-surface-bright hover:bg-surface-container-high border border-outline-variant rounded transition-colors text-xs font-bold uppercase font-mono text-on-surface cursor-pointer"
                                     >
                                       <span className="material-symbols-outlined text-[14px] text-primary">edit</span>
                                       Load
@@ -1564,7 +1564,7 @@ export default function RaceWeekendView({
         <section className="rounded-xl border border-primary/40 bg-primary/5 p-3 space-y-2">
           <div>
             <h2 className="font-display font-bold uppercase text-on-surface">Finish Race Day</h2>
-            <p className="font-mono text-xs text-on-surface-variant mt-1">Saves {lifecycleLabel('final', currentWeekend)}, closes this race night or test day, and makes that setup your new Current Setup.</p>
+            <p className="font-mono text-sm text-on-surface-variant mt-1">Saves {lifecycleLabel('final', currentWeekend)}, closes this race night or test day, and makes that setup your new Current Setup.</p>
           </div>
           <button
             type="button"

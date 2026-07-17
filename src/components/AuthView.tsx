@@ -117,9 +117,9 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
             <h2 className="font-display font-bold text-base text-on-surface uppercase tracking-tight">
               {profile?.displayName || 'Racer'}
             </h2>
-            <p className="text-xs text-on-surface-variant font-mono">{user.email}</p>
+            <p className="text-sm text-on-surface-variant font-mono">{user.email}</p>
           </div>
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase">
+          <span className="font-mono text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase">
             PRO
           </span>
         </div>
@@ -128,7 +128,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
         <div className="flex bg-surface rounded-lg p-0.5 border border-outline-variant/30 gap-0.5">
           <button
             onClick={() => setAuthMode('profile')}
-            className={`flex-1 py-1.5 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
+            className={`flex-1 min-h-11 py-1.5 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
               authMode === 'profile'
                 ? 'bg-primary/10 text-primary font-bold'
                 : 'text-on-surface-muted hover:text-on-surface-variant'
@@ -138,7 +138,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
           </button>
           <button
             onClick={() => setAuthMode('team')}
-            className={`flex-1 py-1.5 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
+            className={`flex-1 min-h-11 py-1.5 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
               authMode === 'team'
                 ? 'bg-primary/10 text-primary font-bold'
                 : 'text-on-surface-muted hover:text-on-surface-variant'
@@ -154,7 +154,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
             {/* Stats */}
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-surface border border-outline-variant/30 rounded-lg p-3">
-                <p className="text-[10px] text-on-surface-variant uppercase font-mono tracking-wider">Account</p>
+                <p className="text-xs text-on-surface-variant uppercase font-mono tracking-wider">Account</p>
                 <p className="text-sm font-bold text-on-surface font-mono">
                   {profile?.createdAt
                     ? new Date(profile.createdAt).toLocaleDateString()
@@ -162,7 +162,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
                 </p>
               </div>
               <div className="bg-surface border border-outline-variant/30 rounded-lg p-3">
-                <p className="text-[10px] text-on-surface-variant uppercase font-mono tracking-wider">Sync</p>
+                <p className="text-xs text-on-surface-variant uppercase font-mono tracking-wider">Sync</p>
                 <p className="text-sm font-bold text-green-400 font-mono flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
                   Active
@@ -178,7 +178,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
                   Cloud Storage Active
                 </span>
               </div>
-              <p className="text-[11px] text-on-surface-muted leading-relaxed">
+              <p className="text-sm text-on-surface-muted leading-relaxed">
                 Your setups, run logs, and Race Day data sync automatically
                 across all your devices. Data stays available offline.
               </p>
@@ -188,7 +188,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
             <button
               onClick={handleLogout}
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-red-900/20 border border-red-800/40 text-red-400 
+              className="w-full min-h-11 py-2.5 px-4 bg-red-900/20 border border-red-800/40 text-red-400
                          font-mono text-xs uppercase tracking-wider rounded-md
                          hover:bg-red-900/30 transition-colors active:opacity-80
                          disabled:opacity-50 disabled:cursor-not-allowed"
@@ -213,7 +213,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
       <div className="flex bg-surface rounded-lg p-0.5 border border-outline-variant/30">
         <button
           onClick={() => { setMode('login'); setError(''); setSuccess(''); }}
-          className={`flex-1 py-2 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
+          className={`flex-1 min-h-11 py-2 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
             mode === 'login'
               ? 'bg-primary/10 text-primary font-bold'
               : 'text-on-surface-muted hover:text-on-surface-variant'
@@ -223,7 +223,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
         </button>
         <button
           onClick={() => { setMode('register'); setError(''); setSuccess(''); }}
-          className={`flex-1 py-2 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
+          className={`flex-1 min-h-11 py-2 text-xs font-mono uppercase tracking-wider rounded-md transition-all ${
             mode === 'register'
               ? 'bg-primary/10 text-primary font-bold'
               : 'text-on-surface-muted hover:text-on-surface-variant'
@@ -237,7 +237,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
       <form onSubmit={mode === 'login' ? handleLogin : handleRegister} className="flex flex-col gap-3">
         {mode === 'register' && (
           <div>
-            <label className="block text-[10px] font-mono uppercase text-on-surface-variant mb-1 tracking-wider">
+            <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1 tracking-wider">
               Display Name
             </label>
             <input
@@ -245,7 +245,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}
               placeholder="Your racing name"
-              className="w-full bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
+              className="w-full min-h-11 bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
                          text-sm text-on-surface placeholder:text-on-surface-muted
                          focus:border-primary/50 focus:outline-none font-mono"
               autoComplete="name"
@@ -254,7 +254,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
         )}
 
         <div>
-          <label className="block text-[10px] font-mono uppercase text-on-surface-variant mb-1 tracking-wider">
+          <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1 tracking-wider">
             Email
           </label>
           <input
@@ -263,7 +263,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
             onChange={e => setEmail(e.target.value)}
             placeholder="racer@example.com"
             required
-            className="w-full bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
+            className="w-full min-h-11 bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
                        text-sm text-on-surface placeholder:text-on-surface-muted
                        focus:border-primary/50 focus:outline-none font-mono"
             autoComplete="email"
@@ -271,7 +271,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
         </div>
 
         <div>
-          <label className="block text-[10px] font-mono uppercase text-on-surface-variant mb-1 tracking-wider">
+          <label className="block text-xs font-mono uppercase text-on-surface-variant mb-1 tracking-wider">
             Password
           </label>
           <input
@@ -281,7 +281,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
             placeholder="••••••••"
             required
             minLength={6}
-            className="w-full bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
+            className="w-full min-h-11 bg-surface-container border border-outline-variant/50 rounded-md px-3 py-2.5
                        text-sm text-on-surface placeholder:text-on-surface-muted
                        focus:border-primary/50 focus:outline-none font-mono"
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
@@ -290,13 +290,13 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
 
         {/* Error / Success messages */}
         {error && (
-          <div className="flex items-center gap-1.5 text-red-400 text-xs font-mono">
+          <div className="flex items-center gap-1.5 text-red-400 text-sm font-mono">
             <span className="material-symbols-outlined text-sm">error</span>
             {error}
           </div>
         )}
         {success && (
-          <div className="flex items-center gap-1.5 text-green-400 text-xs font-mono">
+          <div className="flex items-center gap-1.5 text-green-400 text-sm font-mono">
             <span className="material-symbols-outlined text-sm">check_circle</span>
             {success}
           </div>
@@ -305,7 +305,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 px-4 bg-primary text-on-primary font-mono text-xs font-bold 
+          className="w-full min-h-11 py-2.5 px-4 bg-primary text-on-primary font-mono text-xs font-bold
                      uppercase tracking-wider rounded-md
                      hover:brightness-110 transition-all active:scale-[0.98]
                      disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
@@ -321,7 +321,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
       {/* Divider */}
       <div className="flex items-center gap-2">
         <div className="flex-1 h-px bg-outline-variant/30" />
-        <span className="text-[10px] font-mono uppercase text-on-surface-muted tracking-wider">or</span>
+        <span className="text-xs font-mono uppercase text-on-surface-muted tracking-wider">or</span>
         <div className="flex-1 h-px bg-outline-variant/30" />
       </div>
 
@@ -330,7 +330,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
         type="button"
         onClick={handleGoogleSignIn}
         disabled={loading}
-        className="w-full py-2.5 px-4 bg-surface border border-outline-variant/50 text-on-surface
+        className="w-full min-h-11 py-2.5 px-4 bg-surface border border-outline-variant/50 text-on-surface
                    font-mono text-xs font-bold uppercase tracking-wider rounded-md
                    flex items-center justify-center gap-2
                    hover:bg-surface-container transition-colors active:scale-[0.98]
@@ -346,7 +346,7 @@ export default function AuthView({ user, profile, onAuthChange, externalError }:
       </button>
 
       {/* Skip / offline notice */}
-      <p className="text-[10px] text-on-surface-muted text-center leading-relaxed font-mono">
+      <p className="text-sm text-on-surface-muted text-center leading-relaxed font-mono">
         Your data stays on your device until you sign in.
         <br />
         Sign in to sync setups across all your devices.

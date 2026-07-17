@@ -141,7 +141,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                 <span className="material-symbols-outlined text-primary text-lg">privacy_tip</span>
                 <h3 className="font-display font-bold uppercase text-sm tracking-wide">Privacy</h3>
               </div>
-              <p className="text-[11px] text-on-surface-variant font-mono">
+              <p className="text-sm text-on-surface-variant font-mono">
                 See what data CREW CHIEF uses, where it is stored, and how to remove it.
               </p>
               <button
@@ -159,14 +159,14 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                 <span className="material-symbols-outlined text-red-400 text-lg">warning</span>
                 <h3 className="font-display font-bold uppercase text-sm text-red-400 tracking-wide">Danger Zone</h3>
               </div>
-              <p className="text-[11px] text-on-surface-variant font-mono">
+              <p className="text-sm text-on-surface-variant font-mono">
                 Clear racing records while keeping your login, or permanently delete the entire account.
               </p>
 
               {clearStep === 0 && (
                 <button
                   onClick={() => setClearStep(1)}
-                  className="w-full py-2 rounded-lg border border-red-500/50 text-red-400 font-mono text-xs uppercase tracking-wider hover:bg-red-500/10 transition-colors"
+                  className="w-full min-h-11 py-2 rounded-lg border border-red-500/50 text-red-400 font-mono text-xs uppercase tracking-wider hover:bg-red-500/10 transition-colors"
                 >
                   Clear Racing Data
                 </button>
@@ -174,11 +174,11 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
 
               {clearStep === 1 && (
                 <div className="flex flex-col gap-2">
-                  <p className="text-xs font-mono text-red-400 text-center font-bold">Clear racing records but keep this account?</p>
+                  <p className="text-sm font-mono text-red-400 text-center font-bold">Clear racing records but keep this account?</p>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setClearStep(0)}
-                      className="flex-1 py-2 rounded-lg border border-outline-variant text-on-surface-variant font-mono text-xs uppercase tracking-wider hover:bg-surface transition-colors"
+                      className="flex-1 min-h-11 py-2 rounded-lg border border-outline-variant text-on-surface-variant font-mono text-xs uppercase tracking-wider hover:bg-surface transition-colors"
                     >
                       Cancel
                     </button>
@@ -188,7 +188,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                         await onClearAllData?.();
                         setClearStep(0);
                       }}
-                      className="flex-1 py-2 rounded-lg bg-red-500/20 border border-red-500 text-red-400 font-mono text-xs uppercase tracking-wider font-bold hover:bg-red-500/30 transition-colors"
+                      className="flex-1 min-h-11 py-2 rounded-lg bg-red-500/20 border border-red-500 text-red-400 font-mono text-xs uppercase tracking-wider font-bold hover:bg-red-500/30 transition-colors"
                     >
                       Yes, Clear Records
                     </button>
@@ -197,7 +197,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
               )}
 
               {clearStep === 2 && (
-                <p className="text-xs font-mono text-on-surface-variant text-center py-2">Clearing…</p>
+                <p className="text-sm font-mono text-on-surface-variant text-center py-2">Clearing…</p>
               )}
 
               <div className="border-t border-red-500/20 pt-3">
@@ -210,7 +210,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                     Delete Account
                   </button>
                 ) : (
-                  <p className="text-[11px] font-mono text-on-surface-variant">
+                  <p className="text-sm font-mono text-on-surface-variant">
                     Connect and sign in to delete the cloud account. Offline records can still be cleared above.
                   </p>
                 )}
@@ -227,12 +227,12 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                 <span className="material-symbols-outlined text-primary text-lg">palette</span>
                 <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">App Theme</h3>
               </div>
-              <p className="text-[11px] text-on-surface-variant font-mono">Customize the look. Changes apply instantly across the app.</p>
+              <p className="text-sm text-on-surface-variant font-mono">Customize the look. Changes apply instantly across the app.</p>
             </div>
 
             {/* Light / Dark mode */}
             <div className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">
-              <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Color Mode</label>
+              <label className="text-xs font-mono uppercase font-bold text-on-surface-variant tracking-wider">Color Mode</label>
               <div className="grid grid-cols-2 gap-2">
                 {(['dark', 'light'] as const).map(mode => (
                   <button
@@ -260,7 +260,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
 
             {/* Accent color */}
             <div className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">
-              <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Accent Color</label>
+              <label className="text-xs font-mono uppercase font-bold text-on-surface-variant tracking-wider">Accent Color</label>
 
               {/* Preset swatches grid */}
               <div className="grid grid-cols-3 gap-2">
@@ -270,7 +270,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                     <button
                       key={preset.hex}
                       onClick={() => onThemeChange({ ...theme, accent: preset.hex })}
-                      className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                      className={`flex min-h-11 items-center gap-2 p-2 rounded-lg border transition-all ${
                         isActive ? 'border-2 border-white/40' : 'border-outline-variant/40 hover:border-outline'
                       }`}
                       style={{ backgroundColor: preset.hex + '22' }}
@@ -279,7 +279,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                         className="w-5 h-5 rounded-full shrink-0 border-2"
                         style={{ backgroundColor: preset.hex, borderColor: isActive ? 'rgba(255,255,255,0.6)' : 'transparent' }}
                       />
-                      <span className="font-mono text-[10px] text-on-surface uppercase truncate">{preset.label}</span>
+                      <span className="font-mono text-xs text-on-surface uppercase truncate">{preset.label}</span>
                     </button>
                   );
                 })}
@@ -287,15 +287,15 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
 
               {/* Custom color picker */}
               <div className="flex items-center gap-2 pt-2 border-t border-outline-variant/30">
-                <label className="text-[10px] font-mono uppercase text-on-surface-variant font-bold shrink-0">Custom</label>
+                <label className="text-xs font-mono uppercase text-on-surface-variant font-bold shrink-0">Custom</label>
                 <input
                   type="color"
                   value={theme.accent}
                   onChange={e => onThemeChange({ ...theme, accent: e.target.value })}
-                  className="w-10 h-10 rounded border border-outline-variant cursor-pointer bg-transparent shrink-0"
+                  className="min-h-11 min-w-11 rounded border border-outline-variant cursor-pointer bg-transparent shrink-0"
                   title="Pick any accent color"
                 />
-                <span className="font-mono text-xs text-on-surface-variant flex-1">Tap to pick any color</span>
+                <span className="font-mono text-sm text-on-surface-variant flex-1">Tap to pick any color</span>
                 <div className="w-8 h-8 rounded-full border-2 border-outline-variant shrink-0" style={{ backgroundColor: theme.accent }} />
               </div>
             </div>
@@ -303,8 +303,8 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
             {/* Font Size */}
             <div className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">
               <div>
-                <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Font Size</label>
-                <p className="text-[10px] font-mono text-on-surface-muted mt-0.5">Scales all text and UI elements throughout the app.</p>
+                <label className="text-xs font-mono uppercase font-bold text-on-surface-variant tracking-wider">Font Size</label>
+                <p className="text-sm font-mono text-on-surface-muted mt-0.5">Scales all text and UI elements throughout the app.</p>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {([
@@ -341,7 +341,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
             {/* Reset */}
             <button
               onClick={() => onThemeChange({ mode: 'dark', accent: '#ffb3ac', fontSize: 'standard' })}
-              className="w-full py-2 border border-outline-variant text-on-surface-variant font-mono text-xs uppercase rounded hover:border-outline transition-colors"
+              className="w-full min-h-11 py-2 border border-outline-variant text-on-surface-variant font-mono text-xs uppercase rounded hover:border-outline transition-colors"
             >
               Reset to Defaults
             </button>
