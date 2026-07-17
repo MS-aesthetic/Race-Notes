@@ -198,6 +198,26 @@ const lockProductionClass = (source: string, className: string, label: string) =
   assert.ok(normalizeWhitespace(source).includes(normalizeWhitespace(className)), `${label}: production class is locked`);
   return normalizeWhitespace(className);
 };
+type ProductionValueSpan = { className: string; content: string };
+const findExactProductionSpan = (source: string, markup: string): ProductionValueSpan | null => {
+  const start = source.indexOf(markup);
+  if (start < 0 || source.indexOf(markup, start + markup.length) >= 0) return null;
+  const productionMarkup = source.slice(start, start + markup.length);
+  const parsed = productionMarkup.match(/^<span className="([^"]+)">([\s\S]+)<\/span>$/);
+  return parsed ? { className: parsed[1], content: parsed[2] } : null;
+};
+const lockExactProductionSpan = (source: string, markup: string, label: string) => {
+  const span = findExactProductionSpan(source, markup);
+  assert.ok(span, `${label}: exact production span is uniquely locked`);
+  return span;
+};
+
+const weatherValueMarkup = '<span className="font-mono text-sm font-bold text-on-surface">{value}</span>';
+const historyValueMarkup = '<span className="font-mono text-sm text-on-surface-variant">Best: {sx.bestLap || \'--\'} | Finish: {sx.finishPos || \'--\'}</span>';
+const productionValueSpans = {
+  weather: lockExactProductionSpan(raceWeekend, weatherValueMarkup, 'Race Weather value'),
+  history: lockExactProductionSpan(raceWeekend, historyValueMarkup, 'Race Best and Finish value'),
+};
 
 assert.equal((auth.match(/min-h-11/g) ?? []).length, 10, 'all ten direct Auth controls have explicit 44px floors');
 assert.ok((settings.match(/min-h-11/g) ?? []).length >= 10, 'Settings tabs, Privacy, Danger, accent, Reset, and delete controls retain 44px floors');
@@ -244,20 +264,31 @@ const productionClasses = {
   racePhotoDelete: lockProductionClass(raceWeekend, 'absolute top-1 right-1 bg-black/60 rounded-full min-w-11 min-h-11 flex', 'Race photo delete'),
   raceSetActive: lockProductionClass(raceWeekend, 'inline-flex min-h-11 min-w-11 items-center justify-center px-2 py-1 rounded border border-primary/40', 'Race Set Active'),
   raceLoad: lockProductionClass(raceWeekend, 'flex min-h-11 items-center gap-1.5 px-3 py-1 bg-surface-bright', 'Race Load action'),
-  raceWeatherValue: lockProductionClass(raceWeekend, 'font-mono text-sm font-bold text-on-surface', 'Race Weather value'),
-  raceHistoryValue: lockProductionClass(raceWeekend, 'font-mono text-sm text-on-surface-variant', 'Race Best and Finish value'),
+  raceWeatherValue: productionValueSpans.weather.className,
+  raceHistoryValue: productionValueSpans.history.className,
 };
 assert.ok((settings.match(/<p className="text-sm text-on-surface-variant font-mono">/g) ?? []).length >= 2, 'Privacy and Danger descriptions both use body floor');
 assert.match(settings, /Clear racing records but keep this account\?<\/p>/, 'Danger confirmation body remains present');
 assert.match(raceWeekend, /Best: \{sx\.bestLap \|\| '--'\} \| Finish: \{sx\.finishPos \|\| '--'\}/, 'session history value remains source-locked');
 
 type RepairMutation = 'target-height' | 'compact-width' | 'auth-body' | 'race-value' | 'time-columns';
-type RepairProbe = { name: string; viewportWidth: number; viewportHeight: number; scale: number; mutation?: RepairMutation };
+type RepairProbe = {
+  name: string;
+  viewportWidth: number;
+  viewportHeight: number;
+  scale: number;
+  mutation?: RepairMutation;
+  valueSpans?: typeof productionValueSpans;
+};
 const repairViewports = [[360, 800], [390, 844], [412, 915], [1080, 2118]] as const;
 const repairScales = [['standard', 1], ['large', 1.15]] as const;
 
-const renderRepairProbe = ({ name, viewportWidth, viewportHeight, scale, mutation }: RepairProbe) => {
-  const classes = { ...productionClasses };
+const renderRepairProbe = ({ name, viewportWidth, viewportHeight, scale, mutation, valueSpans = productionValueSpans }: RepairProbe) => {
+  const classes = {
+    ...productionClasses,
+    raceWeatherValue: valueSpans.weather.className,
+    raceHistoryValue: valueSpans.history.className,
+  };
   if (mutation === 'target-height') classes.authMode = classes.authMode.replace('min-h-11', 'min-h-[43px]');
   if (mutation === 'compact-width') classes.raceClear = classes.raceClear.replace('min-w-11', 'min-w-[43px]');
   if (mutation === 'auth-body') classes.authBody = classes.authBody.replace('text-sm', 'text-xs');
@@ -269,8 +300,8 @@ const renderRepairProbe = ({ name, viewportWidth, viewportHeight, scale, mutatio
     if (tag === 'select') return `<select ${attributes} aria-label="${label}"><option>${label}</option></select>`;
     return `<${tag} ${attributes}>${label}</${tag}>`;
   };
-  const text = (label: string, className: string, kind: 'body' | 'value' | 'chrome') =>
-    `<p data-text data-${kind} data-name="${label}" class="${className}">${label}</p>`;
+  const text = (label: string, className: string, kind: 'body' | 'value' | 'chrome', content = label) =>
+    `<p data-text data-${kind} data-name="${label}" class="${className}">${content}</p>`;
   const document = `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;font-family:Arial,sans-serif}.viewport{width:${viewportWidth}px;height:${viewportHeight}px}.repair{zoom:${scale};min-width:0}main{padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:8px}.panel{min-width:0;border:1px solid #777;padding:8px;display:flex;flex-wrap:wrap;align-content:start;gap:8px}.w-full{width:100%}.flex-1{flex:1}.compact{width:min-content!important;flex:none!important;padding-left:0!important;padding-right:0!important}.font-mono{font-family:monospace}.time-grid{display:grid;width:100%;gap:4px}[class~="grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))]"]{grid-template-columns:repeat(auto-fit,minmax(88px,1fr))}[class~="grid-cols-4"]{grid-template-columns:repeat(4,minmax(0,1fr))}[class~="px-1"]{padding-left:4px;padding-right:4px}button,input,select{font:inherit;max-width:100%;padding-top:0;padding-bottom:0}[class~="min-h-11"]{min-height:44px}[class~="min-h-12"]{min-height:48px}[class~="min-w-11"]{min-width:44px}[class~="min-h-[43px]"]{min-height:43px}[class~="min-w-[43px]"]{min-width:43px}[class~="text-base"]{font-size:16px;line-height:24px}[class~="text-sm"]{font-size:14px;line-height:20px}[class~="text-xs"]{font-size:12px;line-height:16px}
@@ -280,8 +311,8 @@ const renderRepairProbe = ({ name, viewportWidth, viewportHeight, scale, mutatio
 <section class="panel" data-state="settings">${text('Privacy description', classes.settingsBody, 'body')}${target('Privacy Policy', classes.settingsPrivacy)}${text('Danger description', classes.settingsBody, 'body')}${target('Clear Racing Data', classes.settingsDanger)}${target('Danger Cancel', classes.settingsConfirm)}${target('Danger Confirm', classes.settingsDangerConfirm)}${target('Delete Account', classes.settingsDeleteAccount)}${target('Type DELETE', classes.settingsDeleteField, false, 'input')}${target('Delete sheet Cancel', classes.settingsDeleteCancel)}${target('Delete Forever', classes.settingsDeleteAction)}${target('Reset', classes.settingsReset)}${target('Color', classes.settingsColor, true, 'input')}</section>
 <section class="panel" data-state="race-weekend-modal">${target('Close Race Day', classes.raceClose, true)}${target('Race Day Name', classes.raceModalField, false, 'input')}${target('Track', classes.raceModalField, false, 'input')}${target('Date', classes.raceModalField, false, 'input')}${target('Starting Setup', classes.raceModalField, false, 'select')}${target('Cancel Race Day', classes.raceModalCancel)}${target('Create Race Day', classes.raceModalAction)}</section>
 <section class="panel" data-state="race-new-session">${target('Close Run', classes.raceClose, true)}${target('Run type', classes.raceChip)}${target('Condition', classes.raceChip)}<div class="time-grid ${classes.raceTimeGrid}">${['Current Time', 'Afternoon', 'Evening', 'Night'].map(label => target(label, classes.raceTimeTarget)).join('')}</div>${target('Surface notes', classes.raceZipField, false, 'input')}${target('GPS', classes.raceWeather)}${target('Zip', classes.raceWeather)}${target('Clear', classes.raceClear, true)}${target('ZIP field', classes.raceZipField, false, 'input')}${target('Get', classes.raceCompactAction, true)}${target('Cancel Run', classes.raceModalCancel)}${target('Start Run', classes.raceModalAction)}${text('Session weather', 'font-mono text-sm text-on-surface', 'value')}</section>
-<section class="panel" data-state="race-weather">${target('Main GPS', classes.raceMainWeather)}${target('Main ZIP', classes.raceMainWeather)}${target('Main ZIP field', classes.raceMainZipField, false, 'input')}${target('Main Get', classes.raceMainAction, true)}${target('Refresh', classes.raceRefresh, true)}${target('Import tires', classes.raceImport)}${target('Tire select', classes.raceSelect, false, 'select')}${target('Add image', classes.raceAddImage, true)}${target('Delete photo', classes.racePhotoDelete, true)}${text('72°F', classes.raceWeatherValue, 'value')}${text('Temp label', 'font-mono text-xs', 'chrome')}</section>
-<section class="panel" data-state="race-history">${target('Set Active', classes.raceSetActive, true)}${target('Load', classes.raceLoad)}${text('Best: 14.250 | Finish: 2', classes.raceHistoryValue, 'value')}${text('Run details', 'font-mono text-xs', 'chrome')}</section>
+<section class="panel" data-state="race-weather">${target('Main GPS', classes.raceMainWeather)}${target('Main ZIP', classes.raceMainWeather)}${target('Main ZIP field', classes.raceMainZipField, false, 'input')}${target('Main Get', classes.raceMainAction, true)}${target('Refresh', classes.raceRefresh, true)}${target('Import tires', classes.raceImport)}${target('Tire select', classes.raceSelect, false, 'select')}${target('Add image', classes.raceAddImage, true)}${target('Delete photo', classes.racePhotoDelete, true)}${text('Weather value', classes.raceWeatherValue, 'value', valueSpans.weather.content)}${text('Temp label', 'font-mono text-xs', 'chrome')}</section>
+<section class="panel" data-state="race-history">${target('Set Active', classes.raceSetActive, true)}${target('Load', classes.raceLoad)}${text('Best and Finish value', classes.raceHistoryValue, 'value', valueSpans.history.content)}${text('Run details', 'font-mono text-xs', 'chrome')}</section>
 </main></div></div><pre id="result"></pre><script>
 const rect=node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};
 const targets=[...document.querySelectorAll('[data-target]')].map(node=>({name:node.dataset.name,compact:node.hasAttribute('data-compact'),rect:rect(node),panel:rect(node.closest('.panel')),clientWidth:node.clientWidth,scrollWidth:node.scrollWidth,clientHeight:node.clientHeight,scrollHeight:node.scrollHeight}));
@@ -350,6 +381,32 @@ for (const mutation of [
 ] as const) {
   const scale = mutation.mutation === 'time-columns' ? 1.15 : 1;
   assert.equal(repairLayoutPasses({ ...mutation, viewportWidth: 360, viewportHeight: 800, scale }).passes, false, `${mutation.name}: rendered repair proof rejects bad fixture`);
+}
+
+for (const mutation of [
+  {
+    name: 'production-weather-value-xs',
+    key: 'weather',
+    goodMarkup: weatherValueMarkup,
+    badMarkup: weatherValueMarkup.replace('text-sm', 'text-xs'),
+  },
+  {
+    name: 'production-history-value-xs',
+    key: 'history',
+    goodMarkup: historyValueMarkup,
+    badMarkup: historyValueMarkup.replace('text-sm', 'text-xs'),
+  },
+] as const) {
+  const mutatedSource = raceWeekend.replace(mutation.goodMarkup, mutation.badMarkup);
+  assert.notEqual(mutatedSource, raceWeekend, `${mutation.name}: exact production markup is mutated in memory`);
+  assert.equal(findExactProductionSpan(mutatedSource, mutation.goodMarkup), null, `${mutation.name}: original exact production lock rejects mutation`);
+  const mutatedSpan = lockExactProductionSpan(mutatedSource, mutation.badMarkup, `${mutation.name} bad fixture`);
+  const valueSpans = { ...productionValueSpans, [mutation.key]: mutatedSpan };
+  assert.equal(
+    repairLayoutPasses({ name: mutation.name, viewportWidth: 360, viewportHeight: 800, scale: 1, valueSpans }).passes,
+    false,
+    `${mutation.name}: rendered gate rejects class and content derived from mutated production span`,
+  );
 }
 
 const runSection = sliceBetween(raceWeekend, '{/* 1 ── Identity */}', '{/* 5 ── Tires & pressures */}');
