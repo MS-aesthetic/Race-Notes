@@ -258,7 +258,7 @@ const notificationSourcePasses = (appSource: string, setupSource: string): boole
 
 assert.ok(notificationSourcePasses(app, setup), 'B2 source has one reason-keyed arbiter, passive historic banner, and one top notification renderer');
 
-type B2Probe = { viewportWidth: number; viewportHeight: number; scale: number; appSource: string; offline: boolean };
+type B2Probe = { viewportWidth: number; viewportHeight: number; scale: number; appSource: string; offline: boolean; simultaneous?: boolean };
 const b2Chrome = [
   process.env.CHROME_BIN,
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -314,7 +314,34 @@ const compileB2Mutation = (source: string, label: string) => {
   );
 };
 
-const b2NotificationGeometry = ({ viewportWidth, viewportHeight, scale, appSource, offline }: B2Probe) => {
+type B2RenderedRoute = {
+  isInfo: boolean;
+  isSuccess: boolean;
+  msg: string;
+};
+
+const productionNotificationRoute = (appSource: string, simultaneous = false): B2RenderedRoute => {
+  const markup = between(appSource, '        {/* One compact notification arbiter.', '\n\n        {/* Core Main Active Canvas Area */}', 'B2 production route slice');
+  const route = markup.match(/(const isInfo = [\s\S]*?const isSuccess = [^;]+;)/)?.[1];
+  assert.ok(route, 'B2 exact production notification routing statements exist');
+  const evaluateRoute = new Function(
+    'infoToast',
+    'savedFlash',
+    'syncStatus',
+    'isOnline',
+    'resolveInfoCopy',
+    `${route}\nreturn { isInfo, isSuccess, msg };`,
+  ) as (infoToast: object, savedFlash: boolean, syncStatus: string, isOnline: boolean, resolveInfoCopy: () => string) => B2RenderedRoute;
+  return evaluateRoute(
+    { reason: 'missing-weekend-log' },
+    simultaneous,
+    '',
+    true,
+    () => 'Race Day setup is missing or locked. Restore it before logging a run.',
+  );
+};
+
+const b2NotificationGeometry = ({ viewportWidth, viewportHeight, scale, appSource, offline, simultaneous = false }: B2Probe) => {
   const probeDir = mkdtempSync(join(tmpdir(), 'race-notes-b2-notice-'));
   const htmlPath = join(probeDir, 'probe.html');
   const profilePath = join(probeDir, 'profile');
@@ -336,16 +363,24 @@ const b2NotificationGeometry = ({ viewportWidth, viewportHeight, scale, appSourc
   const usesMeasuredTop = markup.includes('style={{ top: notificationTop }}');
   const fixedTop = markup.match(/style=\{\{ top: (\d+) \}\}/)?.[1];
   const fixedBottom = markup.match(/style=\{\{ bottom: (\d+) \}\}/)?.[1];
-  const duplicateNotice = markup.includes('data-notification-slot="saved-duplicate"');
+  const route = productionNotificationRoute(appSource, simultaneous);
+  const noticeKind = route.isInfo ? 'info' : route.isSuccess ? 'saved' : 'sync';
+  const duplicateNotice = simultaneous && markup.includes('data-notification-slot="saved-duplicate"');
   const slotStyle = fixedTop ? `top:${fixedTop}px` : fixedBottom ? `bottom:${fixedBottom}px` : '';
+  const renderedPillClass = route.isSuccess
+    ? `${noticeBaseClass(appSource)} bg-green-500 border-green-300 text-black`
+    : pillClass;
+  const renderedClose = route.isInfo
+    ? `<button id="qa-close" type="button" aria-label="Dismiss notification" class="${escapeAttribute(closeClass)}"><span>×</span></button>`
+    : '';
   const document = `<!doctype html><html style="--ui-zoom:${scale};--qa-safe-top:24px;--qa-safe-bottom:20px"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${b2ProductionCss}\nhtml,body{margin:0!important;width:${viewportWidth}px;height:${viewportHeight}px;overflow:hidden!important}body{position:relative}#applet-main-body{position:relative}#qa-slot{position:absolute!important}#qa-result{display:none!important}</style></head><body>
 <div id="applet-main-body" class="${escapeAttribute(rootClass)}"><div id="viewport-chassis" class="${escapeAttribute(chassisClass)}">
 <header id="qa-header" class="${escapeAttribute(headerClass)}"><div id="qa-header-row" class="${escapeAttribute(headerRowClass)}"><div class="${escapeAttribute(brandClass)}"><span class="material-symbols-outlined text-primary text-xl">●</span><h1 class="font-display font-bold tracking-tight text-base text-primary uppercase">CREW CHIEF</h1></div><div class="${escapeAttribute(actionsClass)}">${offline ? `<div class="${escapeAttribute(offlineClass)}"><span>●</span><span class="hidden min-[360px]:inline">OFFLINE</span></div>` : ''}<button class="${escapeAttribute(guideClass)}"><span>●</span><span class="font-mono text-[11px] font-semibold">Tuning Guide</span></button><button class="${escapeAttribute(themeClass)}"><span>●</span></button></div></div></header>
-<div id="qa-slot" data-notification-slot="arbiter" class="${escapeAttribute(wrapperClass)}" style="${slotStyle}"><div id="qa-toast" role="status" aria-live="polite" class="${escapeAttribute(pillClass)}"><span class="material-symbols-outlined text-xl">●</span><span class="min-w-0 flex-1">Race Day setup is missing or locked. Restore it before logging a run.</span><button id="qa-close" type="button" aria-label="Dismiss notification" class="${escapeAttribute(closeClass)}"><span>×</span></button></div>${duplicateNotice ? '<div data-notification-slot="saved-duplicate" role="status" class="min-h-11 rounded-full px-4 py-2">Saved</div>' : ''}</div>
+<div id="qa-slot" data-notification-slot="arbiter" class="${escapeAttribute(wrapperClass)}" style="${slotStyle}"><div id="qa-toast" data-notice-kind="${noticeKind}" role="status" aria-live="polite" class="${escapeAttribute(renderedPillClass)}"><span class="material-symbols-outlined text-xl">●</span><span class="min-w-0 flex-1">${route.msg}</span>${renderedClose}</div>${duplicateNotice ? '<div data-notification-slot="saved-duplicate" role="status" class="min-h-11 rounded-full px-4 py-2">Saved</div>' : ''}</div>
 <main class="${escapeAttribute(mainClass)}">Race Notes</main><nav id="global-bottom-nav-bar" class="${escapeAttribute(navClass)}"><button class="flex flex-1 min-w-0 flex-col items-center justify-center h-full">Dashboard</button></nav>
 </div></div><pre id="qa-result"></pre><script>
 const scale=${scale};const slot=document.querySelector('#qa-slot');const header=document.querySelector('#qa-header');${usesMeasuredTop ? "slot.style.top=((header.getBoundingClientRect().bottom/scale)+8)+'px';" : ''}
-const r=o=>{const x=o.getBoundingClientRect();return {left:x.left,right:x.right,top:x.top,bottom:x.bottom,width:x.width,height:x.height}};const toast=document.querySelector('#qa-toast'),close=document.querySelector('#qa-close'),nav=document.querySelector('#global-bottom-nav-bar'),chassis=document.querySelector('#viewport-chassis'),headerRow=document.querySelector('#qa-header-row');document.querySelector('#qa-result').textContent=JSON.stringify({toast:r(toast),close:r(close),header:r(header),headerRow:r(headerRow),nav:r(nav),chassisClient:chassis.clientWidth,chassisScroll:chassis.scrollWidth,bodyClient:document.documentElement.clientWidth,bodyScroll:document.documentElement.scrollWidth,fontSize:getComputedStyle(toast).fontSize,headerPaddingTop:getComputedStyle(header).paddingTop,statusCount:document.querySelectorAll('[role=status]').length});
+const r=o=>{if(!o)return null;const x=o.getBoundingClientRect();return {left:x.left,right:x.right,top:x.top,bottom:x.bottom,width:x.width,height:x.height}};const toast=document.querySelector('#qa-toast'),close=document.querySelector('#qa-close'),nav=document.querySelector('#global-bottom-nav-bar'),chassis=document.querySelector('#viewport-chassis'),headerRow=document.querySelector('#qa-header-row');document.querySelector('#qa-result').textContent=JSON.stringify({toast:r(toast),close:r(close),header:r(header),headerRow:r(headerRow),nav:r(nav),chassisClient:chassis.clientWidth,chassisScroll:chassis.scrollWidth,bodyClient:document.documentElement.clientWidth,bodyScroll:document.documentElement.scrollWidth,fontSize:getComputedStyle(toast).fontSize,headerPaddingTop:getComputedStyle(header).paddingTop,statusCount:document.querySelectorAll('[role=status]').length,noticeKind:toast.dataset.noticeKind,noticeText:toast.textContent});
 </script></body></html>`;
   try {
     writeFileSync(htmlPath, document);
@@ -358,7 +393,7 @@ const r=o=>{const x=o.getBoundingClientRect();return {left:x.left,right:x.right,
     assert.ok(encoded, 'B2 rendered notification probe returned measurements');
     return JSON.parse(encoded.replaceAll('&quot;', '"').replaceAll('&amp;', '&')) as {
       toast: { left: number; right: number; top: number; bottom: number; width: number; height: number };
-      close: { left: number; right: number; top: number; bottom: number; width: number; height: number };
+      close: { left: number; right: number; top: number; bottom: number; width: number; height: number } | null;
       header: { left: number; right: number; top: number; bottom: number; height: number };
       headerRow: { height: number };
       nav: { left: number; right: number; top: number; bottom: number };
@@ -369,6 +404,8 @@ const r=o=>{const x=o.getBoundingClientRect();return {left:x.left,right:x.right,
       fontSize: string;
       headerPaddingTop: string;
       statusCount: number;
+      noticeKind: 'info' | 'saved' | 'sync';
+      noticeText: string;
     };
   } finally {
     rmSync(probeDir, { recursive: true, force: true });
@@ -389,6 +426,8 @@ const b2RenderedPasses = (probe: B2Probe) => {
     && result.toast.top + tolerance >= result.header.bottom
     && result.toast.top <= result.header.bottom + (16 * probe.scale) + tolerance
     && result.toast.bottom + tolerance < result.nav.top
+    && result.noticeKind === 'info'
+    && result.close !== null
     && result.close.width + tolerance >= target && result.close.height + tolerance >= target
     && Number.parseFloat(result.fontSize) + tolerance >= 14
     && Number.parseFloat(result.headerPaddingTop) + tolerance >= 24
@@ -531,7 +570,13 @@ const coRenderModel = createB2ArbiterModel(coRenderMutation);
 coRenderModel.flashSaved();
 coRenderModel.showInfo('pressure-source');
 assert.equal(coRenderModel.visible(), 'info + Saved', 'B2 duplicate render-path mutation behaviorally co-renders two notices');
-assert.equal(b2NotificationGeometry({ viewportWidth: 360, viewportHeight: 800, scale: 1, appSource: coRenderMutation, offline: true }).statusCount, 2, 'B2 compile-real co-render mutation renders two production-routed statuses');
+assert.equal(b2NotificationGeometry({ viewportWidth: 360, viewportHeight: 800, scale: 1, appSource: coRenderMutation, offline: true, simultaneous: true }).statusCount, 2, 'B2 compile-real co-render mutation renders two production-routed statuses');
+
+const baselinePriorityRender = b2RenderedPasses({ viewportWidth: 360, viewportHeight: 800, scale: 1, appSource: app, offline: true, simultaneous: true });
+assert.equal(baselinePriorityRender.passes, true, 'B2 simultaneous baseline passes rendered arbiter gate');
+assert.equal(baselinePriorityRender.result.noticeKind, 'info', 'B2 simultaneous baseline production routing renders info');
+assert.equal(baselinePriorityRender.result.statusCount, 1, 'B2 simultaneous baseline renders exactly one status');
+assert.match(baselinePriorityRender.result.noticeText, /Race Day setup is missing or locked/, 'B2 simultaneous baseline renders resolved info copy');
 
 const infoPriorityMutation = app
   .replace('    clearSavedFlash();\n    if (syncStatus === \'Synced\')', '    // mutation: retain pending Saved while info becomes active\n    if (syncStatus === \'Synced\')')
@@ -542,6 +587,12 @@ const infoPriorityModel = createB2ArbiterModel(infoPriorityMutation);
 infoPriorityModel.flashSaved();
 infoPriorityModel.showInfo('pressure-source');
 assert.equal(infoPriorityModel.visible(), 'Saved', 'B2 info-priority mutation behaviorally lets Saved hide info');
+const mutatedPriorityRender = b2RenderedPasses({ viewportWidth: 360, viewportHeight: 800, scale: 1, appSource: infoPriorityMutation, offline: true, simultaneous: true });
+assert.equal(mutatedPriorityRender.result.noticeKind, 'saved', 'B2 compile-real priority mutation production routing renders Saved');
+assert.match(mutatedPriorityRender.result.noticeText, /Saved/, 'B2 compile-real priority mutation hides info copy behind Saved');
+assert.doesNotMatch(mutatedPriorityRender.result.noticeText, /Race Day setup is missing or locked/, 'B2 compile-real priority mutation does not render info');
+assert.equal(mutatedPriorityRender.result.statusCount, 1, 'B2 compile-real priority mutation still renders one arbiter status');
+assert.equal(mutatedPriorityRender.passes, false, 'B2 compile-real priority mutation independently fails rendered info-priority gate');
 
 const dedupeRemovalMutation = app.replace('if (lastShownAt !== undefined && now - lastShownAt < INFO_DEDUPE_MS) return;', 'if (false) return;');
 assert.equal(notificationSourcePasses(dedupeRemovalMutation, setup), false, 'B2 dedupe-removal source mutation fails the source gate');
