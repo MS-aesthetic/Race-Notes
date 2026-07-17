@@ -1,6 +1,13 @@
 import { createClient, User, Session } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { Team, TeamProfile } from '../types';
+import {
+  extractNativeAuthCode,
+  isNativeAuthCallbackUrl,
+  NATIVE_AUTH_CALLBACK_URL,
+} from './nativeAuth';
+
+export { NATIVE_AUTH_CALLBACK_URL } from './nativeAuth';
 
 // ---------------------------------------------------------------------------
 // Supabase client singleton – reads keys from Vite env vars (VITE_ prefix)
@@ -28,10 +35,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     flowType: 'pkce',
   },
 });
-
-// Custom URL scheme (registered in AndroidManifest.xml) used to bounce back
-// into the native Android app after the system browser finishes Google sign-in.
-export const NATIVE_AUTH_CALLBACK_URL = 'nimbus.engineering.crewchief://auth-callback';
 
 // ---------------------------------------------------------------------------
 // Local "has this device ever registered/signed in" flag.
@@ -136,9 +139,11 @@ export async function signInWithGoogle() {
  * No-op if the URL isn't our auth callback scheme.
  */
 export async function handleNativeAuthCallback(url: string): Promise<boolean> {
-  if (!url.startsWith(NATIVE_AUTH_CALLBACK_URL)) return false;
+  if (!isNativeAuthCallbackUrl(url)) return false;
   try {
-    const { error } = await supabase.auth.exchangeCodeForSession(url);
+    const authCode = extractNativeAuthCode(url);
+    if (!authCode) return false;
+    const { error } = await supabase.auth.exchangeCodeForSession(authCode);
     if (error) throw error;
     return true;
   } finally {

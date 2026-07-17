@@ -618,6 +618,7 @@ export default function App() {
   const [teamMembers, setTeamMembers] = useState<AppUser[] | null>(null);
   const [teamResolved, setTeamResolved] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const [nativeAuthError, setNativeAuthError] = useState<{ id: number; message: string } | null>(null);
   const [hasLocalAcct, setHasLocalAcct] = useState<boolean>(() => hasLocalAccount());
   const [syncStatus, setSyncStatus] = useState('');
   const [pullDone, setPullDone] = useState(false); // initial cloud pull resolved — gates [4]
@@ -1081,12 +1082,31 @@ export default function App() {
   // ---- Auth: catch the Google sign-in deep link on native Android ----
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
+    let active = true;
+    const handledUrls = new Set<string>();
+    const processAuthUrl = (url?: string) => {
+      if (!active || !url || handledUrls.has(url)) return;
+      handledUrls.add(url);
+      void handleNativeAuthCallback(url)
+        .then(handled => {
+          if (handled) setNativeAuthError(null);
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : 'Google sign-in failed.';
+          console.warn('Native Google sign-in callback failed:', error);
+          setNativeAuthError({ id: Date.now(), message });
+        });
+    };
     const listenerPromise = CapacitorApp.addListener('appUrlOpen', ({ url }) => {
-      handleNativeAuthCallback(url).catch(err =>
-        console.warn('Native Google sign-in callback failed:', err)
-      );
+      processAuthUrl(url);
     });
-    return () => { listenerPromise.then(l => l.remove()); };
+    void CapacitorApp.getLaunchUrl()
+      .then(result => processAuthUrl(result?.url))
+      .catch(error => console.warn('Native launch URL check failed:', error));
+    return () => {
+      active = false;
+      void listenerPromise.then(listener => listener.remove());
+    };
   }, []);
 
   // ---- Cloud sync: pull on login, push on data changes ----
@@ -2102,7 +2122,12 @@ export default function App() {
                   Once you've signed in on this device, the app keeps working with no signal.
                 </span>
               </p>
-              <AuthView user={null} profile={null} onAuthChange={handleAuthViewChange} />
+              <AuthView
+                user={null}
+                profile={null}
+                onAuthChange={handleAuthViewChange}
+                externalError={nativeAuthError}
+              />
             </div>
           </main>
         </div>

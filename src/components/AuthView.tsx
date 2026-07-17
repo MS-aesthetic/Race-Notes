@@ -7,11 +7,12 @@ interface AuthViewProps {
   user: User | null;
   profile: AppUser | null;
   onAuthChange: (user: User | null) => void;
+  externalError?: { id: number; message: string } | null;
 }
 
 type AuthMode = 'login' | 'register' | 'profile';
 
-export default function AuthView({ user, profile, onAuthChange }: AuthViewProps) {
+export default function AuthView({ user, profile, onAuthChange, externalError }: AuthViewProps) {
   const [mode, setMode] = useState<AuthMode>(user ? 'profile' : 'login');
   const [authMode, setAuthMode] = useState<'profile' | 'team'>('profile');
 
@@ -28,6 +29,12 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
     setError('');
     setSuccess('');
   }, [user]);
+
+  React.useEffect(() => {
+    if (!externalError) return;
+    setError(externalError.message || 'Google sign-in failed.');
+    setLoading(false);
+  }, [externalError]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +82,9 @@ export default function AuthView({ user, profile, onAuthChange }: AuthViewProps)
       // Native: the system browser opens; loading resets once we return.
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Google sign-in failed');
+    } finally {
+      // Web navigates away immediately. Native returns here after opening the
+      // system browser; callback success then arrives through appUrlOpen.
       setLoading(false);
     }
   };
