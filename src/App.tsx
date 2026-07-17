@@ -29,7 +29,7 @@ import { reconcileStarterTemplates } from './lib/checklists';
 import { deriveReadableLightAccent, readableOnColor } from './lib/colorContrast';
 
 import DashboardView from './components/DashboardView';
-import SetupView from './components/SetupView';
+import SetupView, { SETUP_NOTICE_COPY } from './components/SetupView';
 import RaceWeekendView from './components/RaceWeekendView';
 import type { NewSessionData, NewWeekendData } from './components/RaceWeekendView';
 import { buildSessionNameFrom } from './lib/sessionSequence';
@@ -39,7 +39,7 @@ import GuideView from './components/GuideView';
 import TrackersView from './components/TrackersView';
 import ContextStrip from './components/ContextStrip';
 import HelpSheet from './components/ui/HelpSheet';
-import UndoToast, { InfoToast } from './components/ui/UndoToast';
+import UndoToast from './components/ui/UndoToast';
 import { pickAutoWeekend, sortWeekends } from './lib/scope';
 import { buildQuickServiceRecords, type QuickServiceOutcome, type QuickServiceRequest } from './lib/serviceLog';
 import { useOnlineStatus } from './lib/saveStatus';
@@ -66,6 +66,19 @@ import { Todo } from './types';
 import { detectAssignmentChanges } from './lib/assignmentNotify';
 
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
+const INFO_DEDUPE_MS = 5000;
+const SUCCESS_TOAST_MS = 1500;
+
+// Setup history has one passive message source. Other callers may supply
+// dynamic copy, but still flow through the same reason-keyed arbiter below.
+const INFO_COPY = {
+  ...SETUP_NOTICE_COPY,
+  'car-has-data': 'Reassign or delete this car\'s data first.',
+  'finished-weekend-read-only': 'Finished Race Days are view-only.',
+  'finished-weekend-inactive': 'Finished Race Days stay in history and cannot be made active.',
+  'missing-car': 'Add a car before starting a Race Day.',
+  'finished-run-history': 'Finished runs stay in history and cannot be loaded for editing.',
+} as const;
 
 const THEME_SCALE_MIGRATION_VERSION = 1 as const;
 
@@ -260,7 +273,10 @@ export default function App() {
   const [infoToast, setInfoToast] = useState<string | null>(null);
   useEffect(() => {
     if (!infoToast) return;
-    const t = setTimeout(() => setInfoToast(null), 3000);
+    const t = setTimeout(() => {
+      infoToastRef.current = null;
+      setInfoToast(null);
+    }, 3000);
     return () => clearTimeout(t);
   }, [infoToast]);
   const isOnline = useOnlineStatus();
@@ -331,7 +347,7 @@ export default function App() {
       const nextCar = currentCars.find(c => c.id === carId);
       if (nextCar) {
         const label = nextCar.name || `${nextCar.chassis} · ${nextCar.carType}`;
-        setInfoToast(`Now viewing ${label} — setups, runs & trackers switched.`);
+        showInfo('car-switch', `Now viewing ${label} — setups, runs & trackers switched.`);
       }
     }
     activeCarIdRef.current = carId;
@@ -456,7 +472,7 @@ export default function App() {
     const tc = tireInventory.filter(t => t.carId === carId).length;
     const shc = shockSessions.filter(s => s.carId === carId).length;
     if (sc + tc + shc > 0) {
-      setInfoToast('Reassign or delete this car\'s data first.');
+      showInfo('car-has-data');
       return;
     }
     const car = carsRef.current.find(item => item.id === carId);
@@ -821,10 +837,34 @@ export default function App() {
   // confirmation that their data was captured — even fully offline.
   const [savedFlash, setSavedFlash] = useState(false);
   const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const infoToastRef = useRef<string | null>(null);
+  const infoShownAtRef = useRef(new Map<string, number>());
+  const clearSavedFlash = () => {
+    setSavedFlash(false);
+    if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
+    savedFlashTimer.current = null;
+  };
+  const clearInfo = () => {
+    infoToastRef.current = null;
+    setInfoToast(null);
+  };
+  const showInfo = (reason: string, message = INFO_COPY[reason as keyof typeof INFO_COPY] ?? reason) => {
+    const now = Date.now();
+    const lastShownAt = infoShownAtRef.current.get(reason);
+    if (lastShownAt !== undefined && now - lastShownAt < INFO_DEDUPE_MS) return;
+    infoShownAtRef.current.set(reason, now);
+    clearSavedFlash();
+    infoToastRef.current = message;
+    setInfoToast(message);
+  };
   const flashSaved = () => {
+    if (infoToastRef.current) return;
     setSavedFlash(true);
     if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
-    savedFlashTimer.current = setTimeout(() => setSavedFlash(false), 1900);
+    savedFlashTimer.current = setTimeout(() => {
+      savedFlashTimer.current = null;
+      setSavedFlash(false);
+    }, SUCCESS_TOAST_MS);
   };
   useEffect(() => {
     return () => {
@@ -962,7 +1002,7 @@ export default function App() {
     if (pick) {
       setActiveWeekendId(pick.id);
       localStorage.setItem(ACTIVE_WEEKEND_KEY, pick.id);
-      setInfoToast(`Active: ${pick.name}`);
+      showInfo('active-weekend', `Active: ${pick.name}`);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekends, activeWeekendId]);
@@ -1428,7 +1468,6 @@ export default function App() {
     const contextWeekend = weekendsRef.current.find(item => item.id === activeWeekendId && !isWeekendFinished(item));
     const eventSetupId = contextWeekend?.activeSetupId;
     const now = new Date().toISOString();
-    let blockedMutation = false;
     const comparable = (value: Setup) => {
       const { updatedAt: _updatedAt, ...rest } = value;
       return JSON.stringify(rest);
@@ -1437,7 +1476,6 @@ export default function App() {
       const prior = priorById.get(candidate.id);
       const canEdit = !prior || (!isSetupLocked(prior, weekendsRef.current) && (!eventSetupId || prior.id === eventSetupId));
       if (!canEdit) {
-        if (prior && comparable(prior) !== comparable(candidate)) blockedMutation = true;
         return prior ? [prior] : [];
       }
       const logged = prior?.lifecycleRole === 'weekend'
@@ -1448,10 +1486,9 @@ export default function App() {
     for (const prior of priorSetups) {
       if (!safeSetups.some(item => item.id === prior.id) && (isSetupLocked(prior, weekendsRef.current) || eventSetupId)) {
         safeSetups.push(prior);
-        blockedMutation = true;
       }
     }
-    if (blockedMutation) setInfoToast('Historical setups are view-only. Finish the Race Day before editing Current Setup.');
+    // Historical cards communicate through their own passive banner only.
 
     const remainingSetupIds = new Set(safeSetups.map(item => item.id));
     priorSetups
@@ -1493,8 +1530,8 @@ export default function App() {
           const tires = mirrorPressureBlockToTires(tireDetails, pressures);
           return { ...current, setupUsed: nextActive.chassis, pressures, tires, pressureSourceNote: hasPressureSource ? sourceNote : undefined };
         });
-        if (hasPressureSource && !preserveInfoToast) setInfoToast(sourceNote);
-        else if (!preserveInfoToast) setInfoToast(null);
+        if (hasPressureSource && !preserveInfoToast) showInfo('pressure-source', sourceNote);
+        else if (!preserveInfoToast) clearInfo();
       }
     }
     flashSaved();
@@ -1508,7 +1545,7 @@ export default function App() {
       ? weekendsRef.current.find(item => item.id === updatedSession.weekendId)
       : null;
     if (isWeekendFinished(targetWeekend)) {
-      setInfoToast('Finished Race Days are view-only.');
+      showInfo('finished-weekend-read-only');
       return;
     }
     const updatedWeekends = applyActiveSessionToWeekends(weekendsRef.current, updatedSession);
@@ -1544,7 +1581,7 @@ export default function App() {
       activeSessionRef.current,
     );
     if (target.ok === false) {
-      setInfoToast(target.error);
+      showInfo('quick-adjust-target', target.error);
       return target;
     }
     quickAdjustSequenceRef.current += 1;
@@ -1552,7 +1589,7 @@ export default function App() {
     const commandId = `quick-adjust-${Date.now()}-${quickAdjustSequenceRef.current}`;
     const result = applyQuickAdjust(target.setup, target.session, command, weekendsRef.current, now, commandId);
     if (result.ok === false) {
-      setInfoToast(result.error);
+      showInfo('quick-adjust-result', result.error);
       return result;
     }
 
@@ -1594,7 +1631,7 @@ export default function App() {
   const handleActivateWeekend = (weekendId: string) => {
     const target = weekends.find(w => w.id === weekendId);
     if (!target || isWeekendFinished(target)) {
-      setInfoToast('Finished Race Days stay in history and cannot be made active.');
+      showInfo('finished-weekend-inactive');
       return;
     }
     setActiveWeekendId(target.id);
@@ -1621,7 +1658,7 @@ export default function App() {
   const handleCreateNewWeekend = (data: NewWeekendData) => {
     if (!data.name.trim() || !data.track.trim()) return;
     if (!activeCarId) {
-      setInfoToast('Add a car before starting a Race Day.');
+      showInfo('missing-car');
       return;
     }
 
@@ -1687,7 +1724,7 @@ export default function App() {
     setActiveWeekendId(lifecycle.weekend.id);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, lifecycle.weekend.id);
     flashSaved();
-    setInfoToast(`Active: ${lifecycle.weekend.name} · ${lifecycle.weekendSetup.versionLabel}`);
+    showInfo('race-day-active', `Active: ${lifecycle.weekend.name} · ${lifecycle.weekendSetup.versionLabel}`);
     if (continueToRunAfterWeekendRef.current) {
       continueToRunAfterWeekendRef.current = false;
       setRwInitialAction('new-session');
@@ -1709,7 +1746,7 @@ export default function App() {
     // The weekend's setup owns every run, even if the garage car selector changes.
     const sessionSetup = resolveWeekendSetup(targetWeekend);
     if (!sessionSetup) {
-      setInfoToast(`${lifecycleLabel('weekend')} is missing or locked. Restore it before logging a run.`);
+      showInfo('missing-weekend-log', `${lifecycleLabel('weekend')} is missing or locked. Restore it before logging a run.`);
       return;
     }
 
@@ -1848,7 +1885,7 @@ export default function App() {
     setActiveSession(nextSession);
     localStorage.setItem('race_notes_active_session', JSON.stringify(nextSession));
     flashSaved();
-    if (pressureSourceNote) setInfoToast(pressureSourceNote);
+    if (pressureSourceNote) showInfo('pressure-source', pressureSourceNote);
 
     setActiveTab('raceweekend');
   };
@@ -2004,7 +2041,7 @@ export default function App() {
     });
     const result = finishWeekendLifecycle(target, savedSetupsRef.current, now, finishFallback);
     if (!result) {
-      setInfoToast(`${lifecycleLabel('weekend')} is missing. Restore it before finishing this Race Day.`);
+      showInfo('missing-weekend-finish', `${lifecycleLabel('weekend')} is missing. Restore it before finishing this Race Day.`);
       return;
     }
     const updatedWeekends = weekendsRef.current.map(item => item.id === target.id ? result.weekend : item);
@@ -2033,19 +2070,19 @@ export default function App() {
       }
       pushActiveSession(clearedSession, user.id, setSyncStatus);
     }
-    setInfoToast(`${target.name} finished. ${lifecycleLabel('final', target)} saved; ${lifecycleLabel('current')} is ready.`);
+    showInfo('weekend-finished', `${target.name} finished. ${lifecycleLabel('final', target)} saved; ${lifecycleLabel('current')} is ready.`);
   };
 
   const handleSelectRecentSession = (rec: SessionRecord, weekendId: string) => {
     if (isWeekendFinished(weekendsRef.current.find(item => item.id === weekendId))) {
-      setInfoToast('Finished runs stay in history and cannot be loaded for editing.');
+      showInfo('finished-run-history');
       return;
     }
     handleActivateWeekend(weekendId);
     const targetWeekend = weekendsRef.current.find(item => item.id === weekendId);
     const currentCarSetup = resolveWeekendSetup(targetWeekend);
     if (targetWeekend && !currentCarSetup) {
-      setInfoToast(`${lifecycleLabel('weekend')} is missing or locked. Restore it before loading this run.`);
+      showInfo('missing-weekend-load', `${lifecycleLabel('weekend')} is missing or locked. Restore it before loading this run.`);
       return;
     }
     const restoredPressures = resolveSessionPressureBlock(rec.pressures, rec.tires);
@@ -2216,26 +2253,25 @@ export default function App() {
           />
         )}
 
-        {/* Single brief Saved / sync toast — bottom-center, above the nav bar.
-            Only three states surface: local "Saved", initial "Syncing…", and
-            "Synced". The chatty per-entity "X synced to cloud" push messages are
-            intentionally NOT shown (they just quietly clear via the auto-dismiss
-            effect) so users see at most one short confirmation per action. */}
+        {/* One compact notification arbiter. Info replaces success/sync feedback
+            so users receive one clear reason at a time. */}
         {(() => {
-          const isBusy = !savedFlash && syncStatus === 'Syncing...';
-          const isSynced = !savedFlash && syncStatus === 'Synced';
-          if (!savedFlash && !isBusy && !isSynced) return null;
-          // [33] Offline-aware: local saves still land, so say exactly that.
-          const msg = savedFlash
+          const isInfo = !!infoToast;
+          const isBusy = !isInfo && !savedFlash && syncStatus === 'Syncing...';
+          const isSynced = !isInfo && !savedFlash && syncStatus === 'Synced';
+          if (!isInfo && !savedFlash && !isBusy && !isSynced) return null;
+          const msg = isInfo
+            ? infoToast
+            : savedFlash
             ? (isOnline ? 'Saved' : 'Offline — saved on device')
             : isBusy ? 'Syncing…' : 'Synced';
-          const isSuccess = savedFlash || isSynced;
+          const isSuccess = !isInfo && (savedFlash || isSynced);
           return (
-            <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[60] pointer-events-none px-4 w-full max-w-md flex justify-center">
+            <div className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[60] pointer-events-none flex justify-center px-4">
               <div
                 role="status"
                 aria-live="polite"
-                className={`flex items-center gap-2.5 px-5 py-3 rounded-full shadow-2xl border-2 font-display font-bold text-sm tracking-wide animate-fade-in ${
+                className={`pointer-events-auto flex min-h-11 max-w-md items-center gap-2.5 rounded-full border-2 px-4 py-2 font-display text-sm font-bold tracking-wide shadow-2xl animate-fade-in ${
                   isSuccess
                     ? 'bg-green-500 border-green-300 text-black'
                     : 'bg-surface-container border-outline-variant text-on-surface'
@@ -2243,9 +2279,19 @@ export default function App() {
                 style={{ boxShadow: isSuccess ? '0 8px 30px rgba(34,197,94,0.45)' : undefined }}
               >
                 <span className={`material-symbols-outlined text-xl ${isBusy ? 'animate-spin' : ''}`} style={{ fontVariationSettings: "'FILL' 1" }}>
-                  {savedFlash && !isOnline ? 'cloud_off' : isSuccess ? 'check_circle' : isBusy ? 'progress_activity' : 'cloud'}
+                  {isInfo ? 'info' : savedFlash && !isOnline ? 'cloud_off' : isSuccess ? 'check_circle' : isBusy ? 'progress_activity' : 'cloud'}
                 </span>
-                {msg}
+                <span className="min-w-0 flex-1">{msg}</span>
+                {isInfo && (
+                  <button
+                    type="button"
+                    aria-label="Dismiss notification"
+                    className="tap-target -mr-2 shrink-0 text-on-surface-variant"
+                    onClick={clearInfo}
+                  >
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -2316,7 +2362,7 @@ export default function App() {
                   weekends={weekends}
                   initialSubTab={setupSubTab}
                   onSaveSetups={handleSaveSetups}
-                  onInfo={setInfoToast}
+                  onInfo={showInfo}
                   onHelp={openHelp}
                   onGoToGarage={openGarage}
                 />
@@ -2341,7 +2387,7 @@ export default function App() {
                   activeSetup={raceWeekendSetup}
                   shockSessions={shockSessions}
                   onCommitQuickAdjust={handleCommitQuickAdjust}
-                  onInfo={setInfoToast}
+                  onInfo={showInfo}
                   onHelp={openHelp}
                   accounting={accounting}
                   onFinishWeekend={handleFinishWeekend}
@@ -2534,12 +2580,6 @@ export default function App() {
         {appGuideHelp ? <GuideView activeSection={helpSection} embedded /> : <QuickReferenceView />}
       </HelpSheet>
 
-      {/* [37]/[5] Car-switch & auto-weekend info toast */}
-      <InfoToast
-        open={!!infoToast}
-        title={infoToast ?? ''}
-        onClose={() => setInfoToast(null)}
-      />
       <UndoToast pending={carUndo.pending} onUndo={carUndo.undo} onDismiss={carUndo.dismiss} />
 
     </div>

@@ -41,6 +41,11 @@ interface SetupViewProps {
   onGoToGarage?: () => void;
 }
 
+export const SETUP_NOTICE_COPY = {
+  historicalSetup: 'Starting and finished snapshots stay unchanged. Clone this setup to make a new editable Current Setup.',
+  minimumSetups: 'You must keep at least one setup configuration.',
+} as const;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const parseWeight = (val: string | undefined): number | null => {
@@ -333,10 +338,9 @@ export default function SetupView({
     const target = setups.find((setupItem) => setupItem.id === setupId);
     if (!target) return;
     if (isSetupLocked(target, weekends)) {
-      onInfo?.('Historical setups are view-only. Clone this setup to make an editable copy.');
       return;
     }
-    if (setups.length <= 1) { onInfo?.('You must keep at least one setup configuration.'); return; }
+    if (setups.length <= 1) { onInfo?.('minimumSetups'); return; }
     setPendingDeleteSetupId(setupId);
   };
 
@@ -348,11 +352,10 @@ export default function SetupView({
     if (!target) return;
     if (!activeCarId || target.carId !== activeCarId) return;
     if (isSetupLocked(target, weekends)) {
-      onInfo?.('Historical setups are view-only. Clone this setup to make an editable copy.');
       return;
     }
     if (setups.length <= 1) {
-      onInfo?.('You must keep at least one setup configuration.');
+      onInfo?.('minimumSetups');
       return;
     }
     const filtered = setups.filter((s) => s.id !== setupId);
@@ -582,7 +585,7 @@ export default function SetupView({
                     <div className="min-w-0 p-2 sm:p-3 border-t border-outline-variant/50 bg-surface-container-low">
                       {isReadOnly && (
                         <div className="mb-4 rounded-lg border border-outline-variant bg-surface-container p-3 font-mono text-xs text-on-surface-variant">
-                          Starting and finished snapshots stay unchanged. Clone this setup to make a new editable Current Setup.
+                          {SETUP_NOTICE_COPY.historicalSetup}
                         </div>
                       )}
                       <fieldset disabled={isReadOnly} className="min-w-0 space-y-6 disabled:opacity-75">

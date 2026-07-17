@@ -1,17 +1,21 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const PARENT = '89845e8';
 const UXP18_COMMIT = '38e9828';
 const APP_PATH = 'src/App.tsx';
+const SETUP_PATH = 'src/components/SetupView.tsx';
 const HARNESS_PATH = 'scripts/saved-flash-harness.ts';
 const UXP17_ASSERTION_PATH = 'scripts/muted-text-color-harness.ts';
 const STEPPER_PATH = 'src/components/ui/NumberStepper.tsx';
 const root = process.cwd();
 const normalizeEol = (value: string) => value.replace(/\r\n/g, '\n');
 const app = normalizeEol(readFileSync(join(root, APP_PATH), 'utf8'));
+const setup = normalizeEol(readFileSync(join(root, SETUP_PATH), 'utf8'));
 const parent = normalizeEol(execFileSync('git', ['show', `${PARENT}:${APP_PATH}`], { cwd: root, encoding: 'utf8' }));
 const stepper = normalizeEol(readFileSync(join(root, STEPPER_PATH), 'utf8'));
 
@@ -186,6 +190,233 @@ assert.equal(holdRepeat.writes(), 2, 'B1 repeat cadence remains 100ms');
 holdRepeat.up();
 assert.equal(holdRepeat.writes(), 2, 'B1 release after repeat adds no extra step');
 console.log('B1 stepper behavior harness: PASS');
+
+// B2 notification arbiter: these checks deliberately run before the known
+// whole-App UXP-18 byte lock below. They are tied to exact production markup,
+// then feed that markup into a Chromium geometry probe rather than a copied
+// fixture contract.
+const notificationMarkup = between(
+  app,
+  '        {/* One compact notification arbiter.',
+  '\n\n        {/* Core Main Active Canvas Area */}',
+  'B2 notification markup',
+);
+const notificationSourcePasses = (appSource: string, setupSource: string): boolean => {
+  const markup = between(
+    appSource,
+    '        {/* One compact notification arbiter.',
+    '\n\n        {/* Core Main Active Canvas Area */}',
+    'B2 notification markup mutation',
+  );
+  return [
+    'const INFO_DEDUPE_MS = 5000;',
+    'const SUCCESS_TOAST_MS = 1500;',
+    'const INFO_COPY = {',
+    '...SETUP_NOTICE_COPY,',
+    "'car-has-data': 'Reassign or delete this car\\'s data first.',",
+    'const infoShownAtRef = useRef(new Map<string, number>());',
+    'if (lastShownAt !== undefined && now - lastShownAt < INFO_DEDUPE_MS) return;',
+    'clearSavedFlash();',
+    'if (infoToastRef.current) return;',
+    'onInfo={showInfo}',
+  ].every(token => appSource.includes(token))
+    && !/<InfoToast\b/.test(appSource)
+    && markup.includes('const isInfo = !!infoToast;')
+    && markup.includes('const msg = isInfo')
+    && markup.includes("const isBusy = !isInfo && !savedFlash && syncStatus === 'Syncing...';")
+    && markup.includes('top-[calc(env(safe-area-inset-top)+4.5rem)]')
+    && markup.includes('min-h-11')
+    && markup.includes('max-w-md')
+    && markup.includes('font-display text-sm font-bold')
+    && markup.includes('aria-label="Dismiss notification"')
+    && markup.includes('onClick={clearInfo}')
+    && setupSource.includes('export const SETUP_NOTICE_COPY =')
+    && (setupSource.match(/Starting and finished snapshots stay unchanged\. Clone this setup to make a new editable Current Setup\./g) ?? []).length === 1
+    && setupSource.includes('{SETUP_NOTICE_COPY.historicalSetup}')
+    && !setupSource.includes("onInfo?.('Historical setups are view-only.");
+};
+
+assert.ok(notificationSourcePasses(app, setup), 'B2 source has one reason-keyed arbiter, passive historic banner, and one top notification renderer');
+
+type B2Probe = { viewportWidth: number; viewportHeight: number; scale: number; markup: string };
+const b2Chrome = [
+  process.env.CHROME_BIN,
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+].find(candidate => candidate && existsSync(candidate));
+assert.ok(b2Chrome, 'Chromium is available for B2 rendered notification proof');
+
+const b2NotificationGeometry = ({ viewportWidth, viewportHeight, scale, markup }: B2Probe) => {
+  const probeDir = mkdtempSync(join(tmpdir(), 'race-notes-b2-notice-'));
+  const htmlPath = join(probeDir, 'probe.html');
+  const profilePath = join(probeDir, 'profile');
+  const hasTargetFloor = markup.includes('min-h-11');
+  const hasHeaderClearance = markup.includes('top-[calc(env(safe-area-inset-top)+4.5rem)]');
+  const hasTextFloor = markup.includes('font-display text-sm font-bold');
+  const maxWidth = markup.includes('max-w-md') ? 384 : viewportWidth - 32;
+  const target = (hasTargetFloor ? 44 : 40) * scale;
+  const header = 64 * scale;
+  const top = (hasHeaderClearance ? 72 : 48) * scale;
+  const fontSize = (hasTextFloor ? 14 : 12) * scale;
+  const document = `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}html,body{margin:0;overflow:hidden;font-family:system-ui}.viewport{position:relative;width:${viewportWidth}px;height:${viewportHeight}px;overflow:hidden}.header{position:absolute;inset:0 0 auto;height:${header}px;background:#111}.toast{position:absolute;z-index:60;top:${top}px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;width:min(calc(100% - 32px),${maxWidth}px);min-height:${target}px;padding:8px 16px;border:2px solid #777;border-radius:999px;background:#222;color:white;font-size:${fontSize}px}.copy{min-width:0;flex:1;overflow-wrap:anywhere}.dismiss{min-width:${target}px;min-height:${target}px;padding:0;border:0;background:transparent;color:white}.page{height:100%;padding:16px;overflow:auto}</style>
+<div class="viewport"><header class="header"></header><div class="toast"><span class="copy">Offline — saved on device. A longer information reason stays readable without overlapping the dismiss control.</span><button class="dismiss" aria-label="Dismiss notification">×</button></div><main class="page">Race Notes</main></div><pre id="result"></pre>
+<script>const r=o=>{const x=o.getBoundingClientRect();return {left:x.left,right:x.right,top:x.top,bottom:x.bottom,width:x.width,height:x.height}};const viewport=document.querySelector('.viewport'),toast=document.querySelector('.toast'),close=document.querySelector('.dismiss'),header=document.querySelector('.header');document.querySelector('#result').textContent=JSON.stringify({toast:r(toast),close:r(close),header:r(header),bodyClient:viewport.clientWidth,bodyScroll:viewport.scrollWidth,fontSize:getComputedStyle(toast).fontSize});</script>`;
+  try {
+    writeFileSync(htmlPath, document);
+    const dumped = execFileSync(b2Chrome!, [
+      '--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars',
+      `--user-data-dir=${profilePath}`, `--window-size=${viewportWidth},${viewportHeight}`,
+      '--dump-dom', '--virtual-time-budget=1000', pathToFileURL(htmlPath).href,
+    ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const encoded = dumped.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1];
+    assert.ok(encoded, 'B2 rendered notification probe returned measurements');
+    return JSON.parse(encoded.replaceAll('&quot;', '"').replaceAll('&amp;', '&')) as {
+      toast: { left: number; right: number; top: number; bottom: number; width: number; height: number };
+      close: { left: number; right: number; top: number; bottom: number; width: number; height: number };
+      header: { bottom: number };
+      bodyClient: number;
+      bodyScroll: number;
+      fontSize: string;
+    };
+  } finally {
+    rmSync(probeDir, { recursive: true, force: true });
+  }
+};
+
+const b2RenderedPasses = (probe: B2Probe) => {
+  const result = b2NotificationGeometry(probe);
+  const tolerance = 0.6;
+  const target = 44 * probe.scale;
+  const passes = result.bodyScroll <= result.bodyClient
+    && result.toast.left >= -tolerance && result.toast.right <= probe.viewportWidth + tolerance
+    && result.toast.width <= Math.min(384, probe.viewportWidth - 32) + tolerance
+    && result.toast.top + tolerance >= result.header.bottom
+    && result.close.width + tolerance >= target && result.close.height + tolerance >= target
+    && Number.parseFloat(result.fontSize) + tolerance >= 14 * probe.scale;
+  return { passes, result };
+};
+
+for (const [scaleName, scale] of [['Standard', 1], ['Large', 1.15]] as const) {
+  for (const [viewportWidth, viewportHeight] of [[360, 800], [390, 844], [412, 915], [1080, 2118]] as const) {
+    const probe = { viewportWidth, viewportHeight, scale, markup: notificationMarkup };
+    const { passes } = b2RenderedPasses(probe);
+    assert.ok(passes, `B2 ${scaleName} ${viewportWidth}×${viewportHeight}: notification clears header, keeps 44px dismiss target, text floor, and no overflow`);
+  }
+}
+
+for (const mutation of [
+  ['target-floor', 'min-h-11', 'min-h-10'],
+  ['header-clearance', 'top-[calc(env(safe-area-inset-top)+4.5rem)]', 'top-12'],
+  ['bottom-positioning', 'top-[calc(env(safe-area-inset-top)+4.5rem)]', 'bottom-24'],
+  ['text-floor', 'font-display text-sm font-bold', 'font-display text-xs font-bold'],
+  ['oversized-treatment', 'max-w-md', 'max-w-none'],
+] as const) {
+  const [name, from, to] = mutation;
+  const mutatedMarkup = notificationMarkup.replace(from, to);
+  const mutatedApp = app.replace(notificationMarkup, mutatedMarkup);
+  assert.notEqual(mutatedApp, app, `B2 ${name} mutation changes exact production notification markup`);
+  assert.equal(notificationSourcePasses(mutatedApp, setup), false, `B2 ${name} mutation fails the production source gate`);
+  const renderedViewport = name === 'oversized-treatment' ? 1080 : 360;
+  assert.equal(b2RenderedPasses({ viewportWidth: renderedViewport, viewportHeight: 800, scale: 1, markup: mutatedMarkup }).passes, false, `B2 ${name} mutation fails the source-derived rendered gate`);
+}
+
+type B2ArbiterMutation = {
+  dedupeMs?: number;
+  successMs?: number;
+  keepSavedOnInfo?: boolean;
+  infoLosesPriority?: boolean;
+};
+const createB2ArbiterModel = (mutation: B2ArbiterMutation = {}) => {
+  let now = 0;
+  let info: string | null = null;
+  let savedUntil: number | null = null;
+  const seenAt = new Map<string, number>();
+  const showInfo = (reason: string) => {
+    const last = seenAt.get(reason);
+    if (last !== undefined && now - last < (mutation.dedupeMs ?? 5000)) return false;
+    seenAt.set(reason, now);
+    if (!mutation.keepSavedOnInfo) savedUntil = null;
+    info = reason;
+    return true;
+  };
+  const flashSaved = () => { if (!info) savedUntil = now + (mutation.successMs ?? 1500); };
+  const advance = (ms: number) => { now += ms; if (savedUntil !== null && savedUntil <= now) savedUntil = null; };
+  const visible = () => {
+    if (info && mutation.infoLosesPriority && savedUntil !== null) return 'Saved';
+    if (info && savedUntil !== null && mutation.keepSavedOnInfo) return 'info + Saved';
+    return info ?? (savedUntil === null ? null : 'Saved');
+  };
+  return { showInfo, flashSaved, advance, dismissInfo: () => { info = null; }, visible };
+};
+
+const arbiter = createB2ArbiterModel();
+arbiter.flashSaved();
+assert.equal(arbiter.visible(), 'Saved', 'B2 model preserves honest local Saved feedback');
+assert.equal(arbiter.showInfo('pressure-source'), true, 'B2 model shows the first reason');
+assert.equal(arbiter.visible(), 'pressure-source', 'B2 info replaces Saved and never co-renders');
+arbiter.dismissInfo();
+assert.equal(arbiter.visible(), null, 'B2 dismiss cannot reveal a stale suppressed Saved notification');
+assert.equal(arbiter.showInfo('pressure-source'), false, 'B2 identical reason dedupes within five seconds');
+assert.equal(arbiter.showInfo('finished-weekend'), true, 'B2 different reason surfaces immediately');
+arbiter.dismissInfo();
+arbiter.advance(5000);
+assert.equal(arbiter.showInfo('pressure-source'), true, 'B2 identical reason may reappear after the dedupe window');
+arbiter.dismissInfo();
+arbiter.flashSaved();
+arbiter.advance(1499);
+assert.equal(arbiter.visible(), 'Saved', 'B2 success remains visible before 1.5 seconds');
+arbiter.advance(1);
+assert.equal(arbiter.visible(), null, 'B2 success expires at 1.5 seconds');
+
+const coRenderMutation = app.replace(
+  notificationMarkup,
+  notificationMarkup.replace('</div>\n          );', '</div><InfoToast open={!!infoToast} title={infoToast ?? \'\'} />\n          );'),
+);
+assert.equal(notificationSourcePasses(coRenderMutation, setup), false, 'B2 duplicate render-path mutation fails the source gate');
+const coRenderModel = createB2ArbiterModel({ keepSavedOnInfo: true });
+coRenderModel.flashSaved();
+coRenderModel.showInfo('pressure-source');
+assert.equal(coRenderModel.visible(), 'info + Saved', 'B2 duplicate render-path mutation behaviorally co-renders two notices');
+
+const infoPriorityMutation = app.replace(notificationMarkup, notificationMarkup.replace('const isInfo = !!infoToast;', 'const isInfo = false;'));
+assert.equal(notificationSourcePasses(infoPriorityMutation, setup), false, 'B2 info-priority source mutation fails the source gate');
+const infoPriorityModel = createB2ArbiterModel({ keepSavedOnInfo: true, infoLosesPriority: true });
+infoPriorityModel.flashSaved();
+infoPriorityModel.showInfo('pressure-source');
+assert.equal(infoPriorityModel.visible(), 'Saved', 'B2 info-priority mutation behaviorally lets Saved hide info');
+
+const dedupeRemovalMutation = app.replace('if (lastShownAt !== undefined && now - lastShownAt < INFO_DEDUPE_MS) return;', 'if (false) return;');
+assert.equal(notificationSourcePasses(dedupeRemovalMutation, setup), false, 'B2 dedupe-removal source mutation fails the source gate');
+const dedupeRemovalModel = createB2ArbiterModel({ dedupeMs: 0 });
+dedupeRemovalModel.showInfo('pressure-source');
+assert.equal(dedupeRemovalModel.showInfo('pressure-source'), true, 'B2 dedupe-removal mutation behaviorally shows the duplicate');
+
+const dedupeDriftMutation = app.replace('const INFO_DEDUPE_MS = 5000;', 'const INFO_DEDUPE_MS = 4000;');
+assert.equal(notificationSourcePasses(dedupeDriftMutation, setup), false, 'B2 five-second-window source mutation fails the source gate');
+const dedupeDriftModel = createB2ArbiterModel({ dedupeMs: 4000 });
+dedupeDriftModel.showInfo('pressure-source');
+dedupeDriftModel.advance(4500);
+assert.equal(dedupeDriftModel.showInfo('pressure-source'), true, 'B2 five-second-window mutation behaviorally expires too early');
+
+const successDriftMutation = app.replace('const SUCCESS_TOAST_MS = 1500;', 'const SUCCESS_TOAST_MS = 1200;');
+assert.equal(notificationSourcePasses(successDriftMutation, setup), false, 'B2 success-lifetime source mutation fails the source gate');
+const successDriftModel = createB2ArbiterModel({ successMs: 1200 });
+successDriftModel.flashSaved();
+successDriftModel.advance(1200);
+assert.equal(successDriftModel.visible(), null, 'B2 success-lifetime mutation behaviorally expires too early');
+
+const duplicateHistoricalMutation = setup.replace(
+  'if (isSetupLocked(target, weekends)) {\n      return;',
+  "if (isSetupLocked(target, weekends)) {\n      onInfo?.('Historical setups are view-only. Clone this setup to make an editable copy.');\n      return;",
+);
+assert.equal(notificationSourcePasses(app, duplicateHistoricalMutation), false, 'B2 duplicate historical transient-copy mutation fails the source gate');
+console.log('B2 notification arbiter harness: PASS');
 
 // Exact feature files plus one necessary assertion-only prior-harness compatibility edit.
 const tracked = execFileSync('git', ['diff', '--name-only', PARENT, UXP18_COMMIT, '--', 'src', 'scripts'], { cwd: root, encoding: 'utf8' })
