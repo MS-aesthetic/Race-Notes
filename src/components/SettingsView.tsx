@@ -306,12 +306,13 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                 <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Font Size</label>
                 <p className="text-[10px] font-mono text-on-surface-muted mt-0.5">Scales all text and UI elements throughout the app.</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 {([
-                  { value: 'large',  icon: 'format_size', label: 'Default' },
-                  { value: 'xlarge', icon: 'text_increase', label: 'Large' },
+                  { value: 'standard', icon: 'format_size', label: 'Default' },
+                  { value: 'large',    icon: 'text_increase', label: 'Large' },
+                  { value: 'xlarge',   icon: 'text_increase', label: 'Extra Large' },
                 ] as const).map(opt => {
-                  const active = (theme.fontSize ?? 'large') === opt.value;
+                  const active = (theme.fontSize ?? 'standard') === opt.value;
                   return (
                     <button
                       key={opt.value}
@@ -339,7 +340,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
 
             {/* Reset */}
             <button
-              onClick={() => onThemeChange({ mode: 'dark', accent: '#ffb3ac', fontSize: 'large' })}
+              onClick={() => onThemeChange({ mode: 'dark', accent: '#ffb3ac', fontSize: 'standard' })}
               className="w-full py-2 border border-outline-variant text-on-surface-variant font-mono text-xs uppercase rounded hover:border-outline transition-colors"
             >
               Reset to Defaults

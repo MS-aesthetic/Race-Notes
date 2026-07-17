@@ -12,29 +12,49 @@ const guide = source('../src/components/QuickReferenceView.tsx');
 const loads = source('../src/components/SmasherLoadsView.tsx');
 const sync = source('../src/lib/sync.ts');
 const types = source('../src/types.ts');
+const index = source('../index.html');
 const migration = source('../supabase/migrations/20260714010630_add_load_session_ride_height.sql');
 
-assert.match(types, /fontSize: 'large' \| 'xlarge';/);
-assert.doesNotMatch(types, /standard|xxlarge/);
-assert.match(app, /const rawFontSize = saved\.fontSize;/);
-assert.match(app, /rawFontSize === 'xlarge' \|\| rawFontSize === 'xxlarge'/);
-assert.match(app, /rawFontSize === 'large' \|\| rawFontSize === 'standard'/);
-assert.match(app, /const ZOOM: Record<AppTheme\['fontSize'\], number> = \{ large: 1\.15, xlarge: 1\.45 \};/);
-assert.doesNotMatch(app.slice(app.indexOf('const ZOOM:'), app.indexOf('const zoom =')), /standard|xxlarge/);
-const normalizeFontSize = (rawFontSize: unknown): 'large' | 'xlarge' => (
-  rawFontSize === 'xlarge' || rawFontSize === 'xxlarge'
+assert.match(types, /fontSize: 'standard' \| 'large' \| 'xlarge';/);
+assert.match(types, /scaleMigrationVersion\?: 1;/);
+assert.match(app, /const THEME_SCALE_MIGRATION_VERSION = 1 as const;/);
+assert.match(app, /const ZOOM: Record<AppTheme\['fontSize'\], number> = \{ standard: 1, large: 1\.15, xlarge: 1\.45 \};/);
+assert.match(app, /fontSize: 'standard', scaleMigrationVersion: THEME_SCALE_MIGRATION_VERSION/);
+assert.match(app, /const isLegacyScale = saved\.scaleMigrationVersion !== THEME_SCALE_MIGRATION_VERSION;/);
+assert.match(app, /rawFontSize === 'large' && !isLegacyScale/);
+
+const normalizeThemeFixture = (value: { mode?: unknown; accent?: unknown; fontSize?: unknown; scaleMigrationVersion?: unknown } = {}) => {
+  const isLegacyScale = value.scaleMigrationVersion !== 1;
+  const fontSize = value.fontSize === 'xlarge' || value.fontSize === 'xxlarge'
     ? 'xlarge'
-    : rawFontSize === 'large' || rawFontSize === 'standard' ? 'large' : 'large'
-);
-assert.equal(normalizeFontSize('large'), 'large');
-assert.equal(normalizeFontSize('xlarge'), 'xlarge');
-assert.equal(normalizeFontSize('standard'), 'large');
-assert.equal(normalizeFontSize('xxlarge'), 'xlarge');
-assert.equal(normalizeFontSize(undefined), 'large');
-assert.equal(normalizeFontSize({ broken: true }), 'large');
-assert.match(settings, /value: 'large'.*label: 'Default'/);
-assert.match(settings, /value: 'xlarge'.*label: 'Large'/);
-assert.doesNotMatch(settings, /1\.15x|1\.45x|1\.7x|1x scale|XX-Large|X-Large/);
+    : value.fontSize === 'large' && !isLegacyScale
+      ? 'large'
+      : 'standard';
+  return {
+    mode: value.mode === 'light' ? 'light' : 'dark',
+    accent: typeof value.accent === 'string' && value.accent ? value.accent : '#ffb3ac',
+    fontSize,
+    scaleMigrationVersion: 1,
+  } as const;
+};
+
+const legacyLarge = normalizeThemeFixture({ mode: 'light', accent: '#123456', fontSize: 'large' });
+assert.deepEqual(legacyLarge, { mode: 'light', accent: '#123456', fontSize: 'standard', scaleMigrationVersion: 1 });
+assert.deepEqual(normalizeThemeFixture(legacyLarge), legacyLarge, 'migration is idempotent');
+assert.equal(normalizeThemeFixture({ fontSize: 'xlarge' }).fontSize, 'xlarge', 'legacy xlarge survives migration');
+assert.equal(normalizeThemeFixture({ fontSize: 'xxlarge' }).fontSize, 'xlarge', 'older extra-large value stays accessible');
+const newlySelectedLarge = normalizeThemeFixture({ ...legacyLarge, fontSize: 'large' });
+assert.equal(newlySelectedLarge.fontSize, 'large', 'new Large selection survives reload');
+assert.equal(normalizeThemeFixture(newlySelectedLarge).fontSize, 'large', 'new Large stays selected after repeat normalization');
+assert.equal(normalizeThemeFixture({ fontSize: 'standard' }).fontSize, 'standard');
+assert.equal(normalizeThemeFixture().fontSize, 'standard');
+assert.match(settings, /grid-cols-3/);
+assert.match(settings, /value: 'standard'.*label: 'Default'/);
+assert.match(settings, /value: 'large'.*label: 'Large'/);
+assert.match(settings, /value: 'xlarge'.*label: 'Extra Large'/);
+assert.match(settings, /fontSize: 'standard' \}\)}/);
+assert.match(index, /<meta name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover"/);
+assert.doesNotMatch(index, /user-scalable\s*=\s*(?:"?no|0)/i);
 
 assert.doesNotMatch(guide, /AFCO|chassis-specific|class\/chassis/i);
 assert.match(guide, /High:<\/strong> Try first\./);

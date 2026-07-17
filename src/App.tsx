@@ -67,16 +67,27 @@ import { detectAssignmentChanges } from './lib/assignmentNotify';
 
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
 
+const THEME_SCALE_MIGRATION_VERSION = 1 as const;
+
 const normalizeTheme = (value: unknown): AppTheme => {
-  const saved = (value && typeof value === 'object' ? value : {}) as { mode?: unknown; accent?: unknown; fontSize?: unknown };
+  const saved = (value && typeof value === 'object' ? value : {}) as {
+    mode?: unknown;
+    accent?: unknown;
+    fontSize?: unknown;
+    scaleMigrationVersion?: unknown;
+  };
   const rawFontSize = saved.fontSize;
+  const isLegacyScale = saved.scaleMigrationVersion !== THEME_SCALE_MIGRATION_VERSION;
   const fontSize: AppTheme['fontSize'] = rawFontSize === 'xlarge' || rawFontSize === 'xxlarge'
     ? 'xlarge'
-    : rawFontSize === 'large' || rawFontSize === 'standard' ? 'large' : 'large';
+    : rawFontSize === 'large' && !isLegacyScale
+      ? 'large'
+      : 'standard';
   return {
     mode: saved.mode === 'light' ? 'light' : 'dark',
     accent: typeof saved.accent === 'string' && saved.accent ? saved.accent : '#ffb3ac',
     fontSize,
+    scaleMigrationVersion: THEME_SCALE_MIGRATION_VERSION,
   };
 };
 
@@ -580,7 +591,7 @@ export default function App() {
         return normalized;
       }
     } catch {}
-    return { mode: 'dark', accent: '#ffb3ac', fontSize: 'large' };
+    return { mode: 'dark', accent: '#ffb3ac', fontSize: 'standard', scaleMigrationVersion: THEME_SCALE_MIGRATION_VERSION };
   });
 
   const handleThemeChange = (updated: AppTheme) => {
@@ -606,7 +617,7 @@ export default function App() {
     // installed PWA (Chrome) vs the Capacitor APK (Android WebView) — both
     // Chromium, both respect `zoom` the same way.
     root.style.fontSize = '16px';
-    const ZOOM: Record<AppTheme['fontSize'], number> = { large: 1.15, xlarge: 1.45 };
+    const ZOOM: Record<AppTheme['fontSize'], number> = { standard: 1, large: 1.15, xlarge: 1.45 };
     const zoom = ZOOM[theme.fontSize];
     root.style.setProperty('--ui-zoom', String(zoom));
   }, [theme]);

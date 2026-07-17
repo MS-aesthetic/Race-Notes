@@ -487,8 +487,10 @@ export interface AppTheme {
   mode: 'dark' | 'light';
   /** Hex color string e.g. "#ffb3ac" */
   accent: string;
-  /** UI scale — Default (`large`) or Large (`xlarge`) in both Chromium clients. */
-  fontSize: 'large' | 'xlarge';
+  /** UI scale in both Chromium clients. */
+  fontSize: 'standard' | 'large' | 'xlarge';
+  /** Completed one-time remap of pre-A1 `large` scale preferences. */
+  scaleMigrationVersion?: 1;
 }
 
 // ===========================================================================
