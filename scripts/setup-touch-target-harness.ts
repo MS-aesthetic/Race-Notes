@@ -18,7 +18,6 @@ const setup = read('src/components/SetupView.tsx');
 const fourBar = read('src/components/FourBarQuickAdjust.tsx');
 const raceWeekend = read('src/components/RaceWeekendView.tsx');
 const stepper = read('src/components/ui/NumberStepper.tsx');
-const parentStepper = execFileSync('git', ['show', 'ace4da1:src/components/ui/NumberStepper.tsx'], { cwd: root, encoding: 'utf8' }).replace(/\r\n/g, '\n');
 const app = read('src/App.tsx');
 const context = read('src/components/ContextStrip.tsx');
 const trackers = read('src/components/TrackersView.tsx');
@@ -57,7 +56,7 @@ assert.doesNotMatch(fourBar, /\[&_\[role=group\]\]:flex-wrap|\[&_\[role=group\]>
 assert.match(setup, /<FourBarQuickAdjust\s+setup=\{setupItem\}\s+compact/, 'Setup activates FourBar compact mode');
 assert.match(fourBar, /min-h-11 min-w-11 shrink-0/, 'FourBar help target has 44px floor');
 assert.match(fourBar, /NumberStepper/, 'FourBar retains shared NumberStepper behavior');
-assert.match(stepper, /'min-h-11 min-w-11 shrink-0 select-none touch-none/, 'stepper direction targets retain 44px floors');
+assert.match(stepper, /'min-h-11 min-w-11 shrink-0 select-none touch-pan-y/, 'stepper direction targets retain 44px floors and vertical-scroll handoff');
 assert.match(stepper, /className="tap-target flex min-w-0 w-full/, 'stepper edit target retains shared 44px floor');
 
 // Exact compact width budget, paired with the Chromium render probe below.
@@ -425,12 +424,27 @@ assert.match(pressureSection, /repeat\(auto-fit, minmax\(10\.5rem, 1fr\)\)/, 'A3
 assert.doesNotMatch(pressureSection, /grid-cols-2/, 'A3 pressure grid does not force columns');
 assert.ok(pressureSection.includes('unit="psi"'), 'A3 pressure stepper props remain');
 
-const stepperBehavior = sliceBetween(stepper, 'const REPEAT_DELAY_MS = 350;', '  const btnClass =');
-const parentBehavior = sliceBetween(parentStepper, 'const REPEAT_DELAY_MS = 350;', '  const btnClass =');
-assert.equal(stepperBehavior, parentBehavior, 'A3 leaves repeat, pointer, and commit semantics byte-identical');
-for (const token of ['touch-none', 'onPointerUp={stopPress}', 'onPointerLeave={stopPress}', 'onPointerCancel={stopPress}', 'onClick={(e) => { if (e.detail === 0) applyStep(-1, step); }}']) {
-  assert.ok(stepper.includes(token), `A3 stepper behavior remains: ${token}`);
-}
-assert.doesNotMatch(stepper, /onPointerMove|touch-action:\s*pan-y/, 'B1 scroll behavior remains untouched');
+const b1StartPress = sliceBetween(stepper, '  const startPress =', '\n\n  const handlePointerMove =');
+const b1PointerMove = sliceBetween(stepper, '  const handlePointerMove =', '\n\n  const finishPress =');
+const b1FinishPress = sliceBetween(stepper, '  const finishPress =', '\n\n  // Clear timers on unmount');
+for (const token of [
+  'const REPEAT_DELAY_MS = 350;',
+  'const REPEAT_INTERVAL_MS = 100;',
+  'const STEPPER_POINTER_SLOP_PX = 8;',
+  'press.didRepeat = true;',
+  '}, REPEAT_DELAY_MS);',
+  '}, REPEAT_INTERVAL_MS);',
+  'onPointerDown={(e) => startPress(e, -1)}',
+  'onPointerDown={(e) => startPress(e, 1)}',
+  'onPointerUp={finishPress}',
+  'onPointerCancel={cancelPress}',
+  'onClick={(e) => { if (e.detail === 0) applyStep(-1, step); }}',
+]) assert.ok(stepper.includes(token), `B1 stepper contract remains: ${token}`);
+assert.doesNotMatch(b1StartPress, /applyStep\(/, 'B1 pointerdown arms state and repeat only; it writes nothing');
+assert.match(b1PointerMove, /Math\.hypot\(event\.clientX - press\.startX, event\.clientY - press\.startY\) > STEPPER_POINTER_SLOP_PX/, 'B1 movement checks 8px slop');
+assert.match(b1PointerMove, /press\.moved = true;\s*cancelPress\(\);/s, 'B1 movement cancels pending step and repeat');
+assert.match(b1FinishPress, /const releasedOutsideSlop = Math\.hypot\(event\.clientX - press\.startX, event\.clientY - press\.startY\) > STEPPER_POINTER_SLOP_PX;/, 'B1 pointerup rechecks release slop when no move event arrives');
+assert.match(b1FinishPress, /if \(!press\.moved && !releasedOutsideSlop && !press\.didRepeat\) applyStep\(press\.dir, step\);/, 'B1 pointerup commits one in-slop, non-repeat step');
+assert.doesNotMatch(stepper, /touch-none/, 'B1 removes scroll-blocking touch-none');
 
 console.log('Setup touch-target harness: PASS');

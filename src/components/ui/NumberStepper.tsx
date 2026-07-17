@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 
 export interface NumberStepperProps {
   value: number | '';
@@ -17,6 +17,16 @@ export interface NumberStepperProps {
 const REPEAT_DELAY_MS = 350;
 const REPEAT_INTERVAL_MS = 100;
 const BIG_STEP_AFTER_TICKS = 10;
+const STEPPER_POINTER_SLOP_PX = 8;
+
+type StepperPress = {
+  dir: 1 | -1;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  moved: boolean;
+  didRepeat: boolean;
+};
 
 export default function NumberStepper({
   value,
@@ -46,6 +56,7 @@ export default function NumberStepper({
   const timeoutRef = useRef<number | null>(null);
   const intervalRef = useRef<number | null>(null);
   const tickCountRef = useRef(0);
+  const pressRef = useRef<StepperPress | null>(null);
 
   const clampRound = (n: number): number => {
     let r = n;
@@ -74,27 +85,65 @@ export default function NumberStepper({
     }
   };
 
-  const startPress = (dir: 1 | -1) => {
+  const cancelPress = () => {
     stopPress();
-    applyStep(dir, step);
+    pressRef.current = null;
+  };
+
+  const applyRepeatStep = (press: StepperPress) => {
+    tickCountRef.current += 1;
+    const s =
+      bigStep !== undefined && tickCountRef.current > BIG_STEP_AFTER_TICKS
+        ? bigStep
+        : step;
+    applyStep(press.dir, s);
+  };
+
+  const startPress = (event: PointerEvent<HTMLButtonElement>, dir: 1 | -1) => {
+    if (event.button !== 0) return;
+    cancelPress();
+    const press: StepperPress = {
+      dir,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+      didRepeat: false,
+    };
+    pressRef.current = press;
     tickCountRef.current = 0;
     timeoutRef.current = window.setTimeout(() => {
+      if (pressRef.current !== press || press.moved) return;
+      press.didRepeat = true;
+      applyRepeatStep(press);
       intervalRef.current = window.setInterval(() => {
-        tickCountRef.current += 1;
-        const s =
-          bigStep !== undefined && tickCountRef.current > BIG_STEP_AFTER_TICKS
-            ? bigStep
-            : step;
-        applyStep(dir, s);
+        if (pressRef.current === press && !press.moved) applyRepeatStep(press);
       }, REPEAT_INTERVAL_MS);
     }, REPEAT_DELAY_MS);
+  };
+
+  const handlePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    const press = pressRef.current;
+    if (!press || press.pointerId !== event.pointerId) return;
+    if (Math.hypot(event.clientX - press.startX, event.clientY - press.startY) > STEPPER_POINTER_SLOP_PX) {
+      press.moved = true;
+      cancelPress();
+    }
+  };
+
+  const finishPress = (event: PointerEvent<HTMLButtonElement>) => {
+    const press = pressRef.current;
+    if (!press || press.pointerId !== event.pointerId) return;
+    stopPress();
+    pressRef.current = null;
+    const releasedOutsideSlop = Math.hypot(event.clientX - press.startX, event.clientY - press.startY) > STEPPER_POINTER_SLOP_PX;
+    if (!press.moved && !releasedOutsideSlop && !press.didRepeat) applyStep(press.dir, step);
   };
 
   // Clear timers on unmount
   useEffect(() => {
     return () => {
-      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
-      if (intervalRef.current !== null) window.clearInterval(intervalRef.current);
+      cancelPress();
     };
   }, []);
 
@@ -102,7 +151,7 @@ export default function NumberStepper({
     value === '' ? '' : decimals > 0 ? value.toFixed(decimals) : String(value);
 
   const beginEdit = () => {
-    stopPress();
+    cancelPress();
     cancelRef.current = false;
     setDraft(display);
     setEditing(true);
@@ -132,7 +181,7 @@ export default function NumberStepper({
   const groupLabel = ariaLabel ?? label ?? 'Number stepper';
 
   const btnClass =
-    'min-h-11 min-w-11 shrink-0 select-none touch-none text-on-surface active:bg-surface-container-highest';
+    'min-h-11 min-w-11 shrink-0 select-none touch-pan-y text-on-surface active:bg-surface-container-highest';
 
   return (
     <div className="w-full">
@@ -148,11 +197,12 @@ export default function NumberStepper({
           type="button"
           aria-label={`Decrease ${groupLabel}`}
           className={`${btnClass} ${atMin ? 'opacity-40' : ''}`}
-          onPointerDown={() => startPress(-1)}
-          onPointerUp={stopPress}
-          onPointerLeave={stopPress}
-          onPointerCancel={stopPress}
-          onBlur={stopPress}
+          onPointerDown={(e) => startPress(e, -1)}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishPress}
+          onPointerLeave={cancelPress}
+          onPointerCancel={cancelPress}
+          onBlur={cancelPress}
           onClick={(e) => { if (e.detail === 0) applyStep(-1, step); }}
           onContextMenu={(e) => e.preventDefault()}
         >
@@ -206,11 +256,12 @@ export default function NumberStepper({
           type="button"
           aria-label={`Increase ${groupLabel}`}
           className={`${btnClass} ${atMax ? 'opacity-40' : ''}`}
-          onPointerDown={() => startPress(1)}
-          onPointerUp={stopPress}
-          onPointerLeave={stopPress}
-          onPointerCancel={stopPress}
-          onBlur={stopPress}
+          onPointerDown={(e) => startPress(e, 1)}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishPress}
+          onPointerLeave={cancelPress}
+          onPointerCancel={cancelPress}
+          onBlur={cancelPress}
           onClick={(e) => { if (e.detail === 0) applyStep(1, step); }}
           onContextMenu={(e) => e.preventDefault()}
         >

@@ -8,10 +8,12 @@ const UXP18_COMMIT = '38e9828';
 const APP_PATH = 'src/App.tsx';
 const HARNESS_PATH = 'scripts/saved-flash-harness.ts';
 const UXP17_ASSERTION_PATH = 'scripts/muted-text-color-harness.ts';
+const STEPPER_PATH = 'src/components/ui/NumberStepper.tsx';
 const root = process.cwd();
 const normalizeEol = (value: string) => value.replace(/\r\n/g, '\n');
 const app = normalizeEol(readFileSync(join(root, APP_PATH), 'utf8'));
 const parent = normalizeEol(execFileSync('git', ['show', `${PARENT}:${APP_PATH}`], { cwd: root, encoding: 'utf8' }));
+const stepper = normalizeEol(readFileSync(join(root, STEPPER_PATH), 'utf8'));
 
 const between = (source: string, start: string, end: string, label: string): string => {
   const startAt = source.indexOf(start);
@@ -41,6 +43,114 @@ const persistenceBeforeLastFlash = (source: string, label: string): void => {
   const flash = source.lastIndexOf('flashSaved();');
   assert.ok(persistence >= 0 && flash > persistence, `${label} flashes after its final direct localStorage write`);
 };
+
+const b1SourceContractsPass = (source: string): boolean => {
+  const startPress = between(source, '  const startPress =', '\n\n  const handlePointerMove =', 'B1 startPress');
+  const finishPress = between(source, '  const finishPress =', '\n\n  // Clear timers on unmount', 'B1 finishPress');
+  return [
+    'const REPEAT_DELAY_MS = 350;',
+    'const REPEAT_INTERVAL_MS = 100;',
+    'const STEPPER_POINTER_SLOP_PX = 8;',
+    'touch-pan-y',
+    'onPointerUp={finishPress}',
+    'onPointerCancel={cancelPress}',
+    'if (Math.hypot(event.clientX - press.startX, event.clientY - press.startY) > STEPPER_POINTER_SLOP_PX) {',
+    'press.moved = true;',
+    'const releasedOutsideSlop = Math.hypot(event.clientX - press.startX, event.clientY - press.startY) > STEPPER_POINTER_SLOP_PX;',
+    'if (!press.moved && !releasedOutsideSlop && !press.didRepeat) applyStep(press.dir, step);',
+    'press.didRepeat = true;',
+    'applyRepeatStep(press);',
+    '}, REPEAT_DELAY_MS);',
+    '}, REPEAT_INTERVAL_MS);',
+  ].every(token => source.includes(token))
+    && !startPress.includes('applyStep(')
+    && finishPress.includes('releasedOutsideSlop');
+};
+
+assert.ok(b1SourceContractsPass(stepper), 'B1 source keeps pointerup/slop/pan-y/cadence contracts');
+for (const [name, mutated] of [
+  ['pointerdown-write', stepper.replace('    const press: StepperPress = {', '    applyStep(dir, step);\n    const press: StepperPress = {')],
+  ['slop-cancel-removed', stepper.replace('      press.moved = true;', '      // moved state removed')],
+  ['pointercancel-write', stepper.replaceAll('onPointerCancel={cancelPress}', 'onPointerCancel={stopPress}')],
+  ['pan-y-removed', stepper.replace('touch-pan-y', 'touch-none')],
+  ['repeat-delay-changed', stepper.replace('const REPEAT_DELAY_MS = 350;', 'const REPEAT_DELAY_MS = 349;')],
+  ['repeat-interval-changed', stepper.replace('const REPEAT_INTERVAL_MS = 100;', 'const REPEAT_INTERVAL_MS = 99;')],
+  ['release-slop-removed', stepper.replace('if (!press.moved && !releasedOutsideSlop && !press.didRepeat) applyStep(press.dir, step);', 'if (!press.moved && !press.didRepeat) applyStep(press.dir, step);')],
+  ['release-double-step', stepper.replace('if (!press.moved && !releasedOutsideSlop && !press.didRepeat) applyStep(press.dir, step);', 'applyStep(press.dir, step);')],
+] as const) {
+  assert.equal(b1SourceContractsPass(mutated), false, `B1 mutation rejected: ${name}`);
+}
+
+type PressModel = { startX: number; startY: number; moved: boolean; didRepeat: boolean };
+const createB1PressModel = () => {
+  let writes = 0;
+  let now = 0;
+  let press: PressModel | null = null;
+  let repeatAt: number | null = null;
+  const cancel = () => { press = null; repeatAt = null; };
+  const down = (x = 0, y = 0) => { cancel(); press = { startX: x, startY: y, moved: false, didRepeat: false }; repeatAt = now + 350; };
+  const move = (x: number, y: number) => {
+    if (!press) return;
+    if (Math.hypot(x - press.startX, y - press.startY) > 8) { press.moved = true; cancel(); }
+  };
+  const cancelPointer = () => cancel();
+  const advance = (ms: number) => {
+    const target = now + ms;
+    while (repeatAt !== null && repeatAt <= target) {
+      now = repeatAt;
+      if (!press || press.moved) { repeatAt = null; break; }
+      press.didRepeat = true;
+      writes += 1;
+      repeatAt += 100;
+    }
+    now = target;
+  };
+  const up = (x = 0, y = 0) => {
+    const releasedOutsideSlop = press !== null && Math.hypot(x - press.startX, y - press.startY) > 8;
+    if (press && !press.moved && !releasedOutsideSlop && !press.didRepeat) writes += 1;
+    cancel();
+  };
+  return { down, move, cancelPointer, advance, up, writes: () => writes };
+};
+
+const shortPress = createB1PressModel();
+shortPress.down();
+assert.equal(shortPress.writes(), 0, 'B1 pointerdown causes zero writes and zero Saved/toast side effects');
+shortPress.advance(349);
+assert.equal(shortPress.writes(), 0, 'B1 holds stay silent before 350ms');
+shortPress.up();
+assert.equal(shortPress.writes(), 1, 'B1 in-slop pointerup commits exactly one step');
+
+const releaseSlopCancel = createB1PressModel();
+releaseSlopCancel.down();
+releaseSlopCancel.up(0, 9);
+assert.equal(releaseSlopCancel.writes(), 0, 'B1 out-of-slop pointerup is zero-write even when no pointermove arrives');
+
+const slopCancel = createB1PressModel();
+slopCancel.down();
+slopCancel.move(0, 9);
+slopCancel.advance(1000);
+slopCancel.up();
+assert.equal(slopCancel.writes(), 0, 'B1 scroll movement beyond 8px cancels with zero writes and zero Saved/toast side effects');
+
+const pointerCancel = createB1PressModel();
+pointerCancel.down();
+pointerCancel.cancelPointer();
+pointerCancel.advance(1000);
+pointerCancel.up();
+assert.equal(pointerCancel.writes(), 0, 'B1 pointercancel cancels with zero writes and zero Saved/toast side effects');
+
+const holdRepeat = createB1PressModel();
+holdRepeat.down();
+holdRepeat.advance(349);
+assert.equal(holdRepeat.writes(), 0, 'B1 repeat has not fired before 350ms');
+holdRepeat.advance(1);
+assert.equal(holdRepeat.writes(), 1, 'B1 first repeat fires at 350ms');
+holdRepeat.advance(100);
+assert.equal(holdRepeat.writes(), 2, 'B1 repeat cadence remains 100ms');
+holdRepeat.up();
+assert.equal(holdRepeat.writes(), 2, 'B1 release after repeat adds no extra step');
+console.log('B1 stepper behavior harness: PASS');
 
 // Exact feature files plus one necessary assertion-only prior-harness compatibility edit.
 const tracked = execFileSync('git', ['diff', '--name-only', PARENT, UXP18_COMMIT, '--', 'src', 'scripts'], { cwd: root, encoding: 'utf8' })
