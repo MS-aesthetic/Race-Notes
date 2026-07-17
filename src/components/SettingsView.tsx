@@ -358,7 +358,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
       </BottomSheet>
 
       <BottomSheet open={deleteOpen} onClose={closeDeleteSheet} title="Delete Account">
-        <div className="space-y-4 pb-2">
+        <div className="space-y-3 pb-2">
           <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-on-surface-variant">
             This permanently deletes your login, cloud records, owned uploads, and CREW CHIEF data on this device.
             It cannot be undone. If you own a shared team, another member becomes owner.

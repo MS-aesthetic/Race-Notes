@@ -229,7 +229,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
   const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
 
       {/* Weekend filter */}
       <WeekendFilter weekends={weekends} value={weekendFilter} onChange={setWeekendFilter} />

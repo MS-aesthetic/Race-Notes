@@ -952,7 +952,7 @@ export default function RaceWeekendView({
     return (
       <div className="space-y-5 pb-4">
         {!activeCarId ? <CarRequiredPrompt onAddCar={onGoToGarage} /> : (
-          <section className="rounded-xl border border-outline-variant bg-surface-container p-4 text-center space-y-3">
+          <section className="rounded-xl border border-outline-variant bg-surface-container p-3 text-center space-y-2">
             <p className="font-display text-base font-bold uppercase text-on-surface">No active Race Day</p>
             <p className="font-mono text-xs text-on-surface-variant">Start a race night or test day. Finished Race Days stay below as history.</p>
             <button type="button" onClick={() => openWeekendForm()} className="min-h-12 px-4 rounded-xl bg-primary text-on-primary font-display font-bold uppercase">
@@ -973,8 +973,8 @@ export default function RaceWeekendView({
         {history.length > 0 && <section className="space-y-3">
           <h2 className="font-display text-sm font-bold uppercase text-on-surface">Race Day history</h2>
           {history.map(weekend => (
-            <article key={weekend.id} className="rounded-xl border border-outline-variant bg-surface-container p-4">
-              <div className="flex items-start justify-between gap-3">
+            <article key={weekend.id} className="rounded-xl border border-outline-variant bg-surface-container p-3">
+              <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-display font-bold uppercase text-on-surface">{weekend.name}</h3>
                   <p className="font-mono text-xs text-on-surface-variant">{weekend.track} · {weekend.date}</p>
@@ -1003,7 +1003,7 @@ export default function RaceWeekendView({
         <section className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
 
           {/* Header row */}
-          <div className="flex items-start gap-3 p-4 border-b border-outline-variant/50">
+          <div className="flex items-start gap-2 p-3 border-b border-outline-variant/50">
             <span className="material-symbols-outlined text-primary text-2xl mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_today</span>
             <div className="flex-1 min-w-0">
               <h2 className="font-display font-bold uppercase text-base text-on-surface tracking-wide leading-tight">{currentWeekend.name}</h2>
@@ -1139,7 +1139,7 @@ export default function RaceWeekendView({
         {/* Collapsible header */}
         <button
           onClick={() => setEditorCollapsed(v => !v)}
-          className="w-full flex items-center justify-between p-4 hover:bg-surface-container-high transition-colors rounded-t-lg"
+          className="w-full flex items-center justify-between p-3 hover:bg-surface-container-high transition-colors rounded-t-lg"
         >
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>edit_note</span>
@@ -1202,7 +1202,7 @@ export default function RaceWeekendView({
         {/* 3 ── Laps & result */}
         <div className="mb-6 pt-4 border-t border-outline-variant/60">
           <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Laps & Result</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-[10px] uppercase font-mono text-on-surface-variant">Best Lap</span>
               {/* [13] Opens the lap-time keypad — OS keyboard suppressed */}
@@ -1273,7 +1273,7 @@ export default function RaceWeekendView({
                 placeholder={`${labels[phase]}…`}
                 value={notesVal}
                 onChange={e => handleNotesChange(notesField, e.target.value)}
-                className="w-full min-h-11 bg-surface border border-outline-variant/50 text-on-surface text-xs font-mono p-2 rounded"
+                className="w-full min-h-11 bg-surface border border-outline-variant/50 text-on-surface text-sm font-mono p-2 rounded"
               />
             );
           })}
@@ -1561,7 +1561,7 @@ export default function RaceWeekendView({
       )}
 
       {currentWeekend && !isWeekendFinished(currentWeekend) && (
-        <section className="rounded-xl border border-primary/40 bg-primary/5 p-4 space-y-3">
+        <section className="rounded-xl border border-primary/40 bg-primary/5 p-3 space-y-2">
           <div>
             <h2 className="font-display font-bold uppercase text-on-surface">Finish Race Day</h2>
             <p className="font-mono text-xs text-on-surface-variant mt-1">Saves {lifecycleLabel('final', currentWeekend)}, closes this race night or test day, and makes that setup your new Current Setup.</p>
