@@ -2255,7 +2255,7 @@ export default function App() {
         <main
           ref={mainRef}
           onScroll={(e) => { scrollPosRef.current[activeTabRef.current] = e.currentTarget.scrollTop; }}
-          className="flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto pb-6 custom-scrollbar"
+          className="app-main-scroll flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto custom-scrollbar"
         >
           <AnimatePresence mode="wait">
             <motion.div

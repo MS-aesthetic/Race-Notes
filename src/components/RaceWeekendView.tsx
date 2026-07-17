@@ -136,7 +136,7 @@ const displayStoredVersionLabel = (versionLabel: string | undefined): string =>
 
 export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
-  onUpdateSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
+  onUpdateSession: persistSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
   activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
   activeSetup = null, shockSessions = [], onCommitQuickAdjust, onInfo, onHelp, onGoToGarage, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
@@ -146,6 +146,7 @@ export default function RaceWeekendView({
   const [showZipInput, setShowZipInput] = useState(false);
   const [zipCode, setZipCode] = useState('');
   const [editorCollapsed, setEditorCollapsed] = useState(false);
+  const [isRunDirty, setIsRunDirty] = useState(false);
   const [expandedWeekendIds, setExpandedWeekendIds] = useState<Set<string>>(
     () => new Set([weekends.find(w => w.id === session.weekendId)?.id ?? weekends[0]?.id ?? ''].filter(Boolean))
   );
@@ -184,6 +185,11 @@ export default function RaceWeekendView({
   const [sessionDiff, setSessionDiff] = useState<{ a: string; b: string } | null>(null);
   const [sharingWeekendId, setSharingWeekendId] = useState<string | null>(null);
   const [pendingFinish, setPendingFinish] = useState<{ weekendId: string; name: string; finalLabel: string } | null>(null);
+  const activeRunIdentity = session.id ?? `${session.weekendId ?? ''}:${session.name}:${session.track}`;
+
+  useEffect(() => {
+    setIsRunDirty(false);
+  }, [activeRunIdentity]);
 
   // Android hardware back closes these modals first ([29])
   useBackClosable(wkFormOpen, () => setWkFormOpen(false));
@@ -240,12 +246,17 @@ export default function RaceWeekendView({
 
   // ── Session helpers ──────────────────────────────────────────────────────────
 
+  const updateRun = (updatedSession: ActiveSession) => {
+    setIsRunDirty(true);
+    persistSession(updatedSession);
+  };
+
   const updateDiagnostics = (phase: 'cornerEntry' | 'centerApex' | 'cornerExit', value: 'TIGHT' | 'NEUTRAL' | 'LOOSE') => {
-    onUpdateSession({ ...session, diagnostics: { ...session.diagnostics, [phase]: value } });
+    updateRun({ ...session, diagnostics: { ...session.diagnostics, [phase]: value } });
   };
 
   const handleNotesChange = (phase: 'cornerEntryNotes' | 'centerApexNotes' | 'cornerExitNotes', value: string) => {
-    onUpdateSession({ ...session, diagnostics: { ...session.diagnostics, [phase]: value } });
+    updateRun({ ...session, diagnostics: { ...session.diagnostics, [phase]: value } });
   };
 
   const handleTireChange = (corner: 'lf' | 'rf' | 'lr' | 'rr', field: keyof TireDetails, val: string) => {
@@ -258,7 +269,7 @@ export default function RaceWeekendView({
     const updatedTires = { ...currentTires, [corner]: { ...currentTires[corner], [field]: val } };
     const updatedPressures = { ...session.pressures, [corner]: field === 'airPressure' ? val : currentTires[corner].airPressure };
     const hasPressure = Object.values(updatedPressures).some(value => value.trim() !== '');
-    onUpdateSession({
+    updateRun({
       ...session,
       tires: updatedTires,
       pressures: updatedPressures,
@@ -284,7 +295,7 @@ export default function RaceWeekendView({
           backSpacing: tire.wheelBackspacing,
         }
       : { ...currentTires[corner], tireId: '' };
-    onUpdateSession({ ...session, tires: { ...currentTires, [corner]: updated } });
+    updateRun({ ...session, tires: { ...currentTires, [corner]: updated } });
   };
 
   // ── Import tires from bound setup ───────────────────────────────────────────
@@ -321,7 +332,7 @@ export default function RaceWeekendView({
       };
       updatedPressures[corner] = pressure.blockPressure;
     }
-    onUpdateSession({
+    updateRun({
       ...session,
       tires: updatedTires,
       pressures: updatedPressures,
@@ -332,7 +343,14 @@ export default function RaceWeekendView({
   const handleQuickFourBarChange = (corner: 'lr' | 'rr', field: NumericCornerField, value: string, previous: string) => {
     if (!activeSetup || !onCommitQuickAdjust || previous === value) return;
     const result = onCommitQuickAdjust({ kind: 'four-bar', corner, field, value });
+    if (result.ok) setIsRunDirty(true);
     if (!result.ok) onInfo?.(result.error || 'Four-bar change could not be saved.');
+  };
+
+  const handleQuickAdjustCommit = (command: QuickAdjustCommand) => {
+    const result = onCommitQuickAdjust?.(command) ?? { ok: false, error: 'Quick Adjust is unavailable for this run.' };
+    if (result.ok) setIsRunDirty(true);
+    return result;
   };
 
   // ── Photo helpers ────────────────────────────────────────────────────────────
@@ -341,12 +359,12 @@ export default function RaceWeekendView({
     const files = e.target.files;
     if (!files) return;
     const compressed = await Promise.all(Array.from(files).map(f => compressImage(f)));
-    onUpdateSession({ ...session, screenshots: [...(session.screenshots || []), ...compressed] });
+    updateRun({ ...session, screenshots: [...(session.screenshots || []), ...compressed] });
     e.target.value = '';
   };
 
   const handleDeletePhoto = (idx: number) => {
-    onUpdateSession({ ...session, screenshots: (session.screenshots || []).filter((_, i) => i !== idx) });
+    updateRun({ ...session, screenshots: (session.screenshots || []).filter((_, i) => i !== idx) });
   };
 
   // ── Weekend weather fetch ────────────────────────────────────────────────────
@@ -601,7 +619,8 @@ export default function RaceWeekendView({
   // ── [14] Save Run: force-persist the session + collapse the editor ─────────
 
   const handleSaveRun = () => {
-    onUpdateSession({ ...session });
+    persistSession({ ...session });
+    setIsRunDirty(false);
     setEditorCollapsed(true);
   };
 
@@ -1147,7 +1166,7 @@ export default function RaceWeekendView({
               type="text"
               className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
               value={session.weather || ''}
-              onChange={e => onUpdateSession({ ...session, weather: e.target.value })}
+              onChange={e => updateRun({ ...session, weather: e.target.value })}
             />
           </label>
         </div>
@@ -1160,7 +1179,7 @@ export default function RaceWeekendView({
               <button
                 key={preset}
                 type="button"
-                onClick={() => onUpdateSession({ ...session, trackConditionPreset: session.trackConditionPreset === preset ? undefined : preset })}
+                onClick={() => updateRun({ ...session, trackConditionPreset: session.trackConditionPreset === preset ? undefined : preset })}
                 className={`py-2 px-1 min-h-12 rounded border font-mono text-[10px] font-bold transition-all text-center leading-tight ${
                   session.trackConditionPreset === preset
                     ? 'bg-primary/20 border-primary text-primary'
@@ -1175,7 +1194,7 @@ export default function RaceWeekendView({
               type="text"
               className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
               value={session.condition || ''}
-              onChange={e => onUpdateSession({ ...session, condition: e.target.value })}
+              onChange={e => updateRun({ ...session, condition: e.target.value })}
             />
           </label>
         </div>
@@ -1209,7 +1228,7 @@ export default function RaceWeekendView({
                   type="text"
                   className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
                   value={(session as any)[key] || ''}
-                  onChange={e => onUpdateSession({ ...session, [key]: e.target.value })}
+                  onChange={e => updateRun({ ...session, [key]: e.target.value })}
                 />
               </label>
             ))}
@@ -1342,7 +1361,7 @@ export default function RaceWeekendView({
             <QuickAdjustPanel
               setup={activeSetup}
               loadSessions={shockSessions}
-              onCommit={onCommitQuickAdjust}
+              onCommit={handleQuickAdjustCommit}
               onOpenFourBar={() => setFourBarOpen(true)}
             />
           )}
@@ -1355,7 +1374,7 @@ export default function RaceWeekendView({
             className="w-full bg-surface border border-outline-variant rounded p-3 text-sm text-on-surface font-mono min-h-[80px]"
             placeholder="What did the driver feel on this run?"
             value={session.competitionNotes || ''}
-            onChange={e => onUpdateSession({ ...session, competitionNotes: e.target.value })}
+            onChange={e => updateRun({ ...session, competitionNotes: e.target.value })}
           />
         </div>
 
@@ -1382,7 +1401,11 @@ export default function RaceWeekendView({
         </div>
         </div>
 
-        {/* [14] Sticky save bar — always visible while the log is open */}
+        </>
+        )}
+
+        {/* [14] Sticky save bar appears only after a run edit. */}
+        {isRunDirty && (
         <div className="sticky-action-bar rounded-b-lg">
           <button
             type="button"
@@ -1393,7 +1416,6 @@ export default function RaceWeekendView({
             SAVE RUN
           </button>
         </div>
-        </>
         )}
       </section>
       )}
@@ -1561,7 +1583,7 @@ export default function RaceWeekendView({
         title="Best lap"
         initialValue={session.bestLap || ''}
         onClose={() => setLapPadOpen(false)}
-        onCommit={(v) => onUpdateSession({ ...session, bestLap: v })}
+        onCommit={(v) => updateRun({ ...session, bestLap: v })}
       />
 
       <BottomSheet

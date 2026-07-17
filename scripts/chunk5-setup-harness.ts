@@ -116,6 +116,20 @@ assert.equal(fourBarAdjustmentLabel('lr', 'topBarAngFD'), 'LR top angle at full 
 assert.equal(fourBarAdjustmentLabel('rr', 'bottomBarAngRH'), 'RR bottom angle at ride height');
 
 const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+const raceWeekendSource = readFileSync(new URL('../src/components/RaceWeekendView.tsx', import.meta.url), 'utf8');
+const cssSource = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
+assert.match(appSource, /className="app-main-scroll flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto custom-scrollbar"/);
+assert.match(cssSource, /\.app-main-scroll\s*\{\s*padding-bottom: calc\(4rem \+ env\(safe-area-inset-bottom, 0px\)\);/);
+assert.match(cssSource, /\.sticky-action-bar[\s\S]*min-height: calc\(4\.5rem \+ env\(safe-area-inset-bottom, 0px\)\);/);
+assert.match(cssSource, /\.sticky-action-bar[\s\S]*background-color: var\(--color-surface-container-high\);/);
+assert.match(cssSource, /\.sticky-action-bar[\s\S]*border-top: 1px solid var\(--color-outline-variant\);/);
+assert.match(cssSource, /\.sticky-action-bar[\s\S]*padding-bottom: calc\(0\.75rem \+ env\(safe-area-inset-bottom, 0px\)\);/);
+assert.match(raceWeekendSource, /const \[isRunDirty, setIsRunDirty\] = useState\(false\);/);
+assert.match(raceWeekendSource, /const activeRunIdentity = session\.id \?\? `\$\{session\.weekendId \?\? ''\}:\$\{session\.name\}:\$\{session\.track\}`;/);
+assert.match(raceWeekendSource, /setIsRunDirty\(false\);[\s\S]*\[activeRunIdentity\]/);
+assert.match(raceWeekendSource, /const updateRun = \(updatedSession: ActiveSession\) => \{\s*setIsRunDirty\(true\);\s*persistSession\(updatedSession\);/);
+assert.match(raceWeekendSource, /const handleSaveRun = \(\) => \{\s*persistSession\(\{ \.\.\.session \}\);\s*setIsRunDirty\(false\);\s*setEditorCollapsed\(true\);/);
+assert.match(raceWeekendSource, /\{isRunDirty && \(\s*<div className="sticky-action-bar rounded-b-lg">/);
 assert.match(appSource, /handleUpdateSession\(current =>/);
 assert.match(appSource, /const candidate = typeof update === 'function' \? update\(activeSessionRef\.current\) : update/);
 assert.match(appSource, /const updatedSession: ActiveSession = \{ \.\.\.candidate, updatedAt:/);
