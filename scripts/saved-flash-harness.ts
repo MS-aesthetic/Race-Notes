@@ -44,8 +44,17 @@ const persistenceBeforeLastFlash = (source: string, label: string): void => {
   assert.ok(persistence >= 0 && flash > persistence, `${label} flashes after its final direct localStorage write`);
 };
 
+const pointerMoveCancelBlock = `    if (Math.hypot(event.clientX - press.startX, event.clientY - press.startY) > STEPPER_POINTER_SLOP_PX) {
+      press.moved = true;
+      cancelPress();
+    }`;
+const pointerMoveIgnoredBlock = `    if (Math.hypot(event.clientX - press.startX, event.clientY - press.startY) > STEPPER_POINTER_SLOP_PX) {
+      // mutation: movement ignored, leaving the gesture and repeat armed
+    }`;
+
 const b1SourceContractsPass = (source: string): boolean => {
   const startPress = between(source, '  const startPress =', '\n\n  const handlePointerMove =', 'B1 startPress');
+  const pointerMove = between(source, '  const handlePointerMove =', '\n\n  const finishPress =', 'B1 pointerMove');
   const finishPress = between(source, '  const finishPress =', '\n\n  // Clear timers on unmount', 'B1 finishPress');
   return [
     'const REPEAT_DELAY_MS = 350;',
@@ -64,14 +73,19 @@ const b1SourceContractsPass = (source: string): boolean => {
     '}, REPEAT_INTERVAL_MS);',
   ].every(token => source.includes(token))
     && !startPress.includes('applyStep(')
+    && pointerMove.includes(pointerMoveCancelBlock)
     && finishPress.includes('releasedOutsideSlop');
 };
 
+const movementIgnoredMutation = stepper.replace(pointerMoveCancelBlock, pointerMoveIgnoredBlock);
+const pointerCancelWriteMutation = stepper.replaceAll('onPointerCancel={cancelPress}', 'onPointerCancel={finishPress}');
+assert.notEqual(movementIgnoredMutation, stepper, 'B1 movement mutation changes the exact production cancellation block');
+assert.notEqual(pointerCancelWriteMutation, stepper, 'B1 pointercancel mutation changes the actual production handlers');
 assert.ok(b1SourceContractsPass(stepper), 'B1 source keeps pointerup/slop/pan-y/cadence contracts');
 for (const [name, mutated] of [
   ['pointerdown-write', stepper.replace('    const press: StepperPress = {', '    applyStep(dir, step);\n    const press: StepperPress = {')],
-  ['slop-cancel-removed', stepper.replace('      press.moved = true;', '      // moved state removed')],
-  ['pointercancel-write', stepper.replaceAll('onPointerCancel={cancelPress}', 'onPointerCancel={stopPress}')],
+  ['movement-ignored-write', movementIgnoredMutation],
+  ['pointercancel-write', pointerCancelWriteMutation],
   ['pan-y-removed', stepper.replace('touch-pan-y', 'touch-none')],
   ['repeat-delay-changed', stepper.replace('const REPEAT_DELAY_MS = 350;', 'const REPEAT_DELAY_MS = 349;')],
   ['repeat-interval-changed', stepper.replace('const REPEAT_INTERVAL_MS = 100;', 'const REPEAT_INTERVAL_MS = 99;')],
@@ -82,7 +96,8 @@ for (const [name, mutated] of [
 }
 
 type PressModel = { startX: number; startY: number; moved: boolean; didRepeat: boolean };
-const createB1PressModel = () => {
+type PressModelMutation = { ignoreMovement?: boolean; pointerCancelWrites?: boolean };
+const createB1PressModel = (mutation: PressModelMutation = {}) => {
   let writes = 0;
   let now = 0;
   let press: PressModel | null = null;
@@ -91,9 +106,12 @@ const createB1PressModel = () => {
   const down = (x = 0, y = 0) => { cancel(); press = { startX: x, startY: y, moved: false, didRepeat: false }; repeatAt = now + 350; };
   const move = (x: number, y: number) => {
     if (!press) return;
-    if (Math.hypot(x - press.startX, y - press.startY) > 8) { press.moved = true; cancel(); }
+    if (Math.hypot(x - press.startX, y - press.startY) > 8) {
+      if (mutation.ignoreMovement) return;
+      press.moved = true;
+      cancel();
+    }
   };
-  const cancelPointer = () => cancel();
   const advance = (ms: number) => {
     const target = now + ms;
     while (repeatAt !== null && repeatAt <= target) {
@@ -109,6 +127,10 @@ const createB1PressModel = () => {
     const releasedOutsideSlop = press !== null && Math.hypot(x - press.startX, y - press.startY) > 8;
     if (press && !press.moved && !releasedOutsideSlop && !press.didRepeat) writes += 1;
     cancel();
+  };
+  const cancelPointer = (x = 0, y = 0) => {
+    if (mutation.pointerCancelWrites) up(x, y);
+    else cancel();
   };
   return { down, move, cancelPointer, advance, up, writes: () => writes };
 };
@@ -139,6 +161,19 @@ pointerCancel.cancelPointer();
 pointerCancel.advance(1000);
 pointerCancel.up();
 assert.equal(pointerCancel.writes(), 0, 'B1 pointercancel cancels with zero writes and zero Saved/toast side effects');
+
+const movementIgnoredRegression = createB1PressModel({ ignoreMovement: true });
+movementIgnoredRegression.down();
+movementIgnoredRegression.move(0, 9);
+movementIgnoredRegression.advance(350);
+assert.equal(movementIgnoredRegression.writes(), 1, 'B1 production movement mutation is behaviorally real: ignored scroll movement allows a repeat write');
+assert.equal(b1SourceContractsPass(movementIgnoredMutation), false, 'B1 source gate rejects ignored production movement cancellation');
+
+const pointerCancelWriteRegression = createB1PressModel({ pointerCancelWrites: true });
+pointerCancelWriteRegression.down();
+pointerCancelWriteRegression.cancelPointer();
+assert.equal(pointerCancelWriteRegression.writes(), 1, 'B1 production pointercancel mutation is behaviorally real: finishPress commits a write');
+assert.equal(b1SourceContractsPass(pointerCancelWriteMutation), false, 'B1 source gate rejects production pointercancel routed to finishPress');
 
 const holdRepeat = createB1PressModel();
 holdRepeat.down();
