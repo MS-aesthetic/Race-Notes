@@ -1,24 +1,22 @@
 # Current Task — UX Overhaul v2 Task B1: Commit-on-Pointerup NumberStepper
 
-**Status:** READY — one Terra High initial build; SOL light QA next; B2 blocked
+**Status:** SOL REPAIR — B1 attempt 1 QA FAIL 94/100 on `d87275d`; B2 blocked
 **Branch:** `codex/ux-overhaul`
 **Dependency:** Chunk A final QA PASS 98/100 at `2fcebc4`; A1–A4 are closed
 **Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` Part 2 item 5, Part 5 Task B1/Chunk B, Part 6.1, and boundary statement 5.2
-**Runtime model:** Required builder role is Terra High. Verify from runtime metadata; report `unverified` only if metadata is absent.
+**Runtime model:** Required repair role is SOL High. Verify from runtime metadata; report `unverified` only if metadata is absent.
 
 ## Role and sequencing
 
-Terra receives one initial implementation pass. Implement B1 only, commit code and harness together, then stop for independent SOL light QA. Any QA failure transfers fixes to SOL; Terra is not re-invoked. Do not begin B2 or B3.
+Terra initial implementation `d87275d` passed product behavior but failed independent SOL QA at 94/100 because two mutation seeds did not represent the regressions they claimed. SOL owns this repair and subsequent fixes; Terra is not re-invoked. Commit the harness repair separately from the preceding Ralph-only failure record, then stop for independent SOL light QA. Do not begin B2 or B3.
 
 ## Permitted files
 
-- `src/components/ui/NumberStepper.tsx`
 - `scripts/saved-flash-harness.ts`
-- `scripts/setup-touch-target-harness.ts` — bounded dependency update only: replace obsolete A3 assertions that B1 is untouched; preserve all A3/A4 target, pressure, FourBar, viewport, text, and overflow proof
 
-No other file is permitted. Roadmap product scope remains `NumberStepper.tsx` only; both script files are harness coverage.
+No other file is permitted for the repair commit. `src/components/ui/NumberStepper.tsx` and `scripts/setup-touch-target-harness.ts` are accepted and frozen; do not modify them.
 
-## Required behavior
+## Accepted product behavior — preserve unchanged
 
 1. Pointer down arms gesture tracking and the existing repeat timer but performs zero writes.
 2. A short press commits exactly one step on pointer up only when release remains within approximately 8px of the initial pointer position and hold-repeat did not fire.
@@ -29,38 +27,43 @@ No other file is permitted. Roadmap product scope remains `NumberStepper.tsx` on
 7. Preserve keyboard-accessible single-step behavior, disabled bounds, min/max clamping, decimal/big-step behavior, direct value editing, ARIA labels, focus, cleanup, and unmount timer cancellation.
 8. Preserve A4 presentation: every direction target remains at least 44×44px; no pressure-grid or FourBar layout change.
 
-## Harness requirements
+## Exact QA failure
 
-1. Add a meaningful zero-writes-on-scroll behavioral assertion to `scripts/saved-flash-harness.ts` using real B1 source/logic contracts. It must distinguish pointer down, in-slop pointer up, beyond-slop movement, pointer cancel, and hold repeat.
-2. Add mutation checks that fail if any of these regress: mutation on pointer down, movement no longer cancels, `pointercancel` writes, `pan-y` returns to `none`, 350ms delay changes, 100ms cadence changes, or release after repeat adds a step.
-3. Update `scripts/setup-touch-target-harness.ts` only to replace its pre-B1 byte-equality/`touch-none`/no-`pointermove` locks with B1 contracts. Retain all existing 44px, actual-width pressure, FourBar 12-case, repair eight-case, exact Weather/Best-Finish, safe-area, overlap, and overflow assertions and mutations.
-4. `saved-flash-harness.ts` has a pre-existing unrelated whole-App reconstruction byte-lock failure. It may remain evidence-only only if the same assertion remains the sole saved-flash failure and all new B1 assertions demonstrably execute and pass before it. Do not weaken unrelated UXP-18 assertions or modify `App.tsx`.
+1. `slop-cancel-removed` removes only `press.moved = true` while leaving `cancelPress()` active. Timers and gesture still cancel, so the production-source mutation is behavior-neutral and does not prove that ignored movement is rejected.
+2. `pointercancel-write` routes `onPointerCancel` to `stopPress`. `stopPress` performs zero writes, so the mutation does not prove that an actual pointercancel write path is rejected.
+3. Product state-machine, source contracts, focused tests, A1–A4 regressions, full 22/24 matrix, exact lint baseline, build, scope, protected paths, signed-out shell, and cavecrew review otherwise passed. Product code requires no repair.
+
+## Required repair
+
+1. Replace the movement seed with an exact production-source mutation that neutralizes the whole movement-cancellation block: beyond-slop movement must be ignored, leaving the gesture armed so the mutated behavior can write. Prove the mutation changes behavior and `b1SourceContractsPass` rejects it.
+2. Replace the pointercancel seed with an exact production-source mutation routing the real `onPointerCancel` handler to `finishPress` or another actual write path. Demonstrate the mutated cancel path writes, then prove the production-source contract rejects it.
+3. Keep existing pointerdown, `pan-y`, 350ms, 100ms, release-slop, and release-double-step production mutations intact and passing.
+4. Preserve the source-derived B1 state model, direct no-move out-of-slop release proof, A1–A4 assertions, and all unrelated UXP-18 assertions.
+5. Preserve ordering: `B1 stepper behavior harness: PASS` must print before the same documented stale whole-App reconstruction byte-lock failure. Do not weaken or move the stale assertion.
 
 ## Acceptance
 
-- Scroll beginning over either stepper direction button causes zero `onChange` writes and zero Saved/toast side effects.
-- In-slop short press commits exactly one step on pointer up, never pointer down.
-- Hold repeat begins at 350ms and continues at 100ms with no release double-step.
-- Movement beyond approximately 8px and `pointercancel` cancel with zero writes.
-- Vertical scrolling works through `touch-action: pan-y`.
-- Keyboard, bounds, editing, ARIA/focus, 44px targets, pressure grid, FourBar layout, and all A1–A4 behavior remain intact.
+- Both replacement mutations are real behavior regressions, not token-only or behavior-neutral edits.
+- Movement-ignored mutation produces a write where production produces zero; production-source contract kills it.
+- Pointercancel-write mutation produces a write where production produces zero; production-source contract kills it.
+- All accepted B1 product behavior and prior A1–A4 proof remain unchanged.
 
 ## Required tests and evidence
 
-1. Run focused B1 behavioral/mutation proof plus `setup-touch-target-harness.ts`.
+1. Run focused B1 behavioral/mutation proof plus `setup-touch-target-harness.ts`; capture the B1 PASS marker before the documented saved-flash stale failure.
 2. Run A1–A4, tire, Quick Adjust, offline, and relevant Saved/toast regressions.
 3. Run all 24 harnesses in one captured matrix. Only `muted-text-color-harness.ts` and the same pre-existing unrelated whole-App assertion in `saved-flash-harness.ts` may remain nonblocking; no new failure is accepted.
 4. Run `npm run lint`; require the exact documented three-error baseline and zero new errors.
 5. Run `npm run build`; require PASS.
 6. Run `git diff --check`, clean status, task-range scope, and protected-path checks.
-7. Use cavecrew reviewer for pointer/timer state-machine, mutation strength, exact three-file boundary, and A1–A4 regression audit.
-8. Commit code plus harness only with a B1-identifying message. Do not update Ralph state.
+7. Use cavecrew reviewer for mutation behavioral relevance, stale-lock ordering, exact one-file repair boundary, and A1–A4 regression audit.
+8. Commit only `scripts/saved-flash-harness.ts` with a B1 repair-identifying message. Do not update Ralph state again after the repair commit.
 
 ## Hard boundaries
 
-- No B2/B3 notification, toast, save-status, App, Setup, RaceWeekend, FourBar, CSS, schema, RLS, migration, sync, delete, queue, pull, lifecycle, persistence, package, config, native, Android, release, credential, branch-ref, push, deploy, merge, production, `master`, or Sprint 4 IA change.
+- No `NumberStepper.tsx`, setup-touch-target harness, B2/B3 notification, toast, save-status, App, Setup, RaceWeekend, FourBar, CSS, schema, RLS, migration, sync, delete, queue, pull, lifecycle, persistence, package, config, native, Android, release, credential, branch-ref, push, deploy, merge, production, `master`, or Sprint 4 IA change.
 - Do not change 350ms/100ms cadence, disable pinch zoom, hide overflow, shrink targets, create/use credentials, or weaken A1–A4 assertions.
 
 ## Compressed execution contract
 
-Terra initial B1 only. Commit pointerup within ~8px; pointerdown/scroll/cancel zero writes; `pan-y`; repeat 350ms/100ms unchanged; no release double-step. Modify only NumberStepper plus two named harnesses, preserve A1–A4, run focused/full/lint/build/diff/cavecrew, commit code+harness, stop for SOL. B2 blocked. No push, deploy, merge, schema, native, or release change.
+SOL B1 harness-only repair after QA FAIL 94. Modify only `scripts/saved-flash-harness.ts`: replace behavior-neutral movement seed with whole-block ignored-movement regression; replace zero-write `stopPress` pointercancel seed with actual `finishPress` write regression; prove both write and source contract rejects them. Preserve product code, setup harness, A1–A4, stale-lock ordering, full tests, exact lint baseline, build, scope, cavecrew. Commit harness only; stop for independent SOL QA. B2 blocked.
