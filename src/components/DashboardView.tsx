@@ -176,7 +176,7 @@ export default function DashboardView({
   const awLastLap = activeWeekend?.sessions.find(s => s.bestLap)?.bestLap ?? null;
 
   return (
-    <div className="space-y-5" id="dashboard-view-root">
+    <div className="space-y-3" id="dashboard-view-root">
 
       {/* Team identity leads Dashboard. Text uses opaque token surfaces. */}
       {team && (
@@ -279,7 +279,7 @@ export default function DashboardView({
         ) : (
           <div className="bg-surface-container border border-primary/60 rounded-lg overflow-hidden">
             <div className="flex items-stretch">
-              <button onClick={onGoToSessions} className="flex-1 min-h-12 min-w-0 p-4 text-left group">
+              <button onClick={onGoToSessions} className="flex-1 min-h-12 min-w-0 p-3 text-left group">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary text-[20px]">calendar_today</span>
                   <h3 className="font-display text-base font-bold text-on-surface uppercase tracking-wide truncate group-hover:text-primary transition-colors">
@@ -364,7 +364,7 @@ export default function DashboardView({
                 <button
                   key={c.id}
                   onClick={onGoToService}
-                  className="w-full px-4 py-3 min-h-12 bg-surface-container hover:bg-surface-container-high transition-colors text-left flex items-center gap-3 group"
+                  className="w-full px-3 py-2 min-h-12 bg-surface-container hover:bg-surface-container-high transition-colors text-left flex items-center gap-2 group"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -397,7 +397,7 @@ export default function DashboardView({
       <button
         type="button"
         onClick={onGoToTodos}
-        className="flex min-h-14 w-full items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container px-4 text-left transition-colors hover:bg-surface-container-high"
+        className="flex min-h-14 w-full items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container px-3 text-left transition-colors hover:bg-surface-container-high"
       >
         <span className="material-symbols-outlined text-primary">checklist</span>
         <span className="min-w-0 flex-1 font-display font-semibold text-on-surface">
@@ -442,7 +442,7 @@ export default function DashboardView({
         onClose={() => setNoWeekendSheetOpen(false)}
         title="No active Race Day — start one?"
       >
-        <div className="space-y-3 pb-2">
+        <div className="space-y-2 pb-2">
           <p className="text-sm text-on-surface-variant">
             Runs live inside a Race Day. Start one and you’ll go straight into your first run.
           </p>
@@ -503,7 +503,7 @@ export default function DashboardView({
         title={selectedServiceComponent ? `Log maintenance — ${selectedServiceComponent.name}` : 'Log maintenance'}
       >
         {selectedServiceComponent && selectedServiceStatus && (
-          <div className="space-y-3 pb-2">
+          <div className="space-y-2 pb-2">
             {visibleMaintenance.length > 1 && (
               <label className="block">
                 <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">Component</span>
@@ -535,7 +535,7 @@ export default function DashboardView({
                 className="mt-1 w-full bg-surface border border-outline-variant focus:border-primary rounded-lg px-3 py-3 text-sm text-on-surface outline-none"
               />
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               <label className="block">
                 <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">Cost (optional)</span>
                 <input

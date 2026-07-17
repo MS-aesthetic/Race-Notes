@@ -83,7 +83,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
   }, [initialSubTab, subTabRequestKey]);
 
   return (
-    <div className="flex flex-col gap-4 h-full">
+    <div className="flex flex-col gap-3 h-full">
       {/* Sub-tab bar */}      
       <div className="flex bg-surface rounded-lg p-0.5 border border-outline-variant/30 text-xs font-mono uppercase tracking-wide overflow-x-auto">
         <button
@@ -133,10 +133,10 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
         )}
 
         {subTab === 'account' && (
-          <div className="flex flex-col gap-4 pb-8">
+          <div className="flex flex-col gap-3 pb-8">
             <AuthView user={user} profile={profile} onAuthChange={onAuthChange} />
 
-            <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+            <div className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-lg">privacy_tip</span>
                 <h3 className="font-display font-bold uppercase text-sm tracking-wide">Privacy</h3>
@@ -154,7 +154,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
             </div>
 
             {/* ── Danger Zone ──────────────────────────────────────────────── */}
-            <div className="bg-surface-container border border-red-500/30 rounded-lg p-4 space-y-3">
+            <div className="bg-surface-container border border-red-500/30 rounded-lg p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-red-400 text-lg">warning</span>
                 <h3 className="font-display font-bold uppercase text-sm text-red-400 tracking-wide">Danger Zone</h3>
@@ -220,9 +220,9 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
         )}
 
         {subTab === 'appearance' && (
-          <div className="space-y-5 pb-8">
+          <div className="space-y-3 pb-8">
             {/* Header */}
-            <div className="bg-surface-container border border-outline-variant rounded-lg p-4">
+            <div className="bg-surface-container border border-outline-variant rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1">
                 <span className="material-symbols-outlined text-primary text-lg">palette</span>
                 <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">App Theme</h3>
@@ -231,14 +231,14 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
             </div>
 
             {/* Light / Dark mode */}
-            <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+            <div className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">
               <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Color Mode</label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 {(['dark', 'light'] as const).map(mode => (
                   <button
                     key={mode}
                     onClick={() => onThemeChange({ ...theme, mode })}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
+                    className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
                       theme.mode === mode
                         ? 'border-primary bg-primary/10'
                         : 'border-outline-variant/50 bg-surface hover:border-outline'
@@ -259,7 +259,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
             </div>
 
             {/* Accent color */}
-            <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+            <div className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">
               <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Accent Color</label>
 
               {/* Preset swatches grid */}
@@ -286,7 +286,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
               </div>
 
               {/* Custom color picker */}
-              <div className="flex items-center gap-3 pt-2 border-t border-outline-variant/30">
+              <div className="flex items-center gap-2 pt-2 border-t border-outline-variant/30">
                 <label className="text-[10px] font-mono uppercase text-on-surface-variant font-bold shrink-0">Custom</label>
                 <input
                   type="color"
@@ -301,12 +301,12 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
             </div>
 
             {/* Font Size */}
-            <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+            <div className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">
               <div>
                 <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Font Size</label>
                 <p className="text-[10px] font-mono text-on-surface-muted mt-0.5">Scales all text and UI elements throughout the app.</p>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {([
                   { value: 'standard', icon: 'format_size', label: 'Default' },
                   { value: 'large',    icon: 'text_increase', label: 'Large' },
@@ -317,7 +317,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
                     <button
                       key={opt.value}
                       onClick={() => onThemeChange({ ...theme, fontSize: opt.value })}
-                      className={`flex flex-col items-center gap-1.5 p-4 rounded-lg border-2 transition-all ${
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all ${
                         active
                           ? 'border-primary bg-primary/10'
                           : 'border-outline-variant/50 bg-surface hover:border-outline'

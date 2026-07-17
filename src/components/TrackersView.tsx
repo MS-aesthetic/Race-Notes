@@ -261,7 +261,7 @@ function AccountingTab({ entries, onSave, weekends }: { entries: AccountingEntry
 
       {/* Add form */}
       {showForm && (
-        <form onSubmit={handleAdd} className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+        <form onSubmit={handleAdd} className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">
 
           {/* Income / Expense toggle */}
           <div className="grid grid-cols-2 gap-2">
@@ -614,7 +614,7 @@ function ServiceTab({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {/* Header actions */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
@@ -637,7 +637,7 @@ function ServiceTab({
 
       {/* Add component form */}
       {showAddForm && (
-        <form onSubmit={handleAddSubmit} className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+        <form onSubmit={handleAddSubmit} className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">
           <input required placeholder="Maintenance item name *" value={addName} onChange={e => setAddName(e.target.value)}
             className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
           <div className="grid grid-cols-2 gap-2">
@@ -850,7 +850,7 @@ function TemplatesTab({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {/* Header actions */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
@@ -873,7 +873,7 @@ function TemplatesTab({
 
       {/* Add template form */}
       {showAddForm && (
-        <form onSubmit={handleAddTemplate} className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+        <form onSubmit={handleAddTemplate} className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">
           <input required placeholder="Template name *" value={addName} onChange={e => setAddName(e.target.value)}
             className="w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none" />
           <div>
@@ -999,7 +999,7 @@ export default function TrackersView({
   const [showTemplateManager, setShowTemplateManager] = useState(initialSubTab === 'templates');
 
   return (
-    <div className="flex flex-col gap-4 h-full">
+    <div className="flex flex-col gap-3 h-full">
 
       {/* Sub-tab bar */}
       <div className="grid grid-cols-3 gap-1 bg-surface rounded-lg p-1 border border-outline-variant/30 text-xs font-mono uppercase tracking-wider">

@@ -158,13 +158,13 @@ const setupSource = readFileSync(new URL('../src/components/SetupView.tsx', impo
 assert.match(setupSource, /activeCarId \? byActiveCar<Setup>/);
 assert.match(setupSource, /preserveInfoToast/);
 assert.match(setupSource, /pressureSourceNote: value\.trim\(\) \? 'Adjusted in Setups' : undefined/);
-assert.match(setupSource, /className="w-full min-w-0 min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 outline-none rounded"/);
+assert.match(setupSource, /className="w-full min-w-0 min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 outline-none rounded"/);
 assert.match(setupSource, /grid grid-cols-2 sm:grid-cols-4 gap-2/);
 assert.match(setupSource, /min-w-0 break-words font-label-sm/);
-assert.match(setupSource, /min-w-0 p-1\.5 sm:p-4 grid grid-cols-1/);
+assert.match(setupSource, /min-w-0 p-2 sm:p-3 grid grid-cols-1 min-\[360px\]:grid-cols-2 gap-2/);
 assert.match(setupSource, /w-full min-w-0 flex flex-wrap items-center justify-end gap-2/);
 assert.match(setupSource, /w-full min-w-0 flex flex-wrap items-center justify-end gap-1 border-t/);
-assert.match(setupSource, /min-w-0 grid grid-cols-1 min-\[360px\]:grid-cols-2 gap-1\.5 min-\[360px\]:gap-3/);
+assert.match(setupSource, /min-w-0 grid grid-cols-1 min-\[360px\]:grid-cols-2 gap-1\.5 min-\[360px\]:gap-2/);
 assert.ok(setupSource.indexOf("(['lf', 'rf', 'lr', 'rr'] as const)") >= 0);
 const smasherSource = readFileSync(new URL('../src/components/SmasherLoadsView.tsx', import.meta.url), 'utf8');
 assert.match(smasherSource, /if \(!activeCarId\) return;/);
@@ -178,9 +178,14 @@ assert.ok(fourBarSource.indexOf("field: 'topBarLength'") < fourBarSource.indexOf
 assert.match(fourBarSource, /bottomBarAngRH/);
 assert.match(fourBarSource, /bottomBarAngFD/);
 assert.match(fourBarSource, /Legacy bottom angle/);
-assert.match(fourBarSource, /\[&_\[role=group\]\]:flex-wrap/);
-assert.equal((fourBarSource.match(/grid grid-cols-1 gap-2 min-\[360px\]:grid-cols-3/g) ?? []).length, 1, 'four-bar measurements use three columns on typical phones');
+assert.doesNotMatch(fourBarSource, /\[&_\[role=group\]\]:flex-wrap|\[&_\[role=group\]>button\]:basis-full/, 'compact steppers are not forced vertical');
+assert.match(fourBarSource, /const barLength = bar\.measurements\[1\];/, 'bar length renders above the hole controls');
+assert.match(fourBarSource, /const holeMeasurements = \[bar\.measurements\[0\], bar\.measurements\[2\]\];/, 'frame and birdcage controls remain paired');
+assert.match(fourBarSource, /<div className="grid grid-cols-2 gap-2">[\s\S]*holeMeasurements\.map/, 'four-bar hole controls use two phone columns');
 assert.equal((fourBarSource.match(/grid grid-cols-1 gap-2 min-\[360px\]:grid-cols-2/g) ?? []).length, 1, 'four-bar angles use two columns on typical phones');
 assert.doesNotMatch(fourBarSource, /sm:grid-cols-[23]/, 'four-bar no longer waits for the 640px breakpoint');
+assert.match(fourBarSource, /compact \? 'space-y-3'/, 'compact FourBar presentation is distinct from full mode');
+assert.match(setupSource, /<FourBarQuickAdjust\s+setup=\{setupItem\}\s+compact/, 'Setup activates compact FourBar presentation');
+assert.match(fourBarSource, /min-h-11 min-w-11 shrink-0/, 'compact FourBar keeps 44px help target');
 
 console.log('CHUNK5_SETUP_HARNESS PASS');

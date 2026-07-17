@@ -57,8 +57,8 @@ const computeStagger = (rightSize: string, leftSize: string): string => {
   return value === null ? '' : `${value.toFixed(2)}"`;
 };
 
-const INP = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-1.5 min-h-12 outline-none rounded';
-const LBL = 'text-[10px] uppercase font-mono font-semibold text-on-surface-variant block mb-1';
+const INP = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-1.5 min-h-11 outline-none rounded';
+const LBL = 'text-xs uppercase font-mono font-semibold text-on-surface-variant block mb-1 leading-tight';
 
 // ─── Corner Form Sub-component ────────────────────────────────────────────────
 
@@ -112,7 +112,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         <span className="material-symbols-outlined shrink-0 text-primary text-[18px]">directions_car</span>
         <h4 className="min-w-0 break-words font-label-sm text-xs uppercase text-on-surface font-bold leading-tight tracking-normal sm:tracking-widest">{cornerLabel}</h4>
       </div>
-      <div className="min-w-0 p-1.5 sm:p-4 grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4">
+      <div className="min-w-0 p-2 sm:p-3 grid grid-cols-1 min-[360px]:grid-cols-2 gap-2">
 
         {/* Tire from Inventory picker */}
         <div className="col-span-1 lg:col-span-2 min-w-0 bg-surface-container p-2 rounded border border-outline-variant/30 flex flex-wrap items-center justify-between gap-2">
@@ -130,7 +130,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
               }
               onFieldChange('tireInventoryId', tireId);
             }}
-            className="w-full min-w-0 min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 outline-none rounded"
+            className="w-full min-w-0 min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 outline-none rounded"
           >
             <option value="">-- Select from Inventory --</option>
             {sortBySize(tireInventory.filter(t => !usedTireIds.includes(t.id) || t.id === (data.tireInventoryId || ''))).map(t => (
@@ -143,7 +143,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         <div className="col-span-1 lg:col-span-2 min-w-0 bg-surface-container p-2 rounded border border-outline-variant/30 flex flex-wrap items-center justify-between gap-2">
           <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant">Bound Load Graph</label>
           <select value={data.boundGraphId || ''} onChange={(e) => onFieldChange('boundGraphId', e.target.value)}
-            className="w-full min-w-0 min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 outline-none rounded">
+            className="w-full min-w-0 min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 outline-none rounded">
             <option value="">-- None --</option>
             {data.boundGraphId && !loadSessions.some(session => session.id === data.boundGraphId) && (
               <option value={data.boundGraphId}>Saved Load Session (unavailable)</option>
@@ -442,10 +442,10 @@ export default function SetupView({
   };
 
   return (
-    <div className="space-y-4" id="setup-view-root">
+    <div className="space-y-3" id="setup-view-root">
 
       {/* Page Header & sub-tab nav */}
-      <div className="flex flex-col gap-3 border-b border-outline-variant pb-4">
+      <div className="flex flex-col gap-2 border-b border-outline-variant pb-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="font-display font-bold tracking-tight text-2xl uppercase text-on-surface">Setups</h2>
@@ -454,7 +454,7 @@ export default function SetupView({
               Saved as you change it
             </p>
           </div>
-          {onHelp && <button type="button" onClick={() => onHelp('setup')} aria-label="Setup help" title="Setup sheet help" className="flex min-h-12 min-w-12 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary"><span className="material-symbols-outlined">help</span></button>}
+          {onHelp && <button type="button" onClick={() => onHelp('setup')} aria-label="Setup help" title="Setup sheet help" className="flex min-h-11 min-w-11 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary"><span className="material-symbols-outlined">help</span></button>}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <SubTabBtn tab="setups" label="Setups" icon="settings_input_component" />
@@ -483,7 +483,7 @@ export default function SetupView({
           {noCar ? (
             <CarRequiredPrompt onAddCar={() => onGoToGarage?.()} />
           ) : (
-            <form onSubmit={handleAddNewSetup} className="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            <form onSubmit={handleAddNewSetup} className="bg-surface-container border border-outline-variant rounded-lg p-3 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
               <div className="flex-grow">
                 <label className="block text-[10px] uppercase font-bold text-on-surface-variant mb-1 font-mono">Create New Setup</label>
                 <input id="new-setup-name" type="text" placeholder="e.g. Chassis #42 - Slick Track Soft" value={newSetupName}
@@ -502,7 +502,7 @@ export default function SetupView({
           )}
 
           {/* Accordion list — filtered to active car */}
-          <div className="space-y-4" id="setups-accordion">
+          <div className="space-y-3" id="setups-accordion">
             {!noCar && displayedSetups.length === 0 && (
               <EmptyState
                 icon="tune"
@@ -522,7 +522,7 @@ export default function SetupView({
 
                   {/* Card header */}
                   <div onClick={() => setExpandedId(isExpanded ? null : setupItem.id)}
-                    className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-surface-container-low hover:bg-surface-container-high transition-all cursor-pointer select-none">
+                    className="p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-surface-container-low hover:bg-surface-container-high transition-all cursor-pointer select-none">
                     <div className="w-full min-w-0 sm:w-auto flex items-start gap-2 sm:gap-3">
                       <div className="mt-1 shrink-0">
                         {isActive
@@ -552,7 +552,7 @@ export default function SetupView({
                       )}
                       <div className="w-full min-w-0 flex flex-wrap items-center justify-end gap-1 border-t border-outline-variant/60 pt-2 sm:w-auto sm:border-t-0 sm:border-l sm:pt-0 sm:pl-2">
                         <button type="button" title="Share setup PDF" disabled={sharingSetupId === setupItem.id} onClick={(e) => { e.stopPropagation(); void handleShareSetup(setupItem); }}
-                          className="flex min-h-12 min-w-12 items-center justify-center text-on-surface-variant hover:text-primary transition-colors rounded disabled:opacity-40">
+                          className="flex min-h-11 min-w-11 items-center justify-center text-on-surface-variant hover:text-primary transition-colors rounded disabled:opacity-40">
                           <span className="material-symbols-outlined text-[18px]">{sharingSetupId === setupItem.id ? 'progress_activity' : 'share'}</span>
                         </button>
                         <button type="button" title="Clone setup" onClick={(e) => { e.stopPropagation(); handleCloneSetup(setupItem.id); }}
@@ -579,7 +579,7 @@ export default function SetupView({
 
                   {/* Collapsible content */}
                   {isExpanded && (
-                    <div className="min-w-0 p-2 sm:p-4 border-t border-outline-variant/50 bg-surface-container-low">
+                    <div className="min-w-0 p-2 sm:p-3 border-t border-outline-variant/50 bg-surface-container-low">
                       {isReadOnly && (
                         <div className="mb-4 rounded-lg border border-outline-variant bg-surface-container p-3 font-mono text-xs text-on-surface-variant">
                           Starting and finished snapshots stay unchanged. Clone this setup to make a new editable Current Setup.
@@ -588,31 +588,31 @@ export default function SetupView({
                       <fieldset disabled={isReadOnly} className="min-w-0 space-y-6 disabled:opacity-75">
 
                       {/* Metadata grid */}
-                      <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2">
                         <div>
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Chassis</label>
                           <input type="text" value={setupItem.chassis} onChange={(e) => handleMetadataChange(setupItem.id, 'chassis', e.target.value)}
-                            className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                            className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
                         <div>
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Track</label>
                           <input type="text" placeholder="e.g. Eldora Speedway" value={setupItem.track} onChange={(e) => handleMetadataChange(setupItem.id, 'track', e.target.value)}
-                            className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                            className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
                         <div>
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Last Updated</label>
                           <input type="text" value={setupItem.date} onChange={(e) => handleMetadataChange(setupItem.id, 'date', e.target.value)}
-                            className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                            className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
                         <div>
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Car Class / Series</label>
                           <input type="text" placeholder="e.g. USMTS Late Model" value={setupItem.carType} onChange={(e) => handleMetadataChange(setupItem.id, 'carType', e.target.value)}
-                            className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                            className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
                         <div className="min-[360px]:col-span-2">
                           <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Toe</label>
                           <input type="text" placeholder='e.g. 1/8" Total Toe-Out' value={setupItem.toe || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'toe', e.target.value)}
-                            className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                            className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
                       </div>
 
@@ -624,42 +624,42 @@ export default function SetupView({
                       </div>
 
                       {/* Car setup details */}
-                      <div className="bg-surface-container/50 border border-outline-variant/60 rounded-lg p-4 space-y-4">
+                      <div className="bg-surface-container/50 border border-outline-variant/60 rounded-lg p-3 space-y-3">
                         <div className="flex items-center gap-2 border-b border-outline-variant/40 pb-2">
                           <span className="material-symbols-outlined text-primary text-[18px]">tune</span>
                           <h4 className="font-label-sm text-xs font-bold uppercase text-on-surface tracking-wider">Car Setup Details</h4>
                         </div>
 
-                        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2">
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Gear</label>
                             <input type="text" placeholder="e.g. 6.14" value={setupItem.gear || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'gear', e.target.value)}
-                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">JBar Length</label>
                             <input type="text" placeholder="e.g. #3" value={setupItem.jbar || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'jbar', e.target.value)}
-                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">J-Bar Frame Height</label>
                             <input type="text" placeholder='e.g. 9.5"' value={setupItem.jbarFrameHeight || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'jbarFrameHeight', e.target.value)}
-                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">J-Bar Pinion Height</label>
                             <input type="text" placeholder='e.g. 8.0"' value={setupItem.jbarPinionHeight || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'jbarPinionHeight', e.target.value)}
-                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Pull Bar Frame Hole</label>
                             <input type="text" placeholder="e.g. Top" value={setupItem.pullBarFrameHole || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'pullBarFrameHole', e.target.value)}
-                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Pull Bar Rear Hole</label>
                             <input type="text" placeholder="e.g. Middle" value={setupItem.pullBarRearHole || ''} onChange={(e) => handleMetadataChange(setupItem.id, 'pullBarRearHole', e.target.value)}
-                              className="w-full min-h-12 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
+                              className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                           </div>
                         </div>
 
@@ -721,7 +721,7 @@ export default function SetupView({
                       </div>
 
                       {/* 4 Corner forms */}
-                      <div className="min-w-0 grid grid-cols-1 min-[360px]:grid-cols-2 gap-1.5 min-[360px]:gap-3">
+                      <div className="min-w-0 grid grid-cols-1 min-[360px]:grid-cols-2 gap-1.5 min-[360px]:gap-2">
                         {(['lf', 'rf', 'lr', 'rr'] as const).map((corner, _, all) => {
                           const usedTireIds = all
                             .filter(c => c !== corner)
@@ -748,12 +748,13 @@ export default function SetupView({
                       {/* Four-bar is part of this setup, after all four corner values. */}
                       <FourBarQuickAdjust
                         setup={setupItem}
+                        compact
                         onHelp={onHelp}
                         onFieldChange={(corner, field, value) => handleCornerChange(setupItem.id, corner, field, value)}
                       />
 
                       {(setupItem.changeLog?.length || 0) > 0 && (
-                        <section className="rounded-lg border border-outline-variant/60 bg-surface-container/50 p-4">
+                        <section className="rounded-lg border border-outline-variant/60 bg-surface-container/50 p-3">
                           <h4 className="font-display text-xs font-bold uppercase text-on-surface">Live-Trackside Changes</h4>
                           <p className="font-mono text-[10px] text-on-surface-variant mt-1">Saved in order so Starting and finished setups can be compared.</p>
                           <div className="mt-3 space-y-2">
@@ -771,7 +772,7 @@ export default function SetupView({
                       )}
 
                       {/* Attachments */}
-                      <div className="bg-surface-container/50 border border-outline-variant/60 rounded-lg p-4">
+                      <div className="bg-surface-container/50 border border-outline-variant/60 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary text-[18px]">photo_library</span>

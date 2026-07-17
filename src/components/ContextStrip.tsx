@@ -40,7 +40,7 @@ export default function ContextStrip({
   const sortedWeekends = sortWeekends(weekends, activeWeekendId);
 
   return (
-    <div className="w-full border-b border-outline-variant bg-surface-container/60 px-4 md:px-6">
+    <div className="w-full border-b border-outline-variant bg-surface-container/60 px-3 md:px-4">
       <div className="flex items-center gap-2 overflow-x-auto py-1">
         {/* Car chip — hidden entirely for single-car users ([37]) */}
         {cars.length > 1 && (
@@ -48,7 +48,7 @@ export default function ContextStrip({
             type="button"
             onClick={() => setCarPickerOpen(true)}
             aria-label="Switch car"
-            className="flex min-h-12 shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 font-mono text-[11px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
+            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 font-mono text-[11px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
           >
             <span className="material-symbols-outlined text-[14px]">directions_car</span>
             <span className="max-w-[110px] truncate">
@@ -63,7 +63,7 @@ export default function ContextStrip({
           <button
             type="button"
             onClick={onAddCar}
-            className="flex min-h-12 min-w-0 items-center gap-1.5 rounded-full border-2 border-primary/60 bg-primary/10 px-3 font-mono text-[11px] font-bold uppercase tracking-wider text-primary"
+            className="flex min-h-11 min-w-0 items-center gap-1.5 rounded-full border-2 border-primary/60 bg-primary/10 px-3 font-mono text-[11px] font-bold uppercase tracking-wider text-primary"
           >
             <span className="material-symbols-outlined text-[16px]">directions_car</span>
             <span className="min-w-0 truncate">Add a car to start a Race Day</span>
@@ -73,7 +73,7 @@ export default function ContextStrip({
             type="button"
             onClick={() => setWeekendPickerOpen(true)}
             aria-label="Switch Race Day"
-            className="flex min-h-12 min-w-0 items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-high px-3 font-mono text-[11px] font-bold uppercase tracking-wider text-on-surface transition-colors hover:border-primary/50"
+            className="flex min-h-11 min-w-0 items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-high px-3 font-mono text-[11px] font-bold uppercase tracking-wider text-on-surface transition-colors hover:border-primary/50"
           >
             <span className="material-symbols-outlined text-[14px] text-primary">flag</span>
             <span className="min-w-0 truncate">
@@ -85,7 +85,7 @@ export default function ContextStrip({
           <button
             type="button"
             onClick={() => (weekends.length === 0 ? onNewWeekend() : setWeekendPickerOpen(true))}
-            className="flex min-h-12 min-w-0 items-center gap-1.5 rounded-full border border-dashed border-outline-variant px-3 font-mono text-[11px] font-bold uppercase tracking-wider text-on-surface-variant transition-colors hover:border-primary/50 hover:text-primary"
+            className="flex min-h-11 min-w-0 items-center gap-1.5 rounded-full border border-dashed border-outline-variant px-3 font-mono text-[11px] font-bold uppercase tracking-wider text-on-surface-variant transition-colors hover:border-primary/50 hover:text-primary"
           >
             <span className="material-symbols-outlined text-[14px]">add_circle</span>
             <span className="min-w-0 truncate">No active Race Day — tap to create</span>
@@ -103,7 +103,7 @@ export default function ContextStrip({
                 key={car.id}
                 type="button"
                 onClick={() => { onSelectCar(car.id); setCarPickerOpen(false); }}
-                className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-left transition-colors ${
+                className={`flex min-h-11 items-center gap-2 rounded-xl px-3 text-left transition-colors ${
                   isActive ? 'bg-primary/10 text-primary' : 'text-on-surface hover:bg-surface-container'
                 }`}
               >
@@ -133,7 +133,7 @@ export default function ContextStrip({
                 key={w.id}
                 type="button"
                 onClick={() => { onSelectWeekend(w.id); setWeekendPickerOpen(false); }}
-                className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-left transition-colors ${
+                className={`flex min-h-11 items-center gap-2 rounded-xl px-3 text-left transition-colors ${
                   isActive ? 'bg-primary/10 text-primary' : 'text-on-surface hover:bg-surface-container'
                 }`}
               >
@@ -157,7 +157,7 @@ export default function ContextStrip({
           <button
             type="button"
             onClick={() => { setWeekendPickerOpen(false); onNewWeekend(); }}
-            className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-left font-display font-semibold text-primary transition-colors hover:bg-surface-container"
+            className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-left font-display font-semibold text-primary transition-colors hover:bg-surface-container"
           >
             <span className="material-symbols-outlined">add_circle</span>
             New Race Day

@@ -103,8 +103,8 @@ export default function TiresSubView({
   };
   const findTire = (id: string | undefined) => displayedTires.find(tire => tire.id === id);
 
-  return <div className="space-y-5">
-    <section className="space-y-3 rounded-xl border border-outline-variant bg-surface-container p-4">
+  return <div className="space-y-3">
+    <section className="space-y-2 rounded-xl border border-outline-variant bg-surface-container p-3">
       <div><h3 className="font-display text-lg font-bold uppercase text-on-surface">Current tire set</h3><p className="font-mono text-xs text-on-surface-variant">Latest logged pressure, heat cycles, and estimated laps.</p></div>
       {!noCar && activeSetup ? <>
         <div className="grid grid-cols-2 gap-2">
@@ -115,14 +115,14 @@ export default function TiresSubView({
             const lastPressure = history[corner][0]?.pressure;
             return <div key={corner} className="min-w-0 rounded border border-outline-variant bg-surface-container-low p-2">
               <p className="font-mono text-xs font-bold text-primary uppercase">{corner}</p>
-              <p className="min-w-0 break-words font-mono text-xs text-on-surface">#{tire?.tireNumber || '—'} · {resolvedSizes?.[corner] || '—'}</p>
-              <p className="min-w-0 break-words font-mono text-xs text-on-surface-variant">{tire?.compound || setupCorner.tireComp || 'No compound'}</p>
-              <p className="mt-1 font-mono text-xs text-on-surface-variant">Last pressure <span className="font-bold text-on-surface">{formatPsiValue(lastPressure) || '—'}</span></p>
-              <p className="font-mono text-xs text-on-surface-variant">Cycles <span className="font-bold text-on-surface">{tire ? tire.heatCycles ?? 0 : '—'}</span> · Est. laps <span className="font-bold text-on-surface">{tire ? getTireTotalLaps(usage) : '—'}</span></p>
+              <p className="min-w-0 break-words font-mono text-sm text-on-surface">#{tire?.tireNumber || '—'} · {resolvedSizes?.[corner] || '—'}</p>
+              <p className="min-w-0 break-words font-mono text-sm text-on-surface-variant">{tire?.compound || setupCorner.tireComp || 'No compound'}</p>
+              <p className="mt-1 font-mono text-sm text-on-surface-variant">Last pressure <span className="font-bold text-on-surface">{formatPsiValue(lastPressure) || '—'}</span></p>
+              <p className="font-mono text-sm text-on-surface-variant">Cycles <span className="font-bold text-on-surface">{tire ? tire.heatCycles ?? 0 : '—'}</span> · Est. laps <span className="font-bold text-on-surface">{tire ? getTireTotalLaps(usage) : '—'}</span></p>
             </div>;
           })}
         </div>
-        <div className="grid grid-cols-2 gap-2 font-mono text-xs"><div className="min-w-0 break-words rounded bg-surface-container-low p-2 text-on-surface-variant">Front stagger <span className="text-primary">{stagger(resolvedSizes?.rf || '', resolvedSizes?.lf || '')}</span></div><div className="min-w-0 break-words rounded bg-surface-container-low p-2 text-on-surface-variant">Rear stagger <span className="text-primary">{stagger(resolvedSizes?.rr || '', resolvedSizes?.lr || '')}</span></div></div>
+        <div className="grid grid-cols-2 gap-2 font-mono text-sm"><div className="min-w-0 break-words rounded bg-surface-container-low p-2 text-on-surface-variant">Front stagger <span className="text-primary">{stagger(resolvedSizes?.rf || '', resolvedSizes?.lf || '')}</span></div><div className="min-w-0 break-words rounded bg-surface-container-low p-2 text-on-surface-variant">Rear stagger <span className="text-primary">{stagger(resolvedSizes?.rr || '', resolvedSizes?.lr || '')}</span></div></div>
       </> : <p className="font-mono text-xs text-on-surface-variant">{noCar ? 'Select or add a car to view its tire set.' : 'Select a setup for this car to view linked tires.'}</p>}
     </section>
 

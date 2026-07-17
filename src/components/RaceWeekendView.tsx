@@ -1029,7 +1029,7 @@ export default function RaceWeekendView({
           </div>
 
           {/* Weather */}
-          <div className="p-4 border-b border-outline-variant/50 space-y-3">
+          <div className="p-3 border-b border-outline-variant/50 space-y-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="font-mono text-[10px] uppercase font-bold text-on-surface-variant tracking-wider">Location & Weather</span>
               <div className="flex gap-2">
@@ -1102,7 +1102,7 @@ export default function RaceWeekendView({
           </div>
 
           {/* Weekend Notes */}
-          <div className="p-4">
+          <div className="p-3">
             <label className="font-mono text-[10px] uppercase font-bold text-on-surface-variant tracking-wider block mb-2">Race Day Notes</label>
             <textarea
               className="w-full bg-surface border border-outline-variant focus:border-primary rounded p-3 text-sm text-on-surface font-mono min-h-[72px] outline-none resize-none"
@@ -1153,7 +1153,7 @@ export default function RaceWeekendView({
 
         {editorCollapsed ? null : (
         <>
-        <div className="p-4 pt-0">
+        <div className="p-3 pt-0">
 
         {/* 1 ── Identity */}
         <div className="mb-6">
@@ -1164,7 +1164,7 @@ export default function RaceWeekendView({
             <span className="text-[10px] uppercase font-mono text-on-surface-variant">Weather</span>
             <input
               type="text"
-              className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+              className="min-h-11 bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
               value={session.weather || ''}
               onChange={e => updateRun({ ...session, weather: e.target.value })}
             />
@@ -1192,7 +1192,7 @@ export default function RaceWeekendView({
             <span className="text-[10px] uppercase font-mono text-on-surface-variant">Condition (free text)</span>
             <input
               type="text"
-              className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+              className="min-h-11 bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
               value={session.condition || ''}
               onChange={e => updateRun({ ...session, condition: e.target.value })}
             />
@@ -1211,7 +1211,7 @@ export default function RaceWeekendView({
                 inputMode="none"
                 readOnly
                 placeholder="--.---"
-                className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono cursor-pointer"
+                className="min-h-11 bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono cursor-pointer"
                 value={session.bestLap || ''}
                 onFocus={() => setLapPadOpen(true)}
                 onClick={() => setLapPadOpen(true)}
@@ -1226,7 +1226,7 @@ export default function RaceWeekendView({
                 <span className="text-[10px] uppercase font-mono text-on-surface-variant">{label}</span>
                 <input
                   type="text"
-                  className="bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
+                  className="min-h-11 bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
                   value={(session as any)[key] || ''}
                   onChange={e => updateRun({ ...session, [key]: e.target.value })}
                 />
@@ -1273,7 +1273,7 @@ export default function RaceWeekendView({
                 placeholder={`${labels[phase]}…`}
                 value={notesVal}
                 onChange={e => handleNotesChange(notesField, e.target.value)}
-                className="w-full bg-surface border border-outline-variant/50 text-on-surface text-xs font-mono p-2 rounded"
+                className="w-full min-h-11 bg-surface border border-outline-variant/50 text-on-surface text-xs font-mono p-2 rounded"
               />
             );
           })}

@@ -77,9 +77,9 @@ export default function GarageView({
   const totalData = (carId: string) => setupCount(carId) + tireCount(carId) + shockCount(carId);
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-3 pb-8">
       {/* Header */}
-      <div className="bg-surface-container border border-outline-variant rounded-lg p-4">
+      <div className="bg-surface-container border border-outline-variant rounded-lg p-3">
         <div className="flex items-center gap-2 mb-1">
           <span className="material-symbols-outlined text-primary text-lg">garage</span>
           <h3 className="font-display font-bold uppercase text-sm text-on-surface tracking-wide">Garage</h3>
@@ -108,7 +108,7 @@ export default function GarageView({
                 }`}
               >
                 {isEditing ? (
-                  <div className="p-4 space-y-3">
+                  <div className="p-3 space-y-2">
                     <label className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Car Type</label>
                     <select
                       value={editForm.carType}
@@ -153,7 +153,7 @@ export default function GarageView({
                 ) : (
                   <button
                     onClick={() => onSelectCar(car.id)}
-                    className="w-full text-left p-4"
+                    className="w-full text-left p-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -214,7 +214,7 @@ export default function GarageView({
 
       {/* Add car form */}
       {showAddForm ? (
-        <div className="bg-surface-container border border-outline-variant rounded-lg p-4 space-y-3">
+        <div className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">
           <h4 className="text-[10px] font-mono uppercase font-bold text-on-surface-variant tracking-wider">Add Car</h4>
           <div>
             <label className="text-[10px] font-mono uppercase text-on-surface-variant mb-1 block">Car Type</label>

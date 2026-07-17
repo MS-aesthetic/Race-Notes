@@ -2117,7 +2117,7 @@ export default function App() {
           className="w-full max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl mx-auto bg-background h-full flex flex-col shadow-none md:shadow-2xl md:border-x border-outline-variant/20"
         >
           <header className="bg-surface w-full top-0 sticky border-b border-outline-variant z-40">
-            <div className="flex items-center gap-1.5 px-4 md:px-6 py-3">
+          <div className="flex items-center gap-1.5 px-3 md:px-4 py-2">
               <span className="material-symbols-outlined text-primary text-xl">headset_mic</span>
               <h1 className="font-display font-bold tracking-tight text-base text-primary uppercase">
                 CREW CHIEF
@@ -2156,7 +2156,7 @@ export default function App() {
       >
         {/* TopAppBar component with logo title & dual NEW entries triggers */}
         <header className="bg-surface w-full top-0 sticky border-b border-outline-variant z-40">
-          <div className="flex flex-wrap justify-between items-center gap-y-1 px-4 md:px-6 py-3 w-full">
+          <div className="flex flex-wrap justify-between items-center gap-y-1 px-3 md:px-4 py-2 w-full">
             <div className="flex min-w-0 items-center gap-1.5">
               <span className="material-symbols-outlined text-primary text-xl">headset_mic</span>
               <h1 className="font-display font-bold tracking-tight text-base text-primary uppercase">
@@ -2181,7 +2181,7 @@ export default function App() {
                 onClick={() => openHelp()}
                 aria-label="Tuning Guide"
                 title="Tuning Guide"
-                className="flex min-w-0 max-w-full flex-wrap items-center justify-center gap-1 px-2 min-h-12 rounded-full text-on-surface-variant hover:text-primary transition-colors text-center leading-tight"
+                className="flex min-w-0 max-w-full flex-wrap items-center justify-center gap-1 px-2 min-h-11 rounded-full text-on-surface-variant hover:text-primary transition-colors text-center leading-tight"
               >
                 <span className="material-symbols-outlined text-[20px]">menu_book</span>
                 <span className="font-mono text-[11px] font-semibold">Tuning Guide</span>
@@ -2191,7 +2191,7 @@ export default function App() {
                 onClick={() => handleThemeChange({ ...theme, mode: theme.mode === 'dark' ? 'light' : 'dark' })}
                 aria-label={theme.mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 title={theme.mode === 'dark' ? 'Switch to light mode (sunlight)' : 'Switch to dark mode'}
-                className="flex items-center justify-center min-w-12 min-h-12 rounded-full text-on-surface-variant hover:text-primary transition-colors"
+                className="flex items-center justify-center min-w-11 min-h-11 rounded-full text-on-surface-variant hover:text-primary transition-colors"
               >
                 <span className="material-symbols-outlined text-[20px]">
                   {theme.mode === 'dark' ? 'dark_mode' : 'light_mode'}
@@ -2416,7 +2416,7 @@ export default function App() {
 
         {/* Global Bottom Tab Navigation bar */}
         <nav
-          className="bg-surface-container border-t border-outline-variant z-40 flex justify-around items-center h-16 md:h-[72px] px-2 md:px-6 lg:px-12 sticky bottom-0 w-full flex-shrink-0"
+          className="bg-surface-container border-t border-outline-variant z-40 flex justify-around items-center h-11 px-2 md:px-4 sticky bottom-0 w-full flex-shrink-0"
           id="global-bottom-nav-bar"
         >
           {/* Dashboard Button */}
@@ -2425,7 +2425,7 @@ export default function App() {
             id="tab-btn-dashboard"
             aria-current={activeTab === 'dashboard' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
-              activeTab === 'dashboard' ? 'text-primary scale-105' : 'text-on-surface-muted hover:text-on-surface'
+              activeTab === 'dashboard' ? 'text-primary' : 'text-on-surface-muted hover:text-on-surface'
             }`}
           >
             <span
@@ -2446,7 +2446,7 @@ export default function App() {
             id="tab-btn-setups"
             aria-current={activeTab === 'setups' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
-              activeTab === 'setups' ? 'text-primary scale-105' : 'text-on-surface-muted hover:text-on-surface'
+              activeTab === 'setups' ? 'text-primary' : 'text-on-surface-muted hover:text-on-surface'
             }`}
           >
             <span
@@ -2467,7 +2467,7 @@ export default function App() {
             id="tab-btn-raceweekend"
             aria-current={activeTab === 'raceweekend' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
-              activeTab === 'raceweekend' ? 'text-primary scale-105' : 'text-on-surface-muted hover:text-on-surface'
+              activeTab === 'raceweekend' ? 'text-primary' : 'text-on-surface-muted hover:text-on-surface'
             }`}
           >
             <span
@@ -2487,7 +2487,7 @@ export default function App() {
             id="tab-btn-trackers"
             aria-current={activeTab === 'trackers' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
-              activeTab === 'trackers' ? 'text-primary scale-105' : 'text-on-surface-muted hover:text-on-surface'
+              activeTab === 'trackers' ? 'text-primary' : 'text-on-surface-muted hover:text-on-surface'
             }`}>
             <span className="material-symbols-outlined text-[20px]"
                   aria-hidden="true"
@@ -2507,7 +2507,7 @@ export default function App() {
             id="tab-btn-settings"
             aria-current={activeTab === 'settings' ? 'page' : undefined}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer ${
-              activeTab === 'settings' ? 'text-primary scale-105' : 'text-on-surface-muted hover:text-on-surface'
+              activeTab === 'settings' ? 'text-primary' : 'text-on-surface-muted hover:text-on-surface'
             }`}
           >
             <span
