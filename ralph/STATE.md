@@ -112,6 +112,18 @@ Separate track from WS-N…Z. Chunks 1–9 are historical and archived under `do
 | UXF-9P | Owner preflight: no-car guidance, Race Day copy, Tuning Guide regression | complete | 0 | 97 | 0361278 | Direct Garage routing and hard creation guards, shared prompts, finder-first regression, display-only Race Day vocabulary, full harness/build/lint/diff gates, cavecrew PASS, and final draft clean at 320/390 signed-out. |
 | UXF-9 | Batch regression, draft, and owner acceptance | complete | 0 | 95 | Release 5.0 | Owner authorized master/GitHub/Android release. Ten harnesses, exact lint baseline, web build, signed APK/AAB, package/version, and certificate gates pass. Separate Claude Fable authenticated plan was not run and is disclosed. |
 
+## UX Overhaul v2 (branch `codex/ux-overhaul`, started 2026-07-17)
+
+Execution authority: `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` Part 5. Tasks run serially with Terra initial builds and SOL light QA. Runtime model identity comes only from turn metadata; when unavailable it is recorded as `unverified`.
+
+| Task | Scope | Status | Attempts | Score | Commit | Notes |
+|---|---|---|---|---|---|---|
+| A1 | Scale default and migration | complete | 1 | 97 | dc49c06 | SOL light QA PASS. `chunk6a-refinement-harness.ts` PASS; lint matched exact three-error baseline; 567-module build PASS; diff contained exactly four authorized files, `git diff --check` passed, and worktree was clean; cavecrew review found no issues. Runtime model unverified. |
+| A2 | Save Run reservation and bottom-nav clearance | in_progress | 0 | — | — | READY for Terra initial build. Bounded work order in `ralph/CURRENT_TASK.md`; A1 prerequisite passed. |
+
+### UX Overhaul v2 grade log
+- 2026-07-17 · A1 · attempt 1 · PASS · 97 · Commit `dc49c06`; focused chunk6a harness PASS; exact three-error lint baseline; 567-module build PASS; exact four-file scoped diff, diff-check, and clean-tree gates PASS; cavecrew found no issues; runtime model unverified. A2 unlocked for Terra initial build.
+
 ### UX chunk grade log
 - 2026-07-14 · UXF-9 / Release 5.0 · OWNER RELEASE PASS · 95 · Maxx explicitly authorized master promotion, GitHub push, APK, and Play Store AAB. All ten harnesses pass; lint remains exact three-error baseline; 559-module/18-entry web build passes; signed APK and AAB build with package `nimbus.engineering.crewchief`, version code 17/name 5.0, API 36, and matching certificate. Android project files are now reproducible from Git without tracked credentials. Separate Claude Fable authenticated final plan was not executed; emulator install was not forced because existing debug signature differs and preserving device data won.
 - 2026-07-14 · UXF-9P · Owner preflight corrections · PASS · 97 · Feature `0361278`; no-car actions route directly to Garage before forms/mutations/follow-on runs, including stale active-event session paths. Shared Setups/Sessions/Dashboard/context guidance, finder-first global Tuning Guide regression, and display-only Race Day terminology landed without internal/schema renames or user-text rewriting. Ten focused/accumulated harnesses PASS; exact three-error lint baseline; 559-module/18-entry build; diff and cavecrew review clean. Final draft `6a56d1d228995bd1cef8c421` has no 320/390 signed-out overflow or console warnings. Authenticated draft feature state unavailable and not claimed. UXF-9 final Claude plan ready.
