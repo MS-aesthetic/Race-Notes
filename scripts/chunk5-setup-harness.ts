@@ -136,7 +136,8 @@ assert.match(appSource, /const updatedSession: ActiveSession = \{ \.\.\.candidat
 assert.match(appSource, /preserveInfoToast/);
 assert.match(appSource, /const pressures = setupPressureBlock\(nextActive\)/);
 assert.match(appSource, /pressureSourceNote: hasPressureSource \? sourceNote : undefined/);
-assert.match(appSource, /else if \(!preserveInfoToast\) setInfoToast\(null\)/);
+assert.match(appSource, /if \(hasPressureSource && !preserveInfoToast\) showInfo\(\{ reason: 'pressure-source', context: \{ label:/);
+assert.match(appSource, /else if \(!preserveInfoToast\) clearInfo\(\)/);
 assert.match(appSource, /mirrorPressureBlockToTires\(data\.prefillTires \?\? defaultTires, initialPressures\)/);
 const canonicalBlock = appSource.slice(appSource.indexOf('const handleUpdateSession'), appSource.indexOf('// Session weather helpers'));
 assert.match(canonicalBlock, /activeSessionRef\.current/);

@@ -7,7 +7,7 @@ const app = source('src/App.tsx');
 const garage = source('src/components/GarageView.tsx');
 
 assert.match(app, /import \{ useUndoableDelete \} from '\.\/lib\/undo';/);
-assert.match(app, /import UndoToast, \{ InfoToast \} from '\.\/components\/ui\/UndoToast';/);
+assert.match(app, /import UndoToast from '\.\/components\/ui\/UndoToast';/);
 assert.match(app, /const carUndo = useUndoableDelete<Car>\(\);/);
 assert.match(app, /const pendingCarId = carUndo\.pending\?\.id \?\? null;/);
 assert.match(app, /cars=\{pendingCarId \? cars\.filter\(car => car\.id !== pendingCarId\) : cars\}/);
@@ -39,7 +39,8 @@ const deleteStart = app.indexOf('const handleDeleteCar = (carId: string) => {');
 const deleteEnd = app.indexOf('// ── Clear All Data', deleteStart);
 assert.ok(deleteStart >= 0 && deleteEnd > deleteStart, 'car delete handler must remain isolated');
 const deleteHandler = app.slice(deleteStart, deleteEnd);
-assert.ok(deleteHandler.indexOf("setInfoToast('Reassign or delete this car\\'s data first.')") < deleteHandler.indexOf('carUndo.requestDelete'), 'info guard must run before undo request');
+assert.ok(deleteHandler.indexOf("showInfo({ reason: 'car-has-data' })") < deleteHandler.indexOf('carUndo.requestDelete'), 'reason-keyed info guard must run before undo request');
+assert.match(app, /'car-has-data': \(\) => 'Reassign or delete this car\\'s data first\.',/);
 assert.match(deleteHandler, /removeFromState: \(\) => \{\},\s*restoreToState: \(\) => \{\}/s);
 assert.match(deleteHandler, /const accountId = userRef\.current\?\.id \?\? null;/);
 assert.match(deleteHandler, /if \(userRef\.current\?\.id !== accountId\) return;/);

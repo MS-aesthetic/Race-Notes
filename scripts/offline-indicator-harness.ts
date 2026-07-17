@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isOnline } from '../src/lib/saveStatus';
@@ -46,21 +45,24 @@ assert.ok(signedHeader >= 0 && chipAt > signedHeader && chipAt < headerEnd, 'chi
 assert.ok(chipAt < guideAt, 'chip precedes Tuning Guide');
 assert.ok(headerEnd < contextAt, 'chip precedes tab-conditioned ContextStrip');
 
-const toastStart = app.indexOf('{/* Single brief Saved / sync toast');
+const toastStart = app.indexOf('{/* One compact notification arbiter.');
 const toastEnd = app.indexOf('{/* Core Main Active Canvas Area */}', toastStart);
-assert.ok(toastStart >= 0 && toastEnd > toastStart, 'existing toast block remains');
+assert.ok(toastStart >= 0 && toastEnd > toastStart, 'unified notification arbiter block remains');
 const toast = app.slice(toastStart, toastEnd);
-assert.equal(
-  createHash('sha256').update(toast.replace(/\r\n/g, '\n')).digest('hex'),
-  '13ca665940990c3fcb92157db6f2cd60861cd7bd2431bae11f1cda94c447587c',
-  'existing transient toast block remains byte-identical',
-);
 for (const state of ['Saved', 'Offline — saved on device', 'Syncing…', 'Synced']) {
-  assert.ok(toast.includes(state), `toast retains ${state}`);
+  assert.ok(toast.includes(state), `arbiter retains ${state}`);
 }
-assert.match(toast, /const isBusy = !savedFlash && syncStatus === 'Syncing\.\.\.';/);
-assert.match(toast, /const isSynced = !savedFlash && syncStatus === 'Synced';/);
-assert.match(toast, /const msg = savedFlash\s*\? \(isOnline \? 'Saved' : 'Offline — saved on device'\)\s*: isBusy \? 'Syncing…' : 'Synced';/);
-assert.match(toast, /const isSuccess = savedFlash \|\| isSynced;/);
+assert.match(toast, /const isInfo = !!infoToast;/);
+assert.match(toast, /const isBusy = !isInfo && !savedFlash && syncStatus === 'Syncing\.\.\.';/);
+assert.match(toast, /const isSynced = !isInfo && !savedFlash && syncStatus === 'Synced';/);
+assert.match(toast, /const msg = isInfo[\s\S]*resolveInfoCopy\(infoToast\)[\s\S]*Offline — saved on device/);
+assert.match(toast, /data-notification-slot="arbiter"/);
+assert.match(toast, /style=\{\{ top: notificationTop \}\}/);
+assert.match(toast, /role="status"/);
+assert.match(toast, /aria-live="polite"/);
+assert.match(toast, /aria-label="Dismiss notification"[\s\S]*className="tap-target/);
+assert.match(app, /const SUCCESS_TOAST_MS = 1500;/);
+assert.match(app, /setTimeout\(\(\) => setSyncStatus\(''\), SUCCESS_TOAST_MS\)/);
+assert.doesNotMatch(app, /setTimeout\(\(\) => setSyncStatus\(''\), (?:2500|3000)\)/);
 
 console.log('Offline indicator harness: PASS');

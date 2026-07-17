@@ -229,9 +229,9 @@ assertOrder(templateDelete, 'onDeleteTemplate(id);', 'if (expandedId === id) set
 
 // Seven former alerts: one App guard, three Setup paths, two Export paths, one tire report path.
 const carDelete = section(app, 'const handleDeleteCar =', '// ── Clear All Data');
-assertOrder(carDelete, "setInfoToast('Reassign or delete this car\\'s data first.');", 'carUndo.requestDelete', 'car guard before undo request');
+assertOrder(carDelete, "showInfo({ reason: 'car-has-data' });", 'carUndo.requestDelete', 'reason-keyed car guard before undo request');
 for (const message of [
-  "onInfo?.('You must keep at least one setup configuration.')",
+  "onInfo?.('minimumSetups')",
   "onInfo?.('Please sign in to attach files.')",
   "onInfo?.('Upload failed.')",
 ]) assert.ok(setup.includes(message), `Setup info replacement: ${message}`);
