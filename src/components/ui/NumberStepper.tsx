@@ -132,7 +132,7 @@ export default function NumberStepper({
   const groupLabel = ariaLabel ?? label ?? 'Number stepper';
 
   const btnClass =
-    'tap-target shrink-0 select-none touch-none text-on-surface active:bg-surface-container-highest';
+    'min-h-11 min-w-11 shrink-0 select-none touch-none text-on-surface active:bg-surface-container-highest';
 
   return (
     <div className="w-full">
@@ -183,16 +183,18 @@ export default function NumberStepper({
             <button
               type="button"
               aria-label={`Edit ${groupLabel}`}
-              className="tap-target w-full font-mono text-lg text-on-surface"
+              className="tap-target flex min-w-0 w-full items-center justify-center gap-1 font-mono text-lg text-on-surface"
               onClick={beginEdit}
             >
-              {display === '' ? (
-                <span className="text-on-surface-variant">--</span>
-              ) : (
-                display
-              )}
+              <span className="min-w-0 whitespace-nowrap tabular-nums">
+                {display === '' ? (
+                  <span className="text-on-surface-variant">--</span>
+                ) : (
+                  display
+                )}
+              </span>
               {unit && (
-                <span className="ml-1 font-sans text-sm text-on-surface-variant">
+                <span className="shrink-0 font-sans text-sm text-on-surface-variant">
                   {unit}
                 </span>
               )}

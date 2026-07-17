@@ -1295,7 +1295,10 @@ export default function RaceWeekendView({
             )}
           </div>
           {session.pressureSourceNote && <p className="mb-2 font-mono text-xs text-on-surface-variant">{displayLifecycleText(session.pressureSourceNote)}</p>}
-          <div className="grid grid-cols-2 gap-2">
+          <div
+            className="grid gap-2"
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(10.5rem, 1fr))' }}
+          >
             {(['lf', 'rf', 'lr', 'rr'] as const).map(corner => {
               const selectedTireId = session.tires?.[corner]?.tireId || '';
               const airPressure = session.tires?.[corner]?.airPressure || session.pressures[corner] || '';

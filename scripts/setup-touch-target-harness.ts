@@ -7,14 +7,15 @@ const root = process.cwd();
 const parentCommit = 'ace4da1';
 const setupPath = 'src/components/SetupView.tsx';
 const stepperPath = 'src/components/ui/NumberStepper.tsx';
-const read = (path: string) => readFileSync(join(root, path), 'utf8');
+const raceWeekendPath = 'src/components/RaceWeekendView.tsx';
+const normalizeEol = (value: string) => value.replace(/\r\n/g, '\n');
+const read = (path: string) => normalizeEol(readFileSync(join(root, path), 'utf8'));
 const readParent = (path: string) => execFileSync(
   'git', ['show', `${parentCommit}:${path}`], { cwd: root, encoding: 'utf8' },
-);
+).replace(/\r\n/g, '\n');
 const readCommit = (commit: string, path: string) => execFileSync(
   'git', ['show', `${commit}:${path}`], { cwd: root, encoding: 'utf8' },
-);
-const normalizeEol = (value: string) => value.replace(/\r\n/g, '\n');
+).replace(/\r\n/g, '\n');
 const normalizeSpace = (value: string) => value.replace(/\s+/g, ' ').trim();
 const countExact = (source: string, value: string) => source.split(value).length - 1;
 const replaceExact = (source: string, current: string, parent: string, expected: number, label: string) => {
@@ -42,6 +43,7 @@ const parentSetupSource = readParent(setupPath);
 const uxp17ParentSetupSource = readCommit('a68731a', setupPath);
 const stepperSource = read(stepperPath);
 const parentStepperSource = readParent(stepperPath);
+const raceWeekendSource = read(raceWeekendPath);
 
 const currentInp = "const INP = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-1.5 min-h-12 outline-none rounded';";
 const parentInp = "const INP = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-1.5 outline-none rounded';";
@@ -244,12 +246,42 @@ assert.ok(carDetailsSection.includes(phoneDetailsGrid), 'editable car-detail gri
 assert.equal(countExact(setupSource, phoneCornerGrid), 1, 'four corner cards activate two columns at 360px');
 assert.doesNotMatch(metadataSection + carDetailsSection, /sm:grid-cols-2/, 'editable details no longer wait for 640px');
 
-assert.equal(normalizeEol(stepperSource), normalizeEol(parentStepperSource), 'NumberStepper stays byte-identical to parent');
+const pressureSection = sliceBetween(raceWeekendSource, '{/* 5 ── Tires & pressures */}', '{/* 6 ── Changes made */}');
+const normalizedPressureSection = normalizeSpace(pressureSection);
+assert.ok(
+  normalizedPressureSection.includes(`className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(10.5rem, 1fr))' }}`),
+  'pressure grid uses actual-width auto-fit minmax columns',
+);
+assert.doesNotMatch(pressureSection, /grid-cols-2/, 'pressure grid no longer forces two columns');
+assert.ok(pressureSection.includes("(['lf', 'rf', 'lr', 'rr'] as const).map(corner =>"), 'pressure grid renders four corners');
+assert.equal((pressureSection.match(/<NumberStepper/g) ?? []).length, 1, 'one mapped NumberStepper renders every pressure control');
+for (const token of ['step={0.5}', 'bigStep={1}', 'min={0}', 'max={60}', 'decimals={1}', 'unit="psi"', 'ariaLabel={`${corner.toUpperCase()} air pressure`}']) {
+  assert.ok(pressureSection.includes(token), `pressure stepper preserves ${token}`);
+}
+
+const stepperBehavior = sliceBetween(stepperSource, 'const REPEAT_DELAY_MS = 350;', '  const btnClass =');
+const parentStepperBehavior = sliceBetween(parentStepperSource, 'const REPEAT_DELAY_MS = 350;', '  const btnClass =');
+assert.equal(stepperBehavior, parentStepperBehavior, 'repeat, timer, pointer-state, and commit logic stay byte-identical');
 const normalizedStepper = normalizeSpace(stepperSource);
-assert.ok(normalizedStepper.includes("const btnClass = 'tap-target shrink-0 select-none touch-none text-on-surface active:bg-surface-container-highest';"), 'decrement/increment buttons use tap-target contract');
-assert.equal((stepperSource.match(/\$\{btnClass\}/g) ?? []).length, 2, 'both decrement/increment buttons use shared tap-target class');
-assert.ok(normalizedStepper.includes('role="group" aria-label={groupLabel} className="flex items-stretch overflow-hidden rounded-xl border border-outline-variant bg-surface-container"'), 'group role and items-stretch preserve 48px row');
+assert.ok(normalizedStepper.includes("const btnClass = 'min-h-11 min-w-11 shrink-0 select-none touch-none text-on-surface active:bg-surface-container-highest';"), 'decrement/increment buttons use 44px floor and preserve touch-none');
+assert.equal((stepperSource.match(/\$\{btnClass\}/g) ?? []).length, 2, 'both decrement/increment buttons use shared 44px class');
+assert.ok(normalizedStepper.includes('role="group" aria-label={groupLabel} className="flex items-stretch overflow-hidden rounded-xl border border-outline-variant bg-surface-container"'), 'group role and items-stretch preserve row semantics');
 assert.ok(normalizedStepper.includes('className="min-h-12 w-full bg-transparent text-center font-mono text-lg text-on-surface outline-none"'), 'editor owns explicit min-h-12');
-assert.ok(normalizedStepper.includes('className="tap-target w-full font-mono text-lg text-on-surface"'), 'display value button owns tap-target');
+assert.ok(normalizedStepper.includes('className="tap-target flex min-w-0 w-full items-center justify-center gap-1 font-mono text-lg text-on-surface"'), 'display value button keeps tap target and handles narrow width');
+assert.ok(normalizedStepper.includes('<span className="min-w-0 whitespace-nowrap tabular-nums">'), 'display value stays nowrap and tabular');
+assert.ok(normalizedStepper.includes('<span className="shrink-0 font-sans text-sm text-on-surface-variant">'), 'unit is separate shrink-safe element');
+for (const [token, expected] of [
+  ['onPointerUp={stopPress}', 2],
+  ['onPointerLeave={stopPress}', 2],
+  ['onPointerCancel={stopPress}', 2],
+  ['onBlur={stopPress}', 2],
+] as const) assert.equal(countExact(stepperSource, token), expected, `${token} remains on both step buttons`);
+for (const token of [
+  'onPointerDown={() => startPress(-1)}',
+  'onPointerDown={() => startPress(1)}',
+  'onClick={(e) => { if (e.detail === 0) applyStep(-1, step); }}',
+  'onClick={(e) => { if (e.detail === 0) applyStep(1, step); }}',
+]) assert.equal(countExact(stepperSource, token), 1, `${token} remains exact`);
+assert.doesNotMatch(stepperSource, /onPointerMove|touch-action:\s*pan-y/, 'A3 leaves B1 pointer and touch-action work untouched');
 
 console.log('Setup touch-target harness: PASS');
