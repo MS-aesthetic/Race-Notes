@@ -2,7 +2,8 @@
 
 **Status:** READY FOR `gpt-5.6-sol` HIGH IMPLEMENTATION. C4 is accepted at 100/100; Chunk C QA and all later work remain blocked.
 **Branch:** `codex/ux-overhaul`
-**Exact clean baseline:** `83230c9ea563fd79106be602dd5f602567ea14e5`
+**Accepted product baseline:** `83230c9ea563fd79106be602dd5f602567ea14e5`
+**Required clean starting HEAD:** `0f9553792128bc20753025034c96faaf3c31df4f` (Ralph/plan/owner-report C4 closeout only above the product baseline)
 **Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` items 6b and 15, Task C5, v2.1 Owner Addendum, Part 5 escalation rule, and Part 6 gates
 **Runtime routing:** implementation must execute as `gpt-5.6-sol` **High** in a separate worker task; primary QA/plan/state work executes as `gpt-5.6-sol` **Extra High**. Runtime `turn_context.payload.model` and effort are authoritative. Missing runtime metadata is `unverified` and cannot satisfy the build role. Terra at every tier and `cavecrew-builder` are forbidden.
 
