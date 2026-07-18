@@ -157,28 +157,31 @@ export async function pullAllData(
 
   try {
     // Pull setups
-    const { data: cloudSetups } = await supabase
+    const { data: cloudSetups, error: setupsError } = await supabase
       .from('setups')
       .select('*')
       .order('updated_at', { ascending: false });
+    if (setupsError) { console.warn('Sync: pullAllData setups error:', setupsError.message); onStatus?.('sync-error'); }
     if (cloudSetups) {
       results.setups = cloudSetups.map((r: Record<string, unknown>) => setupFromCloudRow(r));
     }
 
     // Pull weekends
-    const { data: cloudWeekends } = await supabase
+    const { data: cloudWeekends, error: weekendsError } = await supabase
       .from('race_weekends')
       .select('*')
       .order('updated_at', { ascending: false });
+    if (weekendsError) { console.warn('Sync: pullAllData weekends error:', weekendsError.message); onStatus?.('sync-error'); }
     if (cloudWeekends) {
       results.weekends = cloudWeekends.map((r: Record<string, unknown>) => weekendFromCloudRow(r));
     }
 
     // Pull active session
-    const { data: cloudActive } = await supabase
+    const { data: cloudActive, error: activeSessionError } = await supabase
       .from('active_sessions')
       .select('*')
       .maybeSingle();
+    if (activeSessionError) { console.warn('Sync: pullAllData active session error:', activeSessionError.message); onStatus?.('sync-error'); }
     if (cloudActive?.data) {
       results.activeSession = {
         ...(cloudActive.data as ActiveSession),
@@ -197,7 +200,7 @@ export async function pullAllData(
 // Pull: Shared data (cloud → local)
 // ---------------------------------------------------------------------------
 
-export async function pullSharedData(userId: string): Promise<{
+export async function pullSharedData(userId: string, onStatus?: SyncCallback): Promise<{
   sharedSetups: Setup[];
   sharedWeekends: RaceWeekend[];
 }> {
@@ -208,17 +211,19 @@ export async function pullSharedData(userId: string): Promise<{
 
   try {
     // 1. Get shared setups IDs
-    const { data: sharedSetupRefs } = await supabase
+    const { data: sharedSetupRefs, error: sharedSetupRefsError } = await supabase
       .from('shared_setups')
       .select('setup_id')
       .eq('shared_with', userId);
+    if (sharedSetupRefsError) { console.warn('Sync: pullSharedData setup refs error:', sharedSetupRefsError.message); onStatus?.('sync-error'); }
 
     if (sharedSetupRefs && sharedSetupRefs.length > 0) {
       const setupIds = sharedSetupRefs.map(r => r.setup_id);
-      const { data: cloudSetups } = await supabase
+      const { data: cloudSetups, error: sharedSetupsError } = await supabase
         .from('setups')
         .select('*')
         .in('id', setupIds);
+      if (sharedSetupsError) { console.warn('Sync: pullSharedData setups error:', sharedSetupsError.message); onStatus?.('sync-error'); }
 
       if (cloudSetups) {
         results.sharedSetups = cloudSetups.map((r: Record<string, unknown>) => setupFromCloudRow(r));
@@ -226,17 +231,19 @@ export async function pullSharedData(userId: string): Promise<{
     }
 
     // 2. Get shared weekend IDs
-    const { data: sharedWeekendRefs } = await supabase
+    const { data: sharedWeekendRefs, error: sharedWeekendRefsError } = await supabase
       .from('shared_weekends')
       .select('weekend_id')
       .eq('shared_with', userId);
+    if (sharedWeekendRefsError) { console.warn('Sync: pullSharedData weekend refs error:', sharedWeekendRefsError.message); onStatus?.('sync-error'); }
 
     if (sharedWeekendRefs && sharedWeekendRefs.length > 0) {
       const weekendIds = sharedWeekendRefs.map(r => r.weekend_id);
-      const { data: cloudWeekends } = await supabase
+      const { data: cloudWeekends, error: sharedWeekendsError } = await supabase
         .from('race_weekends')
         .select('*')
         .in('id', weekendIds);
+      if (sharedWeekendsError) { console.warn('Sync: pullSharedData weekends error:', sharedWeekendsError.message); onStatus?.('sync-error'); }
 
       if (cloudWeekends) {
         results.sharedWeekends = cloudWeekends.map((r: Record<string, unknown>) => weekendFromCloudRow(r));
@@ -244,6 +251,7 @@ export async function pullSharedData(userId: string): Promise<{
     }
   } catch (e) {
     console.warn('Sync: pullSharedData failed', e);
+    onStatus?.('sync-error');
   }
 
   return results;
@@ -325,7 +333,7 @@ export async function pullTires(userId: string, onStatus?: SyncCallback): Promis
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-    if (error) { console.warn('Sync: pullTires error:', error.message); return []; }
+    if (error) { console.warn('Sync: pullTires error:', error.message); onStatus?.('sync-error'); return []; }
     if (!data) return [];
     return data.map((r: Record<string, unknown>) => ({
       id: r.id as string,
@@ -344,6 +352,7 @@ export async function pullTires(userId: string, onStatus?: SyncCallback): Promis
     }));
   } catch (e) {
     console.warn('Sync: pullTires failed', e);
+    onStatus?.('sync-error');
     return [];
   }
 }
@@ -388,7 +397,7 @@ export async function pullCars(userId: string, onStatus?: SyncCallback): Promise
       .from('cars')
       .select('*')
       .order('created_at', { ascending: true });
-    if (error) { console.warn('Sync: pullCars error:', error.message); return []; }
+    if (error) { console.warn('Sync: pullCars error:', error.message); onStatus?.('sync-error'); return []; }
     if (!data) return [];
     return data.map((r: Record<string, unknown>) => ({
       id: r.id as string,
@@ -403,6 +412,7 @@ export async function pullCars(userId: string, onStatus?: SyncCallback): Promise
     }));
   } catch (e) {
     console.warn('Sync: pullCars failed', e);
+    onStatus?.('sync-error');
     return [];
   }
 }
@@ -446,7 +456,7 @@ export async function pullShockSessions(userId: string, onStatus?: SyncCallback)
       .from('shock_sessions')
       .select('*')
       .order('created_at', { ascending: false });
-    if (error) { console.warn('Sync: pullShockSessions error:', error.message); return []; }
+    if (error) { console.warn('Sync: pullShockSessions error:', error.message); onStatus?.('sync-error'); return []; }
     if (!data) return [];
     return data.map((r: Record<string, unknown>) => ({
       id: r.id as string,
@@ -462,6 +472,7 @@ export async function pullShockSessions(userId: string, onStatus?: SyncCallback)
     }));
   } catch (e) {
     console.warn('Sync: pullShockSessions failed', e);
+    onStatus?.('sync-error');
     return [];
   }
 }
@@ -484,9 +495,16 @@ export function pushTodos(todos: Todo[], userId: string, onStatus?: SyncCallback
 }
 
 export async function pullTodos(onStatus?: SyncCallback): Promise<Todo[]> {
-  const { data } = await supabase.from('todos').select('*').order('updated_at', { ascending: false });
-  if (data) {
-    return (data as any[]).map((row: Record<string, unknown>) => todoFromCloudRow(row));
+  try {
+    const { data, error } = await supabase.from('todos').select('*').order('updated_at', { ascending: false });
+    if (error) { console.warn('Sync: pullTodos error:', error.message); onStatus?.('sync-error'); return []; }
+    if (data) {
+      return (data as any[]).map((row: Record<string, unknown>) => todoFromCloudRow(row));
+    }
+  } catch (e) {
+    console.warn('Sync: pullTodos failed', e);
+    onStatus?.('sync-error');
+    throw e;
   }
   return [];
 }
@@ -513,11 +531,12 @@ export async function pullMaintenanceComponents(onStatus?: SyncCallback): Promis
       .from('maintenance_components')
       .select('*')
       .order('created_at', { ascending: true });
-    if (error) { console.warn('Sync: pullMaintenanceComponents error:', error.message); return []; }
+    if (error) { console.warn('Sync: pullMaintenanceComponents error:', error.message); onStatus?.('sync-error'); return []; }
     if (!data) return [];
     return data.map((r: Record<string, unknown>) => maintenanceComponentFromCloudRow(r));
   } catch (e) {
     console.warn('Sync: pullMaintenanceComponents failed', e);
+    onStatus?.('sync-error');
     return [];
   }
 }
@@ -561,7 +580,7 @@ export async function pullMaintenanceLogs(onStatus?: SyncCallback): Promise<Main
       .from('maintenance_logs')
       .select('*')
       .order('created_at', { ascending: false });
-    if (error) { console.warn('Sync: pullMaintenanceLogs error:', error.message); return []; }
+    if (error) { console.warn('Sync: pullMaintenanceLogs error:', error.message); onStatus?.('sync-error'); return []; }
     if (!data) return [];
     return data.map((r: Record<string, unknown>) => ({
       id: r.id as string,
@@ -577,6 +596,7 @@ export async function pullMaintenanceLogs(onStatus?: SyncCallback): Promise<Main
     }));
   } catch (e) {
     console.warn('Sync: pullMaintenanceLogs failed', e);
+    onStatus?.('sync-error');
     return [];
   }
 }
@@ -614,7 +634,7 @@ export async function pullChecklistTemplates(onStatus?: SyncCallback): Promise<C
       .from('checklist_templates')
       .select('*')
       .order('updated_at', { ascending: false });
-    if (error) { console.warn('Sync: pullChecklistTemplates error:', error.message); return []; }
+    if (error) { console.warn('Sync: pullChecklistTemplates error:', error.message); onStatus?.('sync-error'); return []; }
     if (!data) return [];
     return data.map((r: Record<string, unknown>) => ({
       id: r.id as string,
@@ -625,6 +645,7 @@ export async function pullChecklistTemplates(onStatus?: SyncCallback): Promise<C
     }));
   } catch (e) {
     console.warn('Sync: pullChecklistTemplates failed', e);
+    onStatus?.('sync-error');
     return [];
   }
 }
@@ -665,7 +686,7 @@ export async function pullWeekendChecklists(onStatus?: SyncCallback): Promise<We
       .from('weekend_checklists')
       .select('*')
       .order('updated_at', { ascending: false });
-    if (error) { console.warn('Sync: pullWeekendChecklists error:', error.message); return []; }
+    if (error) { console.warn('Sync: pullWeekendChecklists error:', error.message); onStatus?.('sync-error'); return []; }
     if (!data) return [];
     return data.map((r: Record<string, unknown>) => ({
       id: r.id as string,
@@ -679,6 +700,7 @@ export async function pullWeekendChecklists(onStatus?: SyncCallback): Promise<We
     }));
   } catch (e) {
     console.warn('Sync: pullWeekendChecklists failed', e);
+    onStatus?.('sync-error');
     return [];
   }
 }
@@ -723,7 +745,7 @@ export async function pullTrips(onStatus?: SyncCallback): Promise<SavedTrip[]> {
       .from('saved_trips')
       .select('*')
       .order('created_at', { ascending: false });
-    if (error) { console.warn('Sync: pullTrips error:', error.message); return []; }
+    if (error) { console.warn('Sync: pullTrips error:', error.message); onStatus?.('sync-error'); return []; }
     if (!data) return [];
     return data.map((r: Record<string, unknown>) => ({
       id: r.id as string,
@@ -741,6 +763,7 @@ export async function pullTrips(onStatus?: SyncCallback): Promise<SavedTrip[]> {
     }));
   } catch (e) {
     console.warn('Sync: pullTrips failed', e);
+    onStatus?.('sync-error');
     return [];
   }
 }

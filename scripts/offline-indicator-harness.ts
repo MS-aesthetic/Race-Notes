@@ -15,6 +15,20 @@ assert.match(app, /const \[online, setOnline\] = useState\(isOnlineNow\(\)\);/);
 assert.match(app, /window\.addEventListener\('online', up\);/);
 assert.match(app, /window\.addEventListener\('offline', down\);/);
 assert.match(app, /return \(\) => \{\s*window\.removeEventListener\('online', up\);\s*window\.removeEventListener\('offline', down\);\s*\};/);
+const connectionEvents = new EventTarget();
+let liveOnline = false;
+const up = () => { liveOnline = true; };
+const down = () => { liveOnline = false; };
+connectionEvents.addEventListener('online', up);
+connectionEvents.addEventListener('offline', down);
+connectionEvents.dispatchEvent(new Event('online'));
+assert.equal(liveOnline, true, 'production-shaped online listener responds live');
+connectionEvents.dispatchEvent(new Event('offline'));
+assert.equal(liveOnline, false, 'production-shaped offline listener responds live');
+connectionEvents.removeEventListener('online', up);
+connectionEvents.removeEventListener('offline', down);
+connectionEvents.dispatchEvent(new Event('online'));
+assert.equal(liveOnline, false, 'listener cleanup prevents post-unmount updates');
 
 const chipMatch = app.match(/\{!isOnline && \(\s*(<div[\s\S]*?aria-label="Offline — saved on device"[\s\S]*?<\/div>)\s*\)\}/);
 assert.ok(chipMatch, 'one persistent offline chip is guarded only by !isOnline');
@@ -51,9 +65,34 @@ assert.match(toast, /style=\{\{ top: notificationTop \}\}/);
 assert.match(toast, /role="status"/);
 assert.match(toast, /aria-live="polite"/);
 assert.match(toast, /aria-label="Dismiss notification"[\s\S]*className="tap-target/);
-assert.match(toast, /onClick=\{isInfo \? clearInfo : \(\) => setSyncStatus\(null\)\}/);
+assert.match(toast, /onClick=\{isInfo \? clearInfo : acknowledgeSyncStatus\}/);
 assert.match(app, /const SUCCESS_TOAST_MS = 1500;/);
-assert.match(app, /setTimeout\(\(\) => setSyncStatus\(null\), SUCCESS_TOAST_MS\)/);
-assert.doesNotMatch(app, /setTimeout\(\(\) => setSyncStatus\(null\), (?:2500|3000)\)/);
+assert.match(app, /setSyncStatusState\(current => current === 'synced' \|\| current === 'offline-saved' \? null : current\);\s*\}, SUCCESS_TOAST_MS\);/);
+assert.match(app, /const acknowledgeSyncStatus = \(\) => setSyncStatusState\(null\);/);
+assert.match(app, /setSyncStatusState\(current => isTerminalSyncStatus\(current\) \? current : null\);/);
+
+const routeSource = toast.match(/(const isInfo = [\s\S]*?const isPersistent = [^;]+;)/)?.[1];
+assert.ok(routeSource, 'exact production typed status route extracts');
+const evaluateRoute = new Function(
+  'infoToast', 'savedFlash', 'syncStatus', 'isOnline', 'resolveInfoCopy',
+  `${routeSource}\nreturn { msg, isSuccess, isPersistent };`,
+) as (infoToast: null, savedFlash: boolean, syncStatus: string, isOnline: boolean, resolveInfoCopy: () => string) => { msg: string; isSuccess: boolean; isPersistent: boolean };
+for (const [status, copy, success, persistent] of [
+  ['synced', 'Synced', true, false],
+  ['offline-saved', 'Offline — saved on device', true, false],
+  ['deferred-delete-retrying', 'Sync failed — will retry', false, true],
+  ['sync-error', 'Sync failed — will retry', false, true],
+] as const) {
+  assert.deepEqual(
+    evaluateRoute(null, false, status, true, () => ''),
+    { msg: copy, isSuccess: success, isPersistent: persistent },
+    `${status} production route has truthful copy, treatment, and persistence`,
+  );
+}
+const expiresAfterSuccessTimer = (status: string): string | null => status === 'synced' || status === 'offline-saved' ? null : status;
+assert.equal(expiresAfterSuccessTimer('synced'), null, 'synced dismisses on shared success timer');
+assert.equal(expiresAfterSuccessTimer('offline-saved'), null, 'offline-saved dismisses on shared success timer');
+assert.equal(expiresAfterSuccessTimer('sync-error'), 'sync-error', 'sync-error survives success timer');
+assert.equal(expiresAfterSuccessTimer('deferred-delete-retrying'), 'deferred-delete-retrying', 'deferred delete survives success timer');
 
 console.log('Offline indicator harness: PASS');

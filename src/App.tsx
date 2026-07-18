@@ -715,7 +715,17 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [nativeAuthError, setNativeAuthError] = useState<{ id: number; message: string } | null>(null);
   const [hasLocalAcct, setHasLocalAcct] = useState<boolean>(() => hasLocalAccount());
-  const [syncStatus, setSyncStatus] = useState<NotificationStatus | null>(null);
+  const [syncStatus, setSyncStatusState] = useState<NotificationStatus | null>(null);
+  const isTerminalSyncStatus = (status: NotificationStatus | null): boolean => (
+    status === 'deferred-delete-retrying' || status === 'sync-error'
+  );
+  const setSyncStatus = (next: NotificationStatus) => {
+    setSyncStatusState(current => isTerminalSyncStatus(current) && !isTerminalSyncStatus(next) ? current : next);
+  };
+  const clearTransientSyncStatus = () => {
+    setSyncStatusState(current => isTerminalSyncStatus(current) ? current : null);
+  };
+  const acknowledgeSyncStatus = () => setSyncStatusState(null);
   const [pullDone, setPullDone] = useState(false); // initial cloud pull resolved — gates [4]
   const [authGeneration, setAuthGeneration] = useState(0);
   const [deleteReplayVersion, setDeleteReplayVersion] = useState(0);
@@ -975,7 +985,9 @@ export default function App() {
   // the operation replaces it with a terminal status.
   useEffect(() => {
     if (syncStatus !== 'synced' && syncStatus !== 'offline-saved') return;
-    const t = setTimeout(() => setSyncStatus(null), SUCCESS_TOAST_MS);
+    const t = setTimeout(() => {
+      setSyncStatusState(current => current === 'synced' || current === 'offline-saved' ? null : current);
+    }, SUCCESS_TOAST_MS);
     return () => clearTimeout(t);
   }, [syncStatus]);
 
@@ -1414,7 +1426,7 @@ export default function App() {
         localStorage.setItem('race_notes_weekend_checklists', JSON.stringify(cloudWkndChecklists));
       }
 
-      if (!pullReportedFailure) setSyncStatus(null);
+      if (!pullReportedFailure) clearTransientSyncStatus();
     };
 
     doPull().catch(error => {
@@ -1571,22 +1583,26 @@ export default function App() {
       const prior = priorById.get(candidate.id);
       return !prior || comparable(prior) !== comparable(candidate);
     });
-    if (!didPersist) return;
-
-    const remainingSetupIds = new Set(safeSetups.map(item => item.id));
-    priorSetups
-      .filter(item => !remainingSetupIds.has(item.id))
-      .forEach(item => queueSharedCloudDelete('setups', item.id));
 
     const requestedActiveId = eventSetupId || activeId;
     const requested = requestedActiveId ? safeSetups.find(item => item.id === requestedActiveId) : null;
     const nextActiveId = requested && !isSetupLocked(requested, weekendsRef.current)
       ? requested.id
       : pickLatestSetupForCar(safeSetups, activeCarId)?.id;
+    const activeSelectionChanged = activeId !== undefined && !eventSetupId && (
+      activeId === '' ? setup.id !== INITIAL_SETUP.id : nextActiveId !== setup.id
+    );
+    if (!didPersist && !activeSelectionChanged) return;
 
-    savedSetupsRef.current = safeSetups;
-    setSavedSetups(safeSetups);
-    localStorage.setItem('race_notes_saved_setups', JSON.stringify(safeSetups));
+    if (didPersist) {
+      const remainingSetupIds = new Set(safeSetups.map(item => item.id));
+      priorSetups
+        .filter(item => !remainingSetupIds.has(item.id))
+        .forEach(item => queueSharedCloudDelete('setups', item.id));
+      savedSetupsRef.current = safeSetups;
+      setSavedSetups(safeSetups);
+      localStorage.setItem('race_notes_saved_setups', JSON.stringify(safeSetups));
+    }
 
     const nextActive = nextActiveId ? safeSetups.find(item => item.id === nextActiveId) : null;
     if (activeId === '' && !eventSetupId) {
@@ -1618,7 +1634,9 @@ export default function App() {
       }
     }
     flashSaved();
-    if (syncOwnerId) pushSetups(safeSetups, syncOwnerId, setSyncStatus);
+    if (didPersist) {
+      if (syncOwnerId) pushSetups(safeSetups, syncOwnerId, setSyncStatus);
+    }
   };
 
   const handleUpdateSession = (update: ActiveSession | ((current: ActiveSession) => ActiveSession)) => {
@@ -2408,7 +2426,7 @@ export default function App() {
                     type="button"
                     aria-label="Dismiss notification"
                     className="tap-target -mr-2 shrink-0 text-on-surface-variant"
-                    onClick={isInfo ? clearInfo : () => setSyncStatus(null)}
+                    onClick={isInfo ? clearInfo : acknowledgeSyncStatus}
                   >
                     <span className="material-symbols-outlined">close</span>
                   </button>
