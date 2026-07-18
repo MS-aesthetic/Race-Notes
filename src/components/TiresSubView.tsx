@@ -2,11 +2,12 @@ import { useState, type FormEvent } from 'react';
 import type { RaceWeekend, Setup, TireInventoryItem } from '../types';
 import { byActiveCar } from '../lib/scope';
 import { compareTireSize, parseTireSize } from '../lib/tireSize';
-import { formatPsiValue, resolveLinkedTireSizes } from '../lib/setupSteps';
+import { formatPsiValue, formatStoredNumber, parseStoredNumber, resolveLinkedTireSizes, SETUP_STEPS } from '../lib/setupSteps';
 import { downloadTireUsageCsv, getRecentPressureHistory, getTireTotalLaps, getTireUsageHistory, printTireUsageReport } from '../lib/tireHistory';
 import EmptyState from './ui/EmptyState';
 import ConfirmSheet from './ui/ConfirmSheet';
 import { InfoToast } from './ui/UndoToast';
+import NumberStepper from './ui/NumberStepper';
 
 interface TiresSubViewProps {
   tires: TireInventoryItem[];
@@ -139,7 +140,83 @@ export default function TiresSubView({
       })}</div>
     </>}
 
-    {showForm && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="relative max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-sm space-y-3 overflow-y-auto rounded-lg border-2 border-outline bg-surface p-5 text-on-surface"><button type="button" onClick={closeForm} className="absolute right-3 top-3 text-on-surface-variant"><span className="material-symbols-outlined">close</span></button><h3 className="pr-10 font-display text-base font-bold uppercase">{editingId ? 'Edit Tire' : 'Add Tire to Inventory'}</h3><form onSubmit={handleSubmit} className="min-w-0 space-y-3"><div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2"><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Tire #<input required value={draft.tireNumber || ''} onChange={event => setDraft(current => ({ ...current, tireNumber: event.target.value }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 font-mono text-on-surface" /></label><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Size<input required value={draft.size || ''} onChange={event => setDraft(current => ({ ...current, size: event.target.value }))} onBlur={event => setDraft(current => ({ ...current, size: normalizeSize(event.target.value) }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 font-mono text-on-surface" /></label></div><label className="block min-w-0 font-mono text-xs uppercase text-on-surface-variant">Compound<div className="my-2 flex min-w-0 flex-wrap gap-1">{compounds.map(compound => <button key={compound} type="button" onClick={() => setDraft(current => ({ ...current, compound }))} className="max-w-full break-words rounded border border-outline-variant px-2 py-1 font-mono text-xs text-on-surface-variant">{compound}</button>)}</div><input required value={draft.compound || ''} onChange={event => setDraft(current => ({ ...current, compound: event.target.value }))} className="w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface" /></label><div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2"><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Backspacing<select value={draft.wheelBackspacing || '2'} onChange={event => setDraft(current => ({ ...current, wheelBackspacing: event.target.value as '2' | '3' | '4' }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface"><option value="2">2&quot;</option><option value="3">3&quot;</option><option value="4">4&quot;</option></select></label><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Durometer<input value={draft.durometer || ''} onChange={event => setDraft(current => ({ ...current, durometer: event.target.value }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface" /></label><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Air pressure<input value={draft.airPressure || ''} onChange={event => setDraft(current => ({ ...current, airPressure: event.target.value }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface" /></label><label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">Age days<input type="number" min="0" value={draft.initialAgeDays ?? ''} onChange={event => setDraft(current => ({ ...current, initialAgeDays: Number(event.target.value) || 0 }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface" /></label></div><div className="flex min-w-0 flex-wrap justify-end gap-2"><button type="button" onClick={closeForm} className="rounded border border-outline-variant px-3 py-2 font-mono text-xs uppercase">Cancel</button><button type="submit" className="rounded bg-primary px-3 py-2 font-mono text-xs font-bold uppercase text-on-primary">{editingId ? 'Save Tire' : 'Add Tire'}</button></div></form></div></div>}
+    {showForm && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div className="relative max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-sm space-y-3 overflow-y-auto rounded-lg border-2 border-outline bg-surface p-5 text-on-surface">
+          <button type="button" onClick={closeForm} className="absolute right-3 top-3 text-on-surface-variant">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+          <h3 className="pr-10 font-display text-base font-bold uppercase">{editingId ? 'Edit Tire' : 'Add Tire to Inventory'}</h3>
+          <form onSubmit={handleSubmit} className="min-w-0 space-y-3">
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">
+                Tire #
+                <input required value={draft.tireNumber || ''} onChange={event => setDraft(current => ({ ...current, tireNumber: event.target.value }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 font-mono text-on-surface" />
+              </label>
+              <label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">
+                Size
+                <input required value={draft.size || ''} onChange={event => setDraft(current => ({ ...current, size: event.target.value }))} onBlur={event => setDraft(current => ({ ...current, size: normalizeSize(event.target.value) }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 font-mono text-on-surface" />
+              </label>
+            </div>
+            <label className="block min-w-0 font-mono text-xs uppercase text-on-surface-variant">
+              Compound
+              <div className="my-2 flex min-w-0 flex-wrap gap-1">
+                {compounds.map(compound => <button key={compound} type="button" onClick={() => setDraft(current => ({ ...current, compound }))} className="max-w-full break-words rounded border border-outline-variant px-2 py-1 font-mono text-xs text-on-surface-variant">{compound}</button>)}
+              </div>
+              <input required value={draft.compound || ''} onChange={event => setDraft(current => ({ ...current, compound: event.target.value }))} className="w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface" />
+            </label>
+            <div className="grid min-w-0 grid-cols-1 items-start gap-3 sm:grid-cols-2">
+              <div className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">
+                <span className="block min-h-4 truncate">Backspacing</span>
+                <div className="mt-1">
+                  <NumberStepper
+                    value={parseStoredNumber(draft.wheelBackspacing || '2')}
+                    onChange={value => {
+                      if (value === '') return;
+                      setDraft(current => ({ ...current, wheelBackspacing: String(value) as '2' | '3' | '4' }));
+                    }}
+                    step={1}
+                    min={2}
+                    max={4}
+                    decimals={0}
+                    unit="in"
+                    ariaLabel="Backspacing"
+                    layout="stacked"
+                  />
+                </div>
+              </div>
+              <label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">
+                <span className="block min-h-4 truncate">Durometer</span>
+                <input value={draft.durometer || ''} onChange={event => setDraft(current => ({ ...current, durometer: event.target.value }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface" />
+              </label>
+              <div className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">
+                <span className="block min-h-4 truncate">Air pressure</span>
+                <div className="mt-1">
+                  <NumberStepper
+                    value={parseStoredNumber(draft.airPressure)}
+                    onChange={value => setDraft(current => ({ ...current, airPressure: formatStoredNumber(value, SETUP_STEPS.tirePress) }))}
+                    step={SETUP_STEPS.tirePress.step}
+                    min={SETUP_STEPS.tirePress.min}
+                    decimals={SETUP_STEPS.tirePress.decimals}
+                    unit={SETUP_STEPS.tirePress.unit}
+                    ariaLabel="Air pressure"
+                    layout="stacked"
+                  />
+                </div>
+              </div>
+              <label className="min-w-0 font-mono text-xs uppercase text-on-surface-variant">
+                <span className="block min-h-4 truncate">Age days</span>
+                <input type="number" min="0" value={draft.initialAgeDays ?? ''} onChange={event => setDraft(current => ({ ...current, initialAgeDays: Number(event.target.value) || 0 }))} className="mt-1 w-full min-w-0 rounded border border-outline-variant bg-surface-container p-2 text-on-surface" />
+              </label>
+            </div>
+            <div className="flex min-w-0 flex-wrap justify-end gap-2">
+              <button type="button" onClick={closeForm} className="rounded border border-outline-variant px-3 py-2 font-mono text-xs uppercase">Cancel</button>
+              <button type="submit" className="rounded bg-primary px-3 py-2 font-mono text-xs font-bold uppercase text-on-primary">{editingId ? 'Save Tire' : 'Add Tire'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
     <ConfirmSheet open={!!pendingDeleteId} title="Delete tire?" body="Delete this tire from inventory?" confirmLabel="Delete" cancelLabel="Keep" destructive onConfirm={confirmDelete} onCancel={() => setPendingDeleteId(null)} />
     <InfoToast open={!!infoToast} title={infoToast ?? ''} onClose={() => setInfoToast(null)} />
   </div>;

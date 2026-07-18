@@ -65,7 +65,7 @@ const computeStagger = (rightSize: string, leftSize: string): string => {
 };
 
 const INP = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-1.5 min-h-11 outline-none rounded';
-const LBL = 'text-xs uppercase font-mono font-semibold text-on-surface-variant block mb-1 leading-tight';
+const LBL = 'block min-h-4 truncate text-xs uppercase font-mono font-semibold text-on-surface-variant mb-1 leading-tight';
 
 // ─── Corner Form Sub-component ────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ function NumericCornerFieldInput({ label, field, data, onFieldChange }: {
   const spec = SETUP_STEPS[field];
   const legacy = legacyValueNote(raw);
   return (
-    <div className="min-w-0 [&_[role=group]]:flex-wrap [&_[role=group]]:overflow-visible [&_[role=group]>button]:basis-full [&_[role=group]>button]:w-full [&_[role=group]>div]:basis-full [&_[role=group]>div]:border-x-0 [&_[role=group]>div]:border-y">
+    <div className="min-w-0">
       <label className={LBL}>
         {label}{field === 'loadCtoC' && data.rideHeightNeedsReview ? ' *' : ''}
       </label>
@@ -103,6 +103,7 @@ function NumericCornerFieldInput({ label, field, data, onFieldChange }: {
         decimals={spec.decimals}
         unit={spec.unit}
         ariaLabel={label}
+        layout="stacked"
       />
       {legacy && <p className="mt-1 font-mono text-xs text-on-surface-variant">Legacy: {legacy}</p>}
       {field === 'loadCtoC' && data.rideHeightNeedsReview && (
@@ -119,7 +120,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         <span className="material-symbols-outlined shrink-0 text-primary text-[18px]">directions_car</span>
         <h4 className="min-w-0 break-words font-label-sm text-xs uppercase text-on-surface font-bold leading-tight tracking-normal sm:tracking-widest">{cornerLabel}</h4>
       </div>
-      <div className="min-w-0 p-2 sm:p-3 grid grid-cols-1 min-[360px]:grid-cols-2 gap-2">
+      <div className="min-w-0 p-2 sm:p-3 grid grid-cols-1 min-[360px]:grid-cols-2 gap-2 items-start">
 
         {/* Tire from Inventory picker */}
         <div className="col-span-1 lg:col-span-2 min-w-0 bg-surface-container p-2 rounded border border-outline-variant/30 flex flex-wrap items-center justify-between gap-2">
@@ -162,7 +163,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         </div>
 
         {/* Spring */}
-        <div>
+        <div className="min-w-0">
           <label className={LBL}>Spring</label>
           <input type="text" value={data.spring || ''} onChange={e => onFieldChange('spring', e.target.value)} className={INP} />
         </div>
@@ -173,11 +174,11 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         )}
 
         {/* Shock */}
-        <div>
+        <div className="min-w-0">
           <label className={LBL}>Shock</label>
           <input type="text" value={data.shock || ''} onChange={e => onFieldChange('shock', e.target.value)} className={INP} />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className={LBL}>Shock Note</label>
           <input type="text" value={data.shockNote || ''} onChange={e => onFieldChange('shockNote', e.target.value)} className={INP} />
         </div>
@@ -203,15 +204,15 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         )}
 
         {/* Tire fields (all corners) */}
-        <div>
+        <div className="min-w-0">
           <label className={LBL}>Tire Compound</label>
           <input type="text" value={data.tireComp || ''} onChange={e => onFieldChange('tireComp', e.target.value)} className={INP} />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className={LBL}>Tire Size</label>
           <input type="text" value={data.tireSize || ''} onChange={e => onFieldChange('tireSize', e.target.value)} className={INP} />
         </div>
-        <div>
+        <div className="min-w-0">
           <NumericCornerFieldInput label="Pressure" field="tirePress" data={data} onFieldChange={onFieldChange} />
           {data.pressureSourceNote && <p className="mt-1 font-mono text-xs text-on-surface-variant">{displayLifecycleText(data.pressureSourceNote)}</p>}
         </div>

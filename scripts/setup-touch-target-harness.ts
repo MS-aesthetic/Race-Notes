@@ -4,6 +4,10 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { transformSync } from 'esbuild';
+import NumberStepper from '../src/components/ui/NumberStepper';
 
 const root = process.cwd();
 const read = (path: string) => readFileSync(join(root, path), 'utf8').replace(/\r\n/g, '\n');
@@ -15,6 +19,7 @@ const sliceBetween = (source: string, start: string, end: string) => {
 };
 
 const setup = read('src/components/SetupView.tsx');
+const tires = read('src/components/TiresSubView.tsx');
 const fourBar = read('src/components/FourBarQuickAdjust.tsx');
 const raceWeekend = read('src/components/RaceWeekendView.tsx');
 const stepper = read('src/components/ui/NumberStepper.tsx');
@@ -41,10 +46,10 @@ assert.ok((context.match(/min-h-11/g) ?? []).length >= 7, 'ContextStrip keeps ev
 
 assert.match(setup, /const INP = '.*text-sm.*min-h-11.*';/, 'shared Setup input has readable 44px floor');
 assert.doesNotMatch(setup, /min-h-12|min-w-12/, 'Setup surfaces no longer retain 48px floor');
-assert.match(setup, /min-w-0 p-2 sm:p-3 grid grid-cols-1 min-\[360px\]:grid-cols-2 gap-2/, 'corner form is phone-first two columns');
+assert.match(setup, /min-w-0 p-2 sm:p-3 grid grid-cols-1 min-\[360px\]:grid-cols-2 gap-2 items-start/, 'corner form is phone-first two columns aligned at row start');
 assert.match(setup, /min-w-0 grid grid-cols-1 min-\[360px\]:grid-cols-2 gap-1\.5 min-\[360px\]:gap-2/, 'four corner cards have compact two-column gutter');
 assert.match(setup, /className="min-w-0 p-2 sm:p-3 border-t border-outline-variant\/50 bg-surface-container-low"/, 'expanded Setup chrome is locked for rendered width proof');
-assert.match(setup, /const LBL = 'text-xs .*leading-tight';/, 'Setup labels use readable compact tier');
+assert.match(setup, /const LBL = 'block min-h-4 truncate text-xs .*leading-tight';/, 'Setup labels reserve one compact line');
 
 assert.match(fourBar, /const barLength = bar\.measurements\[1\];/, 'FourBar puts Bar Length above the hole controls');
 assert.match(fourBar, /const holeMeasurements = \[bar\.measurements\[0\], bar\.measurements\[2\]\];/, 'FourBar keeps Frame and Birdcage Hole controls together');
@@ -58,6 +63,56 @@ assert.match(fourBar, /min-h-11 min-w-11 shrink-0/, 'FourBar help target has 44p
 assert.match(fourBar, /NumberStepper/, 'FourBar retains shared NumberStepper behavior');
 assert.match(stepper, /'min-h-11 min-w-11 shrink-0 select-none touch-pan-y/, 'stepper direction targets retain 44px floors and vertical-scroll handoff');
 assert.match(stepper, /className="tap-target flex min-w-0 w-full/, 'stepper edit target retains shared 44px floor');
+assert.match(stepper, /layout\?: 'inline' \| 'stacked';/, 'NumberStepper exposes first-class inline and stacked layouts');
+assert.match(stepper, /layout = 'inline'/, 'NumberStepper defaults to inline layout');
+assert.match(stepper, /layout === 'stacked'/, 'NumberStepper owns stacked rendering');
+
+const arbitraryStackingSelector = /\[&_\[role=group\]\]|\[&_\[role=group\]>button\]:basis-full/;
+assert.doesNotMatch(setup, arbitraryStackingSelector, 'Setup removes arbitrary role-group stacking selectors');
+assert.doesNotMatch(tires, arbitraryStackingSelector, 'Tires removes arbitrary role-group stacking selectors');
+assert.equal((setup.match(/layout="stacked"/g) ?? []).length, 1, 'Setup numeric corner field binds stacked layout once at shared call site');
+assert.equal((tires.match(/layout="stacked"/g) ?? []).length, 2, 'Tire Inventory pressure and backspacing bind stacked layout');
+assert.match(tires, /ariaLabel="Backspacing"\s+layout="stacked"/, 'Tire Inventory backspacing uses stacked stepper');
+assert.match(tires, /step=\{1\}\s+min=\{2\}\s+max=\{4\}\s+decimals=\{0\}\s+unit="in"/, 'Tire Inventory backspacing remains limited to 2, 3, or 4 inches');
+assert.match(tires, /airPressure: formatStoredNumber\(value, SETUP_STEPS\.tirePress\)/, 'Tire Inventory pressure keeps canonical string formatting and blank handling');
+assert.match(tires, /airPressure: draft\.airPressure\?\.trim\(\) \|\| ''/, 'Tire Inventory submit persistence remains string-based');
+assert.match(tires, /wheelBackspacing: \(draft\.wheelBackspacing as '2' \| '3' \| '4'\) \|\| '2'/, 'Tire Inventory submit preserves allowed backspacing values and default');
+assert.doesNotMatch(tires, /<select value=\{draft\.wheelBackspacing/, 'Tire Inventory old backspacing select is removed');
+assert.doesNotMatch(tires, /<input value=\{draft\.airPressure/, 'Tire Inventory old pressure input is removed');
+
+const stackedBindingsPass = (setupSource: string, tiresSource: string) =>
+  (setupSource.match(/layout="stacked"/g) ?? []).length === 1
+  && (tiresSource.match(/layout="stacked"/g) ?? []).length === 2
+  && !arbitraryStackingSelector.test(setupSource)
+  && !arbitraryStackingSelector.test(tiresSource);
+assert.equal(stackedBindingsPass(setup, tires), true, 'production consumers use only first-class stacked bindings');
+
+for (const mutation of [
+  { name: 'Setup stacked binding removed', setupSource: setup.replace('        layout="stacked"\n', ''), tiresSource: tires },
+  { name: 'Tire backspacing stacked binding removed', setupSource: setup, tiresSource: tires.replace('                    layout="stacked"\n', '') },
+] as const) {
+  assert.doesNotThrow(() => transformSync(mutation.setupSource, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), `${mutation.name}: Setup mutation compiles`);
+  assert.doesNotThrow(() => transformSync(mutation.tiresSource, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), `${mutation.name}: Tires mutation compiles`);
+  assert.equal(stackedBindingsPass(mutation.setupSource, mutation.tiresSource), false, `${mutation.name}: compile-real mutation fails stacked binding gate`);
+}
+
+const stepperProps = {
+  value: 12.5,
+  onChange: (_value: number | '') => undefined,
+  step: 0.5,
+  min: 0,
+  decimals: 1,
+  unit: 'psi',
+  ariaLabel: 'Pressure',
+} as const;
+const defaultStepperMarkup = renderToStaticMarkup(createElement(NumberStepper, stepperProps));
+const inlineStepperMarkup = renderToStaticMarkup(createElement(NumberStepper, { ...stepperProps, layout: 'inline' }));
+const stackedStepperMarkup = renderToStaticMarkup(createElement(NumberStepper, { ...stepperProps, layout: 'stacked' }));
+assert.equal(defaultStepperMarkup, inlineStepperMarkup, 'default and explicit inline render byte-identical markup');
+assert.ok(defaultStepperMarkup.indexOf('aria-label="Decrease Pressure"') < defaultStepperMarkup.indexOf('aria-label="Edit Pressure"'), 'inline DOM remains decrease, value, increase');
+assert.ok(defaultStepperMarkup.indexOf('aria-label="Edit Pressure"') < defaultStepperMarkup.indexOf('aria-label="Increase Pressure"'), 'inline value remains between direction buttons');
+assert.ok(stackedStepperMarkup.indexOf('aria-label="Edit Pressure"') < stackedStepperMarkup.indexOf('aria-label="Decrease Pressure"'), 'stacked DOM renders value before button row');
+assert.ok(stackedStepperMarkup.indexOf('aria-label="Decrease Pressure"') < stackedStepperMarkup.indexOf('aria-label="Increase Pressure"'), 'stacked button row remains minus then plus');
 
 // Exact compact width budget, paired with the Chromium render probe below.
 // At Standard, owner-approved hole controls fit two columns. Enlarged scales
@@ -108,6 +163,50 @@ const chrome = [
   '/usr/bin/chromium-browser',
 ].find(candidate => candidate && existsSync(candidate));
 assert.ok(chrome, 'Chromium is available for rendered FourBar geometry proof');
+
+const renderStackedStepperProbe = () => {
+  const probeDir = mkdtempSync(join(tmpdir(), 'race-notes-c25-stepper-render-'));
+  const htmlPath = join(probeDir, 'probe.html');
+  const profilePath = join(probeDir, 'profile');
+  const document = `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}html,body{margin:0}.probe{width:220px}.grid{display:grid}.flex{display:flex}.w-full{width:100%}.min-w-0{min-width:0}.min-w-11{min-width:44px}.min-h-11,.tap-target{min-height:44px}.min-h-12{min-height:48px}.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.items-center{align-items:center}.items-stretch{align-items:stretch}.justify-center{justify-content:center}.flex-1{flex:1}.border{border:1px solid}.border-b{border-bottom:1px solid}.border-x{border-left:1px solid;border-right:1px solid}.divide-x>button+button{border-left:1px solid}button,input{font:16px monospace;padding:0}
+</style><div class="probe">${stackedStepperMarkup}</div><pre id="result"></pre><script>
+const rect=node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};
+const group=document.querySelector('[role=group]');const value=group.children[0];const row=group.children[1];const buttons=[...row.querySelectorAll(':scope > button')];
+document.querySelector('#result').textContent=JSON.stringify({groupChildren:group.children.length,rowChildren:row.children.length,group:rect(group),value:rect(value),row:rect(row),buttons:buttons.map(rect),text:value.textContent});
+</script>`;
+  try {
+    writeFileSync(htmlPath, document);
+    const dumped = execFileSync(chrome, [
+      '--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars',
+      `--user-data-dir=${profilePath}`, '--window-size=1200,900',
+      '--dump-dom', '--virtual-time-budget=1000', pathToFileURL(htmlPath).href,
+    ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const encoded = dumped.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1];
+    assert.ok(encoded, 'stacked NumberStepper probe returned real DOM measurements');
+    return JSON.parse(encoded.replaceAll('&quot;', '"').replaceAll('&amp;', '&')) as {
+      groupChildren: number;
+      rowChildren: number;
+      group: { width: number; height: number };
+      value: { top: number; bottom: number; width: number; height: number };
+      row: { top: number; bottom: number; width: number; height: number };
+      buttons: Array<{ left: number; right: number; top: number; bottom: number; width: number; height: number }>;
+      text: string;
+    };
+  } finally {
+    rmSync(probeDir, { recursive: true, force: true });
+  }
+};
+
+const stackedRender = renderStackedStepperProbe();
+assert.equal(stackedRender.groupChildren, 2, 'stacked real DOM has value region then button row');
+assert.equal(stackedRender.rowChildren, 2, 'stacked real DOM button row has exactly minus and plus');
+assert.ok(stackedRender.value.bottom <= stackedRender.row.top + 0.5, 'stacked value renders fully above button row');
+assert.ok(stackedRender.value.height >= TARGET_PX && stackedRender.buttons.every(button => button.height >= TARGET_PX), 'stacked value and both buttons render at least 44px tall');
+assert.ok(Math.abs(stackedRender.buttons[0].width - stackedRender.buttons[1].width) <= 0.5, 'stacked minus and plus render equal width');
+assert.ok(Math.abs(stackedRender.row.width - stackedRender.value.width) <= 0.5, 'stacked value and button row each use full available width');
+assert.match(stackedRender.text, /12\.5\s*psi/, 'stacked real value region keeps formatted value and unit');
 
 const renderProbe = ({ name, viewportWidth, scale, target = TARGET_PX, fieldBorder = 0, forceTwoColumns = false }: RenderProbe) => {
   const probeDir = mkdtempSync(join(tmpdir(), 'race-notes-a4-render-'));

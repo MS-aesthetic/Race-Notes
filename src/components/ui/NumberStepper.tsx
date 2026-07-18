@@ -12,6 +12,7 @@ export interface NumberStepperProps {
   decimals?: number;
   label?: string;
   ariaLabel?: string;
+  layout?: 'inline' | 'stacked';
 }
 
 const REPEAT_DELAY_MS = 350;
@@ -39,6 +40,7 @@ export default function NumberStepper({
   decimals = 0,
   label,
   ariaLabel,
+  layout = 'inline',
 }: NumberStepperProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -188,11 +190,95 @@ export default function NumberStepper({
       {label && (
         <div className="mb-1 text-sm text-on-surface-variant">{label}</div>
       )}
-      <div
-        role="group"
-        aria-label={groupLabel}
-        className="flex items-stretch overflow-hidden rounded-xl border border-outline-variant bg-surface-container"
-      >
+      {layout === 'stacked' ? (
+        <div
+          role="group"
+          aria-label={groupLabel}
+          className="grid w-full overflow-hidden rounded-xl border border-outline-variant bg-surface-container"
+        >
+          <div className="min-h-11 min-w-0 w-full border-b border-outline-variant">
+            {editing ? (
+              <input
+                autoFocus
+                type="text"
+                inputMode="decimal"
+                aria-label={groupLabel}
+                className="min-h-12 w-full bg-transparent text-center font-mono text-lg text-on-surface outline-none"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={commit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur();
+                  } else if (e.key === 'Escape') {
+                    cancelRef.current = true;
+                    e.currentTarget.blur();
+                  }
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                aria-label={`Edit ${groupLabel}`}
+                className="tap-target flex min-w-0 w-full items-center justify-center gap-1 font-mono text-lg text-on-surface"
+                onClick={beginEdit}
+              >
+                <span className="min-w-0 whitespace-nowrap tabular-nums">
+                  {display === '' ? (
+                    <span className="text-on-surface-variant">--</span>
+                  ) : (
+                    display
+                  )}
+                </span>
+                {unit && (
+                  <span className="shrink-0 font-sans text-sm text-on-surface-variant">
+                    {unit}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 divide-x divide-outline-variant">
+            <button
+              type="button"
+              aria-label={`Decrease ${groupLabel}`}
+              className={`${btnClass} w-full ${atMin ? 'opacity-40' : ''}`}
+              onPointerDown={(e) => startPress(e, -1)}
+              onPointerMove={handlePointerMove}
+              onPointerUp={finishPress}
+              onPointerLeave={cancelPress}
+              onPointerCancel={cancelPress}
+              onBlur={cancelPress}
+              onClick={(e) => { if (e.detail === 0) applyStep(-1, step); }}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <span className="material-symbols-outlined">remove</span>
+            </button>
+
+            <button
+              type="button"
+              aria-label={`Increase ${groupLabel}`}
+              className={`${btnClass} w-full ${atMax ? 'opacity-40' : ''}`}
+              onPointerDown={(e) => startPress(e, 1)}
+              onPointerMove={handlePointerMove}
+              onPointerUp={finishPress}
+              onPointerLeave={cancelPress}
+              onPointerCancel={cancelPress}
+              onBlur={cancelPress}
+              onClick={(e) => { if (e.detail === 0) applyStep(1, step); }}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <span className="material-symbols-outlined">add</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          role="group"
+          aria-label={groupLabel}
+          className="flex items-stretch overflow-hidden rounded-xl border border-outline-variant bg-surface-container"
+        >
         <button
           type="button"
           aria-label={`Decrease ${groupLabel}`}
@@ -267,7 +353,8 @@ export default function NumberStepper({
         >
           <span className="material-symbols-outlined">add</span>
         </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
