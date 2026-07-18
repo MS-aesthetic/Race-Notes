@@ -2,7 +2,7 @@
 
 **Status:** READY FOR one `gpt-5.6-sol` HIGH implementation subagent. Primary `gpt-5.6-sol` EXTRA HIGH remains QA and plan authority. Chunk C is accepted at 100/100. D2 and every later task remain blocked until D1 passes independent QA.
 **Branch/worktree:** existing `codex/ux-overhaul` at `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`; do not create another branch or worktree.
-**Expected builder parent:** the Chunk C governance closeout commit that contains this work order; primary must pin its exact SHA before dispatch.
+**Expected builder parent:** `5d553cc10e7537b908d6e3c1bc46c2169ad87393` (`docs: close Chunk C and issue D1 work order`). The worker must verify exact HEAD and a clean tree before editing.
 **Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` Task D1, Part 5.2, Part 6.1, and the binding v2.1 Owner Addendum.
 **Routing:** implementation worker must verify runtime `turn_context.payload.model=gpt-5.6-sol` and `effort=high` from rollout metadata before editing. Missing metadata is unverified and cannot satisfy the gate. Terra at every tier and `cavecrew-builder` are forbidden.
 
