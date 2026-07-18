@@ -2,7 +2,7 @@
 
 ## Current status
 
-Tasks C2, C2.5, C3, C4, and C5 are complete. C5 passed its first QA attempt with a score of 100/100. The mandatory integrated Chunk C QA is now active; it will recheck the complete setup lifecycle, session snapshots and diffs, stepper layout, Saved boundaries, naming, and rename behavior together before any deletion work begins.
+Tasks C2, C2.5, C3, C4, C5, the integrated Chunk C gate, and D1 are complete. D1 passed its first QA attempt with a score of 100/100. D2 is now active under an isolated work order for making Clear All Data tell the truth about device-only clearing versus deleting records owned by the signed-in user. D3 and later work remain blocked until D2 passes.
 
 ## Task C2 — Session snapshot model and diff engine
 
@@ -256,3 +256,39 @@ A Java 21 debug APK was synchronized, built, and installed on `emulator-5554`. I
 Chunk C is a final **PASS, 100/100**. No C1–C5 or integrated Chunk C repair remains.
 
 Task D1 is next. It is a deliberately small deletion-integrity change: a cloud delete must prove that a row was actually deleted, not merely return without an error. A blocked delete that affects zero rows must remain queued, show honest retry/error status, and never be reported as successful. D1 is isolated to the existing shared-delete helper, its existing replay decision point if needed, and its production-bound test. D2, D3, Chunk D QA, Chunk E, and final full-sprint QA remain blocked behind that sequence. No production publish, Git push, or master merge has occurred.
+
+## Task D1 — Zero-row cloud-delete detection
+
+### What was built
+
+D1 closes a subtle deletion-integrity gap. Previously, the app treated a Supabase delete as successful whenever the request returned no API error. Under row-level security, however, a request can return without an error while deleting zero rows. That could make the app discard its pending delete too early and later allow cloud data to reappear.
+
+The implementation is commit `1ca3576`. It changes only the existing shared-delete helper in `src/lib/sync.ts` and its production-bound proof in `scripts/saved-flash-harness.ts`. The helper now asks Supabase to return the deleted row ID and reports success only when the response contains the exact requested ID. Empty results, missing data, a different ID, an API error, and a thrown exception all remain failures and publish an honest sync-error state.
+
+No replay code in `src/App.tsx` needed to change. Its existing behavior was already correct: failed deletes stay in the account-scoped queue, the retry remains exactly five seconds, queued records stay filtered out of subsequent pulls, successful deletes alone remove their intent, and stale account or authentication generations cannot continue a replay.
+
+### What was checked
+
+- The new test compiles and executes the real changed helper and the real unchanged replay and pull-filter slices. It uses a deterministic Supabase mock and never contacts or changes the live database.
+- The D1 proof ran 62 assertions and independently killed all 13 required failure mutations, including removing the selected-row request, accepting empty or missing results, accepting API errors or exceptions, discarding a zero-row intent, changing the retry delay, weakening account-generation guards, retaining a proven success, and allowing Saved or Synced to hide a terminal delete failure.
+- Eleven focused Saved, offline, resume, ownership, confirmation, setup, lifecycle, Quick Adjust, tire, and touch-target regressions passed.
+- The complete raw 24-test matrix remained exactly 23 of 24. The only failure was the already documented stale `muted-text-color-harness.ts` byte-count lock, with the same `15 !== 16` result.
+- Type-checking reported exactly the three known baseline errors and no new error. The production build completed with exactly 566 transformed modules.
+- The implementation commit has the exact expected parent, contains one focused implementation commit, changes only the two authorized files, leaves `src/App.tsx` and every later-task or protected path untouched, passes `git diff --check`, and leaves the worktree clean.
+- An independent cavecrew review returned PASS, 100/100, with no repair finding.
+
+### Preview and debug APK
+
+The accepted Netlify draft preview is:
+
+https://6a5c0eb3acf3400ae9649f2f--crew-chief-race-notes.netlify.app/
+
+This is a draft only; production was not published. Its signed-out authentication shell passed at 360×800, 390×844, and 412×915 with exact viewport sizes, no horizontal overflow, a 44-pixel minimum visible control height, pinch-enabled viewport metadata, and no browser warnings or errors.
+
+A Java 21 debug APK was synchronized, built, and installed on `emulator-5554`. It is available at `android/app/build/outputs/apk/debug/app-debug.apk`, is 12,085,163 bytes, and has SHA-256 `4276E03B2C11570C83EDBFC8E9887C3142201A962D0C3B8BC95866169FB72678`. It resolved and launched `nimbus.engineering.crewchief/.MainActivity`, rendered the authenticated Dashboard, and left the Android crash buffer empty.
+
+### Result and what comes next
+
+D1 is a final **PASS, 100/100**. No D1 repair remains.
+
+D2 is next. Team users will receive two explicit Clear All Data choices. The device-only choice will remove local data without queuing cloud deletes and will warn that cloud data can return on sync. The everywhere choice will queue deletion only for records the signed-in user actually owns; records owned by another team member will remain in the cloud and the dialog will say so. Solo and unresolved-membership behavior, the existing deferred-delete machinery, D1's proof requirement, row-level security, and the pull filter must remain unchanged. D3, Chunk D QA, Chunk E, and final full-sprint QA remain blocked behind D2. The pre-D1 save point `9d9e4e1` was pushed to `origin/codex/ux-overhaul`; the D1 implementation and these QA records remain local. No production publish or master merge occurred.
