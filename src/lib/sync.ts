@@ -28,9 +28,14 @@ export async function deleteTeamSharedRecordFromCloud(
   onStatus?: SyncCallback,
 ): Promise<boolean> {
   try {
-    const { error } = await supabase.from(table).delete().eq('id', recordId);
+    const { data, error } = await supabase.from(table).delete().eq('id', recordId).select('id');
     if (error) {
       console.warn(`Sync: shared delete ${table}/${recordId} error:`, error.message);
+      onStatus?.('sync-error');
+      return false;
+    }
+    if (!data?.some(row => row.id === recordId)) {
+      console.warn(`Sync: shared delete ${table}/${recordId} matched no rows`);
       onStatus?.('sync-error');
       return false;
     }

@@ -1879,3 +1879,424 @@ c4Equal(new Set(killedC4Mutations).size, killedC4Mutations.length, 'C4 killed mu
 console.log(`C4 assertions: ${c4AssertionCount}`);
 console.log(`C4 killed mutations: ${killedC4Mutations.join(', ')}`);
 console.log('Saved flash harness: PASS');
+
+// D1 zero-row shared-delete proof. Compile real helper, replay decision, and
+// queued-delete pull filter; live Supabase is never contacted.
+type D1Row = { id: string };
+type D1Response = { data?: readonly D1Row[] | null; error?: { message: string } | null };
+type D1Plan = {
+  selected: D1Response;
+  unselected?: D1Response;
+  throwSelected?: Error;
+};
+type D1Intent = { accountId: string; table: string; recordId: string; soloOnly?: boolean };
+
+let d1AssertionCount = 0;
+const killedD1Mutations: string[] = [];
+const d1Ok = (value: unknown, message: string): void => {
+  d1AssertionCount += 1;
+  assert.ok(value, message);
+};
+const d1Equal = (actual: unknown, expected: unknown, message: string): void => {
+  d1AssertionCount += 1;
+  assert.deepEqual(actual, expected, message);
+};
+const d1Kill = (name: string, killed: boolean): void => {
+  d1AssertionCount += 1;
+  assert.equal(killed, true, `D1 mutation killed: ${name}`);
+  killedD1Mutations.push(name);
+};
+const d1Replace = (source: string, before: string, after: string, label: string): string => {
+  const mutated = source.replace(before, after);
+  d1Ok(mutated !== source, `D1 ${label} mutation changes exact production source`);
+  return mutated;
+};
+
+const d1DeleteBlock = (source: string): string => between(
+  source,
+  '/** Delete one exact shared row. Callers retain failed intents for retry. */',
+  '// ---------------------------------------------------------------------------\n// Push: local',
+  'D1 shared delete helper',
+);
+const d1DeleteSourcePasses = (source: string): boolean => {
+  const block = d1DeleteBlock(source);
+  return block.includes(".delete().eq('id', recordId).select('id')")
+    && block.includes('if (error) {')
+    && block.includes('if (!data?.some(row => row.id === recordId)) {')
+    && block.includes(`console.warn(\`Sync: shared delete \${table}/\${recordId} matched no rows\`);`)
+    && (block.match(/onStatus\?\.\('sync-error'\);/g) ?? []).length === 3
+    && (block.match(/return false;/g) ?? []).length === 3
+    && (block.match(/return true;/g) ?? []).length === 1;
+};
+
+type D1QueryCalls = {
+  from: string[];
+  deletes: number;
+  eq: Array<[string, string]>;
+  select: string[];
+};
+const compileD1Delete = (source: string, plan: D1Plan) => {
+  const calls: D1QueryCalls = { from: [], deletes: 0, eq: [], select: [] };
+  const supabaseMock = {
+    from: (table: string) => {
+      calls.from.push(table);
+      return {
+        delete: () => {
+          calls.deletes += 1;
+          return {
+            eq: (field: string, id: string) => {
+              calls.eq.push([field, id]);
+              const chain = {
+                select: async (columns: string) => {
+                  calls.select.push(columns);
+                  if (plan.throwSelected) throw plan.throwSelected;
+                  return plan.selected;
+                },
+                then: (resolve: (value: D1Response) => unknown, reject: (error: unknown) => unknown) => (
+                  Promise.resolve(plan.unselected ?? { data: null, error: null }).then(resolve, reject)
+                ),
+              };
+              return chain;
+            },
+          };
+        },
+      };
+    },
+  };
+  const compiled = transformSync(d1DeleteBlock(source), { loader: 'ts', format: 'cjs' }).code;
+  const moduleBox = { exports: {} as Record<string, unknown> };
+  new Function('module', 'exports', 'supabase', 'console', compiled)(
+    moduleBox,
+    moduleBox.exports,
+    supabaseMock,
+    { warn: () => undefined },
+  );
+  return {
+    helper: moduleBox.exports.deleteTeamSharedRecordFromCloud as (
+      table: string,
+      recordId: string,
+      onStatus?: (status: string) => void,
+    ) => Promise<boolean>,
+    calls,
+  };
+};
+const runD1Delete = async (source: string, plan: D1Plan) => {
+  const statuses: string[] = [];
+  const compiled = compileD1Delete(source, plan);
+  const result = await compiled.helper('setups', 'row-1', status => statuses.push(status));
+  return { result, statuses, calls: compiled.calls };
+};
+
+d1Ok(d1DeleteSourcePasses(sync), 'D1 helper source requires selected matching deleted id and three honest failures');
+const d1Success = await runD1Delete(sync, { selected: { data: [{ id: 'row-1' }], error: null } });
+d1Equal(d1Success.result, true, 'D1 returned requested row proves delete success');
+d1Equal(d1Success.statuses, [], 'D1 proved success emits no failure status');
+d1Equal(d1Success.calls, {
+  from: ['setups'], deletes: 1, eq: [['id', 'row-1']], select: ['id'],
+}, 'D1 production helper keeps exact table/id delete and selects id');
+for (const [label, plan] of [
+  ['empty rows', { selected: { data: [], error: null } }],
+  ['missing data', { selected: { error: null } }],
+  ['wrong returned id', { selected: { data: [{ id: 'other-row' }], error: null } }],
+  ['API error', { selected: { data: null, error: { message: 'denied' } } }],
+  ['exception', { selected: { data: null, error: null }, throwSelected: new Error('offline') }],
+] as const) {
+  const outcome = await runD1Delete(sync, plan);
+  d1Equal(outcome.result, false, `D1 ${label} remains failure`);
+  d1Equal(outcome.statuses, ['sync-error'], `D1 ${label} publishes sync-error`);
+}
+
+const d1SelectRemoved = d1Replace(
+  sync,
+  ".delete().eq('id', recordId).select('id')",
+  ".delete().eq('id', recordId)",
+  'select-removed',
+);
+const d1SelectRemovedOutcome = await runD1Delete(d1SelectRemoved, {
+  selected: { data: [{ id: 'row-1' }], error: null },
+  unselected: { data: null, error: null },
+});
+d1Kill('select-removed', !d1DeleteSourcePasses(d1SelectRemoved)
+  && d1SelectRemovedOutcome.calls.select.length === 0
+  && d1SelectRemovedOutcome.result === false);
+
+const d1ZeroGuard = '    if (!data?.some(row => row.id === recordId)) {';
+const d1EmptySuccess = d1Replace(
+  sync,
+  d1ZeroGuard,
+  '    if (Array.isArray(data) && data.length === 0) return true;\n' + d1ZeroGuard,
+  'empty-success',
+);
+const d1EmptySuccessOutcome = await runD1Delete(d1EmptySuccess, { selected: { data: [], error: null } });
+d1Kill('empty-row-success', d1EmptySuccessOutcome.result === true && d1EmptySuccessOutcome.statuses.length === 0);
+
+const d1MissingSuccess = d1Replace(
+  sync,
+  d1ZeroGuard,
+  '    if (data == null) return true;\n' + d1ZeroGuard,
+  'missing-data-success',
+);
+const d1MissingSuccessOutcome = await runD1Delete(d1MissingSuccess, { selected: { error: null } });
+d1Kill('missing-data-success', d1MissingSuccessOutcome.result === true && d1MissingSuccessOutcome.statuses.length === 0);
+
+const d1ErrorBranch = `    if (error) {
+      console.warn(\`Sync: shared delete \${table}/\${recordId} error:\`, error.message);
+      onStatus?.('sync-error');
+      return false;
+    }`;
+const d1ErrorSuccess = d1Replace(sync, d1ErrorBranch, d1ErrorBranch.replace('return false;', 'return true;'), 'API-error-success');
+const d1ErrorSuccessOutcome = await runD1Delete(d1ErrorSuccess, { selected: { data: null, error: { message: 'denied' } } });
+d1Kill('api-error-success', d1ErrorSuccessOutcome.result === true);
+
+const d1CatchBranch = `  } catch (error) {
+    console.warn(\`Sync: shared delete \${table}/\${recordId} failed\`, error);
+    onStatus?.('sync-error');
+    return false;
+  }`;
+const d1ExceptionSuccess = d1Replace(sync, d1CatchBranch, d1CatchBranch.replace('return false;', 'return true;'), 'exception-success');
+const d1ExceptionSuccessOutcome = await runD1Delete(d1ExceptionSuccess, {
+  selected: { data: null, error: null }, throwSelected: new Error('offline'),
+});
+d1Kill('exception-success', d1ExceptionSuccessOutcome.result === true);
+
+const d1ReplaySlice = (source: string): string => between(
+  source,
+  '  // Shared deletes are local-first.',
+  '  // Tires stay personal.',
+  'D1 shared replay effect',
+);
+const d1ReplaySourcePasses = (source: string): boolean => {
+  const block = d1ReplaySlice(source);
+  return block.includes('if (deleted) removePendingTeamDelete(window.localStorage, intent);\n        else retryNeeded = true;')
+    && block.includes("setSyncStatus('deferred-delete-retrying');")
+    && block.includes('}, 5000);')
+    && (block.match(/authIdentityRef\.current === accountId/g) ?? []).length >= 2
+    && (block.match(/authGenerationRef\.current === generation/g) ?? []).length >= 2;
+};
+const compileD1Replay = (source: string) => {
+  const slice = d1ReplaySlice(source);
+  const replayStart = '    void (async () => {\n';
+  const body = between(slice, replayStart, '    })();', 'D1 replay async body').slice(replayStart.length);
+  const wrapped = `export const runD1Replay = async (deps) => {
+    const {
+      pending, cancelled, accountId, generation, authIdentityRef, authGenerationRef,
+      deleteTeamSharedRecordFromCloud, removePendingTeamDelete, setSyncStatus,
+      window, setDeleteReplayVersion,
+    } = deps;
+${body}
+  };`;
+  return compileRuntimeModule(wrapped, 'runD1Replay', {}) as (deps: Record<string, unknown>) => Promise<void>;
+};
+const d1PullFilterBlock = (source: string): string => between(
+  source,
+  '      const omitQueuedDeletes = <T extends { id: string }>(',
+  '      const data = await pullAllData',
+  'D1 queued-delete pull filter',
+);
+const compileD1PullFilter = (source: string) => {
+  const wrapped = `export const filterD1Pull = (table, rows, deps) => {
+    const { queuedAtPullStart, readPendingTeamDeletes, pullUserId, window } = deps;
+${d1PullFilterBlock(source)}
+    return omitQueuedDeletes(table, rows);
+  };`;
+  return compileRuntimeModule(wrapped, 'filterD1Pull', {}) as (
+    table: string,
+    rows: D1Row[],
+    deps: Record<string, unknown>,
+  ) => D1Row[];
+};
+type D1ReplayPlan = { source?: string; syncSource?: string; plans: D1Plan[]; identity?: string; generation?: number };
+const createD1Replay = ({ source = app, syncSource = sync, plans, identity = 'acct-1', generation = 7 }: D1ReplayPlan) => {
+  const intent: D1Intent = { accountId: 'acct-1', table: 'setups', recordId: 'row-1' };
+  let queue = [intent];
+  let planIndex = 0;
+  let deleteCalls = 0;
+  let replayVersion = 0;
+  let currentStatus: string | null = null;
+  const statuses: string[] = [];
+  const timers: Array<{ callback: () => void; delay: number }> = [];
+  const authIdentityRef = { current: identity };
+  const authGenerationRef = { current: generation };
+  const replay = compileD1Replay(source);
+  const run = async () => replay({
+    pending: queue.slice(),
+    cancelled: false,
+    accountId: 'acct-1',
+    generation: 7,
+    authIdentityRef,
+    authGenerationRef,
+    deleteTeamSharedRecordFromCloud: async (table: string, recordId: string, onStatus: (status: string) => void) => {
+      deleteCalls += 1;
+      const compiled = compileD1Delete(syncSource, plans[Math.min(planIndex, plans.length - 1)]);
+      planIndex += 1;
+      return compiled.helper(table, recordId, onStatus);
+    },
+    removePendingTeamDelete: (_storage: unknown, completed: D1Intent) => {
+      queue = queue.filter(item => item.accountId !== completed.accountId
+        || item.table !== completed.table || item.recordId !== completed.recordId);
+    },
+    setSyncStatus: (status: string) => { currentStatus = status; statuses.push(status); },
+    window: {
+      localStorage: {},
+      setTimeout: (callback: () => void, delay: number) => { timers.push({ callback, delay }); return timers.length; },
+    },
+    setDeleteReplayVersion: (updater: (version: number) => number) => { replayVersion = updater(replayVersion); },
+  });
+  const filterPull = (rows: D1Row[]) => compileD1PullFilter(source)('setups', rows, {
+    queuedAtPullStart: new Set(queue.map(item => `${item.table}:${item.recordId}`)),
+    readPendingTeamDeletes: () => queue.slice(),
+    pullUserId: 'acct-1',
+    window: { localStorage: {} },
+  });
+  return {
+    run,
+    queue: () => queue.slice(),
+    statuses: () => statuses.slice(),
+    status: () => currentStatus,
+    acknowledge: () => { currentStatus = null; },
+    timers,
+    deleteCalls: () => deleteCalls,
+    replayVersion: () => replayVersion,
+    authIdentityRef,
+    authGenerationRef,
+    filterPull,
+  };
+};
+
+d1Ok(d1ReplaySourcePasses(app), 'D1 replay keeps true-only removal, retry status, 5000ms timer, and auth guards');
+d1Ok(d1PullFilterBlock(app).includes('if (queuedAtPullStart.has(key)) return false;')
+  && d1PullFilterBlock(app).includes('readPendingTeamDeletes(window.localStorage).some'), 'D1 next pull remains bound to queued-delete filter');
+
+const d1ZeroReplay = createD1Replay({ plans: [{ selected: { data: [], error: null } }] });
+await d1ZeroReplay.run();
+d1Equal(d1ZeroReplay.queue().length, 1, 'D1 zero-row intent remains queued');
+d1Equal(d1ZeroReplay.statuses(), ['sync-error', 'deferred-delete-retrying'], 'D1 zero-row reaches honest error then retrying status');
+d1Equal(d1ZeroReplay.timers.map(timer => timer.delay), [5000], 'D1 zero-row schedules exact 5000ms retry');
+d1Equal(d1ZeroReplay.filterPull([{ id: 'row-1' }]), [], 'D1 next-pull fixture cannot resurrect queued zero-row delete');
+d1ZeroReplay.acknowledge();
+d1Equal(d1ZeroReplay.status(), null, 'D1 acknowledgement clears visible terminal status');
+d1Equal(d1ZeroReplay.queue().length, 1, 'D1 acknowledgement does not discard queued intent');
+d1Equal(d1ZeroReplay.filterPull([{ id: 'row-1' }]), [], 'D1 clean acknowledgement still blocks next-pull resurrection');
+
+d1ZeroReplay.timers[0].callback();
+d1Equal(d1ZeroReplay.replayVersion(), 1, 'D1 matching account/generation timer requests replay');
+const d1Eventual = createD1Replay({ plans: [
+  { selected: { data: [], error: null } },
+  { selected: { data: [{ id: 'row-1' }], error: null } },
+] });
+await d1Eventual.run();
+d1Eventual.timers[0].callback();
+await d1Eventual.run();
+d1Equal(d1Eventual.deleteCalls(), 2, 'D1 queued retry reaches eventual cloud success');
+d1Equal(d1Eventual.queue(), [], 'D1 eventual matching-row success removes intent once');
+d1Equal(d1Eventual.timers.length, 1, 'D1 eventual success adds no duplicate retry timer');
+
+const d1SuccessReplay = createD1Replay({ plans: [{ selected: { data: [{ id: 'row-1' }], error: null } }] });
+await d1SuccessReplay.run();
+d1Equal(d1SuccessReplay.queue(), [], 'D1 normal success removes intent');
+d1Equal(d1SuccessReplay.timers, [], 'D1 normal success schedules no retry');
+
+const d1RemoveOnFailure = d1Replace(
+  app,
+  'if (deleted) removePendingTeamDelete(window.localStorage, intent);',
+  'if (deleted || true) removePendingTeamDelete(window.localStorage, intent);',
+  'remove-zero-row-intent',
+);
+const d1RemovedReplay = createD1Replay({ source: d1RemoveOnFailure, plans: [{ selected: { data: [], error: null } }] });
+await d1RemovedReplay.run();
+d1Kill('zero-row-intent-removed', d1RemovedReplay.queue().length === 0
+  && d1RemovedReplay.filterPull([{ id: 'row-1' }]).length === 1);
+
+const d1ZeroStatusBlock = `    if (!data?.some(row => row.id === recordId)) {
+      console.warn(\`Sync: shared delete \${table}/\${recordId} matched no rows\`);
+      onStatus?.('sync-error');
+      return false;
+    }`;
+const d1LostHelperStatus = d1Replace(
+  sync,
+  d1ZeroStatusBlock,
+  d1ZeroStatusBlock.replace("      onStatus?.('sync-error');\n", ''),
+  'zero-row-sync-error-lost',
+);
+const d1LostAllStatus = d1Replace(
+  app,
+  "        setSyncStatus('deferred-delete-retrying');",
+  '        // mutation: retry status lost',
+  'deferred-retry-status-lost',
+);
+const d1LostStatusReplay = createD1Replay({
+  source: d1LostAllStatus,
+  syncSource: d1LostHelperStatus,
+  plans: [{ selected: { data: [], error: null } }],
+});
+await d1LostStatusReplay.run();
+d1Kill('failure-status-lost', d1LostStatusReplay.statuses().length === 0 && d1LostStatusReplay.timers[0].delay === 5000);
+
+const d1DelayChanged = d1Replace(app, '        }, 5000);', '        }, 4999);', 'retry-delay-changed');
+const d1DelayReplay = createD1Replay({ source: d1DelayChanged, plans: [{ selected: { data: [], error: null } }] });
+await d1DelayReplay.run();
+d1Kill('retry-delay-changed', d1DelayReplay.timers[0].delay === 4999);
+
+const d1SuccessRetained = d1Replace(
+  app,
+  'if (deleted) removePendingTeamDelete(window.localStorage, intent);',
+  'if (false && deleted) removePendingTeamDelete(window.localStorage, intent);',
+  'success-retained',
+);
+const d1RetainedReplay = createD1Replay({ source: d1SuccessRetained, plans: [{ selected: { data: [{ id: 'row-1' }], error: null } }] });
+await d1RetainedReplay.run();
+d1Kill('success-intent-retained', d1RetainedReplay.queue().length === 1 && d1RetainedReplay.timers[0].delay === 5000);
+
+const d1EarlyGuard = `if (cancelled
+          || authIdentityRef.current !== accountId
+          || authGenerationRef.current !== generation) return;`;
+const d1AuthWeakened = d1Replace(app, d1EarlyGuard, 'if (cancelled) return;', 'auth-account-generation-guard-weakened');
+const d1StaleBaseline = createD1Replay({ plans: [{ selected: { data: [{ id: 'row-1' }], error: null } }], identity: 'other-account' });
+await d1StaleBaseline.run();
+d1Equal(d1StaleBaseline.deleteCalls(), 0, 'D1 stale account cannot call cloud delete');
+const d1StaleMutation = createD1Replay({ source: d1AuthWeakened, plans: [{ selected: { data: [{ id: 'row-1' }], error: null } }], identity: 'other-account' });
+await d1StaleMutation.run();
+d1Kill('auth-account-generation-guard-weakened', d1StaleMutation.deleteCalls() === 1);
+
+const d1TimerGuard = `if (authIdentityRef.current === accountId
+            && authGenerationRef.current === generation) {`;
+const d1TimerGuardWeakened = d1Replace(app, d1TimerGuard, 'if (true) {', 'retry-generation-guard-weakened');
+const d1GuardBaseline = createD1Replay({ plans: [{ selected: { data: [], error: null } }] });
+await d1GuardBaseline.run();
+d1GuardBaseline.authGenerationRef.current = 8;
+d1GuardBaseline.timers[0].callback();
+d1Equal(d1GuardBaseline.replayVersion(), 0, 'D1 superseded generation cancels scheduled replay');
+const d1GuardMutation = createD1Replay({ source: d1TimerGuardWeakened, plans: [{ selected: { data: [], error: null } }] });
+await d1GuardMutation.run();
+d1GuardMutation.authGenerationRef.current = 8;
+d1GuardMutation.timers[0].callback();
+d1Kill('retry-generation-guard-weakened', d1GuardMutation.replayVersion() === 1);
+
+const d1TerminalOverwrite = d1Replace(app, terminalGuard, 'next', 'terminal-overwritten-by-synced');
+const d1BaselineAfterSynced = transitionStatus(app, 'deferred-delete-retrying', 'synced');
+d1Equal(d1BaselineAfterSynced, 'deferred-delete-retrying', 'D1 terminal retry status survives later Synced');
+const d1MutatedAfterSynced = transitionStatus(d1TerminalOverwrite, 'deferred-delete-retrying', 'synced');
+const d1MutatedSyncedRoute = productionNotificationRoute(d1TerminalOverwrite, false, d1MutatedAfterSynced, false, true);
+d1Kill('terminal-failure-overwritten-by-synced', d1MutatedAfterSynced === 'synced' && d1MutatedSyncedRoute.isSuccess);
+
+const d1SavedResurrection = d1Replace(
+  terminalLaterFlashMutation,
+  'const acknowledgeSyncStatus = () => {\n    clearSavedFlash();\n    syncStatusRef.current = null;',
+  'const acknowledgeSyncStatus = () => {\n    syncStatusRef.current = null;',
+  'terminal-saved-resurrection',
+);
+d1Equal(savedAfterTerminalLaterFlashAndAck(app), false, 'D1 terminal failure plus later save plus acknowledgement never resurrects Saved');
+const d1ResurrectedRoute = productionNotificationRoute(
+  d1SavedResurrection,
+  savedAfterTerminalLaterFlashAndAck(d1SavedResurrection),
+  '',
+  false,
+  true,
+);
+d1Kill('terminal-failure-resurrects-saved', d1ResurrectedRoute.visible && d1ResurrectedRoute.isSuccess && d1ResurrectedRoute.msg === 'Saved');
+
+d1Equal(new Set(killedD1Mutations).size, killedD1Mutations.length, 'D1 killed mutation labels are unique');
+d1Ok(killedD1Mutations.length >= 10, 'D1 kills at least ten independent mutation classes');
+console.log(`D1 assertions: ${d1AssertionCount}`);
+console.log(`D1 killed mutations (${killedD1Mutations.length}): ${killedD1Mutations.join(', ')}`);
+console.log('D1 zero-row delete harness: PASS');
