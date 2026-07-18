@@ -220,3 +220,39 @@ A Java 21 debug APK was built at `android/app/build/outputs/apk/debug/app-debug.
 C5 is a final **PASS, 100/100**. No C5 repair remains.
 
 The mandatory Chunk C QA is next. It will test C1 through C5 as one integrated system, including the owner setup/session scenario, Quick Adjust coexistence, historical immutability, phone-width steppers, process-death persistence, and every Saved boundary. Chunk D cannot begin until that gate passes. After Chunk C, the remaining roadmap is Chunk D deletion integrity, Chunk E help/copy/hardening, the final full-sprint QA, and the cold third-party review handoff. No production publish, Git push, or master merge has occurred.
+
+## Chunk C — Integrated setup, session, and save-behavior QA
+
+### What was checked
+
+Chunk C did not add another feature. It tested C1 through C5 together as one system before allowing deletion work to begin. The review covered the complete accepted code range, not only the latest commit. It confirmed that only the seven approved product files changed across Chunk C and that synchronization, database policy, Android native code, packages, release files, credentials, and future Chunk D/E product files were untouched.
+
+The integrated scenarios confirmed all of the important handoffs between tasks:
+
+- Historical and active Race Day setups remained view-only, while unrelated Current setups remained editable and renameable.
+- Every run retained its own frozen setup snapshot. The run history showed no change from Starting Setup to Hot Laps, the exact gear change from Hot Laps to Qualifying, and no change from Qualifying to Heat. The later Test run captured the same event-owned setup and its own frozen snapshot.
+- The one Quick Adjust gear entry remained a separate run adjustment. It was not duplicated as a legacy setup log entry or lost when the bound setup differences were displayed.
+- The live event setup's Pending panel and each run's Bound setup changes panel stayed computed from frozen data. None of those display rows were written into the historical change log.
+- The stacked setup controls remained value-first with the minus and plus buttons side by side. At 360, 390, and 412 pixels there was no clipping or horizontal overflow. Controls were at least 44 pixels in Default and about 50.59 pixels in Large.
+- Blank setup creation still rejected empty input without a write. A valid named blank created one Current setup, and copying without a name created one meaningfully named Current setup with the correct source reference.
+- Pressing the rename pencil focused the exact existing Chassis field and changed no stored data. Typing a rename updated Local Storage immediately, showed no immediate Saved message, and survived force-stop and relaunch.
+- Backgrounding after an edit produced one confirmation. Repeating a clean background produced none. A later dirty edit produced one timer confirmation. Force-stopping before confirmation lost no data.
+- Creating a new Test run persisted the run, setup source, and frozen snapshot before feedback. The existing pressure-source information message correctly took priority over Saved, and the live setup's historical change log remained byte-for-byte unchanged.
+
+### Automated, browser, and Android results
+
+The focused setup, Saved-boundary, lifecycle, Quick Adjust, offline/resume, tire, and touch tests all passed. The complete raw test matrix was exactly 23 of 24, with the only failure being the already documented stale AuthView byte-count lock in `muted-text-color-harness.ts`. Type-checking reported exactly the three known baseline errors and no new error. The production build completed with exactly 566 transformed modules. An independent cavecrew cumulative review returned PASS, 100/100, with no repair finding.
+
+The accepted Netlify draft preview is:
+
+https://6a5c0047acf340e24b649f28--crew-chief-race-notes.netlify.app/
+
+This is a draft only. The signed-out shell passed at 360×800, 390×844, 412×915, and 1080×2118 with only the authentication screen, exact viewports, no horizontal overflow, controls at least 44 pixels tall, pinch-enabled viewport metadata, and no browser warnings or errors. Production was not published.
+
+A Java 21 debug APK was synchronized, built, and installed on `emulator-5554`. It is available at `android/app/build/outputs/apk/debug/app-debug.apk`, is 12,085,112 bytes, and has SHA-256 `6801A2CEF805508A20D222BD6282659833AC674BC10E994C88CD60AF9FD94FDE`. Authenticated checks passed at 360×800, 390×844, and 412×915 in light and dark modes and the Default and Large font choices. The emulator was restored to its physical 1344×2992 resolution and density 480. There was no application crash or product JavaScript exception.
+
+### Result and what comes next
+
+Chunk C is a final **PASS, 100/100**. No C1–C5 or integrated Chunk C repair remains.
+
+Task D1 is next. It is a deliberately small deletion-integrity change: a cloud delete must prove that a row was actually deleted, not merely return without an error. A blocked delete that affects zero rows must remain queued, show honest retry/error status, and never be reported as successful. D1 is isolated to the existing shared-delete helper, its existing replay decision point if needed, and its production-bound test. D2, D3, Chunk D QA, Chunk E, and final full-sprint QA remain blocked behind that sequence. No production publish, Git push, or master merge has occurred.
