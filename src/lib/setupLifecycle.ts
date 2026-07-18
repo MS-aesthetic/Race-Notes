@@ -42,6 +42,42 @@ export const isSetupLocked = (
       && !!setup.weekendId
       && weekends.some(weekend => weekend.id === setup.weekendId && isWeekendFinished(weekend))));
 
+export type SetupEditabilityReason =
+  | 'historical-role'
+  | 'locked'
+  | 'finished-weekend'
+  | 'in-play-elsewhere'
+  | null;
+
+export interface SetupEditability {
+  editable: boolean;
+  deletable: boolean;
+  reason: SetupEditabilityReason;
+}
+
+/** One edit/delete policy shared by the Setups UI and persistence boundary. */
+export const getSetupEditability = (
+  setup: Setup,
+  weekends: readonly RaceWeekend[] = [],
+  activeEventSetupId?: string,
+): SetupEditability => {
+  if (setup.lifecycleRole === 'baseline' || setup.lifecycleRole === 'final') {
+    return { editable: false, deletable: false, reason: 'historical-role' };
+  }
+  if (setup.lockedAt) {
+    return { editable: false, deletable: false, reason: 'locked' };
+  }
+  if (setup.lifecycleRole === 'weekend'
+    && !!setup.weekendId
+    && weekends.some(weekend => weekend.id === setup.weekendId && isWeekendFinished(weekend))) {
+    return { editable: false, deletable: false, reason: 'finished-weekend' };
+  }
+  if (activeEventSetupId && setup.id === activeEventSetupId) {
+    return { editable: false, deletable: true, reason: 'in-play-elsewhere' };
+  }
+  return { editable: true, deletable: true, reason: null };
+};
+
 /** An active event may only receive its owned Weekend Setup, never the car selector's setup. */
 export const selectRaceWeekendSetup = (
   activeWeekend: RaceWeekend | null | undefined,

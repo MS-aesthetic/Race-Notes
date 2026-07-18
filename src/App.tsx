@@ -19,7 +19,7 @@ import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pu
 import { registerForPush, sendPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
 import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
-import { displayVersionLabel, finishWeekendLifecycle, isSetupLocked, isWeekendFinished, lifecycleLabel, mergeTimestampedRecords, selectRaceWeekendSetupForSelection, startWeekendLifecycle, withSetupDiffLog } from './lib/setupLifecycle';
+import { displayVersionLabel, finishWeekendLifecycle, getSetupEditability, isSetupLocked, isWeekendFinished, lifecycleLabel, mergeTimestampedRecords, selectRaceWeekendSetupForSelection, startWeekendLifecycle, withSetupDiffLog } from './lib/setupLifecycle';
 import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
 import { applyQuickAdjust, resolveQuickAdjustTarget, type QuickAdjustCommand } from './lib/quickAdjust';
 import { materializeMainChecklist } from './lib/mainChecklist';
@@ -1577,9 +1577,19 @@ export default function App() {
       const { updatedAt: _updatedAt, ...rest } = value;
       return JSON.stringify(rest);
     };
+    const hasBlockedEdit = updatedSetups.some(candidate => {
+      const prior = priorById.get(candidate.id);
+      return !!prior
+        && !getSetupEditability(prior, weekendsRef.current, eventSetupId).editable
+        && comparable(prior) !== comparable(candidate);
+    }) || priorSetups.some(prior => (
+      !updatedSetups.some(candidate => candidate.id === prior.id)
+      && !getSetupEditability(prior, weekendsRef.current, eventSetupId).deletable
+    ));
+    if (hasBlockedEdit) return;
     const safeSetups = updatedSetups.flatMap<Setup>(candidate => {
       const prior = priorById.get(candidate.id);
-      const canEdit = !prior || (!isSetupLocked(prior, weekendsRef.current) && (!eventSetupId || prior.id === eventSetupId));
+      const canEdit = !prior || getSetupEditability(prior, weekendsRef.current, eventSetupId).editable;
       if (!canEdit) {
         return prior ? [prior] : [];
       }
@@ -1589,7 +1599,8 @@ export default function App() {
       return [{ ...logged, updatedAt: !prior || comparable(prior) !== comparable(logged) ? now : candidate.updatedAt }];
     });
     for (const prior of priorSetups) {
-      if (!safeSetups.some(item => item.id === prior.id) && (isSetupLocked(prior, weekendsRef.current) || eventSetupId)) {
+      if (!safeSetups.some(item => item.id === prior.id)
+        && !getSetupEditability(prior, weekendsRef.current, eventSetupId).deletable) {
         safeSetups.push(prior);
       }
     }
@@ -2515,6 +2526,7 @@ export default function App() {
                   shockSessions={shockSessions}
                   onSaveShockSessions={handleSaveShockSessions}
                   weekends={weekends}
+                  activeEventSetupId={activeWeekend?.activeSetupId}
                   initialSubTab={setupSubTab}
                   onSaveSetups={handleSaveSetups}
                   onInfo={showComponentInfo}

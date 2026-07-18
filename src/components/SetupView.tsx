@@ -13,7 +13,7 @@ import FourBarQuickAdjust from './FourBarQuickAdjust';
 import TiresSubView from './TiresSubView';
 import { cloneSetup, makeBlankSetup, pickImmediatePriorSetupForCar, pickLatestSetupForCar } from '../lib/setupCompat';
 import { calculateTireStagger, NumericCornerField, SETUP_STEPS, formatStoredNumber, legacyValueNote, parseStoredNumber } from '../lib/setupSteps';
-import { displayLifecycleText, displayVersionLabel, isSetupLocked, lifecycleLabel } from '../lib/setupLifecycle';
+import { displayLifecycleText, displayVersionLabel, getSetupEditability, lifecycleLabel } from '../lib/setupLifecycle';
 import { applyExplicitCornerField } from '../lib/quickAdjust';
 import { buildSetupReport, createPdfFile } from '../lib/exportPdf';
 import { shareOrDownloadReport } from '../lib/reportShare';
@@ -34,6 +34,8 @@ interface SetupViewProps {
   onSaveShockSessions?: (updated: ShockSession[]) => void;
   /** Needed to derive per-tire usage history (which sessions/tracks/corners used each tire). */
   weekends?: RaceWeekend[];
+  /** Setup owned by the active Race Day, if one is in play. */
+  activeEventSetupId?: string;
   /** Deep-link into a specific sub-tab (e.g. from Dashboard Tires panel). */
   initialSubTab?: 'setups' | 'smasherloads' | 'tires';
   onInfo?: (message: string) => void;
@@ -223,7 +225,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
 
 export default function SetupView({
   savedSetups, activeSetupId, onSaveSetups, user, tireInventory, onSaveTires, onDeleteTireFromCloud,
-  activeCarId = null, activeCar = null, shockSessions = [], onSaveShockSessions, weekends = [],
+  activeCarId = null, activeCar = null, shockSessions = [], onSaveShockSessions, weekends = [], activeEventSetupId,
   initialSubTab, onInfo, onHelp, onGoToGarage,
 }: SetupViewProps) {
   const [subTab, setSubTab] = useState<'setups' | 'smasherloads' | 'tires'>(initialSubTab ?? 'setups');
@@ -337,7 +339,7 @@ export default function SetupView({
   const handleDeleteSetup = (setupId: string) => {
     const target = setups.find((setupItem) => setupItem.id === setupId);
     if (!target) return;
-    if (isSetupLocked(target, weekends)) {
+    if (!getSetupEditability(target, weekends, activeEventSetupId).deletable) {
       return;
     }
     if (setups.length <= 1) { onInfo?.('minimumSetups'); return; }
@@ -351,7 +353,7 @@ export default function SetupView({
     const target = setups.find((setupItem) => setupItem.id === setupId);
     if (!target) return;
     if (!activeCarId || target.carId !== activeCarId) return;
-    if (isSetupLocked(target, weekends)) {
+    if (!getSetupEditability(target, weekends, activeEventSetupId).deletable) {
       return;
     }
     if (setups.length <= 1) {
@@ -422,7 +424,6 @@ export default function SetupView({
 
   // Filter at display time only — never mutate the master arrays.
   const displayedSetups = activeCarId ? byActiveCar<Setup>(setups, activeCarId) : [];
-  const activeEventSetupId = weekends?.find(weekend => weekend.status !== 'finished' && weekend.activeSetupId === activeSetupId)?.activeSetupId;
   const displayedTires = activeCarId ? byActiveCar<TireInventoryItem>(tireInventory, activeCarId) : [];
   const noCar = !activeCarId;
   const activeSetup = displayedSetups.find(s => s.id === activeId) ?? pickLatestSetupForCar(setups, activeCarId);
@@ -517,7 +518,8 @@ export default function SetupView({
             {displayedSetups.map((setupItem) => {
               const isExpanded = expandedId === setupItem.id;
               const isActive = activeId === setupItem.id;
-              const isReadOnly = isSetupLocked(setupItem, weekends) || (!!activeEventSetupId && setupItem.id !== activeEventSetupId);
+              const editability = getSetupEditability(setupItem, weekends, activeEventSetupId);
+              const isReadOnly = !editability.editable;
               return (
                 <div key={setupItem.id}
                   className={`bg-surface-container border rounded-lg overflow-hidden transition-all duration-200 ${isActive ? 'border-primary shadow-[0_0_12px_rgba(211,47,47,0.1)]' : 'border-outline-variant/60'}`}
@@ -572,7 +574,7 @@ export default function SetupView({
                           className={`p-1.5 rounded ${priorSetup(setupItem) ? 'text-on-surface-variant hover:text-primary' : 'text-on-surface-muted opacity-30 cursor-not-allowed'}`}>
                           <span className="material-symbols-outlined text-[18px]">compare_arrows</span>
                         </button>
-                        <button type="button" title="Delete setup permanently" disabled={isReadOnly} onClick={(e) => { e.stopPropagation(); handleDeleteSetup(setupItem.id); }}
+                        <button type="button" title="Delete setup permanently" disabled={!editability.deletable} onClick={(e) => { e.stopPropagation(); handleDeleteSetup(setupItem.id); }}
                           className="p-1.5 text-on-surface-variant hover:text-red-400 transition-colors rounded disabled:text-on-surface-muted disabled:opacity-40">
                           <span className="material-symbols-outlined text-[18px]">delete</span>
                         </button>

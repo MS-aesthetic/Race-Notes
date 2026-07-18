@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import type { Setup } from '../src/types';
+import { transformSync } from 'esbuild';
+import type { RaceWeekend, Setup } from '../src/types';
 import { cloneSetup, makeBlankSetup, normalizeSetup, pickImmediatePriorSetupForCar, pickLatestSetupForCar } from '../src/lib/setupCompat';
 import { calculateTireStagger, SETUP_STEPS, formatPressureBlock, formatPsiValue, formatStoredNumber, fourBarAdjustmentId, fourBarAdjustmentLabel, legacyValueNote, mirrorPressureBlockToTires, parseStoredNumber, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from '../src/lib/setupSteps';
+import { getSetupEditability, isSetupLocked } from '../src/lib/setupLifecycle';
 
 const setup = (id: string, carId: string, date: string, tireId = 'tire-a'): Setup => ({
   id, carId, chassis: id, track: 'Track', date, carType: 'Modified',
@@ -188,5 +190,148 @@ assert.doesNotMatch(fourBarSource, /sm:grid-cols-[23]/, 'four-bar no longer wait
 assert.match(fourBarSource, /compact \? 'space-y-3'/, 'compact FourBar presentation is distinct from full mode');
 assert.match(setupSource, /<FourBarQuickAdjust\s+setup=\{setupItem\}\s+compact/, 'Setup activates compact FourBar presentation');
 assert.match(fourBarSource, /min-h-11 min-w-11 shrink-0/, 'compact FourBar keeps 44px help target');
+
+const lifecycleSource = readFileSync(new URL('../src/lib/setupLifecycle.ts', import.meta.url), 'utf8');
+assert.match(lifecycleSource, /export type SetupEditabilityReason =/, 'C1 exports typed editability reasons');
+assert.match(lifecycleSource, /'historical-role'[\s\S]*'locked'[\s\S]*'finished-weekend'[\s\S]*'in-play-elsewhere'/, 'C1 keeps every required typed reason');
+assert.match(lifecycleSource, /export const getSetupEditability = \(/, 'C1 exports one canonical predicate');
+assert.match(lifecycleSource, /if \(activeEventSetupId && setup\.id === activeEventSetupId\) \{\s*return \{ editable: false, deletable: true, reason: 'in-play-elsewhere' \};/, 'C1 freezes only active event setup while retaining deletion');
+assert.match(setupSource, /getSetupEditability\(target, weekends, activeEventSetupId\)\.deletable/, 'C1 Setup delete paths use canonical deletability');
+assert.match(setupSource, /const editability = getSetupEditability\(setupItem, weekends, activeEventSetupId\);/, 'C1 Setup card uses canonical predicate');
+assert.match(setupSource, /disabled=\{!editability\.deletable\}/, 'C1 Setup delete control follows canonical deletability');
+assert.doesNotMatch(setupSource, /isSetupLocked/, 'C1 SetupView keeps no alternate lock predicate');
+assert.match(appSource, /getSetupEditability\(prior, weekendsRef\.current, eventSetupId\)\.editable/, 'C1 App save boundary uses canonical editability');
+assert.match(appSource, /!getSetupEditability\(prior, weekendsRef\.current, eventSetupId\)\.deletable/, 'C1 App removal boundary uses canonical deletability');
+assert.match(appSource, /activeEventSetupId=\{activeWeekend\?\.activeSetupId\}/, 'C1 shares active-event context with SetupView');
+
+const c1Weekend = (id: string, status: RaceWeekend['status'], activeSetupId?: string): RaceWeekend => ({
+  id, name: id, track: 'Track', date: 'Jul 18, 2026', sessions: [], status, activeSetupId,
+});
+const c1Weekends = [
+  c1Weekend('active-weekend', 'active', 'in-play'),
+  c1Weekend('finished-weekend', 'finished'),
+];
+const c1Baseline = { ...legacy, id: 'baseline', lifecycleRole: 'baseline' as const };
+const c1Final = { ...legacy, id: 'final', lifecycleRole: 'final' as const };
+const c1Locked = { ...legacy, id: 'locked', lockedAt: '2026-07-18T00:00:00.000Z' };
+const c1Finished = { ...legacy, id: 'finished', lifecycleRole: 'weekend' as const, weekendId: 'finished-weekend' };
+const c1InPlay = { ...legacy, id: 'in-play', lifecycleRole: 'weekend' as const, weekendId: 'active-weekend' };
+const c1Unrelated = { ...legacy, id: 'unrelated', lifecycleRole: 'current' as const };
+const c1Expected = (editable: boolean, deletable: boolean, reason: string | null) => ({ editable, deletable, reason });
+assert.deepEqual(getSetupEditability(c1Baseline, c1Weekends, 'in-play'), c1Expected(false, false, 'historical-role'), 'C1 baseline remains immutable');
+assert.deepEqual(getSetupEditability(c1Final, c1Weekends, 'in-play'), c1Expected(false, false, 'historical-role'), 'C1 final remains immutable');
+assert.deepEqual(getSetupEditability(c1Locked, c1Weekends, 'in-play'), c1Expected(false, false, 'locked'), 'C1 explicit lock remains immutable');
+assert.deepEqual(getSetupEditability(c1Finished, c1Weekends, 'in-play'), c1Expected(false, false, 'finished-weekend'), 'C1 finished Weekend Setup remains immutable');
+assert.deepEqual(getSetupEditability(c1InPlay, c1Weekends, 'in-play'), c1Expected(false, true, 'in-play-elsewhere'), 'C1 active event setup is edit-frozen but deletable');
+assert.deepEqual(getSetupEditability(c1Unrelated, c1Weekends, 'in-play'), c1Expected(true, true, null), 'C1 unrelated live-Race-Day setup remains editable and deletable');
+assert.equal(isSetupLocked(c1InPlay, c1Weekends), false, 'C1 in-play rule does not redefine historical locking');
+assert.equal(getSetupEditability({ ...c1Unrelated, chassis: 'Renamed live setup' }, c1Weekends, 'in-play').editable, true, 'C1 owner live-Race-Day chassis rename remains enabled');
+
+const c1SourcePasses = (lifecycle: string, setupView: string, app: string): boolean => (
+  lifecycle.includes("setup.lifecycleRole === 'baseline' || setup.lifecycleRole === 'final'")
+  && lifecycle.includes("if (activeEventSetupId && setup.id === activeEventSetupId)")
+  && lifecycle.includes("deletable: true, reason: 'in-play-elsewhere'")
+  && setupView.includes('getSetupEditability(setupItem, weekends, activeEventSetupId)')
+  && setupView.includes('disabled={!editability.deletable}')
+  && app.includes('const canEdit = !prior || getSetupEditability(prior, weekendsRef.current, eventSetupId).editable;')
+  && app.includes('!getSetupEditability(prior, weekendsRef.current, eventSetupId).deletable')
+  && app.includes('const hasBlockedEdit = updatedSetups.some(candidate => {')
+  && app.includes('if (hasBlockedEdit) return;')
+);
+const c1ModelEditability = (lifecycle: string, candidate: Setup, activeEventSetupId?: string) => {
+  if (!lifecycle.includes("setup.lifecycleRole === 'baseline' || setup.lifecycleRole === 'final'")
+    && (candidate.lifecycleRole === 'baseline' || candidate.lifecycleRole === 'final')) {
+    return c1Expected(true, true, null);
+  }
+  if (lifecycle.includes('if (activeEventSetupId) {') && activeEventSetupId) {
+    return c1Expected(false, true, 'in-play-elsewhere');
+  }
+  if (!lifecycle.includes("deletable: true, reason: 'in-play-elsewhere'") && candidate.id === activeEventSetupId) {
+    return c1Expected(false, false, 'in-play-elsewhere');
+  }
+  return getSetupEditability(candidate, c1Weekends, activeEventSetupId);
+};
+const c1AppAllowsEdit = (app: string, candidate: Setup, activeEventSetupId?: string) => (
+  app.includes('const canEdit = !prior || getSetupEditability(prior, weekendsRef.current, eventSetupId).editable;')
+    ? c1ModelEditability(lifecycleSource, candidate, activeEventSetupId).editable
+    : true
+);
+const compileC1Mutation = (source: string, loader: 'ts' | 'tsx', label: string) =>
+  assert.doesNotThrow(() => transformSync(source, { loader, jsx: 'automatic', format: 'esm' }), `C1 ${label} mutation compiles`);
+assert.equal(c1SourcePasses(lifecycleSource, setupSource, appSource), true, 'C1 baseline source/model gate passes');
+
+const historicalBypassMutation = lifecycleSource.replace("if (setup.lifecycleRole === 'baseline' || setup.lifecycleRole === 'final') {", 'if (false) {');
+assert.notEqual(historicalBypassMutation, lifecycleSource, 'C1 historical mutation changes production predicate');
+compileC1Mutation(historicalBypassMutation, 'ts', 'historical bypass');
+assert.equal(c1SourcePasses(historicalBypassMutation, setupSource, appSource), false, 'C1 historical mutation fails source gate');
+assert.equal(c1ModelEditability(historicalBypassMutation, c1Baseline, 'in-play').editable, true, 'C1 historical mutation makes baseline editable');
+assert.equal(c1ModelEditability(lifecycleSource, c1Baseline, 'in-play').editable, false, 'C1 baseline model blocks zero-byte mutation');
+
+const broadEventMutation = lifecycleSource.replace('if (activeEventSetupId && setup.id === activeEventSetupId) {', 'if (activeEventSetupId) {');
+assert.notEqual(broadEventMutation, lifecycleSource, 'C1 broad-event mutation changes production predicate');
+compileC1Mutation(broadEventMutation, 'ts', 'broad event freeze');
+assert.equal(c1SourcePasses(broadEventMutation, setupSource, appSource), false, 'C1 broad-event mutation fails source gate');
+assert.equal(c1ModelEditability(broadEventMutation, c1Unrelated, 'in-play').editable, false, 'C1 broad-event mutation freezes unrelated setup');
+assert.equal(c1ModelEditability(lifecycleSource, c1Unrelated, 'in-play').editable, true, 'C1 baseline keeps unrelated setup editable');
+
+const deleteBlockMutation = lifecycleSource.replace("return { editable: false, deletable: true, reason: 'in-play-elsewhere' };", "return { editable: false, deletable: false, reason: 'in-play-elsewhere' };");
+assert.notEqual(deleteBlockMutation, lifecycleSource, 'C1 delete-block mutation changes production predicate');
+compileC1Mutation(deleteBlockMutation, 'ts', 'in-play delete block');
+assert.equal(c1SourcePasses(deleteBlockMutation, setupSource, appSource), false, 'C1 delete-block mutation fails source gate');
+assert.equal(c1ModelEditability(deleteBlockMutation, c1InPlay, 'in-play').deletable, false, 'C1 delete-block mutation prevents required deletion');
+assert.equal(c1ModelEditability(lifecycleSource, c1InPlay, 'in-play').deletable, true, 'C1 baseline permits in-play deletion');
+
+const divergentAppMutation = appSource.replace(
+  'const canEdit = !prior || getSetupEditability(prior, weekendsRef.current, eventSetupId).editable;',
+  'const canEdit = true;',
+);
+assert.notEqual(divergentAppMutation, appSource, 'C1 App divergence mutation changes production boundary');
+compileC1Mutation(divergentAppMutation, 'tsx', 'App divergence');
+assert.equal(c1SourcePasses(lifecycleSource, setupSource, divergentAppMutation), false, 'C1 App divergence mutation fails source gate');
+assert.equal(c1AppAllowsEdit(divergentAppMutation, c1Baseline, 'in-play'), true, 'C1 App divergence mutation persists historical edit');
+assert.equal(c1AppAllowsEdit(appSource, c1Baseline, 'in-play'), false, 'C1 baseline App preserves historical zero-byte rejection');
+
+type C1WriteModel = {
+  savedSetups: Setup[];
+  activeSetupId: string;
+  pressures: string;
+  localWrites: number;
+  cloudWrites: number;
+  savedFlashes: number;
+};
+const c1ModelSave = (app: string, prior: Setup, attempted: Setup): C1WriteModel => {
+  const before: C1WriteModel = {
+    savedSetups: [prior], activeSetupId: prior.id, pressures: prior.lf.tirePress,
+    localWrites: 0, cloudWrites: 0, savedFlashes: 0,
+  };
+  const blocked = !getSetupEditability(prior, c1Weekends, 'in-play').editable
+    && JSON.stringify(prior) !== JSON.stringify(attempted);
+  if (blocked && app.includes('if (hasBlockedEdit) return;')) return before;
+  return {
+    savedSetups: [attempted], activeSetupId: 'fallback', pressures: attempted.lf.tirePress,
+    localWrites: 2, cloudWrites: 1, savedFlashes: 1,
+  };
+};
+const c1HistoricalFixtures = [c1Baseline, c1Final, c1Locked, c1Finished];
+for (const historical of c1HistoricalFixtures) {
+  const attempted = { ...historical, chassis: `${historical.chassis} changed`, lf: { ...historical.lf, tirePress: '19' } };
+  const result = c1ModelSave(appSource, historical, attempted);
+  assert.deepEqual(result.savedSetups, [historical], `C1 ${historical.id} edit keeps saved setup bytes`);
+  assert.equal(result.activeSetupId, historical.id, `C1 ${historical.id} edit keeps active selection`);
+  assert.equal(result.pressures, historical.lf.tirePress, `C1 ${historical.id} edit keeps session pressures`);
+  assert.equal(result.localWrites, 0, `C1 ${historical.id} edit produces zero local writes`);
+  assert.equal(result.cloudWrites, 0, `C1 ${historical.id} edit produces zero cloud writes`);
+  assert.equal(result.savedFlashes, 0, `C1 ${historical.id} edit produces no Saved flash`);
+}
+const blockedEditMutation = appSource.replace('if (hasBlockedEdit) return;', 'if (false) return;');
+assert.notEqual(blockedEditMutation, appSource, 'C1 blocked-edit mutation changes the production boundary');
+compileC1Mutation(blockedEditMutation, 'tsx', 'blocked historical edit bypass');
+assert.equal(c1SourcePasses(lifecycleSource, setupSource, blockedEditMutation), false, 'C1 blocked-edit mutation fails source gate');
+for (const historical of c1HistoricalFixtures) {
+  const attempted = { ...historical, chassis: `${historical.chassis} changed`, lf: { ...historical.lf, tirePress: '19' } };
+  const result = c1ModelSave(blockedEditMutation, historical, attempted);
+  assert.equal(result.savedFlashes, 1, `C1 mutation exposes false Saved for ${historical.id}`);
+  assert.equal(result.cloudWrites, 1, `C1 mutation exposes cloud write for ${historical.id}`);
+}
 
 console.log('CHUNK5_SETUP_HARNESS PASS');

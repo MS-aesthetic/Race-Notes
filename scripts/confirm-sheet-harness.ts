@@ -107,7 +107,7 @@ const setupRequest = section(setup, 'const handleDeleteSetup =', 'const confirmD
 const setupConfirm = section(setup, 'const confirmDeleteSetup =', 'const handleCloneSetup');
 for (const block of [setupRequest, setupConfirm]) {
   assert.match(block, /setups\.find/);
-  assert.match(block, /isSetupLocked\(target, weekends\)/);
+  assert.match(block, /getSetupEditability\(target, weekends, activeEventSetupId\)\.deletable/);
   assert.match(block, /setups\.length <= 1/);
 }
 assert.match(setupConfirm, /setPendingDeleteSetupId\(null\);/);
