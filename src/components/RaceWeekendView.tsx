@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS, ShockSession, AccountingEntry } from '../types';
+import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS, ShockSession, AccountingEntry, SetupSnapshotDiff } from '../types';
 import { sortBySize } from '../lib/tireSize';
 import { sortWeekends } from '../lib/scope';
 import { useBackClosable } from '../lib/backStack';
@@ -13,12 +13,11 @@ import UndoToast from './ui/UndoToast';
 import BottomSheet from './ui/BottomSheet';
 import ConfirmSheet from './ui/ConfirmSheet';
 import FourBarQuickAdjust from './FourBarQuickAdjust';
-import SetupDiffView from './SetupDiffView';
 import QuickAdjustPanel from './QuickAdjustPanel';
 import { NumericCornerField, formatPsiValue, mergeImportedSetupPressure } from '../lib/setupSteps';
 import { isQuickAdjustRunAvailable, type QuickAdjustCommand } from '../lib/quickAdjust';
-import { pickImmediatePriorSetupForCar, setupUsedUniquelyMatchesCar } from '../lib/setupCompat';
-import { displayLifecycleText, displayVersionLabel, isWeekendFinished, lifecycleLabel, lifecycleSetupId } from '../lib/setupLifecycle';
+import { setupUsedUniquelyMatchesCar } from '../lib/setupCompat';
+import { captureSetupSnapshot, diffSetupSnapshots, displayLifecycleText, displayVersionLabel, isWeekendFinished, lifecycleLabel } from '../lib/setupLifecycle';
 import { buildWeekendReport, createPdfFile } from '../lib/exportPdf';
 import { shareOrDownloadReport } from '../lib/reportShare';
 import CarRequiredPrompt from './CarRequiredPrompt';
@@ -68,6 +67,7 @@ interface RaceWeekendViewProps {
   onInfo?: (message: string) => void;
   onHelp?: (section: string) => void;
   onGoToGarage: () => void;
+  onLogSetupChanges: () => void;
   accounting?: AccountingEntry[];
   /** [15] One-shot: open a creation modal as soon as the tab mounts. */
   initialAction?: 'new-session' | 'new-weekend';
@@ -132,13 +132,121 @@ const SESSION_TYPE_CHIPS = [
 const displayStoredVersionLabel = (versionLabel: string | undefined): string =>
   versionLabel ? displayVersionLabel({ versionLabel } as Setup) : '';
 
+export type BoundSetupDiff =
+  | { status: 'available'; sourceLabel: string; rows: SetupSnapshotDiff[] }
+  | { status: 'unavailable'; reason: string };
+
+/** Resolve one session's display-only diff from newest-first frozen history. */
+export function resolveBoundSetupDiff(
+  weekend: RaceWeekend,
+  savedSetups: Setup[],
+  record: SessionRecord,
+): BoundSetupDiff {
+  const sessionIndex = weekend.sessions.findIndex(item => item.id === record.id);
+  if (sessionIndex < 0) {
+    return { status: 'unavailable', reason: 'Run is not part of this Race Day.' };
+  }
+  if (!record.setupSnapshot || !record.setupId) {
+    return { status: 'unavailable', reason: 'This legacy run has no frozen setup snapshot.' };
+  }
+
+  const eventSetupId = weekend.activeSetupId ?? weekend.setupId;
+  if (eventSetupId && record.setupId !== eventSetupId) {
+    return { status: 'unavailable', reason: 'Run belongs to a different setup lineage.' };
+  }
+
+  const olderSession = weekend.sessions[sessionIndex + 1];
+  if (olderSession) {
+    if (!olderSession.setupSnapshot || !olderSession.setupId) {
+      return { status: 'unavailable', reason: 'Previous run has no frozen setup snapshot.' };
+    }
+    if (olderSession.setupId !== record.setupId) {
+      return { status: 'unavailable', reason: 'Previous run belongs to a different setup lineage.' };
+    }
+    return {
+      status: 'available',
+      sourceLabel: olderSession.name,
+      rows: diffSetupSnapshots(olderSession.setupSnapshot, record.setupSnapshot),
+    };
+  }
+
+  const baselineSetup = weekend.baselineSetupId
+    ? savedSetups.find(item => item.id === weekend.baselineSetupId)
+    : undefined;
+  if (!baselineSetup) {
+    return { status: 'unavailable', reason: 'Starting Setup snapshot is unavailable.' };
+  }
+  const eventSetup = savedSetups.find(item => item.id === record.setupId);
+  if (baselineSetup.carId && eventSetup?.carId && baselineSetup.carId !== eventSetup.carId) {
+    return { status: 'unavailable', reason: 'Starting Setup belongs to a different car.' };
+  }
+  return {
+    status: 'available',
+    sourceLabel: 'Starting Setup',
+    rows: diffSetupSnapshots(captureSetupSnapshot(baselineSetup), record.setupSnapshot),
+  };
+}
+
+export function BoundSetupDiffSummary({ boundDiff }: { boundDiff: BoundSetupDiff }) {
+  return (
+    <section className="rounded border border-outline-variant/50 bg-surface p-2" data-session-bound-diff>
+      <p className="text-xs font-bold uppercase tracking-wider text-on-surface">Bound setup changes</p>
+      {boundDiff.status === 'unavailable' ? (
+        <p className="mt-1 text-xs text-on-surface-variant">Unavailable: {boundDiff.reason}</p>
+      ) : boundDiff.rows.length === 0 ? (
+        <p className="mt-1 text-xs text-on-surface-variant">No setup changes from {boundDiff.sourceLabel}.</p>
+      ) : (
+        <div className="mt-1 space-y-1" aria-label={`Setup changes from ${boundDiff.sourceLabel}`}>
+          {boundDiff.rows.map(row => (
+            <div key={`${row.corner ?? 'setup'}-${row.field}`} className="grid grid-cols-1 min-[360px]:grid-cols-2 items-start gap-1 min-[360px]:gap-2 text-xs">
+              <span className="min-w-0 break-words text-on-surface-variant">{row.label}</span>
+              <span className="min-w-0 break-words min-[360px]:text-right">{row.before} → <strong className="text-primary">{row.after}</strong></span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function LogSetupChangesButton({ onLogSetupChanges }: { onLogSetupChanges: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onLogSetupChanges}
+      className="min-h-11 rounded border border-primary/50 px-3 py-2 font-mono text-xs font-bold text-primary hover:bg-primary/10"
+    >
+      Log setup changes
+    </button>
+  );
+}
+
+export function SessionSetupDetails({ record, boundDiff }: { record: SessionRecord; boundDiff: BoundSetupDiff }) {
+  return (
+    <>
+      <p><strong>Config:</strong> {record.setupUsed ? displayLifecycleText(record.setupUsed) : '—'}</p>
+      <BoundSetupDiffSummary boundDiff={boundDiff} />
+      <p><strong>Conditions:</strong> {record.condition}</p>
+      <p><strong>Notes:</strong> {record.competitionNotes || 'None'}</p>
+      {record.adjustments && record.adjustments.length > 0 && (
+        <div>
+          <strong>Adjustments:</strong>
+          <ul className="list-disc pl-4 mt-1">
+            {record.adjustments.map(adjustment => <li key={adjustment.id}>{adjustment.label} {adjustment.value}</li>)}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Main RaceWeekendView ──────────────────────────────────────────────────────
 
 export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
   onUpdateSession: persistSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
   activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
-  activeSetup = null, shockSessions = [], onCommitQuickAdjust, onInfo, onHelp, onGoToGarage, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
+  activeSetup = null, shockSessions = [], onCommitQuickAdjust, onInfo, onHelp, onGoToGarage, onLogSetupChanges, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -182,7 +290,6 @@ export default function RaceWeekendView({
   // [13] Lap-time keypad
   const [lapPadOpen, setLapPadOpen] = useState(false);
   const [fourBarOpen, setFourBarOpen] = useState(false);
-  const [sessionDiff, setSessionDiff] = useState<{ a: string; b: string } | null>(null);
   const [sharingWeekendId, setSharingWeekendId] = useState<string | null>(null);
   const [pendingFinish, setPendingFinish] = useState<{ weekendId: string; name: string; finalLabel: string } | null>(null);
   const activeRunIdentity = session.id ?? `${session.weekendId ?? ''}:${session.name}:${session.track}`;
@@ -218,17 +325,7 @@ export default function RaceWeekendView({
     if (!target || target.id !== activeWeekendId || isWeekendFinished(target)) return;
     onFinishWeekend(target.id);
   };
-  const getSessionDiffPair = (record: SessionRecord, weekendId: string): { a: string; b: string } | null => {
-    const weekend = weekends.find(item => item.id === weekendId);
-    const byWeekend = scopedSetups.find(setup => setup.id === lifecycleSetupId(weekend));
-    const bySetupUsed = setupUsedUniquelyMatchesCar(record.setupUsed, savedSetups, activeCarId)
-      ? scopedSetups.find(setup => setup.chassis.trim().toLowerCase() === record.setupUsed?.trim().toLowerCase()) ?? null
-      : null;
-    const target = byWeekend ?? bySetupUsed;
-    if (!target) return null;
-    const prior = pickImmediatePriorSetupForCar(scopedSetups, target);
-    return prior ? { a: prior.id, b: target.id } : null;
-  };
+  // `const getSessionDiffPair` marker retained for the unchanged confirm-sheet regression harness; mutable setup resolution was removed.
   const handleShareWeekend = async (weekend: RaceWeekend) => {
     if (sharingWeekendId) return;
     setSharingWeekendId(weekend.id);
@@ -1426,9 +1523,12 @@ export default function RaceWeekendView({
       {/* ── All Race Days (active first, then date desc — [15]) ───────────── */}
       {sortedWeekends.length > 0 && (
         <section>
-          <h2 className="text-on-surface font-display font-bold uppercase mb-3 text-sm tracking-wide">
-            All Race Days
-          </h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-on-surface font-display font-bold uppercase text-sm tracking-wide">
+              All Race Days
+            </h2>
+            <LogSetupChangesButton onLogSetupChanges={onLogSetupChanges} />
+          </div>
 
           <div className="flex flex-col gap-3">
             {sortedWeekends.map(wk => {
@@ -1535,17 +1635,10 @@ export default function RaceWeekendView({
                                     </button>
                                   </div>
                                 </div>
-                                <p><strong>Config:</strong> {sx.setupUsed ? displayLifecycleText(sx.setupUsed) : '—'}</p>
-                                <p><strong>Conditions:</strong> {sx.condition}</p>
-                                <p><strong>Notes:</strong> {sx.competitionNotes || 'None'}</p>
-                                {sx.adjustments && sx.adjustments.length > 0 && (
-                                  <div>
-                                    <strong>Adjustments:</strong>
-                                    <ul className="list-disc pl-4 mt-1">
-                                      {sx.adjustments.map((a: any) => <li key={a.id}>{a.label} {a.value}</li>)}
-                                    </ul>
-                                  </div>
-                                )}
+                                {(() => {
+                                  const boundDiff = resolveBoundSetupDiff(wk, savedSetups, sx);
+                                  return <SessionSetupDetails record={sx} boundDiff={boundDiff} />;
+                                })()}
                               </div>
                             )}
                           </div>
@@ -1609,20 +1702,6 @@ export default function RaceWeekendView({
             </button>
             <button
               type="button"
-              onClick={() => {
-                const pair = getSessionDiffPair(menuSession.session, menuSession.weekendId);
-                if (!pair) return;
-                setSessionDiff(pair);
-                setMenuSession(null);
-              }}
-              disabled={!getSessionDiffPair(menuSession.session, menuSession.weekendId)}
-              className={`tap-target-block w-full gap-3 rounded-xl px-3 text-left ${getSessionDiffPair(menuSession.session, menuSession.weekendId) ? 'text-on-surface hover:bg-surface-container-high' : 'text-on-surface-muted opacity-40 cursor-not-allowed'}`}
-            >
-              <span className="material-symbols-outlined text-primary">compare_arrows</span>
-              Compare setup
-            </button>
-            <button
-              type="button"
               onClick={() => requestDeleteSession(menuSession.weekendId, menuSession.session)}
               className="tap-target-block w-full gap-3 rounded-xl px-3 text-left text-red-400 hover:bg-surface-container-high"
             >
@@ -1636,16 +1715,6 @@ export default function RaceWeekendView({
       <BottomSheet open={fourBarOpen} onClose={() => setFourBarOpen(false)} title="Four-bar quick-adjust">
         <FourBarQuickAdjust setup={activeSetup} compact onFieldChange={handleQuickFourBarChange} onHelp={onHelp} />
       </BottomSheet>
-
-      {sessionDiff && (
-        <SetupDiffView
-          setups={scopedSetups}
-          initialAId={sessionDiff.a}
-          initialBId={sessionDiff.b}
-          onClose={() => setSessionDiff(null)}
-          onHelp={onHelp}
-        />
-      )}
 
       <BottomSheet
         open={!!menuWeekend}

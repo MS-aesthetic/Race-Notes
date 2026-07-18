@@ -2562,6 +2562,10 @@ export default function App() {
                   initialAction={rwInitialAction ?? undefined}
                   onInitialActionConsumed={() => setRwInitialAction(null)}
                   onGoToGarage={openGarage}
+                  onLogSetupChanges={() => {
+                    setSetupSubTab('setups');
+                    setActiveTab('setups');
+                  }}
                 />
               )}
 

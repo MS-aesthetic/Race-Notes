@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { transformSync } from 'esbuild';
-import type { RaceWeekend, SessionRecord, Setup, SetupSnapshot, SetupSnapshotCorner } from '../src/types';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import type { ActiveSession, RaceWeekend, SessionRecord, Setup, SetupSnapshot, SetupSnapshotCorner } from '../src/types';
 import { cloneSetup, makeBlankSetup, normalizeSetup, pickImmediatePriorSetupForCar, pickLatestSetupForCar } from '../src/lib/setupCompat';
 import { calculateTireStagger, SETUP_STEPS, formatPressureBlock, formatPsiValue, formatStoredNumber, fourBarAdjustmentId, fourBarAdjustmentLabel, legacyValueNote, mirrorPressureBlockToTires, parseStoredNumber, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from '../src/lib/setupSteps';
-import { captureSetupSnapshot, diffSetupSnapshots, getSetupEditability, isSetupLocked } from '../src/lib/setupLifecycle';
+import { captureSetupSnapshot, diffSetupSnapshots, displayLifecycleText, getSetupEditability, isSetupLocked, isWeekendFinished, lifecycleSetupId, withSetupDiffLog } from '../src/lib/setupLifecycle';
+import { applyQuickAdjust } from '../src/lib/quickAdjust';
 
 const setup = (id: string, carId: string, date: string, tireId = 'tire-a'): Setup => ({
   id, carId, chassis: id, track: 'Track', date, carType: 'Modified',
@@ -122,7 +125,7 @@ const readNormalizedSource = (url: URL): string =>
 const appSource = readNormalizedSource(new URL('../src/App.tsx', import.meta.url));
 const typesSource = readNormalizedSource(new URL('../src/types.ts', import.meta.url));
 const syncSource = readNormalizedSource(new URL('../src/lib/sync.ts', import.meta.url));
-const raceWeekendSource = readFileSync(new URL('../src/components/RaceWeekendView.tsx', import.meta.url), 'utf8');
+const raceWeekendSource = readNormalizedSource(new URL('../src/components/RaceWeekendView.tsx', import.meta.url));
 const cssSource = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
 assert.match(appSource, /className="app-main-scroll flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto custom-scrollbar"/);
 assert.match(cssSource, /\.app-main-scroll\s*\{\s*padding-bottom: calc\(4rem \+ env\(safe-area-inset-bottom, 0px\)\);/);
@@ -161,7 +164,7 @@ const stateWrite = restoreBlock.indexOf('setActiveSession(restoredSession)');
 const storageWrite = restoreBlock.indexOf("localStorage.setItem('race_notes_active_session'");
 assert.ok(refWrite >= 0 && refWrite < stateWrite && stateWrite < storageWrite);
 assert.doesNotMatch(restoreBlock, /handleUpdateSession|applyActiveSessionToWeekends|setWeekends/);
-const setupSource = readFileSync(new URL('../src/components/SetupView.tsx', import.meta.url), 'utf8');
+const setupSource = readNormalizedSource(new URL('../src/components/SetupView.tsx', import.meta.url));
 assert.match(setupSource, /activeCarId \? byActiveCar<Setup>/);
 assert.match(setupSource, /preserveInfoToast/);
 assert.match(setupSource, /pressureSourceNote: value\.trim\(\) \? 'Adjusted in Setups' : undefined/);
@@ -637,5 +640,490 @@ assert.notEqual(loggingMutation, appSource, 'C2 logging mutation changes App sou
 compileC1Mutation(loggingMutation, 'tsx', 'C2 hot-path logging');
 assert.equal(c2SourcePasses(typesSource, lifecycleSource, loggingMutation), false, 'C2 hot-path logging mutation fails source gate');
 assert.equal(c2EditBurstChangeCount(loggingMutation, snapshotSourceSetup, 3), (snapshotSourceSetup.changeLog?.length || 0) + 3, 'C2 logging mutation appends one legacy row per edit');
+
+// ── C3 session diff UI / Quick Adjust coexistence ────────────────────────────
+
+let c3AssertionCount = 0;
+const killedC3Mutations: string[] = [];
+const c3Equal = (actual: unknown, expected: unknown, message: string) => {
+  c3AssertionCount += 1;
+  assert.deepEqual(actual, expected, message);
+};
+const c3Ok = (value: unknown, message: string) => {
+  c3AssertionCount += 1;
+  assert.ok(value, message);
+};
+const c3Kill = (name: string, failed: boolean) => {
+  c3Ok(failed, `C3 mutation ${name} must fail`);
+  killedC3Mutations.push(name);
+};
+
+type RuntimeExport = (...args: any[]) => any;
+const productionFunctionSource = (source: string, name: string, endMarker: string): string => {
+  const start = source.indexOf(`export function ${name}`);
+  assert.ok(start >= 0, `C3 production function ${name} exists`);
+  const end = source.indexOf(endMarker, start);
+  assert.ok(end > start, `C3 production function ${name} has stable end marker`);
+  return source.slice(start, end);
+};
+const compileProductionExport = (
+  source: string,
+  name: string,
+  endMarker: string,
+  dependencies: Record<string, unknown>,
+): RuntimeExport => {
+  const compiled = transformSync(productionFunctionSource(source, name, endMarker), {
+    loader: 'tsx',
+    format: 'cjs',
+    target: 'es2022',
+    jsx: 'transform',
+  }).code;
+  const moduleBox = { exports: {} as Record<string, RuntimeExport> };
+  const dependencyNames = Object.keys(dependencies);
+  const evaluate = new Function('module', 'exports', ...dependencyNames, compiled);
+  evaluate(moduleBox, moduleBox.exports, ...dependencyNames.map(key => dependencies[key]));
+  return moduleBox.exports[name];
+};
+const compilePendingResolver = (source: string) => compileProductionExport(
+  source,
+  'resolvePendingSetupDiff',
+  '\nexport function PendingSetupDiffSummary',
+  { captureSetupSnapshot, diffSetupSnapshots, isWeekendFinished },
+);
+const compileBoundResolver = (source: string) => compileProductionExport(
+  source,
+  'resolveBoundSetupDiff',
+  '\nexport function BoundSetupDiffSummary',
+  { captureSetupSnapshot, diffSetupSnapshots, lifecycleSetupId },
+);
+const renderProductionSummary = (
+  source: string,
+  name: string,
+  endMarker: string,
+  props: Record<string, unknown>,
+): string => {
+  const Summary = compileProductionExport(source, name, endMarker, { React });
+  return renderToStaticMarkup(React.createElement(Summary as React.ComponentType<any>, props));
+};
+const compileInlineExport = (source: string, name: string, dependencies: Record<string, unknown>): RuntimeExport => {
+  const compiled = transformSync(source, { loader: 'tsx', format: 'cjs', target: 'es2022', jsx: 'transform' }).code;
+  const moduleBox = { exports: {} as Record<string, RuntimeExport> };
+  const dependencyNames = Object.keys(dependencies);
+  const evaluate = new Function('module', 'exports', ...dependencyNames, compiled);
+  evaluate(moduleBox, moduleBox.exports, ...dependencyNames.map(key => dependencies[key]));
+  return moduleBox.exports[name];
+};
+const renderSessionDetails = (source: string, record: SessionRecord, boundDiff: unknown): string => {
+  const BoundSetupDiffSummary = compileProductionExport(
+    source,
+    'BoundSetupDiffSummary',
+    '\nexport function LogSetupChangesButton',
+    { React },
+  );
+  const SessionSetupDetails = compileProductionExport(
+    source,
+    'SessionSetupDetails',
+    '\n// ── Main RaceWeekendView',
+    { React, displayLifecycleText, BoundSetupDiffSummary },
+  );
+  return renderToStaticMarkup(React.createElement(SessionSetupDetails as React.ComponentType<any>, { record, boundDiff }));
+};
+const compileNavigationCallback = (source: string): RuntimeExport => {
+  const match = source.match(/onLogSetupChanges=\{\(\) => \{\n([\s\S]*?)\n\s*\}\}/);
+  assert.ok(match, 'C3 App navigation callback body exists');
+  return compileInlineExport(
+    `export function runNavigation(setSetupSubTab: (tab: string) => void, setActiveTab: (tab: string) => void) {\n${match[1]}\n}`,
+    'runNavigation',
+    {},
+  );
+};
+const compileNewRecordFactory = (source: string): RuntimeExport => {
+  const startMarker = 'const newRecord: SessionRecord = ';
+  const start = source.indexOf(startMarker);
+  assert.ok(start >= 0, 'C3 App newRecord production object exists');
+  const objectStart = start + startMarker.length;
+  const objectEnd = source.indexOf('\n    };', objectStart);
+  assert.ok(objectEnd > objectStart, 'C3 App newRecord production object has end');
+  const objectSource = source.slice(objectStart, objectEnd + '\n    }'.length);
+  return compileInlineExport(
+    `export function buildSessionRecord(sessionSetup: any, sessionSetupSnapshot: any, sessionName: string, data: any, targetWeekend: any, initialTires: any, initialPressures: any, pressureSourceNote: any, resolvedTime: string) { const sessionSetupUsed = sessionSetupSnapshot.chassis || 'No starting setup'; return ${objectSource}; }`,
+    'buildSessionRecord',
+    {},
+  );
+};
+const compileQuickUpdatedSetups = (source: string): RuntimeExport => {
+  const block = source.slice(source.indexOf('const handleCommitQuickAdjust'), source.indexOf('// Session weather helpers'));
+  const loggedStart = block.indexOf('const loggedQuickSetup =');
+  const start = loggedStart >= 0 ? loggedStart : block.indexOf('const updatedSetups =');
+  const end = block.indexOf('\n    const updatedWeekends', start);
+  assert.ok(start >= 0 && end > start, 'C3 Quick Adjust updatedSetups production slice exists');
+  const assignment = block.slice(start, end);
+  return compileInlineExport(
+    `export function buildUpdatedSetups(savedSetupsRef: any, result: any, target: any, now: string, withSetupDiffLog: any) { ${assignment}\nreturn updatedSetups; }`,
+    'buildUpdatedSetups',
+    {},
+  );
+};
+
+const c3SourcePasses = (setupUi: string, raceUi: string, app: string): boolean => {
+  const quickCommit = app.slice(app.indexOf('const handleCommitQuickAdjust'), app.indexOf('// Session weather helpers'));
+  const sessionCreate = app.slice(app.indexOf('const handleCreateNewSession'), app.indexOf('const handleDeleteSession'));
+  return setupUi.includes('export function resolvePendingSetupDiff')
+    && setupUi.includes('const newestSession = weekend.sessions[0];')
+    && setupUi.includes('diffSetupSnapshots(newestSession.setupSnapshot, currentSnapshot)')
+    && setupUi.includes('weekend.baselineSetupId')
+    && setupUi.includes('<PendingSetupDiffSummary pending={pending} />')
+    && setupUi.includes('Pending — will bind to next session')
+    && setupUi.includes('min-w-0 break-words min-[360px]:text-right text-on-surface-variant')
+    && setupUi.includes('<LegacySetupLog changes={setupItem.changeLog} />')
+    && setupUi.includes('filter(change => !change.runId)')
+    && setupUi.includes('legacyChanges.map(change => (')
+    && !setupUi.includes('[...legacyChanges].reverse()')
+    && !setupUi.includes('Live-Trackside Changes')
+    && raceUi.includes('export function resolveBoundSetupDiff')
+    && raceUi.includes('weekend.sessions[sessionIndex + 1]')
+    && raceUi.includes('diffSetupSnapshots(olderSession.setupSnapshot, record.setupSnapshot)')
+    && raceUi.includes('weekend.baselineSetupId')
+    && raceUi.includes('<SessionSetupDetails record={sx} boundDiff={boundDiff} />')
+    && raceUi.includes('Bound setup changes')
+    && raceUi.includes('min-w-0 break-words min-[360px]:text-right')
+    && raceUi.includes('<LogSetupChangesButton onLogSetupChanges={onLogSetupChanges} />')
+    && raceUi.includes('Log setup changes')
+    && raceUi.includes("<p><strong>Notes:</strong> {record.competitionNotes || 'None'}</p>")
+    && raceUi.includes('record.adjustments.map(adjustment => <li key={adjustment.id}>{adjustment.label} {adjustment.value}</li>)')
+    && !raceUi.includes('const getSessionDiffPair =')
+    && !raceUi.includes('<SetupDiffView')
+    && app.includes("setSetupSubTab('setups');\n                    setActiveTab('setups');")
+    && !/withSetupDiffLog|diffSetupSnapshots|captureSetupSnapshot/.test(quickCommit)
+    && !/boundSetupDiff\s*:|pendingSetupDiff\s*:|setupDiff\s*:/.test(sessionCreate);
+};
+c3Equal(c3SourcePasses(setupSource, raceWeekendSource, appSource), true, 'C3 production source contract passes');
+
+const startingSetup: Setup = {
+  ...diffBaseSetup,
+  id: 'setup-starting-c3',
+  carId: 'car-a',
+  lifecycleRole: 'baseline',
+  gear: '5.83',
+  lf: { ...diffBaseSetup.lf, spring: '475' },
+  changeLog: [
+    { id: 'legacy-visible', timestamp: '2026-07-18T12:00:00.000Z', label: 'Old notebook row', before: '5.67', after: '5.83' },
+    { id: 'legacy-second', timestamp: '2026-07-18T12:30:00.000Z', label: 'Second notebook row', before: '475', after: '500' },
+  ],
+};
+const hotLapsSetup: Setup = {
+  ...diffBaseSetup,
+  id: 'setup-live-c3',
+  carId: 'car-a',
+  lifecycleRole: 'weekend',
+  sourceSetupId: startingSetup.id,
+  weekendId: 'wknd-c3',
+  gear: '6.00',
+  lf: { ...diffBaseSetup.lf, spring: '500' },
+  changeLog: startingSetup.changeLog,
+};
+const hotLapsSnapshot = captureSetupSnapshot(hotLapsSetup);
+const hotLapsRecord: SessionRecord = {
+  id: 'session-hot-laps', type: 'HL', sessionType: 'Hot Laps', name: 'Hot Laps', track: 'Track', condition: 'Tacky', bestLap: '15.200',
+  setupId: hotLapsSetup.id, setupSnapshot: hotLapsSnapshot, setupUsed: hotLapsSnapshot.chassis, adjustments: [], competitionNotes: 'Free on entry',
+};
+const ownerWeekendBefore: RaceWeekend = {
+  id: 'wknd-c3', name: 'Owner fixture', track: 'Track', date: 'Jul 18, 2026', status: 'active',
+  baselineSetupId: startingSetup.id, activeSetupId: hotLapsSetup.id, setupId: hotLapsSetup.id,
+  sessions: [hotLapsRecord],
+};
+const activeHotLaps: ActiveSession = {
+  id: hotLapsRecord.id,
+  weekendId: ownerWeekendBefore.id,
+  name: hotLapsRecord.name,
+  track: hotLapsRecord.track,
+  setupUsed: hotLapsRecord.setupUsed || '',
+  condition: hotLapsRecord.condition,
+  weather: '',
+  time: '',
+  bestLap: hotLapsRecord.bestLap,
+  avgLap: '',
+  finishPos: '',
+  gap: '',
+  maxRpm: '',
+  leaderLap: '',
+  leaderGap: '',
+  diagnostics: { cornerEntry: 'NEUTRAL', centerApex: 'NEUTRAL', cornerExit: 'NEUTRAL' },
+  adjustments: [],
+  pressures: { lf: '', rf: '', lr: '', rr: '' },
+  tires: {
+    lf: { compound: '', size: '', airPressure: '' }, rf: { compound: '', size: '', airPressure: '' },
+    lr: { compound: '', size: '', airPressure: '' }, rr: { compound: '', size: '', airPressure: '' },
+  },
+  competitionNotes: '',
+};
+const quickAdjustResult = applyQuickAdjust(
+  hotLapsSetup,
+  activeHotLaps,
+  { kind: 'gear', value: '6.20' },
+  [ownerWeekendBefore],
+  '2026-07-18T13:00:00.000Z',
+  'owner-quick-adjust',
+);
+c3Ok(quickAdjustResult.ok, 'C3 owner fixture Quick Adjust succeeds through real production code');
+if (quickAdjustResult.ok === false) throw new Error(quickAdjustResult.error);
+const qualifyingSetup: Setup = {
+  ...quickAdjustResult.setup,
+  lf: { ...quickAdjustResult.setup.lf, spring: '525' },
+};
+const pendingResolver = compilePendingResolver(setupSource);
+const pendingBeforeQualifying = pendingResolver(
+  [ownerWeekendBefore],
+  [startingSetup, qualifyingSetup],
+  qualifyingSetup,
+  qualifyingSetup.id,
+);
+c3Equal(pendingBeforeQualifying.status, 'available', 'C3 pending uses active Race Day setup lineage');
+if (pendingBeforeQualifying.status !== 'available') throw new Error(pendingBeforeQualifying.reason);
+c3Equal(pendingBeforeQualifying.rows, [
+  { label: 'Gear', field: 'gear', before: '6.00', after: '6.20' },
+  { label: 'LF Spring', corner: 'lf', field: 'spring', before: '500', after: '525' },
+], 'C3 pending rows are deterministic edit + Quick Adjust net effect');
+
+const qualifyingSnapshot = captureSetupSnapshot(qualifyingSetup);
+const qualifyingRecord: SessionRecord = {
+  ...hotLapsRecord,
+  id: 'session-qualifying', type: 'Q1', sessionType: 'Qualifying', name: 'Qualifying', bestLap: '',
+  setupSnapshot: qualifyingSnapshot, adjustments: [], competitionNotes: 'Notes stay attached to run',
+};
+const hotLapsWithAdjustment: SessionRecord = { ...hotLapsRecord, adjustments: quickAdjustResult.session.adjustments };
+const ownerWeekendAfter: RaceWeekend = { ...ownerWeekendBefore, sessions: [qualifyingRecord, hotLapsWithAdjustment] };
+const boundResolver = compileBoundResolver(raceWeekendSource);
+const qualifyingBound = boundResolver(ownerWeekendAfter, [startingSetup, qualifyingSetup], qualifyingRecord);
+c3Equal(qualifyingBound.status, 'available', 'C3 qualifying bound diff resolves');
+if (qualifyingBound.status !== 'available') throw new Error(qualifyingBound.reason);
+c3Equal(qualifyingBound.rows, pendingBeforeQualifying.rows, 'C3 pending-before equals Qualifying bound-after exactly');
+c3Equal(qualifyingBound.sourceLabel, 'Hot Laps', 'C3 Qualifying binds immediately older Hot Laps snapshot');
+c3Equal(hotLapsWithAdjustment.adjustments?.length, 1, 'C3 Quick Adjust remains one net row in original run');
+c3Equal(qualifyingRecord.adjustments?.length, 0, 'C3 bound diff does not append Quick Adjust rows to Qualifying');
+c3Equal(qualifyingSetup.changeLog?.filter(change => change.runId).length, 1, 'C3 Quick Adjust setup history remains one coalesced run row');
+
+const firstSessionBound = boundResolver(ownerWeekendBefore, [startingSetup, hotLapsSetup], hotLapsRecord);
+c3Equal(firstSessionBound.status, 'available', 'C3 first session resolves Starting Setup');
+if (firstSessionBound.status !== 'available') throw new Error(firstSessionBound.reason);
+c3Equal(firstSessionBound.sourceLabel, 'Starting Setup', 'C3 first session names exact baseline source');
+c3Equal(firstSessionBound.rows, [
+  { label: 'Gear', field: 'gear', before: '5.83', after: '6.00' },
+  { label: 'LF Spring', corner: 'lf', field: 'spring', before: '475', after: '500' },
+], 'C3 first session compares baselineSetupId snapshot before session snapshot');
+
+const pendingMarkup = renderProductionSummary(
+  setupSource,
+  'PendingSetupDiffSummary',
+  '\nexport function LegacySetupLog',
+  { pending: pendingBeforeQualifying },
+);
+c3Ok(pendingMarkup.includes('Pending — will bind to next session'), 'C3 real pending renderer carries exact heading');
+c3Ok(pendingMarkup.includes('6.00') && pendingMarkup.includes('6.20') && pendingMarkup.includes('LF Spring'), 'C3 real pending renderer shows deterministic rows');
+const boundMarkup = renderProductionSummary(
+  raceWeekendSource,
+  'BoundSetupDiffSummary',
+  '\nexport function LogSetupChangesButton',
+  { boundDiff: qualifyingBound },
+);
+c3Ok(boundMarkup.includes('Bound setup changes') && boundMarkup.includes('Hot Laps'), 'C3 real bound renderer carries source and compact heading');
+const legacyMarkup = renderProductionSummary(
+  setupSource,
+  'LegacySetupLog',
+  '\n// ─── Corner Form Sub-component',
+  { changes: qualifyingSetup.changeLog },
+);
+c3Ok(legacyMarkup.includes('Legacy log') && legacyMarkup.includes('Old notebook row'), 'C3 real Legacy log renders stored non-run rows');
+c3Ok(!legacyMarkup.includes('Gear 6.00 to 6.20') && !legacyMarkup.includes('owner-quick-adjust'), 'C3 real Legacy log omits Quick Adjust runId rows');
+c3Ok(legacyMarkup.startsWith('<details') && !legacyMarkup.startsWith('<details open'), 'C3 Legacy log stays collapsed by default');
+c3Ok(legacyMarkup.indexOf('Old notebook row') < legacyMarkup.indexOf('Second notebook row'), 'C3 Legacy log preserves stored entry order');
+
+const legacySnapshotMissing = boundResolver(
+  { ...ownerWeekendBefore, sessions: [{ ...hotLapsRecord, setupSnapshot: undefined }] },
+  [startingSetup, hotLapsSetup],
+  { ...hotLapsRecord, setupSnapshot: undefined },
+);
+c3Equal(legacySnapshotMissing.status, 'unavailable', 'C3 legacy missing snapshot is honestly unavailable');
+const legacyBaselineMissing = boundResolver(
+  { ...ownerWeekendBefore, baselineSetupId: undefined },
+  [hotLapsSetup],
+  hotLapsRecord,
+);
+c3Equal(legacyBaselineMissing.status, 'unavailable', 'C3 missing Starting Setup is honestly unavailable');
+const pendingLegacyMissing = pendingResolver(
+  [{ ...ownerWeekendBefore, sessions: [{ ...hotLapsRecord, setupSnapshot: undefined }] }],
+  [startingSetup, qualifyingSetup],
+  qualifyingSetup,
+  qualifyingSetup.id,
+);
+c3Equal(pendingLegacyMissing.status, 'unavailable', 'C3 pending never reconstructs missing snapshot from mutable setup');
+const unrelatedRecord = { ...qualifyingRecord, setupId: 'setup-unrelated' };
+c3Equal(boundResolver({ ...ownerWeekendAfter, sessions: [unrelatedRecord, hotLapsWithAdjustment] }, [startingSetup, qualifyingSetup], unrelatedRecord).status, 'unavailable', 'C3 unrelated session provenance is rejected');
+const noChangeRecord = { ...qualifyingRecord, setupSnapshot: hotLapsSnapshot };
+const noChangeWeekend = { ...ownerWeekendBefore, sessions: [noChangeRecord, hotLapsRecord] };
+const noChangeBound = boundResolver(noChangeWeekend, [startingSetup, hotLapsSetup], noChangeRecord);
+c3Equal(noChangeBound.status === 'available' ? noChangeBound.rows : null, [], 'C3 equal snapshots yield honest zero rows');
+
+const testSnapshot = captureSetupSnapshot({ ...hotLapsSetup, gear: '5.90' });
+const testRecord: SessionRecord = { ...hotLapsRecord, id: 'session-test', name: 'Test', setupSnapshot: testSnapshot };
+const threeSessionWeekend = { ...ownerWeekendAfter, sessions: [qualifyingRecord, hotLapsRecord, testRecord] };
+const oldestMutationSource = raceWeekendSource.replace(
+  'weekend.sessions[sessionIndex + 1]',
+  'weekend.sessions[weekend.sessions.length - 1]',
+);
+c3Ok(oldestMutationSource !== raceWeekendSource, 'C3 oldest-session mutation changes production helper');
+const oldestMutationResult = compileBoundResolver(oldestMutationSource)(threeSessionWeekend, [startingSetup, qualifyingSetup], qualifyingRecord);
+c3Kill('newest-first-i-plus-one', JSON.stringify(oldestMutationResult.rows) !== JSON.stringify(qualifyingBound.rows));
+
+const reversedOperandsSource = raceWeekendSource.replace(
+  'diffSetupSnapshots(olderSession.setupSnapshot, record.setupSnapshot)',
+  'diffSetupSnapshots(record.setupSnapshot, olderSession.setupSnapshot)',
+);
+c3Ok(reversedOperandsSource !== raceWeekendSource, 'C3 reversed-operands mutation changes production helper');
+const reversedResult = compileBoundResolver(reversedOperandsSource)(ownerWeekendAfter, [startingSetup, qualifyingSetup], qualifyingRecord);
+c3Kill('before-after-operands', reversedResult.rows?.[0]?.before !== qualifyingBound.rows[0].before);
+
+const baselineActiveMutationSource = raceWeekendSource.replaceAll('weekend.baselineSetupId', 'weekend.activeSetupId');
+c3Ok(baselineActiveMutationSource !== raceWeekendSource, 'C3 active-setup baseline mutation changes production helper');
+const baselineActiveResult = compileBoundResolver(baselineActiveMutationSource)(ownerWeekendBefore, [startingSetup, qualifyingSetup], hotLapsRecord);
+c3Kill('first-session-active-current-setup', JSON.stringify(baselineActiveResult.rows) !== JSON.stringify(firstSessionBound.rows));
+
+const baselineLifecycleMutationSource = raceWeekendSource.replace(
+  `const baselineSetup = weekend.baselineSetupId
+    ? savedSetups.find(item => item.id === weekend.baselineSetupId)
+    : undefined;`,
+  `const mutatedBaselineId = lifecycleSetupId(weekend);
+  const baselineSetup = mutatedBaselineId
+    ? savedSetups.find(item => item.id === mutatedBaselineId)
+    : undefined;`,
+);
+c3Ok(baselineLifecycleMutationSource !== raceWeekendSource, 'C3 lifecycleSetupId mutation changes production helper');
+const baselineLifecycleResult = compileBoundResolver(baselineLifecycleMutationSource)(ownerWeekendBefore, [startingSetup, qualifyingSetup], hotLapsRecord);
+c3Kill('first-session-lifecycle-setup-id', JSON.stringify(baselineLifecycleResult.rows) !== JSON.stringify(firstSessionBound.rows));
+
+const lineageBypassSource = raceWeekendSource.replace(
+  'if (eventSetupId && record.setupId !== eventSetupId) {',
+  'if (false) {',
+);
+c3Ok(lineageBypassSource !== raceWeekendSource, 'C3 lineage-bypass mutation changes production helper');
+const lineageBypassResult = compileBoundResolver(lineageBypassSource)(
+  { ...ownerWeekendBefore, sessions: [{ ...hotLapsRecord, setupId: 'setup-unrelated' }] },
+  [startingSetup, hotLapsSetup],
+  { ...hotLapsRecord, setupId: 'setup-unrelated' },
+);
+c3Kill('unrelated-setup-provenance', lineageBypassResult.status !== 'unavailable');
+
+const pendingHeadingMutation = setupSource.replace('Pending — will bind to next session', '');
+const pendingHeadingMarkup = renderProductionSummary(pendingHeadingMutation, 'PendingSetupDiffSummary', '\nexport function LegacySetupLog', { pending: pendingBeforeQualifying });
+c3Kill('pending-view-removed', !pendingHeadingMarkup.includes('Pending — will bind to next session'));
+const boundHeadingMutation = raceWeekendSource.replace('Bound setup changes', '');
+const boundHeadingMarkup = renderProductionSummary(boundHeadingMutation, 'BoundSetupDiffSummary', '\nexport function LogSetupChangesButton', { boundDiff: qualifyingBound });
+c3Kill('bound-summary-removed', !boundHeadingMarkup.includes('Bound setup changes'));
+const legacyHeadingMutation = setupSource.replace('Legacy log', '');
+const legacyHeadingMarkup = renderProductionSummary(legacyHeadingMutation, 'LegacySetupLog', '\n// ─── Corner Form Sub-component', { changes: startingSetup.changeLog });
+c3Kill('legacy-disclosure-removed', !legacyHeadingMarkup.includes('Legacy log'));
+
+const navigationCalls: string[] = [];
+compileNavigationCallback(appSource)(
+  (tab: string) => navigationCalls.push(`setup:${tab}`),
+  (tab: string) => navigationCalls.push(`tab:${tab}`),
+);
+c3Equal(navigationCalls, ['setup:setups', 'tab:setups'], 'C3 compiled App navigation selects Setups subtab before tab');
+const navigationMutation = appSource.replace("setSetupSubTab('setups');", '');
+const mutatedNavigationCalls: string[] = [];
+compileNavigationCallback(navigationMutation)(
+  (tab: string) => mutatedNavigationCalls.push(`setup:${tab}`),
+  (tab: string) => mutatedNavigationCalls.push(`tab:${tab}`),
+);
+c3Kill('log-setup-changes-app-wiring', JSON.stringify(mutatedNavigationCalls) !== JSON.stringify(navigationCalls));
+
+const LogSetupChangesButton = compileProductionExport(
+  raceWeekendSource,
+  'LogSetupChangesButton',
+  '\nexport function SessionSetupDetails',
+  { React },
+);
+let navigationButtonClicks = 0;
+const navigationButtonElement = LogSetupChangesButton({ onLogSetupChanges: () => { navigationButtonClicks += 1; } });
+navigationButtonElement.props.onClick();
+c3Equal(navigationButtonClicks, 1, 'C3 compiled Log setup changes button executes navigation callback');
+const navigationButtonMutationSource = raceWeekendSource.replace('onClick={onLogSetupChanges}', 'onClick={() => undefined}');
+const MutatedLogSetupChangesButton = compileProductionExport(
+  navigationButtonMutationSource,
+  'LogSetupChangesButton',
+  '\nexport function SessionSetupDetails',
+  { React },
+);
+const mutatedNavigationButtonElement = MutatedLogSetupChangesButton({ onLogSetupChanges: () => { navigationButtonClicks += 1; } });
+mutatedNavigationButtonElement.props.onClick();
+c3Kill('log-setup-changes-button', navigationButtonClicks === 1);
+
+const sessionDetailsMarkup = renderSessionDetails(raceWeekendSource, hotLapsWithAdjustment, qualifyingBound);
+c3Ok(sessionDetailsMarkup.includes('Free on entry') && sessionDetailsMarkup.includes('Gear') && sessionDetailsMarkup.includes('6.00 to 6.20'), 'C3 compiled run details render notes and existing Quick Adjust row');
+const notesMutation = raceWeekendSource.replace("<p><strong>Notes:</strong> {record.competitionNotes || 'None'}</p>", '');
+const notesMutationMarkup = renderSessionDetails(notesMutation, hotLapsWithAdjustment, qualifyingBound);
+c3Kill('free-text-notes-removed', !notesMutationMarkup.includes('Free on entry'));
+const quickRowsMutation = raceWeekendSource.replace(
+  'record.adjustments.map(adjustment => <li key={adjustment.id}>{adjustment.label} {adjustment.value}</li>)',
+  '[].map(adjustment => <li key={adjustment.id}>{adjustment.label} {adjustment.value}</li>)',
+);
+const quickRowsMutationMarkup = renderSessionDetails(quickRowsMutation, hotLapsWithAdjustment, qualifyingBound);
+c3Kill('quick-adjust-rows-removed', !quickRowsMutationMarkup.includes('6.00 to 6.20'));
+
+const buildSessionRecord = compileNewRecordFactory(appSource);
+const builtSessionRecord = buildSessionRecord(
+  qualifyingSetup,
+  qualifyingSnapshot,
+  'Qualifying',
+  { type: 'Qualifying', trackCondition: '', conditionNotes: '', weather: '' },
+  ownerWeekendAfter,
+  activeHotLaps.tires,
+  activeHotLaps.pressures,
+  undefined,
+  'Night',
+);
+c3Ok(!('boundSetupDiff' in builtSessionRecord), 'C3 compiled production session record persists no computed diff');
+const persistedDiffMutation = appSource.replace(
+  'setupSnapshot: sessionSetupSnapshot,',
+  'setupSnapshot: sessionSetupSnapshot,\n      boundSetupDiff: [],',
+);
+const mutatedBuiltSessionRecord = compileNewRecordFactory(persistedDiffMutation)(
+  qualifyingSetup,
+  qualifyingSnapshot,
+  'Qualifying',
+  { type: 'Qualifying', trackCondition: '', conditionNotes: '', weather: '' },
+  ownerWeekendAfter,
+  activeHotLaps.tires,
+  activeHotLaps.pressures,
+  undefined,
+  'Night',
+);
+c3Kill('session-diff-persisted', 'boundSetupDiff' in mutatedBuiltSessionRecord);
+
+const baselineUpdatedSetups = compileQuickUpdatedSetups(appSource)(
+  { current: [hotLapsSetup] },
+  quickAdjustResult,
+  { setup: hotLapsSetup },
+  '2026-07-18T13:00:00.000Z',
+  withSetupDiffLog,
+);
+c3Equal(baselineUpdatedSetups[0].changeLog?.filter((change: any) => change.runId).length, 1, 'C3 compiled Quick Adjust writer preserves one run-scoped row');
+const quickLoggingMutation = appSource
+  .replace('captureSetupSnapshot, displayVersionLabel', 'captureSetupSnapshot, displayVersionLabel, withSetupDiffLog')
+  .replace(
+    'const updatedSetups = savedSetupsRef.current.map(item => item.id === result.setup.id ? result.setup : item);',
+    "const loggedQuickSetup = withSetupDiffLog(target.setup, result.setup, now);\n    const updatedSetups = savedSetupsRef.current.map(item => item.id === result.setup.id ? loggedQuickSetup : item);",
+  );
+const mutatedUpdatedSetups = compileQuickUpdatedSetups(quickLoggingMutation)(
+  { current: [hotLapsSetup] },
+  quickAdjustResult,
+  { setup: hotLapsSetup },
+  '2026-07-18T13:00:00.000Z',
+  withSetupDiffLog,
+);
+c3Kill('quick-adjust-logging-rewire', mutatedUpdatedSetups[0].changeLog?.filter((change: any) => change.runId).length !== 1);
+
+console.log(`C3 assertions: ${c3AssertionCount}`);
+console.log(`C3 killed mutations: ${killedC3Mutations.join(', ')}`);
 
 console.log('CHUNK5_SETUP_HARNESS PASS');
