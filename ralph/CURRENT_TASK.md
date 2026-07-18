@@ -1,11 +1,11 @@
 # Current Task — UX Overhaul v2 Task C2 Session Snapshot Model and Diff Engine
 
-**Status:** SOL REPAIR BLOCKED — attempt 1 FAIL 92/100; assertion-only scope extension awaits owner approval; C3–C5 and Chunk D/E blocked
+**Status:** SOL REPAIR AUTHORIZED — owner approval recorded 2026-07-18 (see "Owner approval — RECORDED" below). Execute the SOL repair work order now. After C2 QA passes, the next task is **C2.5** (owner addendum, setups corner grid alignment + stacked stepper) — see `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` § v2.1 Owner Addendum.
 **Branch:** `codex/ux-overhaul`
 **Integrated QA commit:** `253897a2518b3ed5f3148926e522163a9ea9d0b3`
 **Builder original:** `32135814ead0cc28179dc0ead9dfbc91a311f2fc` (identical tree)
 **Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` Part 2 item 7, Part 5 Task C2, Part 6.1, and boundary statement 5.2
-**Runtime:** all C2 repair implementation and QA use explicit `gpt-5.6-sol` with `high`. Terra and `cavecrew-builder` are permanently forbidden after attempt 1 FAIL. Runtime metadata remains authoritative; absent metadata records `unverified`.
+**Runtime (owner directive 2026-07-18):** build/implementation work uses `gpt-5.6-sol` **High**; QA and plan/state updates use `gpt-5.6-sol` **Extra High**. The primary (chat) agent is the Sol Extra High QA/plan authority and delegates build work to subagents. Terra and `cavecrew-builder` remain permanently forbidden. Runtime metadata remains authoritative; absent metadata records `unverified`.
 
 ## Attempt 1 failure record
 
@@ -20,13 +20,14 @@ Required Windows harness result failed: raw matrix was **20/24**, not exact **22
 
 Passing gates: lint matched the exact three known baseline errors; build passed with 566 modules; signed-out 360×800, 390×844, 412×915, and 1080×2118 shells retained the auth gate, zero horizontal overflow, controls at least 44px, pinch-enabled viewport metadata, and zero console warnings/errors; diff, protected-path, clean-tree, and cavecrew checks passed.
 
-## Owner approval gate — repair must not begin
+## Owner approval — RECORDED 2026-07-18
 
-Current C2 scope already permits `scripts/chunk5-setup-harness.ts`. Repair also needs an assertion-only extension for `scripts/offline-indicator-harness.ts`, which is outside the existing exact file list.
+The owner (Maxx) approves, recorded via Claude session 2026-07-18:
 
-**Pending owner approval:** allow exactly `scripts/offline-indicator-harness.ts`, solely to normalize the read `src/App.tsx` source from CRLF to LF before existing mutation checks. No product behavior, application file, copy, sync logic, or later-task scope may change.
+1. **`scripts/offline-indicator-harness.ts`** may be changed, solely to normalize the read `src/App.tsx` source from CRLF to LF before existing mutation checks. No product behavior, application file, copy, sync logic, or later-task scope may change.
+2. **Standing approval for harness portability fixes:** for this and future tasks, assertion-only EOL/portability fixes to harness files *outside* a task's exact file list are pre-approved, provided (a) zero product/application code changes, (b) no assertion is weakened or removed, and (c) the commit message names every out-of-list harness file touched. Any change beyond EOL/portability normalization still requires a fresh owner approval.
 
-Do not begin either repair until owner approval is recorded. Do not edit feature code, harness code, Ralph state, or Git history while approval is pending.
+The SOL repair work order below is now unblocked. Begin immediately.
 
 ## SOL repair work order after approval
 

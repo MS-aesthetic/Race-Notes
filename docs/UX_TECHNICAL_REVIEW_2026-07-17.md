@@ -468,3 +468,61 @@ Carried: test at 360×800, 390×844, 412×915, and the 1080×2118 capture; Defau
 - Screenshots: `Screenshot_20260717_074317_Crew Chief.jpg` (Dashboard), `Screenshot_20260717_074518_Crew Chief.jpg` (Setups/Tires), `Screenshot_20260717_081519_Crew Chief.jpg` (Runs/QuickAdjust) — `G:\My Drive\Google AI Studio\`
 - Direct source inspection: `src/App.tsx`, `src/index.css`, `src/types.ts`, `src/components/{SettingsView,ContextStrip,SetupView,FourBarQuickAdjust,RaceWeekendView,TiresSubView,GarageView,TrackersView,ui/NumberStepper}.tsx`, `src/lib/{setupLifecycle,quickAdjust,raceDayGate,saveStatus,sync,resumePull,undo,accountDeletion,teamDataOwnership,helpRouting,location}.ts`, `scripts/*-harness.ts` — all in `.worktrees\hide-scrollbars` @ `ab6b98a` (+2 doc commits)
 - Predecessor: v1 of this document (superseded by this v2; v1's findings are carried, extended, or explicitly folded as noted per item)
+
+---
+
+## v2.1 Owner Addendum — 2026-07-18 (binds like the rest of this document)
+
+Recorded from the owner (Maxx) via Claude review session, 2026-07-18. Three changes: a runtime/model-routing update, an owner-approval record, and one new task inserted into Chunk C.
+
+### v2.1-A — Runtime and role routing (supersedes 5.0's model assignments only; roles/discipline unchanged)
+
+- **Builder** (implementation subagents): `gpt-5.6-sol` **High**.
+- **QA + plan authority** (primary chat agent): `gpt-5.6-sol` **Extra High**. The primary agent does NOT build; it spawns builder subagents for all implementation work, then QAs their output and maintains Ralph state and this plan.
+- Terra (any tier) and `cavecrew-builder` remain permanently forbidden.
+- Everything else in 5.0 stands: escalation rule, caveman for all working notes/QA verdicts, cavecrew pattern for subagent delegation, Ralph-loop discipline, ISOLATED flags.
+
+### v2.1-B — Owner approvals recorded
+
+1. **C2 repair scope extension APPROVED:** `scripts/offline-indicator-harness.ts` may be modified, solely to normalize read `src/App.tsx` source CRLF→LF before existing mutation checks. (Mirrored in `ralph/CURRENT_TASK.md`.)
+2. **Standing approval — harness portability fixes:** assertion-only EOL/portability fixes to harness files outside a task's exact file list are pre-approved when (a) zero product code changes, (b) no assertion weakened or removed, (c) commit message names every out-of-list harness file touched. Anything beyond EOL/portability normalization needs fresh owner approval.
+
+### v2.1-C — New Task C2.5 — Setups corner-card alignment + stacked stepper redesign (owner priority)
+
+Runs immediately after C2's repair passes QA, before C3. Not ISOLATED, but keep the diff to the named files.
+
+**Owner problem statement.** On the Setups page corner cards (LF/RF/LR/RR), fields are visibly staggered/misaligned: short text inputs (Spring, Shock, Shock Note, Tire Compound, Tire Size) sit beside tall stacked steppers (Scale Weight, Ride Height C-to-C, Caster, Camber, Pressure, Backspacing), so the two grid columns drift out of row alignment and leave ragged empty gaps. Additionally the stacked stepper's current vertical order (− / value / +) is wrong. Owner wants every stacked stepper laid out as:
+
+```
+-----VALUE-----
+(  -  )  (  +  )
+```
+
+Value (with unit) full-width on top, tap-to-edit; below it one row with − and + side by side, each half-width and ≥44px tall.
+
+**Root cause (verified 2026-07-18).** `NumberStepper` renders inline `[−][value][+]`. `SetupView.tsx` (`NumericCornerFieldInput`, ~line 94) and `TiresSubView.tsx` (~line 138) force a vertical stack via arbitrary-variant CSS on the wrapper (`[&_[role=group]]:flex-wrap ... [&_[role=group]>button]:basis-full`), which stacks children in DOM order: −, value, +. The corner grid (`grid-cols-1 min-[360px]:grid-cols-2 gap-2`) then sizes each row to its tallest cell; mixed short-input/tall-stepper pairings plus conditional notes (`pressureSourceNote`, legacy notes) and label wrap differences produce the staggering.
+
+**Files:** `src/components/ui/NumberStepper.tsx`, `src/components/SetupView.tsx`, `src/components/TiresSubView.tsx`.
+
+**Change:**
+1. Add a first-class `layout?: 'inline' | 'stacked'` prop to `NumberStepper` (default `'inline'`, zero visual change for existing inline call sites). `stacked` renders: row 1 = full-width value region (tap-to-edit, `tabular-nums`, unit inline, ≥44px); row 2 = grid of two buttons `[−][+]`, each 50% width, ≥44px tall, with the same pointer/repeat semantics. B1's commit-on-pointerup, slop-cancel, and hold-repeat cadence (350ms/100ms) are untouched — this is layout-only.
+2. Remove the arbitrary-variant stacking hacks from `SetupView.tsx` and `TiresSubView.tsx`; pass `layout="stacked"` instead.
+3. Align the corner-card grid: cells align to row start; labels get a consistent single-line treatment (truncate or reserve equal height) so adjacent cells' controls sit on the same line; conditional notes render below the control without shifting the neighbor cell's control position.
+
+**Harness:** extend `setup-touch-target-harness.ts` (or `chunk5-setup-harness.ts` where the corner-grid assertions live): stacked variant renders value above the button row; both buttons ≥44px and half-width; inline call sites byte-identical rendering; no arbitrary-variant `basis-full` selectors remain in `SetupView.tsx`/`TiresSubView.tsx`.
+
+**Acceptance:** at 360×800, 390×844, 412×915, both Default and Large scales — every stacked stepper shows value on top with −/+ side-by-side below; corner-card columns row-align with no ragged gaps; no clipping/overlap; hold-repeat and scroll-over-stepper (zero writes) behavior unchanged; Tires sub-view stepper matches.
+
+*QA focus (Sol XH):* screenshot the LF/RF corner cards at 360px before/after — the staggering in the owner's 2026-07-18 screenshot must be gone; mutation-check the new layout assertions once; confirm zero timing-logic diff in NumberStepper.
+
+### v2.1-D — Progress snapshot at time of addendum
+
+A1–A4 + Chunk A QA: PASS. B1–B3 + Chunk B QA: PASS. C1: PASS. C2: built (`253897a`), QA attempt 1 FAIL 92/100 on harness CRLF portability only (no product defect found); repair authorized above. Remaining: C2 repair→QA, C2.5, C3, C4, C5, Chunk C QA, Chunk D (D1–D3 + QA), Chunk E (E1–E3), final full-sprint QA, Part 6.4 handoff document.
+
+### v2.1-E — Boundary amendment (5.2): emulator testing authorized
+
+Owner authorizes **debug** APK builds (`gradlew assembleDebug`) installed to a locally running Android emulator for QA verification. Netlify remains draft-preview-only for quick inspection (Codex built-in browser). Everything else in 5.2 stands: no release/signed builds, no distribution, no `release/` changes, no production Netlify publish, no master merge/push, no Supabase schema/RLS/migration changes.
+
+### v2.1-F — QA reporting requirement
+
+At the end of every task QA and every chunk QA, the QA agent writes/updates a **plain-English owner report** at `docs/OWNER_REPORT_UX_OVERHAUL.md`: what was built, what was checked, what passed/failed, what's next — no caveman, no jargon walls. This is in addition to (not instead of) Ralph state updates.
