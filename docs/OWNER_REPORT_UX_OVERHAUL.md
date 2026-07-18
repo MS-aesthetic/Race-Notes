@@ -2,7 +2,7 @@
 
 ## Current status
 
-Tasks C2 and C2.5 are complete with scores of 98/100 and 100/100. Task C3 is now also complete. Its first QA attempt passed with a score of 100/100. Task C4, which keeps every local write immediate but delays the visible Saved confirmation until a real commit boundary, is now active.
+Tasks C2, C2.5, C3, and C4 are complete. C4 passed its first QA attempt with a score of 100/100. Task C5 is now active; it will require a name when starting a setup from blank and add an obvious pencil action for renaming editable setups.
 
 ## Task C2 — Session snapshot model and diff engine
 
@@ -137,3 +137,44 @@ A Java 21 debug APK was built, installed on `emulator-5554`, and used for the au
 C3 is a final **PASS, 100/100**. No C3 repair remains.
 
 C4 is next. It will keep React state and localStorage writes immediate on every real change, but stop showing Saved on every press or keystroke. One Saved confirmation will appear only when dirty work reaches a boundary such as leaving the tab, backgrounding the app, the 30-second timer, or creating the next run. C5, Chunk C QA, Chunks D and E, and final full-sprint QA remain after C4.
+
+## Task C4 — Autosave confirmation boundaries
+
+### What was built
+
+C4 changes when the confirmation appears, not when data is saved. Every real edit still updates the screen and the device's local storage immediately. The app now remembers only whether there has been an unacknowledged edit burst. It shows one Saved confirmation when that burst reaches a meaningful boundary: leaving the current app tab, hiding or backgrounding the app, reaching 30 seconds while dirty, or successfully creating the next run.
+
+The implementation is commit `83230c9`. It changes only `src/App.tsx` and `scripts/saved-flash-harness.ts`. No sync, lifecycle, setup-diff, Quick Adjust, native, schema, package, or layout file changed. Repeated background events are coalesced, clean boundaries show nothing, and the dirty flag is cleared before the existing notification system decides whether Saved, an information message, or a sync error has priority.
+
+### What was checked
+
+- Three edits produced three immediate local writes and no per-key or per-press Saved confirmation.
+- Leaving the tab after an edit produced one Saved confirmation. Repeating clean tab changes produced none.
+- The real 30-second timer was captured on the Android emulator: Saved appeared in exactly three consecutive capture frames, matching its 1.5-second lifetime, and was absent before and after.
+- Force-stopping and relaunching the app before any confirmation retained the exact edited Race Day notes, proving that confirmation timing cannot cause data loss.
+- Creating a Heat persisted a third run before the boundary fired. The existing “Pressures carried from Qual” information message correctly took priority over Saved, and closing it did not reveal a stale Saved message afterward.
+- Backgrounding the native app consumed the dirty boundary; the following clean tab change remained silent.
+- The focused C4 test ran 132 assertions and independently killed all 29 required failure mutations, including immediate-toast restoration, marking dirty before persistence, missing boundaries, wrong timer cadence, paired-event double notifications, missing cleanup, weakened error/info priority, and changed cloud timing.
+- The full raw test matrix was exactly 23/24. The only failure was the already documented stale `muted-text-color-harness.ts` lock. The Saved harness now passes and is no longer waived.
+- Type-checking reported exactly the three known baseline errors and no new error. The production build completed with exactly 566 transformed modules.
+- The commit scope, protected paths, diff check, clean worktree, and independent cavecrew review all passed.
+
+### Preview and debug APK
+
+The accepted Netlify draft preview is:
+
+https://6a5be8afd84d6f1d7738613c--crew-chief-race-notes.netlify.app/
+
+The signed-out shell passed at 360×800, 390×844, and 412×915. Every viewport was exact, had no horizontal overflow, kept the pinch-enabled viewport metadata, showed only the authentication gate, and kept every visible button at least 44px tall. The built-in browser reported no console warnings or errors.
+
+QA initially sent one unused draft to a secondary Netlify project because that worktree had an old local site link. This was caught immediately. The worktree was relinked to the explicit Crew Chief site ID and the accepted draft above was deployed. Neither draft changed production.
+
+A Java 21 debug APK was built at `android/app/build/outputs/apk/debug/app-debug.apk`, installed on `emulator-5554`, and used for the authenticated scenarios above. Its size is 11,745,619 bytes and its SHA-256 is `A49577A9D00A7B3E32F94525A255A4E7166DCA0443F413DFDC678EE9508211CE`. Light and dark rendering passed at a 412×915 QA viewport, and the emulator display override was restored afterward.
+
+There was no application crash. A fresh launch did log two Capacitor-injected safe-area CSS errors before the document root existed. C4 does not touch native, configuration, or safe-area code, and the rendered app remained correct; this pre-existing platform diagnostic is recorded for final native hardening rather than being folded into C5.
+
+### Result and what comes next
+
+C4 is a final **PASS, 100/100**. No C4 repair remains.
+
+C5 is next. It will stop blank setup creation until the owner provides a trimmed name, preserve frictionless automatic naming when copying a setup, and add a visible pencil affordance that expands an editable setup and focuses its existing chassis/name field. After C5 passes, the larger integrated Chunk C QA will recheck C1 through C5 together. Chunk D, Chunk E, final full-sprint QA, the final owner handoff, a Netlify draft preview, and a debug APK remain after that.
