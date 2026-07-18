@@ -1,6 +1,6 @@
 # Current Task — UX Overhaul v2 Task C2.5 Setups Corner Alignment and Stacked Stepper
 
-**Status:** READY FOR `gpt-5.6-sol` HIGH IMPLEMENTATION SUBAGENT — owner-priority task; C3 and all later work remain blocked.
+**Status:** ATTEMPT 1 FAIL — READY FOR BOUNDED `gpt-5.6-sol` HIGH REPAIR; C3 and all later work remain blocked.
 **Branch:** `codex/ux-overhaul`
 **C2 baseline:** product `253897a2518b3ed5f3148926e522163a9ea9d0b3` + EOL-only repair `13b556fc664b6fa75d9b82ca768319e303e6a03e`
 **Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` v2.1-C, v2.1-E, v2.1-F, Part 5 escalation rule, and Part 6 gates
@@ -43,6 +43,21 @@ No other file may change during implementation. If a different file is genuinely
    - SetupView and TiresSubView use the first-class stacked prop and contain no arbitrary-variant `basis-full` stacking selectors;
    - a mutation that restores old DOM order or removes the stacked layout binding fails.
 8. Commit only after the focused harness, exact lint baseline, build, diff check, clean-scope check, and `cavecrew-reviewer` pass. Commit message must identify C2.5. Stop for primary QA; do not edit Ralph/plan/owner-report files.
+
+## Attempt 1 failure and SOL repair order
+
+Attempt 1 commit `8ab870aa88d8158301368389da37020b758e8fbc` passed source review, focused and regression harnesses, the exact 22/24 matrix, the exact three-error lint baseline, the 566-module build, signed-out draft shell checks, debug APK build/install/launch, scope, diff, clean-tree, and cavecrew review. The implementation is not accepted because authenticated production geometry exposed a blocker that the harness did not model.
+
+At exact 360×800, 390×844, and 412×915 device metrics, each nested corner numeric field gives its stacked group only 62.5px, 70px, and 75.5px respectively. Both direction buttons correctly retain a 44px minimum, so they overlap by 13.75px, 10px, and 7.25px and extend past the group's clipped right edge by 12.75px, 9px, and 6.25px. `overflow-hidden` prevents page-level horizontal overflow and masks the defect from the existing gate.
+
+Repair requirements:
+
+1. Do not reduce either direction target below 44px and do not change NumberStepper timing, slop, pointer, keyboard, editing, formatting, bounds, or persistence behavior.
+2. Give every stacked corner NumberStepper at least 88px of usable button-row width at 360, 390, and 412 CSS-pixel viewports in both Default and Large scales. Preserve the two LF/RF and LR/RR corner cards and their row alignment. The recommended bounded solution is to let numeric stepper fields span the two-column inner corner grid at phone widths, returning to one field column only at a breakpoint whose real rendered width is proven to keep both buttons non-overlapping. An equally bounded solution is acceptable only with the same proof.
+3. Keep value-first DOM order, equal side-by-side minus/plus widths, labels, notes, values, and units. No button may overlap another button or extend beyond its row/group clipping boundary.
+4. Extend `scripts/setup-touch-target-harness.ts` with production-derived, compiled-CSS/real-DOM integration coverage at 360×800, 390×844, and 412×915 for Default and Large. Assert group/row width, zero button overlap, zero outside/clipped extent, equal widths, each target at least 44px, value above the row, paired alignment, and zero page overflow. A compile-real mutation that removes the responsive width/span repair must independently fail this rendered gate.
+5. Keep the repair inside the original four-file C2.5 scope. Prefer changing only `src/components/SetupView.tsx` and `scripts/setup-touch-target-harness.ts`; touch `NumberStepper.tsx` or `TiresSubView.tsx` only if essential and explain why. No Ralph, plan, owner-report, C3+, native, package, schema, sync, lifecycle, notification, release, push, deploy, or merge changes.
+6. Rerun the focused setup/tire/lifecycle/Quick Adjust/offline/resume gates, the raw exact 22/24 matrix, exact three-error lint baseline, 566-module build, diff/protected/clean checks, and cavecrew review before committing the repair.
 
 ## Independent QA gates
 
