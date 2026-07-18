@@ -159,6 +159,43 @@ export interface Setup {
   updatedAt?: string;
 }
 
+/** Frozen, session-bound tuning state. Deliberately excludes setup lifecycle and media metadata. */
+export type SetupSnapshotCorner = Omit<CornerSetup,
+  'pressureSourceNote' | 'tireInventoryId' | 'rideHeightNeedsReview' | 'boundGraphId'>;
+
+export interface SetupSnapshot {
+  /** Display identity captured when the session starts; not diffed as tuning. */
+  chassis: string;
+  track: string;
+  date: string;
+  carType: string;
+  versionLabel?: string;
+  lf: SetupSnapshotCorner;
+  rf: SetupSnapshotCorner;
+  lr: SetupSnapshotCorner;
+  rr: SetupSnapshotCorner;
+  gear?: string;
+  toe?: string;
+  jbar?: string;
+  jbarFrameHeight?: string;
+  jbarPinionHeight?: string;
+  frontStagger?: string;
+  rearStagger?: string;
+  pullBarFrameHole?: string;
+  pullBarRearHole?: string;
+  pullBarAngle?: string;
+  notes?: string;
+}
+
+/** Computed session-snapshot difference. Separate from legacy append-only SetupChange. */
+export interface SetupSnapshotDiff {
+  label: string;
+  field: string;
+  before: string;
+  after: string;
+  corner?: 'lf' | 'rf' | 'lr' | 'rr';
+}
+
 export interface TireInventoryItem {
   id: string;
   tireNumber: string;
@@ -256,6 +293,10 @@ export interface SessionRecord {
   competitionNotes?: string;
   weather?: string;
   time?: string;
+  /** Setup record that supplied this session's frozen snapshot. Legacy records omit it. */
+  setupId?: string;
+  /** Immutable tuning state captured when this session was created. */
+  setupSnapshot?: SetupSnapshot;
   setupUsed?: string;
   screenshots?: string[];
   /** Shock dyno graph images (base64) */

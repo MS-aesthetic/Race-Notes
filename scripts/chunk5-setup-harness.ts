@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { transformSync } from 'esbuild';
-import type { RaceWeekend, Setup } from '../src/types';
+import type { RaceWeekend, SessionRecord, Setup, SetupSnapshot, SetupSnapshotCorner } from '../src/types';
 import { cloneSetup, makeBlankSetup, normalizeSetup, pickImmediatePriorSetupForCar, pickLatestSetupForCar } from '../src/lib/setupCompat';
 import { calculateTireStagger, SETUP_STEPS, formatPressureBlock, formatPsiValue, formatStoredNumber, fourBarAdjustmentId, fourBarAdjustmentLabel, legacyValueNote, mirrorPressureBlockToTires, parseStoredNumber, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from '../src/lib/setupSteps';
-import { getSetupEditability, isSetupLocked } from '../src/lib/setupLifecycle';
+import { captureSetupSnapshot, diffSetupSnapshots, getSetupEditability, isSetupLocked } from '../src/lib/setupLifecycle';
 
 const setup = (id: string, carId: string, date: string, tireId = 'tire-a'): Setup => ({
   id, carId, chassis: id, track: 'Track', date, carType: 'Modified',
@@ -118,6 +118,8 @@ assert.equal(fourBarAdjustmentLabel('lr', 'topBarAngFD'), 'LR top angle at full 
 assert.equal(fourBarAdjustmentLabel('rr', 'bottomBarAngRH'), 'RR bottom angle at ride height');
 
 const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+const typesSource = readFileSync(new URL('../src/types.ts', import.meta.url), 'utf8');
+const syncSource = readFileSync(new URL('../src/lib/sync.ts', import.meta.url), 'utf8');
 const raceWeekendSource = readFileSync(new URL('../src/components/RaceWeekendView.tsx', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
 assert.match(appSource, /className="app-main-scroll flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto custom-scrollbar"/);
@@ -333,5 +335,305 @@ for (const historical of c1HistoricalFixtures) {
   assert.equal(result.savedFlashes, 1, `C1 mutation exposes false Saved for ${historical.id}`);
   assert.equal(result.cloudWrites, 1, `C1 mutation exposes cloud write for ${historical.id}`);
 }
+
+const snapshotSourceSetup: Setup = {
+  ...legacy,
+  id: 'setup-live-snapshot',
+  chassis: 'Live Snapshot Chassis',
+  track: 'Port Royal',
+  date: 'Jul 18, 2026',
+  carType: 'Dirt Late Model',
+  versionLabel: 'Jul 18 Live-Trackside Setup',
+  gear: '6.00',
+  toe: '1/8 out',
+  jbar: '7.5',
+  jbarFrameHeight: '9.00',
+  jbarPinionHeight: '8.00',
+  frontStagger: '1.25',
+  rearStagger: '1.50',
+  pullBarFrameHole: '3',
+  pullBarRearHole: '2',
+  pullBarAngle: '18',
+  notes: 'Start tight',
+  screenshots: ['attachment-1'],
+  lifecycleRole: 'weekend',
+  sourceSetupId: 'setup-baseline',
+  weekendId: 'wknd-live',
+  lockedAt: '2026-07-18T18:00:00.000Z',
+  changeLog: [{ id: 'legacy-change', timestamp: '2026-07-18T17:00:00.000Z', label: 'Legacy', field: 'gear', before: '5.83', after: '6.00' }],
+  updatedAt: '2026-07-18T18:00:00.000Z',
+  lf: {
+    ...legacy.lf,
+    spring: '500',
+    pressureSourceNote: 'Adjusted in Setups',
+    tireInventoryId: 'tire-live',
+    rideHeightNeedsReview: true,
+    boundGraphId: 'graph-lf',
+  },
+  rf: { ...legacy.rf, camber: '-3.5' },
+  lr: { ...legacy.lr, topBarHBird: 'Hole 4', shockNote: 'Free at entry' },
+  rr: { ...legacy.rr, botBarHBird: 'Hole 2' },
+};
+const expectedSnapshotCornerFields = [
+  'spring', 'shock', 'loadWeight', 'loadWeightUnit', 'loadCtoC', 'loadCtoCUnit',
+  'caster', 'casterUnit', 'camber', 'camberUnit', 'tireComp', 'tireSize', 'toe',
+  'stagger', 'staggerUnit', 'wheelSpacer', 'wheelSpacerUnit', 'tirePress', 'tirePressUnit',
+  'backspacing', 'springHeight', 'springHeightUnit', 'load', 'loadUnit', 'topBarLength',
+  'bottomBarLength', 'topBarHFrame', 'topBarHBird', 'topBarAngRH', 'topBarAngRHUnit',
+  'topBarAngFD', 'topBarAngFDUnit', 'botBarHFrame', 'botBarHBird', 'bottomBarAngRH',
+  'bottomBarAngRHUnit', 'bottomBarAngFD', 'bottomBarAngFDUnit', 'bottomBarAngle',
+  'bottomBarAngleUnit', 'droop', 'droopUnit', 'preload', 'preloadUnit', 'springRounds',
+  'shockNote',
+] as const satisfies readonly (keyof SetupSnapshotCorner)[];
+const expectedSnapshotCorner = (corner: Setup['lf']): SetupSnapshotCorner =>
+  Object.fromEntries(
+    expectedSnapshotCornerFields
+      .filter(field => corner[field] !== undefined)
+      .map(field => [field, corner[field]]),
+  ) as SetupSnapshotCorner;
+const expectedSnapshot: SetupSnapshot = {
+  chassis: snapshotSourceSetup.chassis,
+  track: snapshotSourceSetup.track,
+  date: snapshotSourceSetup.date,
+  carType: snapshotSourceSetup.carType,
+  versionLabel: snapshotSourceSetup.versionLabel,
+  lf: expectedSnapshotCorner(snapshotSourceSetup.lf),
+  rf: expectedSnapshotCorner(snapshotSourceSetup.rf),
+  lr: expectedSnapshotCorner(snapshotSourceSetup.lr),
+  rr: expectedSnapshotCorner(snapshotSourceSetup.rr),
+  gear: snapshotSourceSetup.gear,
+  toe: snapshotSourceSetup.toe,
+  jbar: snapshotSourceSetup.jbar,
+  jbarFrameHeight: snapshotSourceSetup.jbarFrameHeight,
+  jbarPinionHeight: snapshotSourceSetup.jbarPinionHeight,
+  frontStagger: snapshotSourceSetup.frontStagger,
+  rearStagger: snapshotSourceSetup.rearStagger,
+  pullBarFrameHole: snapshotSourceSetup.pullBarFrameHole,
+  pullBarRearHole: snapshotSourceSetup.pullBarRearHole,
+  pullBarAngle: snapshotSourceSetup.pullBarAngle,
+  notes: snapshotSourceSetup.notes,
+};
+const capturedSnapshot = captureSetupSnapshot(snapshotSourceSetup);
+assert.deepEqual(capturedSnapshot, expectedSnapshot, 'C2 snapshot captures display identity and all tune state');
+assert.equal('id' in capturedSnapshot, false, 'C2 snapshot omits live setup identity');
+assert.equal('screenshots' in capturedSnapshot, false, 'C2 snapshot omits attachments');
+assert.equal('lifecycleRole' in capturedSnapshot, false, 'C2 snapshot omits lifecycle metadata');
+assert.equal('changeLog' in capturedSnapshot, false, 'C2 snapshot omits legacy change log');
+assert.equal('updatedAt' in capturedSnapshot, false, 'C2 snapshot omits timestamps');
+for (const corner of ['lf', 'rf', 'lr', 'rr'] as const) {
+  assert.notStrictEqual(capturedSnapshot[corner], snapshotSourceSetup[corner], 'C2 snapshot has no shared corner reference');
+}
+assert.equal('pressureSourceNote' in capturedSnapshot.lf, false, 'C2 snapshot omits corner UI noise');
+assert.equal('tireInventoryId' in capturedSnapshot.lf, false, 'C2 snapshot omits tire provenance');
+assert.equal('rideHeightNeedsReview' in capturedSnapshot.lf, false, 'C2 snapshot omits review flag');
+assert.equal('boundGraphId' in capturedSnapshot.lf, false, 'C2 snapshot omits graph provenance');
+const capturedSnapshotBytes = JSON.stringify(capturedSnapshot);
+snapshotSourceSetup.lf.spring = '525';
+snapshotSourceSetup.lr.topBarHBird = 'Hole 9';
+assert.equal(capturedSnapshot.lf.spring, '500', 'C2 later source edit cannot mutate captured LF');
+assert.equal(capturedSnapshot.lr.topBarHBird, 'Hole 4', 'C2 later source edit cannot mutate captured LR');
+assert.equal(JSON.stringify(capturedSnapshot), capturedSnapshotBytes, 'C2 captured bytes remain frozen after source edits');
+
+type NestedCorner = Setup['lf'] & { calibration: { clicks: number } };
+const nestedSetup: Setup = {
+  ...snapshotSourceSetup,
+  lf: {
+    ...snapshotSourceSetup.lf,
+    spring: { rate: 500 } as unknown as string,
+    calibration: { clicks: 3 },
+  } as NestedCorner,
+};
+const nestedSnapshot = captureSetupSnapshot(nestedSetup);
+const nestedSnapshotCorner = nestedSnapshot.lf as SetupSnapshotCorner & { spring: { rate: number }; calibration?: { clicks: number } };
+assert.equal('calibration' in nestedSnapshotCorner, false, 'C2 snapshot omits unknown corner data outside tune allowlist');
+assert.notStrictEqual(nestedSnapshotCorner.spring, (nestedSetup.lf as NestedCorner).spring, 'C2 snapshot deep-copies nested allowed tune data');
+((nestedSetup.lf as NestedCorner).spring as unknown as { rate: number }).rate = 525;
+assert.equal(nestedSnapshotCorner.spring.rate, 500, 'C2 nested source edit cannot mutate captured snapshot');
+
+const diffBaseSetup: Setup = {
+  ...legacy,
+  id: 'setup-diff',
+  chassis: 'Diff Chassis',
+  gear: '6.00',
+  lf: { ...legacy.lf, spring: '500' },
+  rr: { ...legacy.rr, botBarHBird: 'Hole 1' },
+};
+const diffBefore = captureSetupSnapshot(diffBaseSetup);
+const diffAfter = captureSetupSnapshot({
+  ...diffBaseSetup,
+  gear: '6.20',
+  lf: { ...diffBaseSetup.lf, spring: '525' },
+  rr: { ...diffBaseSetup.rr, botBarHBird: 'Hole 3' },
+});
+const diffBeforeBytes = JSON.stringify(diffBefore);
+const diffAfterBytes = JSON.stringify(diffAfter);
+assert.deepEqual(diffSetupSnapshots(diffBefore, diffAfter), [
+  { label: 'Gear', field: 'gear', before: '6.00', after: '6.20' },
+  { label: 'LF Spring', corner: 'lf', field: 'spring', before: '500', after: '525' },
+  { label: 'RR Bot Bar H Bird', corner: 'rr', field: 'botBarHBird', before: 'Hole 1', after: 'Hole 3' },
+], 'C2 diff rows are exact and deterministic');
+assert.equal(JSON.stringify(diffBefore), diffBeforeBytes, 'C2 diff does not mutate before snapshot');
+assert.equal(JSON.stringify(diffAfter), diffAfterBytes, 'C2 diff does not mutate after snapshot');
+assert.deepEqual(diffSetupSnapshots(diffBefore, diffBefore), [], 'C2 equal snapshots produce zero rows');
+const diffNoise = JSON.parse(JSON.stringify(diffBefore)) as SetupSnapshot;
+diffNoise.chassis = 'Renamed display identity';
+diffNoise.track = 'Other Track';
+diffNoise.date = 'Jul 19, 2026';
+diffNoise.carType = 'A Mod';
+diffNoise.versionLabel = 'Other version';
+(diffNoise.lf as SetupSnapshotCorner & Record<string, unknown>).pressureSourceNote = 'UI only';
+(diffNoise.lf as SetupSnapshotCorner & Record<string, unknown>).tireInventoryId = 'other-tire';
+(diffNoise.lf as SetupSnapshotCorner & Record<string, unknown>).rideHeightNeedsReview = false;
+(diffNoise.lf as SetupSnapshotCorner & Record<string, unknown>).boundGraphId = 'other-graph';
+assert.deepEqual(diffSetupSnapshots(diffBefore, diffNoise), [], 'C2 identity and transient noise produce zero rows');
+
+const legacySession: SessionRecord = {
+  id: 'legacy-session', type: 'P1', name: 'Practice 1', track: 'Track', condition: '', bestLap: '',
+};
+assert.equal(legacySession.setupSnapshot, undefined, 'C2 legacy session records remain valid without snapshots');
+assert.equal(legacySession.setupId, undefined, 'C2 legacy session records remain valid without provenance');
+const legacySessionBytes = JSON.stringify(legacySession);
+assert.equal(JSON.stringify(JSON.parse(legacySessionBytes)), legacySessionBytes, 'C2 legacy session JSON remains byte-stable');
+const boundSession: SessionRecord = {
+  ...legacySession,
+  setupId: diffBaseSetup.id,
+  setupSnapshot: diffBefore,
+  setupUsed: diffBefore.chassis || 'No starting setup',
+};
+assert.equal(boundSession.setupId, diffBaseSetup.id, 'C2 session setupId binds source setup');
+assert.strictEqual(boundSession.setupSnapshot, diffBefore, 'C2 record uses one captured snapshot image');
+assert.equal(boundSession.setupUsed, diffBefore.chassis, 'C2 setupUsed derives from captured snapshot');
+assert.match(syncSource, /sessions: w\.sessions/, 'C2 sync mapper writes sessions as opaque JSON');
+assert.match(syncSource, /sessions: \(r\.sessions as SessionRecord\[\]\) \|\| \[\]/, 'C2 sync mapper restores sessions as opaque JSON');
+const syncRoundTrip = JSON.parse(JSON.stringify({ sessions: [boundSession] })) as { sessions: SessionRecord[] };
+assert.deepEqual(syncRoundTrip.sessions[0], boundSession, 'C2 snapshot and provenance round-trip in existing sessions payload');
+
+const c2TopAllowlist = (source: string) => {
+  const start = source.indexOf('const setupSnapshotTopLevelTuneFields');
+  return source.slice(start, source.indexOf('] as const;', start));
+};
+const c2CornerAllowlist = (source: string) => {
+  const start = source.indexOf('const setupSnapshotCornerTuneFields');
+  return source.slice(start, source.indexOf('] as const', start));
+};
+const c2SourcePasses = (types: string, lifecycle: string, app: string): boolean => (
+  types.includes('export interface SetupSnapshot {')
+  && types.includes('export interface SetupSnapshotDiff {')
+  && types.includes('setupId?: string;')
+  && types.includes('setupSnapshot?: SetupSnapshot;')
+  && lifecycle.includes('export function captureSetupSnapshot')
+  && lifecycle.includes('const tunableCorner = Object.fromEntries(')
+  && lifecycle.includes('setupSnapshotCornerTuneFields\n      .filter(field => corner[field] !== undefined)')
+  && lifecycle.includes('lf: captureSnapshotCorner(setup.lf),')
+  && lifecycle.includes('lr: captureSnapshotCorner(setup.lr),')
+  && lifecycle.includes('return clonePlainData(snapshot);')
+  && lifecycle.includes('export function diffSetupSnapshots')
+  && c2TopAllowlist(lifecycle).includes("'gear'")
+  && !c2TopAllowlist(lifecycle).includes("'chassis'")
+  && c2CornerAllowlist(lifecycle).includes("'spring'")
+  && lifecycle.includes('for (const field of setupSnapshotCornerTuneFields)')
+  && app.includes('const sessionSetupSnapshot = captureSetupSnapshot(sessionSetup);')
+  && app.includes("const sessionSetupUsed = sessionSetupSnapshot.chassis || 'No starting setup';")
+  && app.slice(app.indexOf('const handleCreateNewSession'), app.indexOf('const handleDeleteSession')).includes('setupId: sessionSetup.id,')
+  && app.slice(app.indexOf('const handleCreateNewSession'), app.indexOf('const handleDeleteSession')).includes('setupSnapshot: sessionSetupSnapshot,')
+  && app.slice(app.indexOf('const handleCreateNewSession'), app.indexOf('const handleDeleteSession')).includes('setupUsed: sessionSetupUsed,')
+  && !app.includes('withSetupDiffLog')
+  && app.includes('return [{ ...candidate, updatedAt: !prior || comparable(prior) !== comparable(candidate) ? now : candidate.updatedAt }];')
+);
+const c2ModelCapture = (source: string, sourceSetup: Setup): SetupSnapshot => {
+  const snapshot = captureSetupSnapshot(sourceSetup);
+  return {
+    ...snapshot,
+    ...(source.includes('lf: captureSnapshotCorner(setup.lf),') ? {} : { lf: sourceSetup.lf as SetupSnapshotCorner }),
+    ...(source.includes('lr: captureSnapshotCorner(setup.lr),') ? {} : { lr: sourceSetup.lr as SetupSnapshotCorner }),
+  };
+};
+const c2ModelDiff = (source: string, before: SetupSnapshot, after: SetupSnapshot) => {
+  const rows = diffSetupSnapshots(before, after);
+  const top = c2TopAllowlist(source);
+  const corners = c2CornerAllowlist(source);
+  const modeled = rows.filter(row => (
+    (top.includes("'gear'") || row.field !== 'gear')
+    && (corners.includes("'spring'") || !(row.corner === 'lf' && row.field === 'spring'))
+  ));
+  if (top.includes("'chassis'") && before.chassis !== after.chassis) {
+    modeled.unshift({ label: 'Chassis', field: 'chassis', before: before.chassis, after: after.chassis });
+  }
+  return modeled;
+};
+const c2ModelSessionBinding = (source: string, sourceSetup: Setup): Pick<SessionRecord, 'setupId' | 'setupSnapshot' | 'setupUsed'> => {
+  const snapshot = captureSetupSnapshot(sourceSetup);
+  return {
+    setupId: source.includes('setupId: sessionSetup.id,') ? sourceSetup.id : undefined,
+    setupSnapshot: source.includes('setupSnapshot: sessionSetupSnapshot,') ? snapshot : undefined,
+    setupUsed: source.includes('const sessionSetupUsed = sessionSetupSnapshot.chassis') ? snapshot.chassis || 'No starting setup' : sourceSetup.chassis,
+  };
+};
+const c2EditBurstChangeCount = (source: string, prior: Setup, edits: number): number =>
+  (prior.changeLog?.length || 0) + (source.includes('withSetupDiffLog') && prior.lifecycleRole === 'weekend' ? edits : 0);
+assert.equal(c2SourcePasses(typesSource, lifecycleSource, appSource), true, 'C2 baseline source/model gate passes');
+assert.equal(c2EditBurstChangeCount(appSource, snapshotSourceSetup, 3), snapshotSourceSetup.changeLog?.length, 'C2 live edit burst appends zero legacy SetupChange rows');
+assert.equal(JSON.stringify(snapshotSourceSetup.changeLog), JSON.stringify([{ id: 'legacy-change', timestamp: '2026-07-18T17:00:00.000Z', label: 'Legacy', field: 'gear', before: '5.83', after: '6.00' }]), 'C2 preserves legacy changeLog bytes');
+assert.deepEqual(c2ModelSessionBinding(appSource, diffBaseSetup), {
+  setupId: diffBaseSetup.id,
+  setupSnapshot: diffBefore,
+  setupUsed: diffBefore.chassis,
+}, 'C2 source binds setupId, snapshot, and display name from one capture');
+
+const shallowCaptureMutation = lifecycleSource.replace('lf: captureSnapshotCorner(setup.lf),', 'lf: setup.lf as SetupSnapshotCorner,');
+assert.notEqual(shallowCaptureMutation, lifecycleSource, 'C2 shallow capture mutation changes lifecycle source');
+compileC1Mutation(shallowCaptureMutation, 'ts', 'C2 shallow capture');
+assert.equal(c2SourcePasses(typesSource, shallowCaptureMutation, appSource), false, 'C2 shallow capture mutation fails source gate');
+const shallowModeledSnapshot = c2ModelCapture(shallowCaptureMutation, nestedSetup) as SetupSnapshot & { lf: NestedCorner };
+assert.strictEqual(shallowModeledSnapshot.lf.calibration, (nestedSetup.lf as NestedCorner).calibration, 'C2 shallow mutation shares nested corner data');
+
+const laterEditMutation = lifecycleSource.replace('lr: captureSnapshotCorner(setup.lr),', 'lr: setup.lr as SetupSnapshotCorner,');
+assert.notEqual(laterEditMutation, lifecycleSource, 'C2 later-edit mutation changes lifecycle source');
+compileC1Mutation(laterEditMutation, 'ts', 'C2 later edit');
+assert.equal(c2SourcePasses(typesSource, laterEditMutation, appSource), false, 'C2 later-edit mutation fails source gate');
+const laterEditModeledSnapshot = c2ModelCapture(laterEditMutation, diffBaseSetup);
+diffBaseSetup.lr.topBarHBird = 'Later edit';
+assert.equal(laterEditModeledSnapshot.lr.topBarHBird, 'Later edit', 'C2 later-edit mutation mutates captured snapshot');
+
+const omittedSnapshotMutation = appSource.replace('setupSnapshot: sessionSetupSnapshot,', '');
+assert.notEqual(omittedSnapshotMutation, appSource, 'C2 omitted snapshot mutation changes App source');
+compileC1Mutation(omittedSnapshotMutation, 'tsx', 'C2 omitted snapshot binding');
+assert.equal(c2SourcePasses(typesSource, lifecycleSource, omittedSnapshotMutation), false, 'C2 omitted snapshot mutation fails source gate');
+assert.equal(c2ModelSessionBinding(omittedSnapshotMutation, diffBaseSetup).setupSnapshot, undefined, 'C2 omitted snapshot mutation loses frozen state');
+
+const omittedSetupIdMutation = appSource.replace('setupId: sessionSetup.id,', '');
+assert.notEqual(omittedSetupIdMutation, appSource, 'C2 omitted setupId mutation changes App source');
+compileC1Mutation(omittedSetupIdMutation, 'tsx', 'C2 omitted setupId binding');
+assert.equal(c2SourcePasses(typesSource, lifecycleSource, omittedSetupIdMutation), false, 'C2 omitted setupId mutation fails source gate');
+assert.equal(c2ModelSessionBinding(omittedSetupIdMutation, diffBaseSetup).setupId, undefined, 'C2 omitted setupId mutation loses provenance');
+
+const topDiffMutation = lifecycleSource.replace("'gear', ", '');
+assert.notEqual(topDiffMutation, lifecycleSource, 'C2 top-level diff mutation changes lifecycle source');
+compileC1Mutation(topDiffMutation, 'ts', 'C2 top-level diff omission');
+assert.equal(c2SourcePasses(typesSource, topDiffMutation, appSource), false, 'C2 top-level diff mutation fails source gate');
+assert.equal(c2ModelDiff(topDiffMutation, diffBefore, diffAfter).some(row => row.field === 'gear'), false, 'C2 top-level mutation misses gear diff');
+
+const cornerDiffMutation = lifecycleSource.replace("'spring', ", '');
+assert.notEqual(cornerDiffMutation, lifecycleSource, 'C2 corner diff mutation changes lifecycle source');
+compileC1Mutation(cornerDiffMutation, 'ts', 'C2 corner diff omission');
+assert.equal(c2SourcePasses(typesSource, cornerDiffMutation, appSource), false, 'C2 corner diff mutation fails source gate');
+assert.equal(c2ModelDiff(cornerDiffMutation, diffBefore, diffAfter).some(row => row.corner === 'lf' && row.field === 'spring'), false, 'C2 corner mutation misses LF spring diff');
+
+const noiseDiffMutation = lifecycleSource.replace("'gear', 'toe'", "'chassis', 'gear', 'toe'");
+assert.notEqual(noiseDiffMutation, lifecycleSource, 'C2 noise diff mutation changes lifecycle source');
+compileC1Mutation(noiseDiffMutation, 'ts', 'C2 identity noise');
+assert.equal(c2SourcePasses(typesSource, noiseDiffMutation, appSource), false, 'C2 identity noise mutation fails source gate');
+assert.equal(c2ModelDiff(noiseDiffMutation, diffBefore, diffNoise).some(row => row.field === 'chassis'), true, 'C2 noise mutation emits identity diff');
+
+const loggingMutation = appSource
+  .replace('captureSetupSnapshot, displayVersionLabel', 'captureSetupSnapshot, displayVersionLabel, withSetupDiffLog')
+  .replace(
+    'return [{ ...candidate, updatedAt: !prior || comparable(prior) !== comparable(candidate) ? now : candidate.updatedAt }];',
+    "const logged = prior?.lifecycleRole === 'weekend' ? withSetupDiffLog(prior, candidate, now) : candidate;\n      return [{ ...logged, updatedAt: !prior || comparable(prior) !== comparable(logged) ? now : candidate.updatedAt }];",
+  );
+assert.notEqual(loggingMutation, appSource, 'C2 logging mutation changes App source');
+compileC1Mutation(loggingMutation, 'tsx', 'C2 hot-path logging');
+assert.equal(c2SourcePasses(typesSource, lifecycleSource, loggingMutation), false, 'C2 hot-path logging mutation fails source gate');
+assert.equal(c2EditBurstChangeCount(loggingMutation, snapshotSourceSetup, 3), (snapshotSourceSetup.changeLog?.length || 0) + 3, 'C2 logging mutation appends one legacy row per edit');
 
 console.log('CHUNK5_SETUP_HARNESS PASS');

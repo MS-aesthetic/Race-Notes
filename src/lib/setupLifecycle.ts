@@ -1,4 +1,4 @@
-import type { CornerSetup, RaceWeekend, Setup, SetupChange } from '../types';
+import type { CornerSetup, RaceWeekend, Setup, SetupChange, SetupSnapshot, SetupSnapshotCorner, SetupSnapshotDiff } from '../types';
 import { inferSessionType } from './tireHistory';
 
 const cloneSetup = (setup: Setup): Setup => JSON.parse(JSON.stringify(setup)) as Setup;
@@ -104,6 +104,100 @@ const displayValue = (value: unknown): string => {
   if (value === undefined || value === null || value === '') return '—';
   return typeof value === 'string' ? value : JSON.stringify(value);
 };
+
+const setupSnapshotTopLevelTuneFields = [
+  'gear', 'toe', 'jbar', 'jbarFrameHeight', 'jbarPinionHeight', 'frontStagger', 'rearStagger',
+  'pullBarFrameHole', 'pullBarRearHole', 'pullBarAngle', 'notes',
+] as const;
+
+const setupSnapshotCornerTuneFields = [
+  'spring', 'shock', 'loadWeight', 'loadWeightUnit', 'loadCtoC', 'loadCtoCUnit',
+  'caster', 'casterUnit', 'camber', 'camberUnit', 'tireComp', 'tireSize', 'toe',
+  'stagger', 'staggerUnit', 'wheelSpacer', 'wheelSpacerUnit', 'tirePress', 'tirePressUnit',
+  'backspacing', 'springHeight', 'springHeightUnit', 'load', 'loadUnit', 'topBarLength',
+  'bottomBarLength', 'topBarHFrame', 'topBarHBird', 'topBarAngRH', 'topBarAngRHUnit',
+  'topBarAngFD', 'topBarAngFDUnit', 'botBarHFrame', 'botBarHBird', 'bottomBarAngRH',
+  'bottomBarAngRHUnit', 'bottomBarAngFD', 'bottomBarAngFDUnit', 'bottomBarAngle',
+  'bottomBarAngleUnit', 'droop', 'droopUnit', 'preload', 'preloadUnit', 'springRounds',
+  'shockNote',
+] as const satisfies readonly (keyof SetupSnapshotCorner)[];
+
+const clonePlainData = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+const captureSnapshotCorner = (corner: CornerSetup): SetupSnapshotCorner => {
+  const tunableCorner = Object.fromEntries(
+    setupSnapshotCornerTuneFields
+      .filter(field => corner[field] !== undefined)
+      .map(field => [field, corner[field]]),
+  ) as SetupSnapshotCorner;
+  return clonePlainData(tunableCorner);
+};
+
+/** Capture plain, detached setup state for one newly-created session. */
+export function captureSetupSnapshot(setup: Setup): SetupSnapshot {
+  const snapshot: SetupSnapshot = {
+    chassis: setup.chassis,
+    track: setup.track,
+    date: setup.date,
+    carType: setup.carType,
+    versionLabel: setup.versionLabel,
+    lf: captureSnapshotCorner(setup.lf),
+    rf: captureSnapshotCorner(setup.rf),
+    lr: captureSnapshotCorner(setup.lr),
+    rr: captureSnapshotCorner(setup.rr),
+    gear: setup.gear,
+    toe: setup.toe,
+    jbar: setup.jbar,
+    jbarFrameHeight: setup.jbarFrameHeight,
+    jbarPinionHeight: setup.jbarPinionHeight,
+    frontStagger: setup.frontStagger,
+    rearStagger: setup.rearStagger,
+    pullBarFrameHole: setup.pullBarFrameHole,
+    pullBarRearHole: setup.pullBarRearHole,
+    pullBarAngle: setup.pullBarAngle,
+    notes: setup.notes,
+  };
+  return clonePlainData(snapshot);
+}
+
+const diffFieldLabel = (field: string): string =>
+  field.replace(/([A-Z])/g, ' $1').replace(/^./, value => value.toUpperCase());
+
+/** Return deterministic tuning-only rows without mutating either snapshot. */
+export function diffSetupSnapshots(
+  before: SetupSnapshot | null | undefined,
+  after: SetupSnapshot | null | undefined,
+): SetupSnapshotDiff[] {
+  if (!before || !after) return [];
+
+  const rows: SetupSnapshotDiff[] = [];
+  for (const field of setupSnapshotTopLevelTuneFields) {
+    if (JSON.stringify(before[field]) === JSON.stringify(after[field])) continue;
+    rows.push({
+      label: diffFieldLabel(field),
+      field,
+      before: displayValue(before[field]),
+      after: displayValue(after[field]),
+    });
+  }
+
+  for (const corner of ['lf', 'rf', 'lr', 'rr'] as const) {
+    for (const field of setupSnapshotCornerTuneFields) {
+      const beforeValue = before[corner][field];
+      const afterValue = after[corner][field];
+      if (JSON.stringify(beforeValue) === JSON.stringify(afterValue)) continue;
+      rows.push({
+        label: `${corner.toUpperCase()} ${diffFieldLabel(field)}`,
+        corner,
+        field,
+        before: displayValue(beforeValue),
+        after: displayValue(afterValue),
+      });
+    }
+  }
+
+  return rows;
+}
 
 /** Add one history entry per changed setup field. Lifecycle metadata is excluded. */
 export function withSetupDiffLog(prior: Setup, next: Setup, now: string): Setup {

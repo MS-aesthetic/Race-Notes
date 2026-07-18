@@ -19,7 +19,7 @@ import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pu
 import { registerForPush, sendPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
 import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
-import { displayVersionLabel, finishWeekendLifecycle, getSetupEditability, isSetupLocked, isWeekendFinished, lifecycleLabel, mergeTimestampedRecords, selectRaceWeekendSetupForSelection, startWeekendLifecycle, withSetupDiffLog } from './lib/setupLifecycle';
+import { captureSetupSnapshot, displayVersionLabel, finishWeekendLifecycle, getSetupEditability, isSetupLocked, isWeekendFinished, lifecycleLabel, mergeTimestampedRecords, selectRaceWeekendSetupForSelection, startWeekendLifecycle } from './lib/setupLifecycle';
 import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
 import { applyQuickAdjust, resolveQuickAdjustTarget, type QuickAdjustCommand } from './lib/quickAdjust';
 import { materializeMainChecklist } from './lib/mainChecklist';
@@ -1593,10 +1593,7 @@ export default function App() {
       if (!canEdit) {
         return prior ? [prior] : [];
       }
-      const logged = prior?.lifecycleRole === 'weekend'
-        ? withSetupDiffLog(prior, candidate, now)
-        : candidate;
-      return [{ ...logged, updatedAt: !prior || comparable(prior) !== comparable(logged) ? now : candidate.updatedAt }];
+      return [{ ...candidate, updatedAt: !prior || comparable(prior) !== comparable(candidate) ? now : candidate.updatedAt }];
     });
     for (const prior of priorSetups) {
       if (!safeSetups.some(item => item.id === prior.id)
@@ -1877,6 +1874,8 @@ export default function App() {
       showInfo({ reason: 'missing-weekend-log' });
       return;
     }
+    const sessionSetupSnapshot = captureSetupSnapshot(sessionSetup);
+    const sessionSetupUsed = sessionSetupSnapshot.chassis || 'No starting setup';
 
     // Load setup baseline pressures as initial psi values for convenience
     const defaultPressures = setupPressureBlock(sessionSetup);
@@ -1925,7 +1924,7 @@ export default function App() {
       sessionType: data.type,
       name: sessionName,
       track: targetWeekend.track,
-      setupUsed: sessionSetup?.chassis || 'No starting setup',
+      setupUsed: sessionSetupUsed,
       condition: '',
       trackConditionPreset: data.trackCondition || undefined,
       conditionNotes: data.conditionNotes || undefined,
@@ -1957,6 +1956,8 @@ export default function App() {
 
     const newRecord: SessionRecord = {
       id: `session-rec-${Date.now()}`,
+      setupId: sessionSetup.id,
+      setupSnapshot: sessionSetupSnapshot,
       type: sessionName,
       sessionType: data.type,
       name: sessionName,
@@ -1986,7 +1987,7 @@ export default function App() {
       competitionNotes: '',
       time: resolvedTime,
       weather: data.weather || '',
-      setupUsed: sessionSetup?.chassis || 'No starting setup',
+      setupUsed: sessionSetupUsed,
       screenshots: []
     };
 
