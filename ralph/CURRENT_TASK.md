@@ -1,67 +1,60 @@
-# Current Task — UX Overhaul v2 Task B3: Honest Status Feedback
+# Current Task — UX Overhaul v2 Task B3 SOL Repair After QA FAIL 79
 
-**Status:** READY — owner-approved narrow harness extension recorded; exactly one Terra High initial build; stop for independent SOL QA
+**Status:** REPAIR READY — SOL owns implementation and repair QA loop; Terra permanently out for B3; B4 blocked
 **Branch:** `codex/ux-overhaul`
-**Dependency gate:** B1 and B2 complete; final B2 independent SOL QA PASS 98 at `546ffa5`
-**Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` Part 2 item 10 including UXP-18 and UXN-3, Part 5 Task B3/Chunk B, Part 6.1, and boundary statement 5.2
-**Runtime:** Terra High initial builder. Any QA failure transfers repair ownership to SOL; Terra is not re-invoked.
+**Failed commit:** `95c0ceb`
+**Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` Part 2 item 10 including UXP-18 and UXN-3, Part 5 Task B3/Chunk B, Part 6.1, boundary statement 5.2, and owner repair order
+**Runtime:** SOL repair. Runtime identity must come from metadata; record `unverified` when unavailable.
 
-## Exact scope
+## Exact repair scope
 
 Modify only:
 
 - `src/App.tsx`
 - `src/lib/sync.ts`
-- `src/lib/saveStatus.ts` — delete this obsolete module; keep any still-required online-state behavior inside the permitted files without semantic drift
 - `scripts/saved-flash-harness.ts`
-- `scripts/offline-indicator-harness.ts` — assertion-only modernization so existing offline/online proof follows the relocated typed sync-status hook after `src/lib/saveStatus.ts` deletion
+- `scripts/offline-indicator-harness.ts` — assertion/proof modernization only
 
-No other file is permitted.
+`src/lib/saveStatus.ts` remains deleted. No other file is permitted after this Ralph-only authority commit.
 
-## Required implementation
+## Required corrections
 
-1. Finish UXP-18 at the bounded save path: call `flashSaved()` only when the user mutation actually persisted. A blocked or reverted `handleSaveSetups` branch must return with zero Saved/Synced notification.
-2. Replace string-whitelist status handling with one typed, truthful four-outcome renderer through the completed B2 top notification arbiter:
-   - synced;
-   - offline-saved;
-   - deferred-delete-retrying;
-   - sync-error.
-3. Use exact failure copy `Sync failed — will retry`. Failed cloud writes or deletes must never show Saved or Synced. Offline local persistence must remain honestly identified as offline-saved. Existing deferred-delete state must remain a passive retry warning.
-4. Success status auto-dismiss remains the B2 shared approximately 1500ms lifetime. Deferred-retry and sync-error states persist until explicit acknowledgement. Preserve B2 keyed-copy dedupe, info-over-Saved priority, safe-area top pill geometry, 44px direct close, and no co-render.
-5. In `src/lib/sync.ts`, make only the minimum typed status/error-callback changes needed for push-helper failure reporting. Audit every changed helper line. Do not change write payloads, success criteria, retry behavior, delete queries, zero-row meaning, queue contents, queue timing, or pull merge/throttle behavior.
-6. Delete dead `src/lib/saveStatus.ts`. Preserve its still-live online/offline observation behavior by relocating only what is necessary within the permitted files; do not recreate the dead reporting abstraction.
-7. UXN-3 is frozen: cloud pulls, resume pulls, and hydration never enqueue a success notification. Preserve the 30-second pull throttle and all lifecycle meaning.
-8. Preserve local-first dual writes, honest offline Saved behavior, B1 pointer state machine, B2 arbiter behavior, and every A1–A4 layout/accessibility guarantee. Do not implement C4 dirty-boundary autosave or D1/D2/D3 delete semantics early.
-9. Owner-approved scope extension is harness-only: update `scripts/offline-indicator-harness.ts` solely to import/extract the relocated online-status implementation and assert the new typed status renderer. It may not change product behavior, weaken offline/header/toast assertions, waive failures, or become a third stale lock.
+1. Separate setup-data persistence from active selection in `handleSaveSetups`:
+   - unchanged setup bytes plus a different valid requested active ID must still activate that setup and retain existing pressure/tire/session propagation;
+   - genuine blocked/reverted no-op returns with zero Saved/Synced and zero cloud write;
+   - setup-array local/cloud writes occur only when setup bytes changed;
+   - active-selection/session persistence and feedback remain truthful when selection actually changed.
+2. Every Supabase pull query error response and catch must report typed `sync-error`. Successful pulls remain notification-silent. Preserve query payloads/order, merge behavior, 30-second throttle, generation isolation, local writes, queue contents/timing, delete queries, and zero-row meaning.
+3. Route every automatic status transition through one terminal-preserving arbiter:
+   - `sync-error` and `deferred-delete-retrying` survive later `synced`, `offline-saved`, `syncing`, and pull-completion transitions;
+   - failure overrides prior Saved/success immediately;
+   - only direct user acknowledgement clears a terminal state;
+   - pull-origin successful pushes remain silent;
+   - shared ~1500ms timeout applies only to success states.
+4. Preserve exact failure copy `Sync failed — will retry`, honest offline copy, B2 info priority/no co-render/dedupe/top safe-area geometry/44px close, B1 pointer semantics, A1–A4 layout, local-first dual writes, deferred queues, and sync lifecycle behavior.
 
-## Harness acceptance
+## Required proof
 
-Extend `scripts/saved-flash-harness.ts` with production-source, model, and rendered proof. All seeds must mutate real permitted production source and independently fail the relevant gates.
+Extend permitted harnesses with compile-real production-source mutations plus source, model, and rendered rejection where applicable:
 
-1. Blocked/reverted save mutation: zero Saved and zero Synced.
-2. Persisted local offline mutation: exactly one truthful offline-saved status, never Synced.
-3. Push failure and failed-delete reporting: persistent `Sync failed — will retry`, never Saved/Synced.
-4. Deferred delete: persistent deferred-retry warning, never success.
-5. Actual push success: synced outcome uses the shared approximately 1500ms success timer.
-6. Pull, resume pull, hydration, scroll start, pointer movement, and pointercancel: zero success notifications.
-7. Mutations must cover at least: reintroducing flash on the blocked branch, removing a real push-helper error callback/report, changing sync-error to success, auto-dismissing an error, and making a pull enqueue success. Each advertised fault must compile where applicable, occur behaviorally, and be rejected.
-8. Retain all B1/B2 priority, co-render, dedupe, shared-timer, real header/toast/nav geometry, safe-area, 44px close, overflow, viewport/scale, A1–A4, and stale-lock provenance proof.
-9. Modernized offline-indicator proof must pass against the deleted-module replacement, retain live navigator event/listener cleanup checks, retain persistent offline-chip checks, and verify all four typed status states plus success-only dismissal and persistent error acknowledgement.
+1. Unchanged-array activation with different active ID succeeds and propagates pressures; mutation that restores early return fails. Genuine blocked/reverted no-op remains silent.
+2. Each pull helper error response and catch reports `sync-error`; successful pull/resume/hydration remains zero success. Mutations removing each real error callback fail independently.
+3. Terminal sequences `sync-error` or `deferred-delete-retrying` followed by `synced`, `offline-saved`, `syncing`, and pull completion remain terminal until explicit close. Mutations bypassing arbiter fail.
+4. Failure arriving during Saved immediately renders persistent error, never Saved/Synced.
+5. All four typed states render exact truthful copy/treatment; only success auto-dismisses; errors expose direct >=44px acknowledgement and persist.
+6. Retain B1/B2 source/model/rendered mutation proof, real header/toast/nav geometry, safe areas, overflow, Standard/Large and four viewport coverage, offline navigator event/listener cleanup, persistent chip, A1–A4, and stale-lock provenance.
 
 ## Required gates
 
-1. Focused B3 plus retained B1/B2 harness proof must PASS before the unchanged saved-flash stale whole-App lock.
-2. Run A1–A4, tire, Quick Adjust, offline, pull-on-resume, semantic-status, deletion/undo, confirmation, and notification regressions.
-3. Run all 24 harnesses captured. Required result: 22/24 PASS. Only these two unchanged named stale byte locks may fail:
-   - `muted-text-color-harness.ts` AuthView byte lock;
-   - `saved-flash-harness.ts` post-B1/B2 whole-App reconstruction byte lock.
-4. `npm run lint`: exact documented three-error baseline only — `RaceWeekendView` unknown-to-`File`, `SetupView` `key`/`CornerFormProps`, and `SmasherLoadsView` unknown-to-`File`.
-5. `npm run build`: PASS with the current 567-module baseline unless an explained toolchain-only count changes.
-6. Signed-out shell at 360×800, 390×844, 412×915, and 1080×2118: exact dimensions, no horizontal overflow, controls at least 44px, pinch zoom enabled, notification below wrapped safe-area header and above nav, zero console errors. Do not create or use credentials.
-7. `git diff --check`; exact five-file boundary including the authorized deletion and assertion-only offline harness modernization; protected paths clean; worktree clean after commit.
-8. Cavecrew reviewer must pass typed outcome truthfulness, failure persistence/copy, blocked/pull zero-success behavior, sync-helper error-only drift audit, B1/B2/A1–A4 preservation, mutations, and scope.
-9. Commit code plus harness only with a B3-identifying message. Leave both Ralph files untouched after builder completion. Stop for independent SOL QA; do not open Chunk B QA or C1 yourself.
+1. Focused B3 plus retained B1/B2 proof passes before unchanged saved-flash whole-App stale lock.
+2. Run all relevant A1–A4, B1/B2, tire, Quick Adjust, offline, pull-on-resume, semantic-status, delete/undo, confirmation, and notification regressions.
+3. Full 24-harness matrix must be 22/24. Only unchanged `muted-text-color-harness.ts` AuthView byte lock and `saved-flash-harness.ts` post-B1/B2 whole-App reconstruction lock may fail.
+4. `npm run lint` matches exact three-error baseline only. `npm run build` passes; 566 modules is explained by deleted `saveStatus.ts`.
+5. Signed-out 360x800, 390x844, 412x915, and 1080x2118 shell: exact dimensions, no horizontal overflow, >=44px controls, pinch zoom enabled, zero console errors. Auth-gated signed-in views remain unauthorized without credentials.
+6. `git diff --check`; exact four modified files with prior deletion retained; protected paths and Ralph files clean after repair commit.
+7. Cavecrew reviewer must pass active-selection behavior, pull error coverage, terminal-state precedence, error-only sync drift, harness mutation strength, and scope.
+8. Commit repair code plus harness only with B3-identifying message. Do not mark B3 PASS or open B4; stop for independent SOL QA.
 
 ## Hard bans
 
-No B4, Chunk B QA advancement, Chunk C, C1–C5, or D1–D3. No `src/types.ts`, NumberStepper, SetupView, RaceWeekendView, CSS, other component or harness beyond the two named B3 harnesses, schema, RLS, migrations, Supabase configuration, native, Android, release, package/config, credentials, branch refs, push, deploy, merge, production, or `master` changes. Do not alter dual-write data, delete/undo/cascade/zero-row behavior, retry-queue semantics, pull merge/throttle/lifecycle behavior, or B1/B2 interaction semantics. `scripts/offline-indicator-harness.ts` authority is proof-maintenance only and grants zero application-behavior expansion.
+No B4, Chunk B QA advancement, Chunk C/D, schema, RLS, migrations, Supabase configuration, NumberStepper, SetupView, RaceWeekendView, CSS, types, other components/harnesses, native, Android, release, package/config, credentials, branch refs, push, deploy, merge, production, or `master` changes. Do not alter dual-write data, setup lifecycle roles/history, delete/undo/cascade/zero-row behavior, retry queues, pull merge/throttle/generation lifecycle, B1 interactions, or B2/A1–A4 semantics.
