@@ -716,17 +716,28 @@ export default function App() {
   const [nativeAuthError, setNativeAuthError] = useState<{ id: number; message: string } | null>(null);
   const [hasLocalAcct, setHasLocalAcct] = useState<boolean>(() => hasLocalAccount());
   const [syncStatus, setSyncStatusState] = useState<NotificationStatus | null>(null);
+  const syncStatusRef = useRef<NotificationStatus | null>(null);
   const isTerminalSyncStatus = (status: NotificationStatus | null): boolean => (
     status === 'deferred-delete-retrying' || status === 'sync-error'
   );
   const setSyncStatus = (next: NotificationStatus) => {
     if (isTerminalSyncStatus(next)) clearSavedFlash();
-    setSyncStatusState(current => isTerminalSyncStatus(current) && !isTerminalSyncStatus(next) ? current : next);
+    const current = syncStatusRef.current;
+    const resolved = isTerminalSyncStatus(current) && !isTerminalSyncStatus(next) ? current : next;
+    syncStatusRef.current = resolved;
+    setSyncStatusState(resolved);
   };
   const clearTransientSyncStatus = () => {
-    setSyncStatusState(current => isTerminalSyncStatus(current) ? current : null);
+    const current = syncStatusRef.current;
+    const resolved = isTerminalSyncStatus(current) ? current : null;
+    syncStatusRef.current = resolved;
+    setSyncStatusState(resolved);
   };
-  const acknowledgeSyncStatus = () => setSyncStatusState(null);
+  const acknowledgeSyncStatus = () => {
+    clearSavedFlash();
+    syncStatusRef.current = null;
+    setSyncStatusState(null);
+  };
   const [pullDone, setPullDone] = useState(false); // initial cloud pull resolved — gates [4]
   const [authGeneration, setAuthGeneration] = useState(0);
   const [deleteReplayVersion, setDeleteReplayVersion] = useState(0);
@@ -939,7 +950,7 @@ export default function App() {
   };
   const showComponentInfo = (message: string) => showInfo(componentInfoNotice(message));
   const flashSaved = () => {
-    if (infoToastRef.current) return;
+    if (infoToastRef.current || isTerminalSyncStatus(syncStatusRef.current)) return;
     if (!isOnline) setSyncStatus('offline-saved');
     setSavedFlash(true);
     if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
@@ -987,7 +998,10 @@ export default function App() {
   useEffect(() => {
     if (syncStatus !== 'synced' && syncStatus !== 'offline-saved') return;
     const t = setTimeout(() => {
-      setSyncStatusState(current => current === 'synced' || current === 'offline-saved' ? null : current);
+      const current = syncStatusRef.current;
+      const resolved = current === 'synced' || current === 'offline-saved' ? null : current;
+      syncStatusRef.current = resolved;
+      setSyncStatusState(resolved);
     }, SUCCESS_TOAST_MS);
     return () => clearTimeout(t);
   }, [syncStatus]);

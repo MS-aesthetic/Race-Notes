@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Setup, ActiveSession, RaceWeekend, AccountingEntry, Todo, TireInventoryItem } from '../types';
 import { User } from '@supabase/supabase-js';
 import { pullSharedData } from '../lib/sync';
@@ -47,6 +47,10 @@ export default function ExportView({
   const [sharedWeekends, setSharedWeekends] = useState<RaceWeekend[]>([]);
   const [loadingShared, setLoadingShared] = useState(false);
   const [infoToast, setInfoToast] = useState<string | null>(null);
+  const activeUserIdRef = useRef<string | null>(user?.id ?? null);
+  const onSyncStatusRef = useRef(onSyncStatus);
+  activeUserIdRef.current = user?.id ?? null;
+  onSyncStatusRef.current = onSyncStatus;
 
   // The active setup is always selectable, plus any saved setups (deduped).
   const setupOptions: Setup[] = [setup, ...savedSetups.filter((s) => s.id !== setup.id)];
@@ -68,15 +72,25 @@ export default function ExportView({
   }, [sortedWeekendOptions, selectedWeekendId]);
 
   useEffect(() => {
-    if (user) {
-      setLoadingShared(true);
-      pullSharedData(user.id, onSyncStatus).then((res) => {
-        setSharedSetups(res.sharedSetups);
-        setSharedWeekends(res.sharedWeekends);
-        setLoadingShared(false);
-      });
+    const pullUserId = user?.id;
+    if (!pullUserId) {
+      setLoadingShared(false);
+      return;
     }
-  }, [user]);
+    let cancelled = false;
+    const reportSharedPullStatus = (status: SyncStatus) => {
+      if (cancelled || activeUserIdRef.current !== pullUserId) return;
+      onSyncStatusRef.current?.(status);
+    };
+    setLoadingShared(true);
+    pullSharedData(pullUserId, reportSharedPullStatus).then((res) => {
+      if (cancelled || activeUserIdRef.current !== pullUserId) return;
+      setSharedSetups(res.sharedSetups);
+      setSharedWeekends(res.sharedWeekends);
+      setLoadingShared(false);
+    });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   // ── Export actions ───────────────────────────────────────────────────────
   const selectedSetup = setupOptions.find((s) => s.id === selectedSetupId) ?? setup;

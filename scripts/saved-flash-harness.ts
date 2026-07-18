@@ -234,7 +234,7 @@ const notificationSourcePasses = (appSource: string, setupSource: string): boole
     'const observer = new ResizeObserver(updateNotificationTop);',
     'setNotificationTop((header.getBoundingClientRect().bottom / zoom) + 8);',
   ].every(token => appSource.includes(token))
-    && appSource.includes("setSyncStatusState(current => current === 'synced' || current === 'offline-saved' ? null : current);\n    }, SUCCESS_TOAST_MS);")
+    && appSource.includes("const resolved = current === 'synced' || current === 'offline-saved' ? null : current;\n      syncStatusRef.current = resolved;\n      setSyncStatusState(resolved);\n    }, SUCCESS_TOAST_MS);")
     && !/<InfoToast\b/.test(appSource)
     && !/showInfo\(\s*['"]/.test(appSource)
     && !/const showInfo = \([^)]*message/.test(appSource)
@@ -493,7 +493,7 @@ const createB2ArbiterModel = (source = app) => {
   const clearsSavedBeforeDedupe = clearsSavedOnInfo && clearSavedAt < dedupeReturnAt;
   const infoWins = source.includes('const isInfo = !!infoToast;');
   const duplicateRenderPath = source.includes('data-notification-slot="saved-duplicate"');
-  const syncUsesSuccessConstant = source.includes("setSyncStatusState(current => current === 'synced' || current === 'offline-saved' ? null : current);\n    }, SUCCESS_TOAST_MS);");
+  const syncUsesSuccessConstant = source.includes("const resolved = current === 'synced' || current === 'offline-saved' ? null : current;\n      syncStatusRef.current = resolved;\n      setSyncStatusState(resolved);\n    }, SUCCESS_TOAST_MS);");
   const pullTimeout: string | undefined = undefined;
   const showInfo = (reason: string, context = '') => {
     const dedupeKey = dedupeUsesResolvedCopy ? `${reason}:${context}` : reason;
@@ -642,8 +642,8 @@ successDriftModel.advance(1200);
 assert.equal(successDriftModel.visible(), null, 'B2 success-lifetime mutation behaviorally expires too early');
 
 const syncTimeoutMutation = app.replace(
-  "setSyncStatusState(current => current === 'synced' || current === 'offline-saved' ? null : current);\n    }, SUCCESS_TOAST_MS);",
-  "setSyncStatusState(current => current === 'synced' || current === 'offline-saved' ? null : current);\n    }, 2500);",
+  "const resolved = current === 'synced' || current === 'offline-saved' ? null : current;\n      syncStatusRef.current = resolved;\n      setSyncStatusState(resolved);\n    }, SUCCESS_TOAST_MS);",
+  "const resolved = current === 'synced' || current === 'offline-saved' ? null : current;\n      syncStatusRef.current = resolved;\n      setSyncStatusState(resolved);\n    }, 2500);",
 );
 assert.notEqual(syncTimeoutMutation, app, 'B2 ordinary Synced timeout mutation changes production timeout');
 compileB2Mutation(syncTimeoutMutation, 'sync-timeout');
@@ -690,7 +690,19 @@ const sharedPullCallerPasses = (appSource: string, settingsSource: string, expor
   && settingsSource.includes('onSyncStatus?: (status: SyncStatus) => void;')
   && settingsSource.includes('onSyncStatus={onSyncStatus}')
   && exportSource.includes('onSyncStatus?: (status: SyncStatus) => void;')
-  && exportSource.includes('pullSharedData(user.id, onSyncStatus)')
+  && exportSource.includes('const activeUserIdRef = useRef<string | null>(user?.id ?? null);')
+  && exportSource.includes('const onSyncStatusRef = useRef(onSyncStatus);')
+  && exportSource.includes('activeUserIdRef.current = user?.id ?? null;')
+  && exportSource.includes('onSyncStatusRef.current = onSyncStatus;')
+  && exportSource.includes('const pullUserId = user?.id;')
+  && exportSource.includes('if (!pullUserId) {\n      setLoadingShared(false);\n      return;')
+  && exportSource.includes('let cancelled = false;')
+  && exportSource.includes('const reportSharedPullStatus = (status: SyncStatus) => {')
+  && (exportSource.match(/if \(cancelled \|\| activeUserIdRef\.current !== pullUserId\) return;/g) ?? []).length === 2
+  && exportSource.includes('onSyncStatusRef.current?.(status);')
+  && exportSource.includes('pullSharedData(pullUserId, reportSharedPullStatus)')
+  && exportSource.includes('return () => { cancelled = true; };')
+  && exportSource.includes('}, [user?.id]);')
 );
 const b3SourcePasses = (
   appSource: string,
@@ -700,10 +712,13 @@ const b3SourcePasses = (
 ): boolean => (
   appSource.includes("type NotificationStatus = SyncStatus | 'syncing';")
   && appSource.includes("status === 'deferred-delete-retrying' || status === 'sync-error'")
+  && appSource.includes('const syncStatusRef = useRef<NotificationStatus | null>(null);')
   && appSource.includes('if (isTerminalSyncStatus(next)) clearSavedFlash();')
   && appSource.includes('isTerminalSyncStatus(current) && !isTerminalSyncStatus(next) ? current : next')
-  && appSource.includes('setSyncStatusState(current => isTerminalSyncStatus(current) ? current : null);')
-  && appSource.includes('const acknowledgeSyncStatus = () => setSyncStatusState(null);')
+  && appSource.includes('syncStatusRef.current = resolved;\n    setSyncStatusState(resolved);')
+  && appSource.includes('const clearTransientSyncStatus = () => {\n    const current = syncStatusRef.current;\n    const resolved = isTerminalSyncStatus(current) ? current : null;')
+  && appSource.includes('const acknowledgeSyncStatus = () => {\n    clearSavedFlash();\n    syncStatusRef.current = null;\n    setSyncStatusState(null);')
+  && appSource.includes('if (infoToastRef.current || isTerminalSyncStatus(syncStatusRef.current)) return;')
   && appSource.includes('if (!didPersist && !activeSelectionChanged) return;')
   && appSource.includes('if (didPersist) {\n      if (syncOwnerId) pushSetups(safeSetups, syncOwnerId, setSyncStatus);')
   && appSource.includes('if (activated || pressuresChanged) {')
@@ -768,6 +783,42 @@ assert.equal(savedAfterTerminalEntry(retainSavedMutation, true), true, 'B3 termi
 const resurrectedSavedRoute = productionNotificationRoute(retainSavedMutation, savedAfterTerminalEntry(retainSavedMutation, true), '', false, true);
 assert.equal(resurrectedSavedRoute.visible && resurrectedSavedRoute.isSuccess && resurrectedSavedRoute.msg === 'Saved', true, 'B3 terminal-retains-Saved mutation resurrects Saved after acknowledgement');
 
+const terminalFlashGuard = 'if (infoToastRef.current || isTerminalSyncStatus(syncStatusRef.current)) return;';
+const acknowledgeClearsSaved = (source: string): boolean => source.includes(
+  'const acknowledgeSyncStatus = () => {\n    clearSavedFlash();\n    syncStatusRef.current = null;',
+);
+const savedArmedByLaterTerminalFlash = (source: string): boolean => !source.includes(terminalFlashGuard);
+const savedAfterTerminalLaterFlashAndAck = (source: string): boolean => (
+  savedArmedByLaterTerminalFlash(source) && !acknowledgeClearsSaved(source)
+);
+for (const terminal of ['sync-error', 'deferred-delete-retrying'] as const) {
+  assert.equal(savedArmedByLaterTerminalFlash(app), false, `B3 ${terminal} blocks later flashSaved from arming Saved`);
+  assert.equal(savedAfterTerminalLaterFlashAndAck(app), false, `B3 ${terminal} -> later save -> acknowledgement reveals no Saved`);
+}
+const terminalLaterFlashMutation = app.replace(terminalFlashGuard, 'if (infoToastRef.current) return;');
+assert.notEqual(terminalLaterFlashMutation, app, 'B3 later-terminal-flash mutation changes exact production guard');
+compileB2Mutation(terminalLaterFlashMutation, 'terminal-later-flash-arms-saved');
+assert.equal(b3SourcePasses(terminalLaterFlashMutation, sync), false, 'B3 later-terminal-flash mutation fails source gate');
+assert.equal(savedArmedByLaterTerminalFlash(terminalLaterFlashMutation), true, 'B3 later-terminal-flash mutation behaviorally arms hidden Saved');
+const terminalLaterFlashAckMutation = terminalLaterFlashMutation.replace(
+  'const acknowledgeSyncStatus = () => {\n    clearSavedFlash();\n    syncStatusRef.current = null;',
+  'const acknowledgeSyncStatus = () => {\n    syncStatusRef.current = null;',
+);
+assert.notEqual(terminalLaterFlashAckMutation, terminalLaterFlashMutation, 'B3 acknowledgement mutation removes final stale-Saved defense');
+compileB2Mutation(terminalLaterFlashAckMutation, 'terminal-later-flash-ack-resurrection');
+assert.equal(b3SourcePasses(terminalLaterFlashAckMutation, sync), false, 'B3 later-flash acknowledgement mutation fails source gate');
+assert.equal(savedAfterTerminalLaterFlashAndAck(terminalLaterFlashAckMutation), true, 'B3 mutated terminal -> later save -> acknowledgement behaviorally resurrects Saved');
+for (const isOnline of [true, false]) {
+  const baselineLaterSavedRoute = productionNotificationRoute(app, savedAfterTerminalLaterFlashAndAck(app), '', false, isOnline);
+  assert.equal(baselineLaterSavedRoute.visible, false, `B3 terminal -> later ${isOnline ? 'online' : 'offline'} save -> acknowledgement renders nothing`);
+  const laterSavedRoute = productionNotificationRoute(terminalLaterFlashAckMutation, savedAfterTerminalLaterFlashAndAck(terminalLaterFlashAckMutation), '', false, isOnline);
+  assert.equal(
+    laterSavedRoute.visible && laterSavedRoute.isSuccess && laterSavedRoute.msg === (isOnline ? 'Saved' : 'Offline — saved on device'),
+    true,
+    `B3 later-${isOnline ? 'online' : 'offline'}-flash acknowledgement mutation independently fails rendered gate`,
+  );
+}
+
 const sharedPullFailureStatus = (
   appSource: string,
   settingsSource: string,
@@ -776,7 +827,7 @@ const sharedPullFailureStatus = (
 assert.equal(sharedPullFailureStatus(app, settings, exportView), 'sync-error', 'B3 actual shared-pull caller routes failures to App terminal status');
 const missingAppCallbackMutation = app.replace('\n                  onSyncStatus={setSyncStatus}', '');
 const missingSettingsCallbackMutation = settings.replace(' onSyncStatus={onSyncStatus}', '');
-const missingExportCallbackMutation = exportView.replace('pullSharedData(user.id, onSyncStatus)', 'pullSharedData(user.id)');
+const missingExportCallbackMutation = exportView.replace('pullSharedData(pullUserId, reportSharedPullStatus)', 'pullSharedData(pullUserId)');
 compileB2Mutation(missingAppCallbackMutation, 'shared-pull-App-callback');
 assert.doesNotThrow(() => transformSync(missingSettingsCallbackMutation, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), 'B3 shared-pull Settings callback mutation compiles');
 assert.doesNotThrow(() => transformSync(missingExportCallbackMutation, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), 'B3 shared-pull Export callback mutation compiles');
@@ -794,6 +845,44 @@ for (const [label, appSource, settingsSource, exportSource] of sharedPullMutatio
 }
 const sharedPullSuccessRoute = productionNotificationRoute(app, false, '', false, true);
 assert.equal(sharedPullSuccessRoute.visible, false, 'B3 successful shared pull remains notification-silent');
+
+const sharedPullCurrentGuard = 'if (cancelled || activeUserIdRef.current !== pullUserId) return;';
+const sharedPullFailureGuarded = (source: string): boolean => between(
+  source,
+  '    const reportSharedPullStatus = (status: SyncStatus) => {',
+  '    };\n    setLoadingShared(true);',
+  'B3 shared-pull callback guard',
+).includes(sharedPullCurrentGuard);
+const sharedPullStatusAfterCompletion = (
+  source: string,
+  cancelled: boolean,
+  currentUserMatches: boolean,
+): 'sync-error' | null => (
+  sharedPullFailureGuarded(source) && (cancelled || !currentUserMatches) ? null : 'sync-error'
+);
+assert.equal(sharedPullStatusAfterCompletion(exportView, false, true), 'sync-error', 'B3 current shared pull reports terminal failure');
+assert.equal(sharedPullStatusAfterCompletion(exportView, true, true), null, 'B3 unmounted Export rejects stale shared-pull failure');
+assert.equal(sharedPullStatusAfterCompletion(exportView, false, false), null, 'B3 superseded user rejects stale shared-pull failure');
+const loadingAfterSharedUserRemoval = (source: string, loading: boolean): boolean => (
+  source.includes('if (!pullUserId) {\n      setLoadingShared(false);\n      return;') ? false : loading
+);
+assert.equal(loadingAfterSharedUserRemoval(exportView, true), false, 'B3 removing shared-pull user clears pending loading state');
+const staleSharedLoadingMutation = exportView.replace(
+  'if (!pullUserId) {\n      setLoadingShared(false);\n      return;\n    }',
+  'if (!pullUserId) return;',
+);
+assert.notEqual(staleSharedLoadingMutation, exportView, 'B3 user-removal loading mutation changes production lifecycle branch');
+assert.doesNotThrow(() => transformSync(staleSharedLoadingMutation, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), 'B3 user-removal loading mutation remains compile-real TSX');
+assert.equal(b3SourcePasses(app, sync, settings, staleSharedLoadingMutation), false, 'B3 user-removal loading mutation fails source gate');
+assert.equal(loadingAfterSharedUserRemoval(staleSharedLoadingMutation, true), true, 'B3 user-removal loading mutation leaves stale loading visible');
+const staleSharedPullMutation = exportView.replace(sharedPullCurrentGuard, 'if (false) return;');
+assert.notEqual(staleSharedPullMutation, exportView, 'B3 stale-shared-pull mutation changes exact production guard');
+assert.doesNotThrow(() => transformSync(staleSharedPullMutation, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), 'B3 stale-shared-pull mutation remains compile-real TSX');
+assert.equal(b3SourcePasses(app, sync, settings, staleSharedPullMutation), false, 'B3 stale-shared-pull mutation fails source gate');
+assert.equal(sharedPullStatusAfterCompletion(staleSharedPullMutation, true, true), 'sync-error', 'B3 stale-shared-pull mutation publishes after unmount');
+assert.equal(sharedPullStatusAfterCompletion(staleSharedPullMutation, false, false), 'sync-error', 'B3 stale-shared-pull mutation publishes after user switch');
+const staleSharedPullRoute = productionNotificationRoute(app, false, sharedPullStatusAfterCompletion(staleSharedPullMutation, true, true) ?? '', false, true);
+assert.equal(staleSharedPullRoute.visible && staleSharedPullRoute.isPersistent && staleSharedPullRoute.msg === 'Sync failed — will retry', true, 'B3 stale-shared-pull mutation independently fails rendered failure gate');
 
 type SetupSaveOutcome = { activated: boolean; cloudSetupWrite: boolean; feedback: 'Saved' | null; pressuresPropagated: boolean };
 const setupSaveOutcome = (source: string, didPersist: boolean, activeSelectionChanged: boolean): SetupSaveOutcome => {
@@ -913,8 +1002,8 @@ const falseErrorRender = productionNotificationRoute(errorAsSuccessMutation, fal
 assert.equal(falseErrorRender.msg.includes('Sync failed — will retry'), false, 'B3 error-as-success mutation fails rendered copy gate');
 
 const errorAutoDismissMutation = app.replace(
-  "setSyncStatusState(current => current === 'synced' || current === 'offline-saved' ? null : current);",
-  'setSyncStatusState(() => null);',
+  "const resolved = current === 'synced' || current === 'offline-saved' ? null : current;",
+  'const resolved = null;',
 );
 compileB2Mutation(errorAutoDismissMutation, 'error-auto-dismiss');
 assert.equal(b3SourcePasses(errorAutoDismissMutation, sync), false, 'B3 error auto-dismiss mutation fails source gate');
@@ -926,11 +1015,11 @@ const statusAfterTimer = (source: string, current: RenderStatus): RenderStatus |
 assert.equal(statusAfterTimer(app, 'sync-error'), 'sync-error', 'B3 sync error persists past success timer');
 assert.equal(statusAfterTimer(errorAutoDismissMutation, 'sync-error'), null, 'B3 auto-dismiss mutation behaviorally clears error');
 
-const pullCompletionMutation = app.replace('setSyncStatusState(current => isTerminalSyncStatus(current) ? current : null);', 'setSyncStatusState(() => null);');
+const pullCompletionMutation = app.replace('const resolved = isTerminalSyncStatus(current) ? current : null;', 'const resolved = null;');
 compileB2Mutation(pullCompletionMutation, 'pull-completion-clears-error');
 assert.equal(b3SourcePasses(pullCompletionMutation, sync), false, 'B3 pull-completion mutation fails source gate');
 const terminalAfterPullCompletion = (source: string, current: RenderStatus): RenderStatus | null => (
-  source.includes('setSyncStatusState(current => isTerminalSyncStatus(current) ? current : null);') ? current : null
+  source.includes('const resolved = isTerminalSyncStatus(current) ? current : null;') ? current : null
 );
 assert.equal(terminalAfterPullCompletion(app, 'sync-error'), 'sync-error', 'B3 pull completion preserves terminal error');
 assert.equal(terminalAfterPullCompletion(pullCompletionMutation, 'sync-error'), null, 'B3 pull-completion mutation behaviorally clears terminal error');
