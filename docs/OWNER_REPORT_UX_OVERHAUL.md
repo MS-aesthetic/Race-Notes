@@ -2,7 +2,7 @@
 
 ## Current status
 
-Task C2 is complete with a score of 98/100. Task C2.5, the owner-priority Setups corner-card alignment and stacked-stepper redesign, is also complete. Its second QA attempt passed with a score of 100/100. Task C3, which adds session-bound setup-difference summaries without duplicating Quick Adjust history, is now active.
+Tasks C2 and C2.5 are complete with scores of 98/100 and 100/100. Task C3 is now also complete. Its first QA attempt passed with a score of 100/100. Task C4, which keeps every local write immediate but delays the visible Saved confirmation until a real commit boundary, is now active.
 
 ## Task C2 — Session snapshot model and diff engine
 
@@ -39,7 +39,7 @@ A Java 21 debug APK was built at `android/app/build/outputs/apk/debug/app-debug.
 
 C2 is a PASS. There is no remaining C2 product repair.
 
-C2.5 now redesigns the Setups steppers so the value sits above side-by-side minus and plus buttons, and it aligns the LF/RF/LR/RR field rows. After C2.5 passes its focused, regression, three-width/two-scale browser, and emulator checks, work resumes in plan order: C3, C4, C5, Chunk C QA, Chunk D, Chunk E, and the final full-sprint QA and handoff.
+C2.5 followed C2 and is documented below. It redesigned the Setups steppers so the value sits above side-by-side minus and plus buttons and aligned the LF/RF/LR/RR field rows. The remaining work continues in plan order through C3, C4, C5, Chunk C QA, Chunk D, Chunk E, and the final full-sprint QA and handoff.
 
 ## Task C2.5 — QA attempt 1
 
@@ -101,4 +101,39 @@ A fresh Java 21 debug APK was built at `android/app/build/outputs/apk/debug/app-
 
 C2.5 is a final **PASS, 100/100**. The attempt-one geometry defect is closed and no C2.5 repair remains.
 
-Task C3 is next. It will replace the old per-press setup-change presentation with a compact computed “will bind to next session” view, show each session’s frozen setup difference, and keep Quick Adjust’s in-run net rows unchanged so the same adjustment is not logged twice. C4, C5, Chunk C QA, Chunks D and E, and final full-sprint QA remain after C3.
+Task C3 followed and has now passed; its detailed result is below. C4 is active. C5, Chunk C QA, Chunks D and E, and final full-sprint QA remain after C4.
+
+## Task C3 — Session-bound setup differences
+
+### What was built
+
+C3 replaces the noisy per-press setup-history presentation with two compact, computed views. Setups now shows changes that are waiting to be captured by the next run under “Pending — will bind to next session.” Each saved run can show the setup changes that were frozen when that run started. A new “Log setup changes” button on the Runs page takes the user back to Setups without changing editability or lifecycle rules.
+
+The implementation is commit `e8d7016`. It changes only `src/App.tsx`, `src/components/SetupView.tsx`, `src/components/RaceWeekendView.tsx`, and `scripts/chunk5-setup-harness.ts`. Existing non-run historical setup-log rows remain available in a collapsed Legacy log. Quick Adjust rows remain attached to the run where the adjustment happened and are not repeated in the Legacy log or written again as session-difference rows.
+
+### What was checked
+
+- Run history is newest-first, so each run compares its frozen snapshot with the immediately older run. The first run compares with the Race Day's Starting Setup.
+- Missing legacy snapshots, missing Starting Setups, and unrelated setup lineages show an honest unavailable state instead of reconstructing history from a mutable setup.
+- Equal snapshots show no false change rows. Field order and before/after direction remain deterministic.
+- The canonical owner scenario passed: Starting Setup, Hot Laps, a Quick Adjust gear change, then Qualifying. Before Qualifying, Setups showed `Gear — → 6.20` as pending. After Qualifying was created, the Qualifying card showed the identical bound row.
+- Config, Conditions, free-text Notes, and existing run Adjustments remain present. C1's active Race Day setup stays view-only; the new button is navigation only.
+- The focused C3 harness ran 49 assertions and killed 14 independent mutations. Lifecycle, Quick Adjust, offline/resume, tires, and touch-target regressions passed.
+- The raw 24-harness matrix remained exactly 22/24. The only failures were the two expected pre-C4 stale locks: `muted-text-color-harness.ts` and `saved-flash-harness.ts`.
+- Type-checking reported exactly the three known baseline errors. The production build completed with exactly 566 transformed modules. Scope, protected-path, diff, clean-worktree, and independent cavecrew review checks passed.
+
+### Preview and debug APK
+
+The accepted Netlify draft preview is:
+
+https://6a5bd7642d319b93215dfc81--crew-chief-race-notes.netlify.app/
+
+The signed-out shell passed at 360×800, 390×844, and 412×915. It had no horizontal overflow, every visible control was at least 44px, pinch-enabled viewport metadata remained present, and the browser reported no console warnings or errors.
+
+A Java 21 debug APK was built, installed on `emulator-5554`, and used for the authenticated owner scenario. The APK is 11,745,619 bytes with SHA-256 `0DEB68C77FB6DD110E57242300F555AE5AF92C804D510DB0C431277B9F67F556`. The preserved emulator data initially loaded an older service-worker bundle, so QA cleared only the debug app's WebView service-worker cache while preserving Local Storage. The new bundle then rendered the pending and bound C3 cards correctly. Android emitted only emulator/Chromium engine diagnostics; there was no application crash or JavaScript exception.
+
+### Result and what comes next
+
+C3 is a final **PASS, 100/100**. No C3 repair remains.
+
+C4 is next. It will keep React state and localStorage writes immediate on every real change, but stop showing Saved on every press or keystroke. One Saved confirmation will appear only when dirty work reaches a boundary such as leaving the tab, backgrounding the app, the 30-second timer, or creating the next run. C5, Chunk C QA, Chunks D and E, and final full-sprint QA remain after C4.
