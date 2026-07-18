@@ -515,9 +515,9 @@ Value (with unit) full-width on top, tap-to-edit; below it one row with − and 
 
 *QA focus (Sol XH):* screenshot the LF/RF corner cards at 360px before/after — the staggering in the owner's 2026-07-18 screenshot must be gone; mutation-check the new layout assertions once; confirm zero timing-logic diff in NumberStepper.
 
-### v2.1-D — Progress snapshot at time of addendum
+### v2.1-D — Current progress snapshot
 
-A1–A4 + Chunk A QA: PASS. B1–B3 + Chunk B QA: PASS. C1: PASS. C2: built (`253897a`), QA attempt 1 FAIL 92/100 on harness CRLF portability only (no product defect found); repair authorized above. Remaining: C2 repair→QA, C2.5, C3, C4, C5, Chunk C QA, Chunk D (D1–D3 + QA), Chunk E (E1–E3), final full-sprint QA, Part 6.4 handoff document.
+A1–A4 + Chunk A QA: PASS. B1–B3 + Chunk B QA: PASS. C1: PASS. C2: PASS 98/100 on QA attempt 2 (`253897a` product + `13b556f` EOL-portability repair); no C2 product defect or remaining repair exists. C2.5 is now active under the exact owner-priority contract in `ralph/CURRENT_TASK.md`. Remaining: C2.5, C3, C4, C5, Chunk C QA, Chunk D (D1–D3 + QA), Chunk E (E1–E3), final full-sprint QA, Part 6.4 handoff document.
 
 ### v2.1-E — Boundary amendment (5.2): emulator testing authorized
 

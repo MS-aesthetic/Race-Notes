@@ -1,51 +1,62 @@
-# Current Task — UX Overhaul v2 Task C2 Session Snapshot Model and Diff Engine
+# Current Task — UX Overhaul v2 Task C2.5 Setups Corner Alignment and Stacked Stepper
 
-**Status:** SOL REPAIR AUTHORIZED — owner approval recorded 2026-07-18 (see "Owner approval — RECORDED" below). Execute the SOL repair work order now. After C2 QA passes, the next task is **C2.5** (owner addendum, setups corner grid alignment + stacked stepper) — see `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` § v2.1 Owner Addendum.
+**Status:** READY FOR `gpt-5.6-sol` HIGH IMPLEMENTATION SUBAGENT — owner-priority task; C3 and all later work remain blocked.
 **Branch:** `codex/ux-overhaul`
-**Integrated QA commit:** `253897a2518b3ed5f3148926e522163a9ea9d0b3`
-**Builder original:** `32135814ead0cc28179dc0ead9dfbc91a311f2fc` (identical tree)
-**Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` Part 2 item 7, Part 5 Task C2, Part 6.1, and boundary statement 5.2
-**Runtime (owner directive 2026-07-18):** build/implementation work uses `gpt-5.6-sol` **High**; QA and plan/state updates use `gpt-5.6-sol` **Extra High**. The primary (chat) agent is the Sol Extra High QA/plan authority and delegates build work to subagents. Terra and `cavecrew-builder` remain permanently forbidden. Runtime metadata remains authoritative; absent metadata records `unverified`.
+**C2 baseline:** product `253897a2518b3ed5f3148926e522163a9ea9d0b3` + EOL-only repair `13b556fc664b6fa75d9b82ca768319e303e6a03e`
+**Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` v2.1-C, v2.1-E, v2.1-F, Part 5 escalation rule, and Part 6 gates
+**Runtime routing:** implementation must execute as `gpt-5.6-sol` **High**; primary QA/plan/state work executes as `gpt-5.6-sol` **Extra High**. Runtime metadata is authoritative; absent metadata is `unverified` and cannot satisfy the build role. Terra and `cavecrew-builder` are forbidden.
 
-## Attempt 1 failure record
+## Owner outcome
 
-Independent SOL QA found no current product defect. Snapshot type/capture/diff behavior, one canonical setup resolution and capture, matching `setupId`/`setupSnapshot`/`setupUsed`, detached plain data, complete ordered tune allowlists, legacy `changeLog` preservation, unchanged opaque sessions JSON sync, Quick Adjust neutrality, exact four-file feature scope, protected paths, clean worktrees, and cavecrew review all passed.
+On Setups corner cards, paired LF/RF and LR/RR fields must align cleanly instead of drifting because text inputs and tall steppers have different structures. Every stacked stepper must show one full-width value row above one two-column button row:
 
-Required Windows harness result failed: raw matrix was **20/24**, not exact **22/24**.
+```text
+----- VALUE -----
+(     −     ) (     +     )
+```
 
-- Allowed named stale failures: `scripts/muted-text-color-harness.ts` and `scripts/saved-flash-harness.ts`.
-- Unexpected failure: `scripts/chunk5-setup-harness.ts` at the C2 baseline source/model gate. Its multiline source match hardcodes LF and rejects the normal CRLF Windows checkout.
-- Unexpected failure: `scripts/offline-indicator-harness.ts` at the terminal-clear mutation. Its source replacement hardcodes LF and does not mutate CRLF `src/App.tsx`.
-- Both focused harnesses pass on the identical LF builder tree, confirming harness portability defects rather than product behavior defects.
+The value remains tap-to-edit and includes its unit. The minus and plus buttons are equal width and each at least 44px tall. Inline steppers elsewhere must not change.
 
-Passing gates: lint matched the exact three known baseline errors; build passed with 566 modules; signed-out 360×800, 390×844, 412×915, and 1080×2118 shells retained the auth gate, zero horizontal overflow, controls at least 44px, pinch-enabled viewport metadata, and zero console warnings/errors; diff, protected-path, clean-tree, and cavecrew checks passed.
+## Exact implementation scope
 
-## Owner approval — RECORDED 2026-07-18
+Change only:
 
-The owner (Maxx) approves, recorded via Claude session 2026-07-18:
+1. `src/components/ui/NumberStepper.tsx`
+2. `src/components/SetupView.tsx`
+3. `src/components/TiresSubView.tsx`
+4. `scripts/setup-touch-target-harness.ts`
 
-1. **`scripts/offline-indicator-harness.ts`** may be changed, solely to normalize the read `src/App.tsx` source from CRLF to LF before existing mutation checks. No product behavior, application file, copy, sync logic, or later-task scope may change.
-2. **Standing approval for harness portability fixes:** for this and future tasks, assertion-only EOL/portability fixes to harness files *outside* a task's exact file list are pre-approved, provided (a) zero product/application code changes, (b) no assertion is weakened or removed, and (c) the commit message names every out-of-list harness file touched. Any change beyond EOL/portability normalization still requires a fresh owner approval.
+No other file may change during implementation. If a different file is genuinely required, stop and return exact evidence for owner/QA scope approval.
 
-The SOL repair work order below is now unblocked. Begin immediately.
+## Build contract
 
-## SOL repair work order after approval
+1. Add `layout?: 'inline' | 'stacked'` to `NumberStepper`; default is `'inline'`.
+2. Preserve the existing inline DOM, classes, tap-to-edit behavior, keyboard behavior, pointer slop cancellation, commit-on-pointerup behavior, and 350ms/100ms hold-repeat cadence.
+3. In stacked layout only, render a full-width value region on row one and a two-column `[−][+]` button grid on row two. Value and both buttons are at least 44px tall; buttons split available width evenly. Keep current disabled behavior, accessible names, numeric formatting, unit rendering, and pointer handlers.
+4. Remove the arbitrary-variant `role=group`/`basis-full` stacking selectors from `SetupView.tsx` and `TiresSubView.tsx`. Pass `layout="stacked"` at the intended corner/tire stepper call sites.
+5. Align paired corner fields at row start. Give labels a consistent single-line footprint (truncate or equivalent reserved height) so adjacent controls begin at the same vertical position. Conditional pressure/legacy notes stay below their own control and must not move the neighboring control.
+6. Keep all setup values, step sizes, min/max bounds, units, pressure provenance, persistence calls, Saved/sync notifications, setup lifecycle rules, and Quick Adjust behavior unchanged.
+7. Extend `scripts/setup-touch-target-harness.ts` with compile-real/source/model coverage that proves:
+   - stacked value appears above the button row;
+   - stacked minus/plus buttons are equal-width and at least 44px;
+   - default inline rendering remains unchanged;
+   - SetupView and TiresSubView use the first-class stacked prop and contain no arbitrary-variant `basis-full` stacking selectors;
+   - a mutation that restores old DOM order or removes the stacked layout binding fails.
+8. Commit only after the focused harness, exact lint baseline, build, diff check, clean-scope check, and `cavecrew-reviewer` pass. Commit message must identify C2.5. Stop for primary QA; do not edit Ralph/plan/owner-report files.
 
-1. Change only `scripts/chunk5-setup-harness.ts` and owner-approved `scripts/offline-indicator-harness.ts`.
-2. In `scripts/chunk5-setup-harness.ts`, make C2 source and mutation matching EOL-agnostic. Accept LF and CRLF without weakening exact production-symbol, allowlist, binding, noise, detachment, or logging-rewire gates.
-3. In `scripts/offline-indicator-harness.ts`, normalize the read App source from CRLF to LF before existing mutation checks. Keep every B1–B4 assertion and expected behavior unchanged.
-4. No product changes are presently indicated or authorized. Keep `src/types.ts`, `src/lib/setupLifecycle.ts`, `src/App.tsx`, `src/lib/sync.ts`, and all components byte-unchanged from `253897a` during repair.
-5. Commit repair harnesses together with a C2 task-identifying SOL repair message. Leave Ralph files unchanged during implementation.
+## Independent QA gates
 
-## Exact post-repair gates
-
-1. `npx tsx scripts/chunk5-setup-harness.ts` passes from the normal CRLF Windows checkout, including every C1/C2 source, model, behavioral, and mutation gate.
-2. `npx tsx scripts/offline-indicator-harness.ts` passes from the same checkout, including terminal-entry clearing, later-Saved suppression, acknowledgement safety, typed status rendering, pull failure, and stale-generation gates.
-3. Raw full 24-harness matrix is exactly **22/24**. Only unchanged `muted-text-color-harness.ts` AuthView byte lock and final `saved-flash-harness.ts` whole-App reconstruction byte lock may fail. Any other failure blocks completion.
-4. `npm run lint` matches the exact three-error baseline. `npm run build` passes with 566 modules.
-5. Repair diff contains only the two approved harness files; `git diff --check`, protected paths, worktree cleanliness, and independent `cavecrew-reviewer` all pass.
-6. Report repair commit SHA and exact evidence. Stop for independent SOL QA. Do not advance Ralph or begin C3.
+1. Diff is exactly the four authorized files; protected paths and later C3+ scope are absent; `git diff --check` and clean worktree pass.
+2. `npx tsx scripts/setup-touch-target-harness.ts` passes, including one independently exercised layout mutation.
+3. `npx tsx scripts/chunk5-setup-harness.ts`, `npx tsx scripts/chunk5-tires-harness.ts`, and the full raw 24-harness matrix pass at the established exact **22/24**, with failures only in unchanged `muted-text-color-harness.ts` and `saved-flash-harness.ts` stale locks.
+4. `npm run lint` reports exactly the three known baseline errors. `npm run build` passes with 566 modules.
+5. NumberStepper timing/pointer logic has zero semantic diff. Inline call sites retain their prior layout and interaction behavior.
+6. Built-in browser visual QA at 360×800, 390×844, and 412×915 covers Default and Large scales. LF/RF and LR/RR controls row-align; stacked value is above side-by-side buttons; no clipping, overlap, or horizontal overflow; browser console has no warning/error.
+7. Hold-repeat retains 350ms/100ms cadence; pointer movement, pointer cancel, and scroll over a stepper produce zero unintended writes.
+8. Tires sub-view stacked pressure/backspacing controls match the Setups design.
+9. Java 21 debug APK is built after `npx cap sync android`, installed to the running emulator, and visually checked. Debug only: no release/signing/`release/` change.
+10. Independent `cavecrew-reviewer` reports no blocking finding. Primary records a strict PASS/FAIL score and updates Ralph, this plan, and `docs/OWNER_REPORT_UX_OVERHAUL.md`.
 
 ## Exclusions and hard bans
 
-No product changes; no C3–C5 or Chunk D/E; no session diff/pending UI; no SetupView, Quick Adjust, autosave, naming, rename, editability, lifecycle-definition, sync, schema, RLS, migration, Supabase configuration, CSS, NumberStepper, RaceWeekendView, native, Android, release, package/config, credentials, branch-ref, push, deploy, merge, production, or `master` change. Preserve dual weekend-delete, team-owner canonical writes, deferred delete queue, UXN-1 filtering, UXN-3 pull behavior, local-only active IDs, pinch zoom, accessibility, safe areas, and all A1–C1 acceptance. Terra and `cavecrew-builder` remain forbidden for all future C2 work.
+No C3–C5, Chunk D/E, session-diff UI, pending-change UI, setup lifecycle definition, Quick Adjust logic, autosave timing, Saved/sync arbiter, copy/naming/rename/editability behavior, schema, RLS, migration, Supabase configuration, native source, Android version/signing, release artifacts, package/config, credentials, production deploy, push, merge, or `master` change. Preserve all A1–C2 acceptance, dual-write behavior, team-owner writes, deferred deletes, offline/resume behavior, safe areas, pinch zoom, themes, and accessibility. Terra and `cavecrew-builder` remain forbidden.
