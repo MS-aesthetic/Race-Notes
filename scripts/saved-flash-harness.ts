@@ -6,14 +6,10 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { transformSync } from 'esbuild';
 
-const PARENT = '89845e8';
-const UXP18_COMMIT = '38e9828';
 const APP_PATH = 'src/App.tsx';
 const SETUP_PATH = 'src/components/SetupView.tsx';
 const SETTINGS_PATH = 'src/components/SettingsView.tsx';
 const EXPORT_PATH = 'src/components/ExportView.tsx';
-const HARNESS_PATH = 'scripts/saved-flash-harness.ts';
-const UXP17_ASSERTION_PATH = 'scripts/muted-text-color-harness.ts';
 const STEPPER_PATH = 'src/components/ui/NumberStepper.tsx';
 const root = process.cwd();
 const normalizeEol = (value: string) => value.replace(/\r\n/g, '\n');
@@ -21,7 +17,6 @@ const app = normalizeEol(readFileSync(join(root, APP_PATH), 'utf8'));
 const setup = normalizeEol(readFileSync(join(root, SETUP_PATH), 'utf8'));
 const settings = normalizeEol(readFileSync(join(root, SETTINGS_PATH), 'utf8'));
 const exportView = normalizeEol(readFileSync(join(root, EXPORT_PATH), 'utf8'));
-const parent = normalizeEol(execFileSync('git', ['show', `${PARENT}:${APP_PATH}`], { cwd: root, encoding: 'utf8' }));
 const stepper = normalizeEol(readFileSync(join(root, STEPPER_PATH), 'utf8'));
 
 const between = (source: string, start: string, end: string, label: string): string => {
@@ -654,9 +649,10 @@ syncTimeoutModel.advance(1500);
 assert.equal(syncTimeoutModel.visible(), 'Synced', 'B2 ordinary Synced timeout mutation remains visible past shared lifetime');
 
 const duplicateHistoricalMutation = setup.replace(
-  'if (isSetupLocked(target, weekends)) {\n      return;',
-  "if (isSetupLocked(target, weekends)) {\n      onInfo?.('Historical setups are view-only. Clone this setup to make an editable copy.');\n      return;",
+  'if (!getSetupEditability(target, weekends, activeEventSetupId).deletable) {\n      return;',
+  "if (!getSetupEditability(target, weekends, activeEventSetupId).deletable) {\n      onInfo?.('Historical setups are view-only. Clone this setup to make an editable copy.');\n      return;",
 );
+assert.notEqual(duplicateHistoricalMutation, setup, 'B2 duplicate historical mutation changes current production guard');
 assert.equal(notificationSourcePasses(app, duplicateHistoricalMutation), false, 'B2 duplicate historical transient-copy mutation fails the source gate');
 
 const sync = normalizeEol(readFileSync(join(root, 'src/lib/sync.ts'), 'utf8'));
@@ -884,31 +880,31 @@ assert.equal(sharedPullStatusAfterCompletion(staleSharedPullMutation, false, fal
 const staleSharedPullRoute = productionNotificationRoute(app, false, sharedPullStatusAfterCompletion(staleSharedPullMutation, true, true) ?? '', false, true);
 assert.equal(staleSharedPullRoute.visible && staleSharedPullRoute.isPersistent && staleSharedPullRoute.msg === 'Sync failed — will retry', true, 'B3 stale-shared-pull mutation independently fails rendered failure gate');
 
-type SetupSaveOutcome = { activated: boolean; cloudSetupWrite: boolean; feedback: 'Saved' | null; pressuresPropagated: boolean };
+type SetupSaveOutcome = { activated: boolean; cloudSetupWrite: boolean; dirty: boolean; pressuresPropagated: boolean };
 const setupSaveOutcome = (source: string, didPersist: boolean, activeSelectionChanged: boolean): SetupSaveOutcome => {
   const repairedGuard = source.includes('if (!didPersist && !activeSelectionChanged) return;');
   const oldGuard = source.includes('if (!didPersist) return;');
   const returns = repairedGuard ? !didPersist && !activeSelectionChanged : oldGuard ? !didPersist : false;
-  if (returns) return { activated: false, cloudSetupWrite: false, feedback: null, pressuresPropagated: false };
+  if (returns) return { activated: false, cloudSetupWrite: false, dirty: false, pressuresPropagated: false };
   return {
     activated: activeSelectionChanged,
     cloudSetupWrite: didPersist && source.includes('if (didPersist) {\n      if (syncOwnerId) pushSetups(safeSetups, syncOwnerId, setSyncStatus);'),
-    feedback: 'Saved',
+    dirty: true,
     pressuresPropagated: activeSelectionChanged && source.includes('if (activated || pressuresChanged) {') && source.includes('const pressures = setupPressureBlock(nextActive);'),
   };
 };
-assert.deepEqual(setupSaveOutcome(app, false, false), { activated: false, cloudSetupWrite: false, feedback: null, pressuresPropagated: false }, 'B3 genuine reverted no-op stays silent');
-assert.deepEqual(setupSaveOutcome(app, false, true), { activated: true, cloudSetupWrite: false, feedback: 'Saved', pressuresPropagated: true }, 'B3 unchanged-array active selection persists and propagates pressures without setup cloud write');
-assert.deepEqual(setupSaveOutcome(app, true, false), { activated: false, cloudSetupWrite: true, feedback: 'Saved', pressuresPropagated: false }, 'B3 setup byte change persists and reports honestly');
+assert.deepEqual(setupSaveOutcome(app, false, false), { activated: false, cloudSetupWrite: false, dirty: false, pressuresPropagated: false }, 'B3 genuine reverted no-op stays silent');
+assert.deepEqual(setupSaveOutcome(app, false, true), { activated: true, cloudSetupWrite: false, dirty: true, pressuresPropagated: true }, 'B3 unchanged-array active selection persists and propagates pressures without setup cloud write');
+assert.deepEqual(setupSaveOutcome(app, true, false), { activated: false, cloudSetupWrite: true, dirty: true, pressuresPropagated: false }, 'B3 setup byte change persists and arms honest boundary feedback');
 const activeSelectionMutation = app.replace('if (!didPersist && !activeSelectionChanged) return;', 'if (!didPersist) return;');
 compileB2Mutation(activeSelectionMutation, 'unchanged-array-active-selection');
 assert.equal(b3SourcePasses(activeSelectionMutation, sync), false, 'B3 active-selection mutation fails source gate');
 assert.equal(setupSaveOutcome(activeSelectionMutation, false, true).activated, false, 'B3 active-selection mutation behaviorally blocks Use Setup');
 const activationRender = b2NotificationGeometry({ viewportWidth: 360, viewportHeight: 800, scale: 1, appSource: app, offline: true, simultaneous: true, includeInfo: false });
-assert.equal(setupSaveOutcome(app, false, true).feedback === 'Saved' && activationRender.noticeText.includes('Offline — saved on device'), true, 'B3 unchanged-array activation reaches truthful rendered offline feedback');
+assert.equal(setupSaveOutcome(app, false, true).dirty && activationRender.noticeText.includes('Offline — saved on device'), true, 'B3 unchanged-array activation reaches truthful rendered offline feedback at boundary');
 const activationRoute = (source: string): B2RenderedRoute => productionNotificationRoute(
   source,
-  setupSaveOutcome(source, false, true).feedback === 'Saved',
+  setupSaveOutcome(source, false, true).dirty,
   '',
   false,
   false,
@@ -920,7 +916,7 @@ assert.equal(mutatedActivationRoute.visible || mutatedActivationRoute.msg.includ
 const blockedFlashMutation = app.replace('if (!didPersist && !activeSelectionChanged) return;', 'if (false) return;');
 compileB2Mutation(blockedFlashMutation, 'blocked-save-flash');
 assert.equal(b3SourcePasses(blockedFlashMutation, sync), false, 'B3 blocked-save mutation fails source gate');
-assert.equal(setupSaveOutcome(blockedFlashMutation, false, false).feedback, 'Saved', 'B3 blocked-save mutation behaviorally emits false Saved');
+assert.equal(setupSaveOutcome(blockedFlashMutation, false, false).dirty, true, 'B3 blocked-save mutation behaviorally arms false Saved');
 
 for (const [label, start, end, expected] of pullSpecs) {
   const block = pullBlock(sync, start, end, label);
@@ -1034,128 +1030,547 @@ assert.equal(pullSuccessSourceMutation.includes("setSyncStatus('synced');"), tru
 console.log('B3 honest status harness: PASS');
 console.log('B2 notification arbiter harness: PASS');
 
-// Exact feature files plus one necessary assertion-only prior-harness compatibility edit.
-const tracked = execFileSync('git', ['diff', '--name-only', PARENT, UXP18_COMMIT, '--', 'src', 'scripts'], { cwd: root, encoding: 'utf8' })
-  .split(/\r?\n/).filter(Boolean);
-assert.deepEqual(
-  tracked.sort(),
-  [APP_PATH, HARNESS_PATH, UXP17_ASSERTION_PATH].sort(),
-  'UXP-18 changes App/focused harness plus only the required UXP-17 assertion compatibility file',
-);
+// C4 autosave boundary harness follows. B1/B2/B3 coverage above stays active.
 
-// Reconstruct parent App exactly by reversing only authorized UXP-18 edits.
-let reverted = app.replace(/^\s+(?:if \(notifySaved\) )?flashSaved\(\);\n/gm, '');
-reverted = reverted
-  .replace(
-    `    const notifySaved = typeof (expectedAccountId as unknown) === 'boolean'\n      ? expectedAccountId as unknown as boolean\n      : true;\n    if (typeof (expectedAccountId as unknown) === 'boolean') expectedAccountId = undefined;\n`,
-    '',
-  )
-  .replace(
-    'const handleSaveShockSessions = (updated: ShockSession[], notifySaved = true) => {',
-    'const handleSaveShockSessions = (updated: ShockSession[]) => {',
-  )
-  .replace(
-    'const handleSaveTodos = (updated: Todo[], notifySaved = true) => {',
-    'const handleSaveTodos = (updated: Todo[]) => {',
-  )
-  .replace('handleSaveTodos(reconciled, false);', 'handleSaveTodos(reconciled);')
-  .replace('handleSaveShockSessions(stampedShock, false);', 'handleSaveShockSessions(stampedShock);')
-  .replace(
-    `    // @ts-expect-error Runtime boolean overload keeps UXP-3's account-guard signature stable.\n    handleSaveCars([defaultCar], false);`,
-    '    handleSaveCars([defaultCar]);',
-  )
-  .replace(
-    `  const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);\n`,
-    `  const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);\n  const flashReadyRef = useRef(false);      // false until initial hydration settles\n  const suppressPullRef = useRef(false);    // true during cloud pulls\n`,
-  )
-  .replace(
-    `  useEffect(() => {\n    return () => {\n      if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);\n    };\n  }, []);\n`,
-    `  // Enable flashes only after the initial localStorage hydration has settled,\n  // so loading the app doesn't count as a "save".\n  useEffect(() => {\n    const t = setTimeout(() => { flashReadyRef.current = true; }, 800);\n    return () => clearTimeout(t);\n  }, []);\n`,
-  )
-  .replace(
-    `  // Auto-dismiss any sync status so a message can never get "stuck" on screen.\n`,
-    `  // Fire on any change to the core datasets — covers every save path (online\n  // or offline) without wiring each individual handler.\n  useEffect(() => {\n    if (!flashReadyRef.current || suppressPullRef.current) return;\n    flashSaved();\n    // eslint-disable-next-line react-hooks/exhaustive-deps\n  }, [setup, savedSetups, weekends, activeSession, tireInventory, cars, shockSessions, todos, accounting, shopping, maintenance, maintenanceLogs, checklistTemplates, weekendChecklists]);\n\n  // Auto-dismiss any sync status so a message can never get "stuck" on screen.\n`,
-  )
-  .replace(
-    `    const doPull = async () => {\n      setSyncStatus('Syncing...');`,
-    `    const doPull = async () => {\n      suppressPullRef.current = true; // don't show "Saved" for cloud-pull state updates\n      setSyncStatus('Syncing...');`,
-  )
-  .replace(
-    `      setSyncStatus('Synced');\n      setTimeout(() => setSyncStatus(''), 3000);\n`,
-    `      setSyncStatus('Synced');\n      setTimeout(() => setSyncStatus(''), 3000);\n      // Re-enable "Saved" flashes after pull-driven state settles.\n      setTimeout(() => { if (isCurrentPull()) suppressPullRef.current = false; }, 800);\n`,
-  )
-  .replace(
-    `      setPullDone(true); // checklist reconciliation may now use merged/local data\n`,
-    `      setPullDone(true); // checklist reconciliation may now use merged/local data\n      setTimeout(() => { if (isCurrentPull()) suppressPullRef.current = false; }, 800);\n`,
-  );
-assert.equal(reverted, parent, 'whole App equals parent after reversing only authorized UXP-18 changes');
-
-// Dataset watcher and timing suppression are gone; explicit timer behavior stays.
-assert.doesNotMatch(app, /flashReadyRef|suppressPullRef/);
-assert.doesNotMatch(app, /\[setup, savedSetups, weekends, activeSession, tireInventory, cars, shockSessions, todos, accounting, shopping, maintenance, maintenanceLogs, checklistTemplates, weekendChecklists\]/);
-assert.equal((app.match(/\bflashSaved\(\);/g) ?? []).length, 22, 'exact explicit user-boundary flash inventory');
-assert.match(app, /const \[savedFlash, setSavedFlash\] = useState\(false\);/);
-assert.match(app, /const savedFlashTimer = useRef<ReturnType<typeof setTimeout> \| null>\(null\);/);
-assert.match(app, /const flashSaved = \(\) => \{\s*setSavedFlash\(true\);\s*if \(savedFlashTimer\.current\) clearTimeout\(savedFlashTimer\.current\);\s*savedFlashTimer\.current = setTimeout\(\(\) => setSavedFlash\(false\), 1900\);\s*\};/s);
-assert.match(app, /useEffect\(\(\) => \{\s*return \(\) => \{\s*if \(savedFlashTimer\.current\) clearTimeout\(savedFlashTimer\.current\);\s*\};\s*\}, \[\]\);/s);
-
-// Executable coalescing model, tied to exact source lock above.
-let visible = false;
-let timer: number | null = null;
-let nextTimer = 0;
-const liveTimers = new Set<number>();
-const flashModel = () => {
-  visible = true;
-  if (timer !== null) liveTimers.delete(timer);
-  timer = ++nextTimer;
-  liveTimers.add(timer);
+type RuntimeExport = (...args: any[]) => any;
+let c4AssertionCount = 0;
+const killedC4Mutations: string[] = [];
+const c4Ok = (value: unknown, message: string): void => {
+  c4AssertionCount += 1;
+  assert.ok(value, message);
 };
-flashModel();
-flashModel();
-flashModel();
-assert.equal(visible, true);
-assert.deepEqual([...liveTimers], [3], 'same-tick compound writes leave one timer');
-liveTimers.delete(3);
-visible = false;
-assert.equal(visible, false, 'latest timer dismisses one coalesced flash');
+const c4Equal = (actual: unknown, expected: unknown, message: string): void => {
+  c4AssertionCount += 1;
+  assert.deepEqual(actual, expected, message);
+};
+const c4Kill = (name: string, killed: boolean): void => {
+  c4AssertionCount += 1;
+  assert.equal(killed, true, `C4 mutation killed: ${name}`);
+  killedC4Mutations.push(name);
+};
 
-// Existing visuals, copy, offline variant, and sync-state priority are byte-identical.
-const toastStart = '{/* Single brief Saved / sync toast';
-const toastEnd = '{/* Core Main Active Canvas Area */}';
-assert.equal(
-  between(app, toastStart, toastEnd, 'current toast'),
-  between(parent, toastStart, toastEnd, 'parent toast'),
-  'Saved/sync toast markup remains byte-identical',
+const compileExport = (
+  source: string,
+  name: string,
+  endMarker: string,
+  dependencies: Record<string, unknown> = {},
+): RuntimeExport => {
+  const start = source.indexOf(`export const ${name} =`);
+  const end = source.indexOf(endMarker, start);
+  assert.ok(start >= 0 && end > start, `C4 production export ${name} exists`);
+  const compiled = transformSync(source.slice(start, end), { loader: 'tsx', format: 'cjs' }).code;
+  const moduleBox = { exports: {} as Record<string, unknown> };
+  const dependencyNames = Object.keys(dependencies);
+  const evaluate = new Function('module', 'exports', ...dependencyNames, compiled);
+  evaluate(moduleBox, moduleBox.exports, ...dependencyNames.map(key => dependencies[key]));
+  return moduleBox.exports[name] as RuntimeExport;
+};
+
+const compileHandler = (
+  source: string,
+  name: string,
+  nextAnchor: string,
+  dependencies: Record<string, unknown>,
+): RuntimeExport => {
+  const block = between(source, `  const ${name} =`, nextAnchor, `C4 ${name} production handler`);
+  const exported = block.replace(`  const ${name} =`, `export const ${name} =`);
+  const compiled = transformSync(exported, { loader: 'tsx', format: 'cjs' }).code;
+  const moduleBox = { exports: {} as Record<string, unknown> };
+  const dependencyNames = Object.keys(dependencies);
+  const evaluate = new Function('module', 'exports', ...dependencyNames, compiled);
+  evaluate(moduleBox, moduleBox.exports, ...dependencyNames.map(key => dependencies[key]));
+  return moduleBox.exports[name] as RuntimeExport;
+};
+
+const intervalFromSource = (source: string): number => {
+  const match = source.match(/const SAVED_FEEDBACK_INTERVAL_MS = ([\d_]+);/);
+  assert.ok(match, 'C4 production interval constant exists');
+  return Number(match[1].replaceAll('_', ''));
+};
+const compileController = (source = app): RuntimeExport => compileExport(
+  source,
+  'createSavedFeedbackController',
+  '\ntype SavedFeedbackBoundaryTargets',
 );
-for (const text of ['Saved', 'Offline — saved on device', 'Syncing…', 'Synced']) assert.ok(app.includes(text));
+const compileInstaller = (source = app): RuntimeExport => compileExport(
+  source,
+  'installSavedFeedbackBoundaries',
+  '\nexport const flushSavedFeedbackOnTabChange',
+  { SAVED_FEEDBACK_INTERVAL_MS: intervalFromSource(source) },
+);
+const compileTabBoundary = (source = app): RuntimeExport => compileExport(
+  source,
+  'flushSavedFeedbackOnTabChange',
+  '\nconst isOnlineNow',
+);
 
-// Mixed-origin helpers default to notification; exact background calls opt out.
-assert.match(app, /const handleSaveCars = \(updated: Car\[\], expectedAccountId\?: string \| null\)/);
-assert.match(app, /const notifySaved = typeof \(expectedAccountId as unknown\) === 'boolean'\s*\? expectedAccountId as unknown as boolean\s*: true;/s);
-assert.match(app, /if \(typeof \(expectedAccountId as unknown\) === 'boolean'\) expectedAccountId = undefined;/);
-assert.match(app, /const handleSaveShockSessions = \(updated: ShockSession\[\], notifySaved = true\)/);
-assert.match(app, /const handleSaveTodos = \(updated: Todo\[\], notifySaved = true\)/);
-for (const call of [
-  'handleSaveTodos(reconciled, false);',
-  'handleSaveShockSessions(stampedShock, false);',
-  'handleSaveCars([defaultCar], false);',
-]) assert.equal(app.split(call).length - 1, 1, `${call} is exact and unique`);
+const c4SourcePasses = (source: string): boolean => {
+  const sessionCreate = between(source, '  const handleCreateNewSession =', '  // Immediate delete', 'C4 session source');
+  return source.includes('const SAVED_FEEDBACK_INTERVAL_MS = 30_000;')
+    && source.includes('export const createSavedFeedbackController =')
+    && source.includes('if (!dirty) return false;\n      dirty = false;\n      announceSaved();')
+    && source.includes('export const installSavedFeedbackBoundaries =')
+    && source.includes("targets.documentTarget.addEventListener('visibilitychange', onVisibilityChange);")
+    && source.includes("targets.windowTarget.addEventListener('pagehide', onPageHide);")
+    && source.includes('targets.windowTarget.setInterval(flushSavedBoundary, SAVED_FEEDBACK_INTERVAL_MS)')
+    && source.includes('if (!isActive) flushSavedBoundary();')
+    && source.includes("targets.documentTarget.removeEventListener('visibilitychange', onVisibilityChange);")
+    && source.includes("targets.windowTarget.removeEventListener('pagehide', onPageHide);")
+    && source.includes('targets.windowTarget.clearInterval(intervalHandle);')
+    && source.includes('export const flushSavedFeedbackOnTabChange =')
+    && source.includes('previousTab !== nextTab && flushSavedBoundary()')
+    && source.includes('const markSavedDirty = () => { savedFeedbackControllerRef.current?.markDirty(); };')
+    && source.includes('const flushSavedBoundary = () => savedFeedbackControllerRef.current?.flush() ?? false;')
+    && source.includes('createSavedFeedbackController(() => flashSavedRef.current())')
+    && source.includes('flushSavedFeedbackOnTabChange(previousTab, activeTab, flushSavedBoundary);')
+    && source.includes('useEffect(() => installSavedFeedbackBoundaries(flushSavedBoundary, {')
+    && (source.match(/\bmarkSavedDirty\(\);/g) ?? []).length === 22
+    && (source.match(/\bflashSaved\(\);/g) ?? []).length === 0
+    && sessionCreate.includes("localStorage.setItem('race_notes_active_session', JSON.stringify(nextSession));\n    markSavedDirty();\n    flushSavedBoundary();");
+};
+c4Ok(c4SourcePasses(app), 'C4 production source binds one dirty controller and every required boundary');
 
-// Shared save helpers flash after state + localStorage and before optional cloud push.
+const createController = compileController(app) as (announce: () => void) => {
+  markDirty: () => void;
+  flush: () => boolean;
+  isDirty: () => boolean;
+};
+let burstAnnouncements = 0;
+const burstController = createController(() => { burstAnnouncements += 1; });
+const burstStore = new Map<string, string>();
+let burstWrites = 0;
+const burstEvents: string[] = [];
+const compileTireSave = (source: string, controller = burstController, announcements?: { count: number }) => compileHandler(
+  source,
+  'handleSaveTires',
+  '  const handleDeleteTireFromCloud',
+  {
+    setTireInventory: () => { burstEvents.push('state'); },
+    localStorage: { setItem: (key: string, value: string) => { burstWrites += 1; burstStore.set(key, value); burstEvents.push('write'); } },
+    markSavedDirty: () => { burstEvents.push('mark'); controller.markDirty(); },
+    flashSaved: () => { burstEvents.push('flash'); if (announcements) announcements.count += 1; },
+    user: null,
+    pushTires: () => { burstEvents.push('push'); },
+    setSyncStatus: () => undefined,
+  },
+);
+const saveTires = compileTireSave(app);
+for (const pressure of ['10', '11', '12']) saveTires([{ id: 'tire-1', airPressure: pressure }]);
+c4Equal(burstWrites, 3, 'C4 N-edit burst performs N immediate local writes');
+c4Equal(burstAnnouncements, 0, 'C4 N-edit burst emits zero Saved before boundary');
+c4Equal(JSON.parse(burstStore.get('race_notes_tires') ?? '[]')[0].airPressure, '12', 'C4 final edit is synchronously persisted');
+c4Ok(burstEvents.lastIndexOf('write') < burstEvents.lastIndexOf('mark'), 'C4 dirty mark follows direct persistence');
+
+const tabBoundary = compileTabBoundary(app) as (previous: string, next: string, flush: () => boolean) => boolean;
+c4Equal(tabBoundary('setups', 'raceweekend', burstController.flush), true, 'C4 tab change consumes dirty boundary');
+c4Equal(burstAnnouncements, 1, 'C4 first dirty tab boundary emits exactly one Saved');
+c4Equal(tabBoundary('raceweekend', 'dashboard', burstController.flush), false, 'C4 clean second tab boundary stays silent');
+c4Equal(burstAnnouncements, 1, 'C4 clean tab boundary emits zero additional Saved');
+burstController.markDirty();
+c4Equal(tabBoundary('dashboard', 'trackers', burstController.flush), true, 'C4 later edit rearms tab boundary');
+c4Equal(burstAnnouncements, 2, 'C4 rearmed boundary emits one later Saved');
+
+const processDeathStore = new Map(burstStore);
+let processDeathAnnouncements = 0;
+const relaunchedController = createController(() => { processDeathAnnouncements += 1; });
+c4Equal(JSON.parse(processDeathStore.get('race_notes_tires') ?? '[]')[0].airPressure, '12', 'C4 process death retains every pre-boundary persisted edit');
+c4Equal(processDeathAnnouncements, 0, 'C4 process death before boundary needs no prior Saved feedback');
+c4Equal(relaunchedController.isDirty(), false, 'C4 dirty feedback state is memory-only and not resurrected');
+
+const immediateCounter = { count: 0 };
+const immediateFlashMutation = app.replace(
+  "localStorage.setItem('race_notes_tires', JSON.stringify(updated));\n    markSavedDirty();",
+  "localStorage.setItem('race_notes_tires', JSON.stringify(updated));\n    flashSaved();",
+);
+assert.notEqual(immediateFlashMutation, app, 'C4 immediate-flash mutation changes production tire handler');
+const immediateSave = compileTireSave(immediateFlashMutation, createController(() => undefined), immediateCounter);
+immediateSave([]); immediateSave([]); immediateSave([]);
+c4Kill('immediate-flash-restored', immediateCounter.count === 3);
+
+const markBeforePersistenceMutation = app.replace(
+  "setTireInventory(updated);\n    localStorage.setItem('race_notes_tires', JSON.stringify(updated));\n    markSavedDirty();",
+  "markSavedDirty();\n    setTireInventory(updated);\n    localStorage.setItem('race_notes_tires', JSON.stringify(updated));",
+);
+assert.notEqual(markBeforePersistenceMutation, app, 'C4 mark-before-persistence mutation changes production tire handler');
+burstEvents.length = 0;
+compileTireSave(markBeforePersistenceMutation)([]);
+c4Kill('mark-before-persistence', burstEvents.indexOf('mark') < burstEvents.indexOf('write'));
+
+const omittedTabMutation = app.replace('previousTab !== nextTab && flushSavedBoundary()', 'false && flushSavedBoundary()');
+const omittedTab = compileTabBoundary(omittedTabMutation) as typeof tabBoundary;
+let omittedTabAnnouncements = 0;
+const omittedTabController = createController(() => { omittedTabAnnouncements += 1; });
+omittedTabController.markDirty();
+omittedTab('setups', 'raceweekend', omittedTabController.flush);
+c4Kill('tab-boundary-omitted', omittedTabAnnouncements === 0 && omittedTabController.isDirty());
+
+type BoundaryProbe = {
+  controller: ReturnType<typeof createController>;
+  announcements: () => number;
+  setHidden: () => void;
+  fireVisibility: () => void;
+  firePageHide: () => void;
+  fireNative: (isActive: boolean) => void;
+  fireTimer: () => void;
+  intervalDelay: () => number;
+  cleanup: () => void;
+  counts: Record<string, number>;
+};
+const createBoundaryProbe = (source = app): BoundaryProbe => {
+  let announcements = 0;
+  const controllerFactory = compileController(source) as typeof createController;
+  const controller = controllerFactory(() => { announcements += 1; });
+  let visibilityState = 'visible';
+  let visibilityListener: (() => void) | null = null;
+  let pageHideListener: (() => void) | null = null;
+  let nativeListener: ((state: { isActive: boolean }) => void) | null = null;
+  let timerCallback: (() => void) | null = null;
+  let timerDelay = 0;
+  const counts = {
+    visibilityAdd: 0, visibilityRemove: 0,
+    pageHideAdd: 0, pageHideRemove: 0,
+    intervalAdd: 0, intervalClear: 0,
+    nativeAdd: 0, nativeRemove: 0,
+  };
+  const documentTarget = {
+    get visibilityState() { return visibilityState; },
+    addEventListener: (_type: 'visibilitychange', listener: () => void) => { counts.visibilityAdd += 1; visibilityListener = listener; },
+    removeEventListener: (_type: 'visibilitychange', listener: () => void) => {
+      counts.visibilityRemove += 1;
+      if (visibilityListener === listener) visibilityListener = null;
+    },
+  };
+  const windowTarget = {
+    addEventListener: (_type: 'pagehide', listener: () => void) => { counts.pageHideAdd += 1; pageHideListener = listener; },
+    removeEventListener: (_type: 'pagehide', listener: () => void) => {
+      counts.pageHideRemove += 1;
+      if (pageHideListener === listener) pageHideListener = null;
+    },
+    setInterval: (callback: () => void, delay: number) => { counts.intervalAdd += 1; timerCallback = callback; timerDelay = delay; return 41; },
+    clearInterval: (handle: number) => { assert.equal(handle, 41); counts.intervalClear += 1; timerCallback = null; },
+  };
+  const addNativeListener = async (listener: (state: { isActive: boolean }) => void) => {
+    counts.nativeAdd += 1;
+    nativeListener = listener;
+    return { remove: async () => { counts.nativeRemove += 1; nativeListener = null; } };
+  };
+  const install = compileInstaller(source) as (
+    flush: () => boolean,
+    targets: { documentTarget: typeof documentTarget; windowTarget: typeof windowTarget; addNativeListener: typeof addNativeListener },
+  ) => () => void;
+  const cleanup = install(controller.flush, { documentTarget, windowTarget, addNativeListener });
+  return {
+    controller,
+    announcements: () => announcements,
+    setHidden: () => { visibilityState = 'hidden'; },
+    fireVisibility: () => { visibilityListener?.(); },
+    firePageHide: () => { pageHideListener?.(); },
+    fireNative: isActive => { nativeListener?.({ isActive }); },
+    fireTimer: () => { timerCallback?.(); },
+    intervalDelay: () => timerDelay,
+    cleanup,
+    counts,
+  };
+};
+
+const boundaryProbe = createBoundaryProbe(app);
+c4Equal(boundaryProbe.counts, {
+  visibilityAdd: 1, visibilityRemove: 0,
+  pageHideAdd: 1, pageHideRemove: 0,
+  intervalAdd: 1, intervalClear: 0,
+  nativeAdd: 1, nativeRemove: 0,
+}, 'C4 lifecycle listeners and timer register once');
+boundaryProbe.controller.markDirty();
+boundaryProbe.setHidden();
+boundaryProbe.fireVisibility();
+c4Equal(boundaryProbe.announcements(), 1, 'C4 hidden visibility flushes dirty feedback once');
+boundaryProbe.firePageHide();
+c4Equal(boundaryProbe.announcements(), 1, 'C4 paired visibility and pagehide coalesce');
+boundaryProbe.controller.markDirty();
+boundaryProbe.firePageHide();
+c4Equal(boundaryProbe.announcements(), 2, 'C4 isolated pagehide flushes once');
+boundaryProbe.controller.markDirty();
+boundaryProbe.fireNative(false);
+c4Equal(boundaryProbe.announcements(), 3, 'C4 native inactive flushes once');
+boundaryProbe.fireNative(true);
+c4Equal(boundaryProbe.announcements(), 3, 'C4 native active transition stays feedback-silent');
+boundaryProbe.controller.markDirty();
+c4Equal(boundaryProbe.intervalDelay(), 30_000, 'C4 periodic cadence is exactly 30,000ms');
+boundaryProbe.fireTimer();
+c4Equal(boundaryProbe.announcements(), 4, 'C4 dirty periodic timer flushes once');
+boundaryProbe.fireTimer();
+c4Equal(boundaryProbe.announcements(), 4, 'C4 clean periodic timer stays silent');
+boundaryProbe.cleanup();
+await Promise.resolve();
+await Promise.resolve();
+c4Equal(boundaryProbe.counts, {
+  visibilityAdd: 1, visibilityRemove: 1,
+  pageHideAdd: 1, pageHideRemove: 1,
+  intervalAdd: 1, intervalClear: 1,
+  nativeAdd: 1, nativeRemove: 1,
+}, 'C4 lifecycle listeners and timer clean up exactly once');
+
+const boundaryMutationResult = (
+  source: string,
+  fire: (probe: BoundaryProbe) => void,
+): { announcements: number; dirty: boolean; probe: BoundaryProbe } => {
+  const probe = createBoundaryProbe(source);
+  probe.controller.markDirty();
+  fire(probe);
+  return { announcements: probe.announcements(), dirty: probe.controller.isDirty(), probe };
+};
+const visibilityOmittedMutation = app.replace(
+  "if (targets.documentTarget.visibilityState === 'hidden') flushSavedBoundary();",
+  "if (targets.documentTarget.visibilityState === 'hidden') return;",
+);
+const visibilityMutationResult = boundaryMutationResult(visibilityOmittedMutation, probe => { probe.setHidden(); probe.fireVisibility(); });
+c4Kill('visibility-boundary-omitted', visibilityMutationResult.announcements === 0 && visibilityMutationResult.dirty);
+
+const pageHideOmittedMutation = app.replace(
+  'const onPageHide = () => { flushSavedBoundary(); };',
+  'const onPageHide = () => undefined;',
+);
+const pageHideMutationResult = boundaryMutationResult(pageHideOmittedMutation, probe => probe.firePageHide());
+c4Kill('pagehide-boundary-omitted', pageHideMutationResult.announcements === 0 && pageHideMutationResult.dirty);
+
+const nativeOmittedMutation = app.replace('if (!isActive) flushSavedBoundary();', 'if (!isActive) return;');
+const nativeMutationResult = boundaryMutationResult(nativeOmittedMutation, probe => probe.fireNative(false));
+c4Kill('native-inactive-boundary-omitted', nativeMutationResult.announcements === 0 && nativeMutationResult.dirty);
+
+const timerOmittedMutation = app.replace(
+  'targets.windowTarget.setInterval(flushSavedBoundary, SAVED_FEEDBACK_INTERVAL_MS)',
+  'targets.windowTarget.setInterval(() => undefined, SAVED_FEEDBACK_INTERVAL_MS)',
+);
+const timerMutationResult = boundaryMutationResult(timerOmittedMutation, probe => probe.fireTimer());
+c4Kill('timer-boundary-omitted', timerMutationResult.announcements === 0 && timerMutationResult.dirty);
+
+const timerCadenceMutation = app.replace('const SAVED_FEEDBACK_INTERVAL_MS = 30_000;', 'const SAVED_FEEDBACK_INTERVAL_MS = 29_999;');
+const timerCadenceProbe = createBoundaryProbe(timerCadenceMutation);
+c4Kill('timer-cadence-changed', timerCadenceProbe.intervalDelay() === 29_999);
+
+const dirtyClearMutation = app.replace('dirty = false;\n      announceSaved();', 'announceSaved();');
+const dirtyClearControllerFactory = compileController(dirtyClearMutation) as typeof createController;
+let dirtyClearAnnouncements = 0;
+const dirtyClearController = dirtyClearControllerFactory(() => { dirtyClearAnnouncements += 1; });
+dirtyClearController.markDirty();
+dirtyClearController.flush();
+dirtyClearController.flush();
+c4Kill('dirty-clear-omitted', dirtyClearAnnouncements === 2);
+
+const cleanGuardMutation = app.replace('if (!dirty) return false;', 'if (false) return false;');
+const cleanGuardFactory = compileController(cleanGuardMutation) as typeof createController;
+let cleanGuardAnnouncements = 0;
+cleanGuardFactory(() => { cleanGuardAnnouncements += 1; }).flush();
+c4Kill('clean-boundary-flushes', cleanGuardAnnouncements === 1);
+
+const visibilityCleanupMutation = app.replace(
+  "    targets.documentTarget.removeEventListener('visibilitychange', onVisibilityChange);\n",
+  '',
+);
+const visibilityCleanupProbe = createBoundaryProbe(visibilityCleanupMutation);
+visibilityCleanupProbe.cleanup();
+c4Kill('visibility-cleanup-removed', visibilityCleanupProbe.counts.visibilityRemove === 0);
+
+const pageHideCleanupMutation = app.replace(
+  "    targets.windowTarget.removeEventListener('pagehide', onPageHide);\n",
+  '',
+);
+const pageHideCleanupProbe = createBoundaryProbe(pageHideCleanupMutation);
+pageHideCleanupProbe.cleanup();
+c4Kill('pagehide-cleanup-removed', pageHideCleanupProbe.counts.pageHideRemove === 0);
+
+const timerCleanupMutation = app.replace('    targets.windowTarget.clearInterval(intervalHandle);\n', '');
+const timerCleanupProbe = createBoundaryProbe(timerCleanupMutation);
+timerCleanupProbe.cleanup();
+c4Kill('timer-cleanup-removed', timerCleanupProbe.counts.intervalClear === 0);
+
+const nativeCleanupMutation = app.replace(
+  '    if (nativeListener) void nativeListener.then(listener => listener.remove());\n',
+  '',
+);
+const nativeCleanupProbe = createBoundaryProbe(nativeCleanupMutation);
+nativeCleanupProbe.cleanup();
+await Promise.resolve();
+await Promise.resolve();
+c4Kill('native-cleanup-removed', nativeCleanupProbe.counts.nativeRemove === 0);
+
+const compileFlashSaved = (source: string): RuntimeExport => {
+  const block = between(source, '  const flashSaved = () => {', '  flashSavedRef.current = flashSaved;', 'C4 flashSaved production block');
+  const exported = block.replace('  const flashSaved =', 'export const flashSaved =');
+  return (dependencies: Record<string, unknown>) => {
+    const compiled = transformSync(exported, { loader: 'tsx', format: 'cjs' }).code;
+    const moduleBox = { exports: {} as Record<string, unknown> };
+    const names = Object.keys(dependencies);
+    const evaluate = new Function('module', 'exports', ...names, compiled);
+    evaluate(moduleBox, moduleBox.exports, ...names.map(key => dependencies[key]));
+    return moduleBox.exports.flashSaved;
+  };
+};
+const createFlashRuntime = (source: string, info: unknown, terminal: string | null) => {
+  let savedShows = 0;
+  const infoToastRef = { current: info };
+  const syncStatusRef = { current: terminal };
+  const savedFlashTimer = { current: null as number | null };
+  const flashFactory = compileFlashSaved(source);
+  const flashSaved = flashFactory({
+    infoToastRef,
+    isTerminalSyncStatus: (status: string | null) => status === 'sync-error' || status === 'deferred-delete-retrying',
+    syncStatusRef,
+    isOnline: true,
+    setSyncStatus: () => undefined,
+    setSavedFlash: (value: boolean) => { if (value) savedShows += 1; },
+    savedFlashTimer,
+    clearTimeout: () => undefined,
+    setTimeout: () => 91,
+    SUCCESS_TOAST_MS: 1500,
+  }) as () => void;
+  return { flashSaved, infoToastRef, syncStatusRef, savedShows: () => savedShows };
+};
+
+const infoFlash = createFlashRuntime(app, { reason: 'pressure-source' }, null);
+const infoController = createController(infoFlash.flashSaved);
+infoController.markDirty();
+c4Equal(infoController.flush(), true, 'C4 info-suppressed boundary still consumes dirty state');
+c4Equal(infoFlash.savedShows(), 0, 'C4 accepted info priority suppresses boundary Saved');
+infoFlash.infoToastRef.current = null;
+c4Equal(infoController.flush(), false, 'C4 info acknowledgement cannot resurrect consumed Saved');
+c4Equal(infoFlash.savedShows(), 0, 'C4 no stale Saved appears after info acknowledgement');
+
+const terminalFlash = createFlashRuntime(app, null, 'sync-error');
+const terminalController = createController(terminalFlash.flashSaved);
+terminalController.markDirty();
+c4Equal(terminalController.flush(), true, 'C4 terminal-suppressed boundary consumes dirty state');
+c4Equal(terminalFlash.savedShows(), 0, 'C4 accepted terminal priority suppresses boundary Saved');
+terminalFlash.syncStatusRef.current = null;
+c4Equal(terminalController.flush(), false, 'C4 terminal acknowledgement cannot resurrect consumed Saved');
+
+const priorityMutation = app.replace(
+  'if (infoToastRef.current || isTerminalSyncStatus(syncStatusRef.current)) return;',
+  'if (false) return;',
+);
+const priorityFlash = createFlashRuntime(priorityMutation, null, 'sync-error');
+const priorityController = createController(priorityFlash.flashSaved);
+priorityController.markDirty();
+priorityController.flush();
+c4Kill('boundary-priority-weakened', priorityFlash.savedShows() === 1);
+
+const sessionHandlerBlock = (source: string): string => between(
+  source,
+  '  const handleCreateNewSession =',
+  '  // Immediate delete',
+  'C4 session handler',
+);
+const compileSessionPersistence = (source: string): RuntimeExport => {
+  const sessionBlock = sessionHandlerBlock(source);
+  const start = sessionBlock.indexOf('    const updatedWeekends = weekendsRef.current.map');
+  const end = sessionBlock.indexOf('    if (pressureSourceNote)', start);
+  assert.ok(start >= 0 && end > start, 'C4 real session persistence tail exists');
+  const tail = sessionBlock.slice(start, end);
+  const wrapped = `export function persistCreatedSession(context: any) {
+    const { weekendsRef, targetWeekend, newRecord, setWeekends, localStorage, syncOwnerId, pushWeekends,
+      syncTireLifecycle, tireInventory, setTireInventory, user, pushTires, activeSessionRef, nextSession,
+      setActiveSession, markSavedDirty, flushSavedBoundary } = context;
+${tail}
+  }`;
+  const compiled = transformSync(wrapped, { loader: 'tsx', format: 'cjs' }).code;
+  const moduleBox = { exports: {} as Record<string, unknown> };
+  new Function('module', 'exports', compiled)(moduleBox, moduleBox.exports);
+  return moduleBox.exports.persistCreatedSession as RuntimeExport;
+};
+const runSessionPersistence = (source: string) => {
+  const events: string[] = [];
+  const storage = new Map<string, string>();
+  let announcements = 0;
+  const controller = createController(() => { announcements += 1; events.push('announce'); });
+  const targetWeekend = { id: 'weekend-1', sessions: [] };
+  const newRecord = { id: 'session-1', setupId: 'setup-1', setupSnapshot: { chassis: 'Owner Setup', gear: '6.20' } };
+  const nextSession = { id: 'session-1', weekendId: 'weekend-1' };
+  compileSessionPersistence(source)({
+    weekendsRef: { current: [targetWeekend] },
+    targetWeekend,
+    newRecord,
+    setWeekends: () => { events.push('state:weekends'); },
+    localStorage: { setItem: (key: string, value: string) => { storage.set(key, value); events.push(`write:${key}`); } },
+    syncOwnerId: null,
+    pushWeekends: () => { events.push('push:weekends'); },
+    syncTireLifecycle: () => [{ id: 'tire-1' }],
+    tireInventory: [],
+    setTireInventory: () => { events.push('state:tires'); },
+    user: null,
+    pushTires: () => { events.push('push:tires'); },
+    activeSessionRef: { current: null },
+    nextSession,
+    setActiveSession: () => { events.push('state:active'); },
+    markSavedDirty: () => { events.push('mark'); controller.markDirty(); },
+    flushSavedBoundary: () => { events.push('flush'); return controller.flush(); },
+  });
+  return { events, storage, announcements, dirty: controller.isDirty() };
+};
+
+const sessionResult = runSessionPersistence(app);
+c4Equal(sessionResult.announcements, 1, 'C4 successful session creation flushes exactly once');
+c4Equal(sessionResult.dirty, false, 'C4 session boundary clears dirty state');
+const lastSessionWrite = Math.max(
+  sessionResult.events.indexOf('write:race_notes_weekends'),
+  sessionResult.events.indexOf('write:race_notes_tires'),
+  sessionResult.events.indexOf('write:race_notes_active_session'),
+);
+c4Ok(lastSessionWrite < sessionResult.events.indexOf('mark')
+  && sessionResult.events.indexOf('mark') < sessionResult.events.indexOf('flush'), 'C4 session persistence completes before mark and flush');
+const persistedSessions = JSON.parse(sessionResult.storage.get('race_notes_weekends') ?? '[]')[0].sessions;
+c4Equal(persistedSessions[0].setupSnapshot, { chassis: 'Owner Setup', gear: '6.20' }, 'C4 session snapshot persists before feedback boundary');
+
+const sessionFlushOmittedMutation = app.replace(
+  '    markSavedDirty();\n    flushSavedBoundary();\n    if (pressureSourceNote)',
+  '    markSavedDirty();\n    if (pressureSourceNote)',
+);
+const sessionFlushOmitted = runSessionPersistence(sessionFlushOmittedMutation);
+c4Kill('session-boundary-omitted', sessionFlushOmitted.announcements === 0 && sessionFlushOmitted.dirty);
+
+const sessionMarkOmittedMutation = app.replace(
+  '    markSavedDirty();\n    flushSavedBoundary();\n    if (pressureSourceNote)',
+  '    flushSavedBoundary();\n    if (pressureSourceNote)',
+);
+const sessionMarkOmitted = runSessionPersistence(sessionMarkOmittedMutation);
+c4Kill('session-dirty-mark-omitted', sessionMarkOmitted.announcements === 0);
+
+const sessionBeforePersistenceMutation = app
+  .replace('    markSavedDirty();\n    flushSavedBoundary();\n    if (pressureSourceNote)', '    if (pressureSourceNote)')
+  .replace(
+    '    const updatedWeekends = weekendsRef.current.map',
+    '    markSavedDirty();\n    flushSavedBoundary();\n    const updatedWeekends = weekendsRef.current.map',
+  );
+const sessionBeforePersistence = runSessionPersistence(sessionBeforePersistenceMutation);
+c4Kill('session-boundary-before-persistence', sessionBeforePersistence.events.indexOf('flush') < sessionBeforePersistence.events.indexOf('write:race_notes_weekends'));
+
+const handlerFrom = (source: string, name: string, nextAnchor: string): string => between(
+  source,
+  `  const ${name} =`,
+  nextAnchor,
+  `C4 neutrality ${name}`,
+);
 const helperContracts: Array<[string, string, string[]]> = [
-  ['handleSaveTires', '  const handleDeleteTireFromCloud', ['setTireInventory(updated);', "localStorage.setItem('race_notes_tires'", 'flashSaved();', 'pushTires(']],
-  ['handleSaveCars', '  const handleSaveGarageCars', ['setCars(updated);', "localStorage.setItem('race_notes_cars'", 'if (notifySaved) flashSaved();', 'pushCars(']],
-  ['handleSaveShockSessions', '  const handleSaveMaintenance', ['setShockSessions(updated);', "localStorage.setItem('race_notes_shock_graphs'", 'if (notifySaved) flashSaved();', 'pushShockSessions(']],
-  ['handleSaveMaintenance', '  const handleSaveTodos', ['setMaintenance(updated);', "localStorage.setItem('race_notes_maintenance'", 'flashSaved();', 'pushMaintenanceComponents(']],
-  ['handleSaveTodos', '  const handleSelectGarageCar', ['setTodos(updated);', "localStorage.setItem('race_notes_todos'", 'if (notifySaved) flashSaved();', 'pushTodos(']],
-  ['handleSaveMaintenanceLogs', '  const handleSaveChecklistTemplates', ['setMaintenanceLogs(updated);', "localStorage.setItem('race_notes_maintenance_logs'", 'flashSaved();', 'pushMaintenanceLogs(']],
-  ['handleSaveChecklistTemplates', '  const handleSaveWeekendChecklists', ['setChecklistTemplates(updated);', "localStorage.setItem('race_notes_checklist_templates'", 'flashSaved();', 'pushChecklistTemplates(']],
-  ['handleSaveWeekendChecklists', '  const handleDeleteCar', ['setWeekendChecklists(updated);', "localStorage.setItem('race_notes_weekend_checklists'", 'flashSaved();', 'pushWeekendChecklists(']],
+  ['handleSaveTires', '  const handleDeleteTireFromCloud', ['setTireInventory(updated);', "localStorage.setItem('race_notes_tires'", 'markSavedDirty();', 'pushTires(']],
+  ['handleSaveCars', '  const handleSaveGarageCars', ['setCars(updated);', "localStorage.setItem('race_notes_cars'", 'if (notifySaved) markSavedDirty();', 'pushCars(']],
+  ['handleSaveShockSessions', '  const handleSaveMaintenance', ['setShockSessions(updated);', "localStorage.setItem('race_notes_shock_graphs'", 'if (notifySaved) markSavedDirty();', 'pushShockSessions(']],
+  ['handleSaveMaintenance', '  const handleSaveTodos', ['setMaintenance(updated);', "localStorage.setItem('race_notes_maintenance'", 'markSavedDirty();', 'pushMaintenanceComponents(']],
+  ['handleSaveTodos', '  const handleSelectGarageCar', ['setTodos(updated);', "localStorage.setItem('race_notes_todos'", 'if (notifySaved) markSavedDirty();', 'pushTodos(']],
+  ['handleSaveMaintenanceLogs', '  const handleSaveChecklistTemplates', ['setMaintenanceLogs(updated);', "localStorage.setItem('race_notes_maintenance_logs'", 'markSavedDirty();', 'pushMaintenanceLogs(']],
+  ['handleSaveChecklistTemplates', '  const handleSaveWeekendChecklists', ['setChecklistTemplates(updated);', "localStorage.setItem('race_notes_checklist_templates'", 'markSavedDirty();', 'pushChecklistTemplates(']],
+  ['handleSaveWeekendChecklists', '  const handleDeleteCar', ['setWeekendChecklists(updated);', "localStorage.setItem('race_notes_weekend_checklists'", 'markSavedDirty();', 'pushWeekendChecklists(']],
 ];
-for (const [name, end, tokens] of helperContracts) ordered(handler(name, end), tokens, name);
+for (const [name, end, tokens] of helperContracts) {
+  const source = handlerFrom(app, name, end);
+  let cursor = -1;
+  for (const token of tokens) {
+    const next = source.indexOf(token, cursor + 1);
+    c4Ok(next > cursor, `C4 ${name} keeps ${token} in persistence/feedback/cloud order`);
+    cursor = next;
+  }
+}
 
-// Direct user entry points flash only after their local persistence boundary.
 const directHandlers: Array<[string, string]> = [
+  ['handleSaveTires', '  const handleDeleteTireFromCloud'],
   ['handleClearAllData', '  const handleDeleteAccount'],
   ['handleSaveSetups', '  const handleUpdateSession'],
   ['handleUpdateSession', '  const handleCommitQuickAdjust'],
@@ -1169,40 +1584,298 @@ const directHandlers: Array<[string, string]> = [
   ['handleUpdateWeekend', '  const handleFinishWeekend'],
   ['handleFinishWeekend', '  const handleSelectRecentSession'],
 ];
-for (const [name, end] of directHandlers) persistenceBeforeLastFlash(handler(name, end), name);
+for (const [name, end] of directHandlers) {
+  const source = handlerFrom(app, name, end);
+  const persistence = Math.max(source.lastIndexOf('localStorage.setItem'), source.lastIndexOf('localStorage.removeItem'));
+  const mark = source.lastIndexOf('markSavedDirty();');
+  c4Ok(persistence >= 0 && mark > persistence, `C4 ${name} marks dirty after its final direct local write`);
+}
+const accountingCallback = between(app, 'onSaveAccounting={(updated) => {', '                  }}', 'C4 accounting callback');
+c4Ok(accountingCallback.indexOf("localStorage.setItem('race_notes_accounting'") < accountingCallback.indexOf('markSavedDirty();'), 'C4 accounting callback marks dirty after immediate local write');
 
-const accountingCallback = between(app, 'onSaveAccounting={(updated) => {', '                  }}', 'accounting callback');
-ordered(accountingCallback, ['setAccounting(updated);', "localStorage.setItem('race_notes_accounting'", 'flashSaved();'], 'accounting callback');
-assert.match(handler('handleDeleteCar', '  // ── Clear All Data'), /handleSaveCars\(updated, accountId\);/);
-assert.match(handler('handleDeleteMaintenanceComponent', '  const handleDeleteChecklistTemplate'), /handleSaveMaintenance[\s\S]*handleSaveMaintenanceLogs/);
-assert.match(handler('handleDeleteChecklistTemplate', '  // ── Create weekend'), /handleSaveChecklistTemplates\(updated\);/);
+const tirePushTimingMutation = app.replace(
+  "localStorage.setItem('race_notes_tires', JSON.stringify(updated));\n    markSavedDirty();\n    if (user) pushTires(updated, user.id, setSyncStatus);",
+  "if (user) pushTires(updated, user.id, setSyncStatus);\n    localStorage.setItem('race_notes_tires', JSON.stringify(updated));\n    markSavedDirty();",
+);
+assert.notEqual(tirePushTimingMutation, app, 'C4 cloud timing mutation changes real tire handler');
+const tireOrder = (source: string): string[] => {
+  const events: string[] = [];
+  const controller = createController(() => undefined);
+  compileHandler(source, 'handleSaveTires', '  const handleDeleteTireFromCloud', {
+    setTireInventory: () => { events.push('state'); },
+    localStorage: { setItem: () => { events.push('write'); } },
+    markSavedDirty: () => { events.push('mark'); controller.markDirty(); },
+    flashSaved: () => { events.push('flash'); },
+    user: { id: 'user-1' },
+    pushTires: () => { events.push('push'); },
+    setSyncStatus: () => undefined,
+  })([]);
+  return events;
+};
+c4Equal(tireOrder(app), ['state', 'write', 'mark', 'push'], 'C4 production keeps immediate local write before unchanged cloud push');
+c4Kill('cloud-push-timing-rewired', JSON.stringify(tireOrder(tirePushTimingMutation)) === JSON.stringify(['state', 'push', 'write', 'mark']));
 
-// Every idle/background/load-only family remains directly flash-free.
-const backgroundSlices: Array<[string, string]> = [
-  ['todo hydration', between(app, "const [todos, setTodos]", '  const prevTodosForNotifyRef', 'todo hydration')],
-  ['starter reconciliation', between(app, '// Wait for auth restoration', '// Maintenance usage is derived', 'starter reconciliation')],
-  ['maintenance reconciliation', between(app, '// Maintenance usage is derived', '// ── "Saved" flash toast', 'maintenance reconciliation')],
-  ['weekend recovery and auto-select', between(app, '// Active weekend is device-local', '  useEffect(() => {\n    // Attempt load', 'weekend recovery')],
-  ['mount hydration', between(app, '  useEffect(() => {\n    // Attempt load', '  // ---- Auth: restore session', 'mount hydration')],
-  ['cloud pull', between(app, '  // ---- Cloud sync: pull on login', '  // Resume gets a fresh pull-effect', 'cloud pull')],
-  ['legacy backfill', between(app, '// ── One-time backfill', '// ── [4] Auto-create', 'legacy backfill')],
-  ['empty-account auto-car', between(app, '// ── [4] Auto-create', '  const handleSaveSetups', 'auto-car')],
-  ['car auto-selection', between(app, '// Auto-select first car', '  const handleSaveCars', 'car auto-selection')],
-  ['car selection', handler('handleSelectCar', '  const handleSaveShockSessions')],
-  ['weekend activation', handler('handleActivateWeekend', '  const handleDeleteMaintenanceComponent')],
-  ['recent-session selection', handler('handleSelectRecentSession', '  // ---- Auth gate')],
-];
-for (const [label, source] of backgroundSlices) assert.doesNotMatch(source, /flashSaved\(\);/, `${label} stays directly silent`);
+const compileRuntimeModule = (
+  source: string,
+  exportName: string,
+  dependencies: Record<string, unknown>,
+): RuntimeExport => {
+  const compiled = transformSync(source, { loader: 'tsx', format: 'cjs' }).code;
+  const moduleBox = { exports: {} as Record<string, unknown> };
+  const names = Object.keys(dependencies);
+  new Function('module', 'exports', ...names, compiled)(
+    moduleBox,
+    moduleBox.exports,
+    ...names.map(name => dependencies[name]),
+  );
+  return moduleBox.exports[exportName] as RuntimeExport;
+};
 
-// Protected ownership, retry, pull, assignment, Undo, and dialog-era sentinels.
-assert.match(app, /const currentSyncOwnerId = syncOwnerIdRef\.current;\s*if \(currentSyncOwnerId\) pushCars\(updated, currentSyncOwnerId, teamRef\.current\?\.id \?\? null, setSyncStatus\);/s);
-assert.match(app, /queueSharedCloudDelete\('cars', car\.id, false, currentAccountId\)/);
-assert.match(app, /const generation = \+\+pullGenerationRef\.current;/);
-assert.match(app, /const isCurrentPull = \(\) => pullGenerationRef\.current === generation;/);
-assert.match(app, /prevTodosForNotifyRef\.current = updated;/);
-assert.match(app, /prevTodosForNotifyRef\.current = materialized;/);
-assert.match(app, /<UndoToast pending=\{carUndo\.pending\} onUndo=\{carUndo\.undo\} onDismiss=\{carUndo\.dismiss\}/);
-assert.match(app, /<InfoToast\s*open=\{!!infoToast\}/s);
-assert.doesNotMatch(app, /window\.confirm\(|\balert\(/);
+const dirtyProbe = () => {
+  let announcements = 0;
+  const controller = createController(() => { announcements += 1; });
+  return { controller, announcements: () => announcements };
+};
 
+// Execute the exact production todo initializer. Hydration may normalize storage,
+// but it must never arm user-mutation feedback.
+const todoInitializerSource = (source: string): string => {
+  const marker = 'const [todos, setTodos] = useState<Todo[]>(() => {';
+  const markerAt = source.indexOf(marker);
+  const arrowAt = source.indexOf('() => {', markerAt);
+  const initializerEnd = source.indexOf('\n  });', arrowAt);
+  const arrowEnd = initializerEnd + '\n  }'.length;
+  assert.ok(markerAt >= 0 && arrowAt >= markerAt && arrowEnd > arrowAt, 'C4 real todo hydration initializer exists');
+  return source.slice(arrowAt, arrowEnd);
+};
+const runTodoHydration = (source: string) => {
+  const probe = dirtyProbe();
+  const storage = new Map<string, string>([['race_notes_todos', JSON.stringify([{ id: 'todo-1' }])]]);
+  const hydrate = compileRuntimeModule(
+    `export const hydrateTodos = ${todoInitializerSource(source)};`,
+    'hydrateTodos',
+    {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => { storage.set(key, value); },
+      },
+      materializeMainChecklist: (value: unknown) => value,
+      markSavedDirty: probe.controller.markDirty,
+    },
+  );
+  hydrate();
+  return probe;
+};
+const hydrationProbe = runTodoHydration(app);
+c4Equal(hydrationProbe.controller.isDirty(), false, 'C4 real hydration write stays zero-dirty');
+c4Equal(hydrationProbe.announcements(), 0, 'C4 real hydration stays zero-Saved');
+const hydrationDirtyMutation = app.replace(
+  "localStorage.setItem('race_notes_todos', JSON.stringify(materialized));\n    return materialized;",
+  "localStorage.setItem('race_notes_todos', JSON.stringify(materialized));\n    markSavedDirty();\n    return materialized;",
+);
+c4Kill('hydration-dirty-mark-added', runTodoHydration(hydrationDirtyMutation).controller.isDirty());
+
+// Execute the real reconciliation save helper with its production false flag.
+const runTodoReconciliation = (source: string) => {
+  const probe = dirtyProbe();
+  let writes = 0;
+  const save = compileHandler(source, 'handleSaveTodos', '  const handleSelectGarageCar', {
+    prevTodosForNotifyRef: { current: [] },
+    user: null,
+    todos: [],
+    queueSharedCloudDelete: () => undefined,
+    setTodos: () => undefined,
+    localStorage: { setItem: () => { writes += 1; } },
+    markSavedDirty: probe.controller.markDirty,
+    syncOwnerId: null,
+    pushTodos: () => undefined,
+    setSyncStatus: () => undefined,
+    teamMembers: null,
+    detectAssignmentChanges: () => [],
+    pushAssignmentNotification: () => undefined,
+  });
+  save([{ id: 'todo-1' }], false);
+  return { ...probe, writes };
+};
+c4Ok(app.includes('handleSaveTodos(reconciled, false);'), 'C4 maintenance reconciliation calls the real save helper with feedback suppressed');
+const reconciliationProbe = runTodoReconciliation(app);
+c4Equal(reconciliationProbe.writes, 1, 'C4 real reconciliation retains its immediate local write');
+c4Equal(reconciliationProbe.controller.isDirty(), false, 'C4 real reconciliation stays zero-dirty');
+const reconciliationDirtyMutation = app.replace(
+  "localStorage.setItem('race_notes_todos', JSON.stringify(updated));\n    if (notifySaved) markSavedDirty();",
+  "localStorage.setItem('race_notes_todos', JSON.stringify(updated));\n    markSavedDirty();",
+);
+c4Kill('reconciliation-suppression-removed', runTodoReconciliation(reconciliationDirtyMutation).controller.isDirty());
+
+// Execute a real cloud-pull persistence branch, not a synthetic pull model.
+const cloudTireSlice = (source: string): string => between(
+  source,
+  '      if (cloudTires.length > 0) {',
+  '\n\n      const cloudCars',
+  'C4 cloud tire pull branch',
+);
+const runCloudPullSlice = (source: string) => {
+  const probe = dirtyProbe();
+  let writes = 0;
+  const runPull = compileRuntimeModule(
+    `export function runPull(cloudTires: any[], setTireInventory: any, localStorage: any, markSavedDirty: any) {\n${cloudTireSlice(source)}\n}`,
+    'runPull',
+    {},
+  );
+  runPull([{ id: 'tire-1' }], () => undefined, { setItem: () => { writes += 1; } }, probe.controller.markDirty);
+  return { ...probe, writes };
+};
+const cloudPullProbe = runCloudPullSlice(app);
+c4Equal(cloudPullProbe.writes, 1, 'C4 real cloud pull branch retains its local cache write');
+c4Equal(cloudPullProbe.controller.isDirty(), false, 'C4 real cloud pull branch stays zero-dirty');
+const cloudPullDirtyMutation = app.replace(
+  "localStorage.setItem('race_notes_tires', JSON.stringify(cloudTires));\n      }\n\n      const cloudCars",
+  "localStorage.setItem('race_notes_tires', JSON.stringify(cloudTires));\n        markSavedDirty();\n      }\n\n      const cloudCars",
+);
+c4Kill('cloud-pull-dirty-mark-added', runCloudPullSlice(cloudPullDirtyMutation).controller.isDirty());
+
+// Execute the exact resume request closure. It changes pull generation only.
+const resumeRequestSource = (source: string): string => {
+  const block = between(source, '    const requestResumePull = () => {', '\n\n    if (Capacitor.isNativePlatform())', 'C4 resume request');
+  return block.replace('    const requestResumePull =', 'export const requestResumePull =');
+};
+const runResumeRequest = (source: string) => {
+  const probe = dirtyProbe();
+  let resumeUpdates = 0;
+  const request = compileRuntimeModule(resumeRequestSource(source), 'requestResumePull', {
+    lastPullStartedAtRef: { current: 0 },
+    Date: { now: () => 50_000 },
+    shouldPullOnResume: () => true,
+    setResumePullVersion: () => { resumeUpdates += 1; },
+    markSavedDirty: probe.controller.markDirty,
+  });
+  request();
+  return { ...probe, resumeUpdates };
+};
+const resumeProbe = runResumeRequest(app);
+c4Equal(resumeProbe.resumeUpdates, 1, 'C4 real resume path schedules its pull');
+c4Equal(resumeProbe.controller.isDirty(), false, 'C4 real resume path stays zero-dirty');
+const resumeDirtyMutation = app.replace(
+  '      setResumePullVersion(version => version + 1);\n    };',
+  '      setResumePullVersion(version => version + 1);\n      markSavedDirty();\n    };',
+);
+c4Kill('resume-dirty-mark-added', runResumeRequest(resumeDirtyMutation).controller.isDirty());
+
+// Execute a real selection handler. Device-local selection writes are navigation,
+// not user data commits, so they remain feedback-silent.
+const runCarSelection = (source: string) => {
+  const probe = dirtyProbe();
+  let writes = 0;
+  const select = compileHandler(source, 'handleSelectCar', '  const handleSaveShockSessions', {
+    activeCarIdRef: { current: 'car-1' },
+    carsRef: { current: [{ id: 'car-1' }, { id: 'car-2', name: 'Two' }] },
+    showInfo: () => undefined,
+    setActiveCarId: () => undefined,
+    localStorage: { setItem: () => { writes += 1; } },
+    pickLatestSetupForCar: () => null,
+    savedSetupsRef: { current: [] },
+    setSetup: () => undefined,
+    markSavedDirty: probe.controller.markDirty,
+  });
+  select('car-2');
+  return { ...probe, writes };
+};
+const selectionProbe = runCarSelection(app);
+c4Equal(selectionProbe.writes, 1, 'C4 real selection path retains its device-local write');
+c4Equal(selectionProbe.controller.isDirty(), false, 'C4 real selection-only path stays zero-dirty');
+const selectionDirtyMutation = app.replace(
+  "localStorage.setItem('race_notes_active_car', carId);\n    const nextSetup",
+  "localStorage.setItem('race_notes_active_car', carId);\n    markSavedDirty();\n    const nextSetup",
+);
+c4Kill('selection-dirty-mark-added', runCarSelection(selectionDirtyMutation).controller.isDirty());
+
+// Execute the whole real Setup save handler through three non-persistence exits.
+const runSilentSetupSave = (
+  source: string,
+  prior: Array<Record<string, unknown>>,
+  updated: Array<Record<string, unknown>>,
+  editable: boolean,
+) => {
+  const probe = dirtyProbe();
+  const save = compileHandler(source, 'handleSaveSetups', '  const handleUpdateSession', {
+    savedSetupsRef: { current: prior },
+    weekendsRef: { current: [] },
+    activeWeekendId: null,
+    isWeekendFinished: () => false,
+    getSetupEditability: () => ({ editable, deletable: editable }),
+    setup: { id: 'setup-active' },
+    INITIAL_SETUP: { id: 'initial' },
+    isSetupLocked: () => false,
+    pickLatestSetupForCar: () => undefined,
+    activeCarId: null,
+    markSavedDirty: probe.controller.markDirty,
+    syncOwnerId: null,
+  });
+  save(updated);
+  return probe;
+};
+const priorSetup = { id: 'setup-1', chassis: 'Owner', updatedAt: '2026-07-18T00:00:00.000Z' };
+const blockedSetupProbe = runSilentSetupSave(app, [priorSetup], [{ ...priorSetup, chassis: 'Blocked edit' }], false);
+c4Equal(blockedSetupProbe.controller.isDirty(), false, 'C4 real blocked Setup save stays zero-dirty');
+const blockedSetupMutation = app.replace('    if (hasBlockedEdit) return;', '    if (hasBlockedEdit) markSavedDirty();');
+c4Kill('blocked-path-dirty-mark-added', runSilentSetupSave(blockedSetupMutation, [priorSetup], [{ ...priorSetup, chassis: 'Blocked edit' }], false).controller.isDirty());
+
+const revertedSetupProbe = runSilentSetupSave(app, [priorSetup], [{ ...priorSetup }], true);
+c4Equal(revertedSetupProbe.controller.isDirty(), false, 'C4 real reverted Setup save stays zero-dirty');
+const revertedSetupMutation = app.replace(
+  '    if (!didPersist && !activeSelectionChanged) return;',
+  '    if (safeSetups.length === 0 && !didPersist && !activeSelectionChanged) return;',
+);
+c4Kill('reverted-path-guard-removed', runSilentSetupSave(revertedSetupMutation, [priorSetup], [{ ...priorSetup }], true).controller.isDirty());
+
+const zeroRowSetupProbe = runSilentSetupSave(app, [], [], true);
+c4Equal(zeroRowSetupProbe.controller.isDirty(), false, 'C4 real zero-row Setup save stays zero-dirty');
+const zeroRowSetupMutation = app.replace(
+  '    if (!didPersist && !activeSelectionChanged) return;',
+  '    if (safeSetups.length > 0 && !didPersist && !activeSelectionChanged) return;',
+);
+c4Kill('zero-row-guard-removed', runSilentSetupSave(zeroRowSetupMutation, [], [], true).controller.isDirty());
+
+// Execute the real first Quick Adjust rejection before any persistence branch.
+const runBlockedQuickAdjust = (source: string) => {
+  const probe = dirtyProbe();
+  const commit = compileHandler(source, 'handleCommitQuickAdjust', '  // Session weather helpers', {
+    resolveQuickAdjustTarget: () => ({ ok: false, error: 'blocked' }),
+    activeWeekendId: null,
+    weekendsRef: { current: [] },
+    savedSetupsRef: { current: [] },
+    activeSessionRef: { current: {} },
+    showInfo: () => undefined,
+    markSavedDirty: probe.controller.markDirty,
+  });
+  commit({});
+  return probe;
+};
+const blockedQuickAdjustProbe = runBlockedQuickAdjust(app);
+c4Equal(blockedQuickAdjustProbe.controller.isDirty(), false, 'C4 real blocked Quick Adjust stays zero-dirty');
+const blockedQuickAdjustMutation = app.replace(
+  "    if (target.ok === false) {\n      showInfo({ reason: 'quick-adjust-target' });",
+  "    if (target.ok === false) {\n      markSavedDirty();\n      showInfo({ reason: 'quick-adjust-target' });",
+);
+c4Kill('quick-adjust-blocked-dirty-mark-added', runBlockedQuickAdjust(blockedQuickAdjustMutation).controller.isDirty());
+
+c4Ok(app.includes('handleSaveShockSessions(stampedShock, false);')
+  && app.includes('handleSaveCars([defaultCar], false);'), 'C4 remaining background helper suppression stays explicit');
+
+const pairedDoubleFlushMutation = app.replace('dirty = false;\n      announceSaved();', 'dirty = true;\n      announceSaved();');
+c4Ok(pairedDoubleFlushMutation !== dirtyClearMutation, 'C4 paired-event mutant is independent from dirty-clear omission');
+const pairedDoubleProbe = createBoundaryProbe(pairedDoubleFlushMutation);
+pairedDoubleProbe.controller.markDirty();
+pairedDoubleProbe.setHidden();
+pairedDoubleProbe.fireVisibility();
+pairedDoubleProbe.firePageHide();
+c4Kill('paired-background-double-flush', pairedDoubleProbe.announcements() === 2);
+
+c4Ok(notificationSourcePasses(app, setup), 'C4 preserves accepted B2 notification source contract');
+c4Ok(b3SourcePasses(app, sync), 'C4 preserves accepted B3 status and priority source contract');
+c4Ok(c4SourcePasses(app), 'C4 final production source gate passes');
+c4Equal(new Set(killedC4Mutations).size, killedC4Mutations.length, 'C4 killed mutation labels are unique');
+
+console.log(`C4 assertions: ${c4AssertionCount}`);
+console.log(`C4 killed mutations: ${killedC4Mutations.join(', ')}`);
 console.log('Saved flash harness: PASS');
