@@ -1,77 +1,95 @@
-# Current Task — UX Overhaul v2 Task C2.5 Setups Corner Alignment and Stacked Stepper
+# Current Task — UX Overhaul v2 Task C3 Session Diff UI and Quick Adjust Coexistence
 
-**Status:** ATTEMPT 1 FAIL — READY FOR BOUNDED `gpt-5.6-sol` HIGH REPAIR; C3 and all later work remain blocked.
+**Status:** READY FOR `gpt-5.6-sol` HIGH IMPLEMENTATION. C2.5 is accepted at 100/100; C4 and all later work remain blocked.
 **Branch:** `codex/ux-overhaul`
-**C2 baseline:** product `253897a2518b3ed5f3148926e522163a9ea9d0b3` + EOL-only repair `13b556fc664b6fa75d9b82ca768319e303e6a03e`
-**Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` v2.1-C, v2.1-E, v2.1-F, Part 5 escalation rule, and Part 6 gates
-**Runtime routing:** implementation must execute as `gpt-5.6-sol` **High**; primary QA/plan/state work executes as `gpt-5.6-sol` **Extra High**. Runtime metadata is authoritative; absent metadata is `unverified` and cannot satisfy the build role. Terra and `cavecrew-builder` are forbidden.
+**Accepted product baseline:** C2 `253897a2518b3ed5f3148926e522163a9ea9d0b3` + portability repair `13b556fc664b6fa75d9b82ca768319e303e6a03e`; C2.5 feature `8ab870aa88d8158301368389da37020b758e8fbc` + repair `2235c7d4fcabc4c527709d744ea0760fdfc38eb1`
+**Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` item 7, Task C3, v2.1 Owner Addendum, Part 5 escalation rule, and Part 6 gates
+**Runtime routing:** implementation must execute as `gpt-5.6-sol` **High** in a separate worker task; primary QA/plan/state work executes as `gpt-5.6-sol` **Extra High**. Runtime `turn_context.payload.model` and effort are authoritative. Missing runtime metadata is `unverified` and cannot satisfy the build role. Terra at every tier and `cavecrew-builder` are forbidden.
 
 ## Owner outcome
 
-On Setups corner cards, paired LF/RF and LR/RR fields must align cleanly instead of drifting because text inputs and tall steppers have different structures. Every stacked stepper must show one full-width value row above one two-column button row:
+Replace the noisy per-press setup history with two computed, honest views:
 
-```text
------ VALUE -----
-(     −     ) (     +     )
-```
+1. Setups shows current changes since the latest frozen session snapshot as **Pending — will bind to next session**.
+2. Each session shows a compact read-only setup difference bound to that session.
 
-The value remains tap-to-edit and includes its unit. The minus and plus buttons are equal width and each at least 44px tall. Inline steppers elsewhere must not change.
+The owner scenario is canonical: Starting Setup → Hot Laps snapshot → edits and/or Quick Adjust → Qualifying snapshot. Before Qualifying, pending must describe the same net change that becomes Qualifying's bound diff after Qualifying is created. Quick Adjust keeps its existing one-net-row-per-field in-run view; the new session summary must not append, persist, or duplicate those rows.
 
 ## Exact implementation scope
 
 Change only:
 
-1. `src/components/ui/NumberStepper.tsx`
-2. `src/components/SetupView.tsx`
-3. `src/components/TiresSubView.tsx`
-4. `scripts/setup-touch-target-harness.ts`
+1. `src/components/SetupView.tsx`
+2. `src/components/RaceWeekendView.tsx`
+3. `src/App.tsx` — Setups navigation callback/wiring only; no session creation, Quick Adjust, lifecycle, Saved, sync, or persistence logic change
+4. `scripts/chunk5-setup-harness.ts`
 
-No other file may change during implementation. If a different file is genuinely required, stop and return exact evidence for owner/QA scope approval.
+`src/lib/quickAdjust.ts`, `src/lib/setupLifecycle.ts`, `src/lib/setupDiff.ts`, `src/types.ts`, `src/lib/sync.ts`, schemas, and migrations are verify-only and must have zero diff. If another file is genuinely required, stop and return exact evidence for primary/owner scope approval.
+
+## Canonical diff semantics
+
+1. `weekend.sessions` is newest-first. For the session at index `i`, compare the immediately older frozen session at `i + 1` to session `i`.
+2. For the chronologically first session, compare the weekend Starting Setup identified by `baselineSetupId` to that session's snapshot. Capture the current referenced Setup as plain data with the existing canonical snapshot helper; do not compare mutable Setup objects directly.
+3. Pending compares the newest frozen session snapshot at index `0` to a freshly captured snapshot of the live setup selected for the same active Race Day. If no session exists, compare the weekend Starting Setup snapshot to the current live setup.
+4. Require honest provenance: use snapshots and setup ids from the same Race Day/setup lineage. Do not silently compare unrelated setups.
+5. Use the accepted deterministic `diffSetupSnapshots` output and its field order. Before/after operands must never be reversed. Zero-difference results show a compact honest empty state, not invented changes.
+6. Legacy sessions without `setupSnapshot` or weekends without a resolvable Starting Setup must show an honest unavailable state. Never reconstruct frozen history from a mutable saved setup.
+7. Computed pending and bound diffs are display-only. Never write them to a session, Setup `changeLog`, localStorage, cloud payload, or schema.
 
 ## Build contract
 
-1. Add `layout?: 'inline' | 'stacked'` to `NumberStepper`; default is `'inline'`.
-2. Preserve the existing inline DOM, classes, tap-to-edit behavior, keyboard behavior, pointer slop cancellation, commit-on-pointerup behavior, and 350ms/100ms hold-repeat cadence.
-3. In stacked layout only, render a full-width value region on row one and a two-column `[−][+]` button grid on row two. Value and both buttons are at least 44px tall; buttons split available width evenly. Keep current disabled behavior, accessible names, numeric formatting, unit rendering, and pointer handlers.
-4. Remove the arbitrary-variant `role=group`/`basis-full` stacking selectors from `SetupView.tsx` and `TiresSubView.tsx`. Pass `layout="stacked"` at the intended corner/tire stepper call sites.
-5. Align paired corner fields at row start. Give labels a consistent single-line footprint (truncate or equivalent reserved height) so adjacent controls begin at the same vertical position. Conditional pressure/legacy notes stay below their own control and must not move the neighboring control.
-6. Keep all setup values, step sizes, min/max bounds, units, pressure provenance, persistence calls, Saved/sync notifications, setup lifecycle rules, and Quick Adjust behavior unchanged.
-7. Extend `scripts/setup-touch-target-harness.ts` with compile-real/source/model coverage that proves:
-   - stacked value appears above the button row;
-   - stacked minus/plus buttons are equal-width and at least 44px;
-   - default inline rendering remains unchanged;
-   - SetupView and TiresSubView use the first-class stacked prop and contain no arbitrary-variant `basis-full` stacking selectors;
-   - a mutation that restores old DOM order or removes the stacked layout binding fails.
-8. Commit only after the focused harness, exact lint baseline, build, diff check, clean-scope check, and `cavecrew-reviewer` pass. Commit message must identify C2.5. Stop for primary QA; do not edit Ralph/plan/owner-report files.
+1. In `SetupView.tsx`, replace the visible `Live-Trackside Changes` presentation with a compact pending section labeled exactly **Pending — will bind to next session**. It must show deterministic current-vs-last-snapshot rows, omit zero/noise rows, and use the existing active Race Day setup provenance.
+2. Preserve all existing stored non-run `changeLog` bytes and expose them read-only under a collapsed **Legacy log** disclosure. Do not migrate, delete, append, reorder, or reinterpret old entries.
+3. Do not repeat Quick Adjust `runId` rows in the pending or legacy presentation. Existing Quick Adjust rows remain where the Runs UI already renders `SessionRecord.adjustments`.
+4. In `RaceWeekendView.tsx`, add a compact read-only bound setup-difference summary to each session. Qualifying in the owner fixture must show exactly the net changes from Hot Laps to the Qualifying snapshot. The first session uses the Starting Setup baseline. Keep the free-text notes section and all existing adjustment rows unchanged.
+5. Remove or replace the stale session comparison path that resolves mutable saved setups for historical diff display. No session history may be inferred from a setup's current state.
+6. Add one button labeled exactly **Log setup changes** on the sessions page. Through a narrowly scoped callback in `App.tsx`, it navigates to the existing Setups tab and its Setups subtab, with the active setup expanded when the existing state allows it.
+7. C1 editability is protected. The navigation button is a review/navigation affordance and does not override `getSetupEditability`, change `activeEventSetupId`, rebind a setup, or make an in-play setup editable. If implementation appears to require any lifecycle/editability change, stop and report the plan conflict; do not modify C1 behavior.
+8. Keep `src/lib/quickAdjust.ts` and `handleCommitQuickAdjust` semantically and textually unchanged. Add no logging call. Preserve coalescing by `runId + corner + field`, original `before`, final `after`, persistence, Saved, offline, and sync behavior.
+9. Preserve C2 snapshot capture, `setupSnapshot`, `setupId`, `setupUsed`, session creation, deep-copy behavior, sync roundtrip, and deterministic diff helper unchanged.
+10. Keep the sessions page uncluttered: compact labels/rows, readable at 360px, no new modal or persistent state, and no hidden overflow.
 
-## Attempt 1 failure and SOL repair order
+## Mutation-complete harness contract
 
-Attempt 1 commit `8ab870aa88d8158301368389da37020b758e8fbc` passed source review, focused and regression harnesses, the exact 22/24 matrix, the exact three-error lint baseline, the 566-module build, signed-out draft shell checks, debug APK build/install/launch, scope, diff, clean-tree, and cavecrew review. The implementation is not accepted because authenticated production geometry exposed a blocker that the harness did not model.
+Extend `scripts/chunk5-setup-harness.ts` using real changed production code. EOL-sensitive source matching must remain CRLF/LF agnostic. The gate must independently prove:
 
-At exact 360×800, 390×844, and 412×915 device metrics, each nested corner numeric field gives its stacked group only 62.5px, 70px, and 75.5px respectively. Both direction buttons correctly retain a 44px minimum, so they overlap by 13.75px, 10px, and 7.25px and extend past the group's clipped right edge by 12.75px, 9px, and 6.25px. `overflow-hidden` prevents page-level horizontal overflow and masks the defect from the existing gate.
+1. Owner fixture: Starting Setup → Hot Laps snapshot → setup edit and Quick Adjust net change → Qualifying snapshot.
+2. Pending before Qualifying equals Qualifying's bound diff after session creation, with the same deterministic rows, values, order, and provenance.
+3. Newest-first binding uses index `i + 1`; a mutation using the oldest session or reversing operands fails.
+4. First-session comparison uses `baselineSetupId`; mutations using `lifecycleSetupId`, active/current setup, or an unrelated setup fail.
+5. Legacy missing-snapshot/baseline cases return honest unavailable states and never reconstruct history from mutable setups.
+6. Equal snapshots yield no false rows. Transient, identity, lifecycle, media, and noise fields remain excluded.
+7. Pending meaning, Setups navigation wiring, compact session bound summary, Legacy log disclosure, free-text notes, and existing Quick Adjust rows are bound to the compiled/real changed code.
+8. Removing the pending view, bound summary, Log setup changes navigation, legacy disclosure, notes, or Quick Adjust rows independently fails.
+9. Adding any per-press/session-diff persistence or logging rewire independently fails.
+10. Assertion count and killed mutation list are printed. Source-only locks without executable production binding are insufficient.
 
-Repair requirements:
+## Worker gates before commit
 
-1. Do not reduce either direction target below 44px and do not change NumberStepper timing, slop, pointer, keyboard, editing, formatting, bounds, or persistence behavior.
-2. Give every stacked corner NumberStepper at least 88px of usable button-row width at 360, 390, and 412 CSS-pixel viewports in both Default and Large scales. Preserve the two LF/RF and LR/RR corner cards and their row alignment. The recommended bounded solution is to let numeric stepper fields span the two-column inner corner grid at phone widths, returning to one field column only at a breakpoint whose real rendered width is proven to keep both buttons non-overlapping. An equally bounded solution is acceptable only with the same proof.
-3. Keep value-first DOM order, equal side-by-side minus/plus widths, labels, notes, values, and units. No button may overlap another button or extend beyond its row/group clipping boundary.
-4. Extend `scripts/setup-touch-target-harness.ts` with production-derived, compiled-CSS/real-DOM integration coverage at 360×800, 390×844, and 412×915 for Default and Large. Assert group/row width, zero button overlap, zero outside/clipped extent, equal widths, each target at least 44px, value above the row, paired alignment, and zero page overflow. A compile-real mutation that removes the responsive width/span repair must independently fail this rendered gate.
-5. Keep the repair inside the original four-file C2.5 scope. Prefer changing only `src/components/SetupView.tsx` and `scripts/setup-touch-target-harness.ts`; touch `NumberStepper.tsx` or `TiresSubView.tsx` only if essential and explain why. No Ralph, plan, owner-report, C3+, native, package, schema, sync, lifecycle, notification, release, push, deploy, or merge changes.
-6. Rerun the focused setup/tire/lifecycle/Quick Adjust/offline/resume gates, the raw exact 22/24 matrix, exact three-error lint baseline, 566-module build, diff/protected/clean checks, and cavecrew review before committing the repair.
+1. `npx tsx scripts/chunk5-setup-harness.ts`
+2. `npx tsx scripts/chunk6b-lifecycle-harness.ts`
+3. `npx tsx scripts/chunk7-quick-adjust-harness.ts`
+4. `npx tsx scripts/offline-indicator-harness.ts`
+5. `npx tsx scripts/pull-on-resume-harness.ts`
+6. Raw full 24-harness matrix is exactly **22/24**, with failures only in unchanged `muted-text-color-harness.ts` and `saved-flash-harness.ts` stale whole-file locks.
+7. `npm run lint` reports exactly the three known baseline errors and no new error.
+8. `npm run build` succeeds with exactly 566 transformed modules.
+9. `git diff --check`, exact scope/protected-path audit, and clean post-commit worktree pass.
+10. Independent `cavecrew-reviewer` reports no blocking finding.
 
-## Independent QA gates
+Commit exactly the authorized product/harness files with a C3-identifying message. Stop for primary QA. Do not edit Ralph, the technical plan, the owner report, native files, release files, or Git history beyond that one commit. Do not deploy, push, merge, or begin C4.
 
-1. Diff is exactly the four authorized files; protected paths and later C3+ scope are absent; `git diff --check` and clean worktree pass.
-2. `npx tsx scripts/setup-touch-target-harness.ts` passes, including one independently exercised layout mutation.
-3. `npx tsx scripts/chunk5-setup-harness.ts`, `npx tsx scripts/chunk5-tires-harness.ts`, and the full raw 24-harness matrix pass at the established exact **22/24**, with failures only in unchanged `muted-text-color-harness.ts` and `saved-flash-harness.ts` stale locks.
-4. `npm run lint` reports exactly the three known baseline errors. `npm run build` passes with 566 modules.
-5. NumberStepper timing/pointer logic has zero semantic diff. Inline call sites retain their prior layout and interaction behavior.
-6. Built-in browser visual QA at 360×800, 390×844, and 412×915 covers Default and Large scales. LF/RF and LR/RR controls row-align; stacked value is above side-by-side buttons; no clipping, overlap, or horizontal overflow; browser console has no warning/error.
-7. Hold-repeat retains 350ms/100ms cadence; pointer movement, pointer cancel, and scroll over a stepper produce zero unintended writes.
-8. Tires sub-view stacked pressure/backspacing controls match the Setups design.
-9. Java 21 debug APK is built after `npx cap sync android`, installed to the running emulator, and visually checked. Debug only: no release/signing/`release/` change.
-10. Independent `cavecrew-reviewer` reports no blocking finding. Primary records a strict PASS/FAIL score and updates Ralph, this plan, and `docs/OWNER_REPORT_UX_OVERHAUL.md`.
+## Independent primary QA gates
+
+1. Verify runtime model/effort, exact parent/head, branch, scope, protected paths, diff check, and clean tree.
+2. Inspect every changed line and independently exercise all canonical semantics and harness mutations above.
+3. Run focused C3, lifecycle, Quick Adjust, offline/resume, tire, touch-target, and session regressions; raw matrix must remain exact 22/24 with only the two named stale locks.
+4. Lint must be the exact three-error baseline; build must be 566 modules.
+5. Verify the owner fixture end-to-end and prove pending-before equals bound-after while Quick Adjust shows one net row and no duplicate/persisted session row.
+6. Deploy a Netlify draft preview to the explicit Crew Chief site and inspect the signed-out shell at 360×800, 390×844, and 412×915. Then inspect authenticated Setups/Runs UI at required mobile sizes, themes, and Default/Large scales: no overflow, compact summaries, notes preserved, controls at least 44px, viewport meta intact, no product console warning/error.
+7. Run `npx cap sync android`, build a Java 21 debug APK only, install to the running emulator, and inspect the owner scenario. No release build, signing, native source edit, or production deploy.
+8. Obtain independent `cavecrew-reviewer` scope/diff/behavior review. Record strict PASS/FAIL score in Ralph, keep this plan current, and update `docs/OWNER_REPORT_UX_OVERHAUL.md` in full plain English.
 
 ## Exclusions and hard bans
 
-No C3–C5, Chunk D/E, session-diff UI, pending-change UI, setup lifecycle definition, Quick Adjust logic, autosave timing, Saved/sync arbiter, copy/naming/rename/editability behavior, schema, RLS, migration, Supabase configuration, native source, Android version/signing, release artifacts, package/config, credentials, production deploy, push, merge, or `master` change. Preserve all A1–C2 acceptance, dual-write behavior, team-owner writes, deferred deletes, offline/resume behavior, safe areas, pinch zoom, themes, and accessibility. Terra and `cavecrew-builder` remain forbidden.
+No C4/C5, Chunk D/E, autosave timing, Saved/sync arbiter, setup naming/rename changes, lifecycle/editability meaning, snapshot/data-model changes, Quick Adjust logic, session creation logic, schema/RLS/migration/Supabase configuration, native source, Android version/signing, release artifacts, package/config, credentials, production deploy, Git push, merge, or `master` change. Preserve all A1–C2.5 acceptance, dual-write behavior, team-owner writes, deferred deletes, offline/resume behavior, safe areas, pinch zoom, themes, and accessibility. Terra and `cavecrew-builder` remain forbidden.
