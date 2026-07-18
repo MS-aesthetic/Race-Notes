@@ -2,7 +2,7 @@
 
 ## Current status
 
-Tasks C2, C2.5, C3, and C4 are complete. C4 passed its first QA attempt with a score of 100/100. Task C5 is now active; it will require a name when starting a setup from blank and add an obvious pencil action for renaming editable setups.
+Tasks C2, C2.5, C3, C4, and C5 are complete. C5 passed its first QA attempt with a score of 100/100. The mandatory integrated Chunk C QA is now active; it will recheck the complete setup lifecycle, session snapshots and diffs, stepper layout, Saved boundaries, naming, and rename behavior together before any deletion work begins.
 
 ## Task C2 — Session snapshot model and diff engine
 
@@ -177,4 +177,46 @@ There was no application crash. A fresh launch did log two Capacitor-injected sa
 
 C4 is a final **PASS, 100/100**. No C4 repair remains.
 
-C5 is next. It will stop blank setup creation until the owner provides a trimmed name, preserve frictionless automatic naming when copying a setup, and add a visible pencil affordance that expands an editable setup and focuses its existing chassis/name field. After C5 passes, the larger integrated Chunk C QA will recheck C1 through C5 together. Chunk D, Chunk E, final full-sprint QA, the final owner handoff, a Netlify draft preview, and a debug APK remain after that.
+C5 followed and has now passed. Its result is documented below. The larger integrated Chunk C QA is active. Chunk D, Chunk E, final full-sprint QA, and the final third-party handoff remain after that gate.
+
+## Task C5 — Setup naming and rename affordance
+
+### What was built
+
+C5 prevents accidental unnamed setups when the owner starts from blank. The blank action now requires a real name after trimming leading and trailing spaces, and the old anonymous `Setup #N` fallback is no longer used on that path. Copying an existing setup still requires no typing: the app derives a meaningful name from the source setup and keeps the existing copy provenance and pressure-source behavior. A typed name still overrides the automatic copy name.
+
+Editable setup cards now show a pencil beside the setup name. Pressing it opens that exact setup and focuses the existing Chassis field, so renaming uses the same field and persistence path as every other setup edit. The pencil does not create a second name field, modal, storage key, or cloud workflow. Historical snapshots and the active Race Day's edit-frozen event setup remain view-only and do not show the rename action.
+
+The implementation is commit `1a3d492`. It changes only `src/components/SetupView.tsx` and `scripts/chunk5-setup-harness.ts`. No App, lifecycle, snapshot, Quick Adjust, sync, schema, native, package, or later-task product file changed.
+
+### What was checked
+
+- An empty or whitespace-only blank name left the saved-setup count, current setup, active session, Race Day data, and Saved feedback unchanged.
+- Copying with an empty name created exactly one new Current setup with a source-derived name and preserved the live Race Day and active-session bytes.
+- Entering `C5 Named Blank` created exactly one blank Current setup with that exact name and no numbered fallback.
+- The new pencil measured exactly 44×44px in Default at 360px and about 50.59×50.59px in Large. It remained unclipped at 360, 390, and 412px.
+- Historical starting and active event-owned cards showed `VIEW ONLY` and no pencil. An unrelated Current setup remained renameable while the live Race Day was present.
+- Pressing the pencil focused the exact input `setup-chassis-setup-rec-1784412999666`. That focus action changed no setup, active-session, Race Day, dirty, or Saved state.
+- Typing `C5 Renamed Current` appeared in Local Storage immediately while the live event-owned setup and Race Day remained unchanged. No immediate Saved message appeared; exactly one later C4 boundary confirmation was observed. The new name survived a force-stop and relaunch.
+- Light and dark modes and the Default and Large font choices rendered without horizontal overflow at exact authenticated Android viewports of 360×800, 390×844, and 412×915.
+- The focused setup harness ran 84 C5 assertions and independently killed all 20 required mutations while retaining the earlier C1-C3 proof.
+- Eight focused setup, Saved, lifecycle, Quick Adjust, offline/resume, tire, and touch-target regressions passed.
+- The complete raw 24-harness matrix was exactly 23/24. The only failure was the already documented stale `muted-text-color-harness.ts` AuthView byte lock.
+- Type-checking reported exactly the three known baseline errors and no new error. The production build completed with exactly 566 transformed modules.
+- The exact two-file scope, protected paths, diff check, clean worktree, and independent cavecrew review all passed.
+
+### Preview and debug APK
+
+The accepted Netlify draft preview is:
+
+https://6a5bf7e2eadc63cd8a09d116--crew-chief-race-notes.netlify.app/
+
+This is a draft only; production was not published. The signed-out shell passed at 360×800, 390×844, and 412×915. Each viewport was exact, showed only the authentication gate, had no horizontal overflow, kept the pinch-enabled viewport metadata, and kept every visible control at least 44px. The built-in browser reported no warnings or errors.
+
+A Java 21 debug APK was built at `android/app/build/outputs/apk/debug/app-debug.apk`, installed on `emulator-5554`, and used for the authenticated scenarios. It is 12,085,112 bytes with SHA-256 `6801A2CEF805508A20D222BD6282659833AC674BC10E994C88CD60AF9FD94FDE`. The emulator's temporary phone-size overrides were restored to its physical 1344×2992 at density 480 afterward. There was no application crash or product JavaScript exception.
+
+### Result and what comes next
+
+C5 is a final **PASS, 100/100**. No C5 repair remains.
+
+The mandatory Chunk C QA is next. It will test C1 through C5 as one integrated system, including the owner setup/session scenario, Quick Adjust coexistence, historical immutability, phone-width steppers, process-death persistence, and every Saved boundary. Chunk D cannot begin until that gate passes. After Chunk C, the remaining roadmap is Chunk D deletion integrity, Chunk E help/copy/hardening, the final full-sprint QA, and the cold third-party review handoff. No production publish, Git push, or master merge has occurred.
