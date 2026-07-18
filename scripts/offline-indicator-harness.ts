@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const app = readFileSync(join(process.cwd(), 'src/App.tsx'), 'utf8');
+const app = readFileSync(join(process.cwd(), 'src/App.tsx'), 'utf8').replace(/\r\n/g, '\n');
 const onlineExpression = app.match(/const isOnlineNow = \(\): boolean => (typeof navigator === 'undefined' \|\| navigator\.onLine);/)?.[1];
 assert.ok(onlineExpression, 'B3 owns a production-derived navigator expression after saveStatus deletion');
 const isOnlineNow = (navigator: unknown): boolean => new Function('navigator', `return ${onlineExpression};`)(navigator) as boolean;

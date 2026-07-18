@@ -117,9 +117,11 @@ assert.equal(fourBarAdjustmentId('rr', 'topBarHBird'), 'fourbar-rr-topBarHBird')
 assert.equal(fourBarAdjustmentLabel('lr', 'topBarAngFD'), 'LR top angle at full droop');
 assert.equal(fourBarAdjustmentLabel('rr', 'bottomBarAngRH'), 'RR bottom angle at ride height');
 
-const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
-const typesSource = readFileSync(new URL('../src/types.ts', import.meta.url), 'utf8');
-const syncSource = readFileSync(new URL('../src/lib/sync.ts', import.meta.url), 'utf8');
+const readNormalizedSource = (url: URL): string =>
+  readFileSync(url, 'utf8').replace(/\r\n/g, '\n');
+const appSource = readNormalizedSource(new URL('../src/App.tsx', import.meta.url));
+const typesSource = readNormalizedSource(new URL('../src/types.ts', import.meta.url));
+const syncSource = readNormalizedSource(new URL('../src/lib/sync.ts', import.meta.url));
 const raceWeekendSource = readFileSync(new URL('../src/components/RaceWeekendView.tsx', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
 assert.match(appSource, /className="app-main-scroll flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto custom-scrollbar"/);
@@ -193,7 +195,7 @@ assert.match(fourBarSource, /compact \? 'space-y-3'/, 'compact FourBar presentat
 assert.match(setupSource, /<FourBarQuickAdjust\s+setup=\{setupItem\}\s+compact/, 'Setup activates compact FourBar presentation');
 assert.match(fourBarSource, /min-h-11 min-w-11 shrink-0/, 'compact FourBar keeps 44px help target');
 
-const lifecycleSource = readFileSync(new URL('../src/lib/setupLifecycle.ts', import.meta.url), 'utf8');
+const lifecycleSource = readNormalizedSource(new URL('../src/lib/setupLifecycle.ts', import.meta.url));
 assert.match(lifecycleSource, /export type SetupEditabilityReason =/, 'C1 exports typed editability reasons');
 assert.match(lifecycleSource, /'historical-role'[\s\S]*'locked'[\s\S]*'finished-weekend'[\s\S]*'in-play-elsewhere'/, 'C1 keeps every required typed reason');
 assert.match(lifecycleSource, /export const getSetupEditability = \(/, 'C1 exports one canonical predicate');
