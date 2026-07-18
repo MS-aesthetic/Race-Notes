@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { transformSync } from 'esbuild';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { compile } from '@tailwindcss/node';
 import type { ActiveSession, RaceWeekend, SessionRecord, Setup, SetupSnapshot, SetupSnapshotCorner } from '../src/types';
 import { cloneSetup, makeBlankSetup, normalizeSetup, pickImmediatePriorSetupForCar, pickLatestSetupForCar } from '../src/lib/setupCompat';
 import { calculateTireStagger, SETUP_STEPS, formatPressureBlock, formatPsiValue, formatStoredNumber, fourBarAdjustmentId, fourBarAdjustmentLabel, legacyValueNote, mirrorPressureBlockToTires, parseStoredNumber, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from '../src/lib/setupSteps';
@@ -1125,5 +1126,371 @@ c3Kill('quick-adjust-logging-rewire', mutatedUpdatedSetups[0].changeLog?.filter(
 
 console.log(`C3 assertions: ${c3AssertionCount}`);
 console.log(`C3 killed mutations: ${killedC3Mutations.join(', ')}`);
+
+// ── C5 setup naming and rename affordance ───────────────────────────────────
+
+let c5AssertionCount = 0;
+const killedC5Mutations: string[] = [];
+const c5Equal = (actual: unknown, expected: unknown, message: string) => {
+  c5AssertionCount += 1;
+  assert.deepEqual(actual, expected, message);
+};
+const c5Ok = (value: unknown, message: string) => {
+  c5AssertionCount += 1;
+  assert.ok(value, message);
+};
+const c5Kill = (name: string, failed: boolean) => {
+  c5Ok(failed, `C5 mutation ${name} must fail`);
+  killedC5Mutations.push(name);
+};
+
+const localHandlerSource = (source: string, name: string, nextName: string): string => {
+  const start = source.indexOf(`  const ${name} =`);
+  const end = source.indexOf(`\n\n  const ${nextName} =`, start);
+  assert.ok(start >= 0 && end > start, `C5 real ${name} handler exists`);
+  return source.slice(start, end).replace(`  const ${name} =`, `export const ${name} =`);
+};
+const compileLocalHandler = (
+  source: string,
+  name: string,
+  nextName: string,
+  dependencies: Record<string, unknown>,
+): RuntimeExport => compileInlineExport(localHandlerSource(source, name, nextName), name, dependencies);
+
+type CreationRun = {
+  prevented: number;
+  errors: boolean[];
+  expanded: string[];
+  clearedNames: string[];
+  selections: string[];
+  saves: Array<{ setups: Setup[]; activeId?: string; preserveInfoToast?: boolean }>;
+  info: string[];
+};
+const runCreation = (
+  source: string,
+  initialSetups: Setup[],
+  carId: string,
+  typedName: string,
+  mode: 'copy' | 'blank' | 'default',
+): CreationRun => {
+  const result: CreationRun = {
+    prevented: 0,
+    errors: [],
+    expanded: [],
+    clearedNames: [],
+    selections: [],
+    saves: [],
+    info: [],
+  };
+  const handler = compileLocalHandler(source, 'handleAddNewSetup', 'handleRenameSetup', {
+    pickLatestSetupForCar,
+    setups: initialSetups,
+    activeCarId: carId,
+    newSetupName: typedName,
+    setNewSetupNameError: (value: boolean) => { result.errors.push(value); },
+    displayVersionLabel: (value: Setup) => value.versionLabel || value.chassis,
+    activeCar: { id: carId, carType: 'Modified' },
+    lifecycleLabel: () => 'Current Setup',
+    cloneSetup,
+    makeBlankSetup,
+    onInfo: (message: string) => { result.info.push(message); },
+    setExpandedId: (id: string) => { result.expanded.push(id); },
+    setNewSetupName: (value: string) => { result.clearedNames.push(value); },
+    setActiveId: (id: string) => { result.selections.push(id); },
+    updateAndSaveSetups: (setups: Setup[], activeId?: string, preserveInfoToast?: boolean) => {
+      result.saves.push({ setups, activeId, preserveInfoToast });
+    },
+    displayedSetups: initialSetups,
+  });
+  const event = { preventDefault: () => { result.prevented += 1; } };
+  if (mode === 'default') handler(event);
+  else handler(event, mode);
+  return result;
+};
+
+const ownerSource = {
+  ...setup('owner-source', 'car-owner', 'Jul 18, 2026'),
+  chassis: 'Rocket XR1',
+  track: 'Eldora',
+  gear: '6.20',
+  screenshots: ['owner-photo'],
+  lifecycleRole: 'current' as const,
+  versionLabel: 'Current Setup',
+  changeLog: [{ id: 'legacy-owner', timestamp: '2026-07-18T10:00:00.000Z', label: 'Gear', field: 'gear', before: '6.00', after: '6.20' }],
+};
+
+for (const [label, typedName] of [['empty', ''], ['whitespace', '   \t  ']] as const) {
+  const rejected = runCreation(setupSource, [ownerSource], 'car-owner', typedName, 'blank');
+  c5Equal(rejected.prevented, 1, `C5 ${label} blank attempt prevents default`);
+  c5Equal(rejected.errors, [true], `C5 ${label} blank attempt exposes exact error state`);
+  c5Equal(rejected.saves.length, 0, `C5 ${label} blank attempt creates zero records and writes`);
+  c5Equal(rejected.expanded.length, 0, `C5 ${label} blank attempt changes no expansion`);
+  c5Equal(rejected.selections.length, 0, `C5 ${label} blank attempt changes no active selection`);
+  c5Equal(rejected.info.length, 0, `C5 ${label} blank attempt shows no copy info`);
+}
+
+const noSourceDefault = runCreation(setupSource, [], 'car-owner', '', 'default');
+c5Equal(noSourceDefault.errors, [true], 'C5 no-source default action follows blank-name guard');
+c5Equal(noSourceDefault.saves.length, 0, 'C5 no-source default action has zero persistence effects');
+
+const validBlank = runCreation(setupSource, [ownerSource], 'car-owner', '  Owner Blank Tune  ', 'blank');
+c5Equal(validBlank.saves.length, 1, 'C5 named blank creates exactly one save transaction');
+c5Equal(validBlank.saves[0].setups.length, 2, 'C5 named blank prepends exactly one record');
+c5Equal(validBlank.saves[0].setups[0].chassis, 'Owner Blank Tune', 'C5 blank name is trimmed before persistence');
+c5Equal(validBlank.saves[0].setups[0].lifecycleRole, 'current', 'C5 named blank is a Current Setup');
+c5Equal(validBlank.saves[0].activeId, validBlank.saves[0].setups[0].id, 'C5 named blank becomes active selection');
+c5Ok(!validBlank.saves[0].setups[0].chassis.includes('Setup #'), 'C5 valid blank never uses numbered fallback');
+
+const copiedOwner = runCreation(setupSource, [ownerSource], 'car-owner', '', 'copy');
+const copiedOwnerSetup = copiedOwner.saves[0].setups[0];
+c5Equal(copiedOwner.saves.length, 1, 'C5 empty-name source copy stays frictionless');
+c5Ok(copiedOwnerSetup.chassis.includes('Eldora') && copiedOwnerSetup.chassis.includes('from Eldora Jul 18, 2026'), 'C5 empty-name copy derives meaningful source-based name');
+c5Equal(copiedOwnerSetup.sourceSetupId, ownerSource.id, 'C5 copy retains exact source provenance');
+c5Equal(copiedOwnerSetup.gear, ownerSource.gear, 'C5 copy clones source tune');
+c5Equal(copiedOwnerSetup.lr.topBarHBird, ownerSource.lr.topBarHBird, 'C5 copy clones source corner tune');
+c5Equal(copiedOwnerSetup.screenshots, [], 'C5 copy clears source media');
+c5Equal(copiedOwnerSetup.changeLog, [], 'C5 copy clears historical change rows');
+c5Equal(copiedOwner.saves[0].preserveInfoToast, true, 'C5 copy preserves existing copy-info persistence behavior');
+c5Equal(copiedOwner.info.length, 1, 'C5 copy retains one pressure provenance info notice');
+
+const typedCopy = runCreation(setupSource, [ownerSource], 'car-owner', '  Feature Tune  ', 'copy');
+c5Equal(typedCopy.saves[0].setups[0].chassis, 'Feature Tune', 'C5 typed trimmed copy name wins over derived name');
+
+const whitespaceTrackSource = {
+  ...ownerSource,
+  track: '   ',
+  chassis: 'Meaningful Chassis',
+};
+const whitespaceTrackCopy = runCreation(setupSource, [whitespaceTrackSource], 'car-owner', '', 'copy');
+c5Ok(whitespaceTrackCopy.saves[0].setups[0].chassis.includes('Meaningful Chassis'), 'C5 whitespace-only source track falls through to meaningful chassis');
+c5Ok(!whitespaceTrackCopy.saves[0].setups[0].chassis.includes('   '), 'C5 derived source name excludes raw whitespace track');
+
+const creationFormSource = (source: string): string | null => {
+  const start = source.indexOf('            <form onSubmit={handleAddNewSetup}');
+  if (start < 0) return null;
+  const close = source.indexOf('            </form>', start);
+  if (close < 0) return null;
+  return source.slice(start, close + '            </form>'.length);
+};
+const renderCreationForm = (source: string, activeSetup: Setup | null, newSetupName: string, newSetupNameError: boolean): string => {
+  const form = creationFormSource(source);
+  if (!form) return '';
+  const Form = compileInlineExport(
+    `export function CreationForm(props: any) { const { handleAddNewSetup, activeSetup, newSetupName, newSetupNameError, setNewSetupName } = props; return (${form}); }`,
+    'CreationForm',
+    { React },
+  );
+  return renderToStaticMarkup(React.createElement(Form as React.ComponentType<any>, {
+    handleAddNewSetup: () => undefined,
+    activeSetup,
+    newSetupName,
+    newSetupNameError,
+    setNewSetupName: () => undefined,
+  }));
+};
+const blankFormMarkup = renderCreationForm(setupSource, null, '', true);
+c5Ok(blankFormMarkup.includes('required=""') && blankFormMarkup.includes('disabled=""'), 'C5 no-source blank control is required and visibly disabled while empty');
+c5Ok(blankFormMarkup.includes('aria-invalid="true"') && blankFormMarkup.includes('aria-describedby="new-setup-name-error"'), 'C5 blank error has accessible input relationship');
+c5Ok(blankFormMarkup.includes('id="new-setup-name-error"') && blankFormMarkup.includes('role="alert"') && blankFormMarkup.includes('Name this setup'), 'C5 blank error renders exact accessible hint');
+const copyFormMarkup = renderCreationForm(setupSource, ownerSource, '', false);
+c5Ok(!copyFormMarkup.includes('required=""'), 'C5 copy input does not impose blank-name browser validation');
+const copyButtonMarkup = copyFormMarkup.slice(copyFormMarkup.indexOf('<button type="submit"'), copyFormMarkup.indexOf('</button>') + 9);
+c5Ok(!copyButtonMarkup.includes('disabled=""') && copyButtonMarkup.includes('Copy latest'), 'C5 blankless copy submit remains enabled');
+const blankButtonMarkup = copyFormMarkup.slice(copyFormMarkup.lastIndexOf('<button'), copyFormMarkup.lastIndexOf('</button>') + 9);
+c5Ok(blankButtonMarkup.includes('disabled=""') && blankButtonMarkup.includes('Start blank'), 'C5 explicit blank action is visibly disabled while trimmed-empty');
+const namedFormMarkup = renderCreationForm(setupSource, ownerSource, 'Named', false);
+const namedBlankMarkup = namedFormMarkup.slice(namedFormMarkup.lastIndexOf('<button'), namedFormMarkup.lastIndexOf('</button>') + 9);
+c5Ok(!namedBlankMarkup.includes('disabled=""'), 'C5 explicit blank action enables after a real name');
+
+const numberedFallbackMutation = setupSource.replace(
+  'const name = trimmedName || `${sourceName} ${today} — from ${sourceLabel || sourceName}`;',
+  'const name = mode === \'blank\' ? `Setup #${displayedSetups.length + 1}` : trimmedName || `${sourceName} ${today} — from ${sourceLabel || sourceName}`;',
+);
+c5Kill('numbered-fallback-restored', runCreation(numberedFallbackMutation, [ownerSource], 'car-owner', 'Named Blank', 'blank').saves[0].setups[0].chassis.startsWith('Setup #'));
+
+const removedGuardMutation = setupSource.replace('if (!source && !trimmedName) {', 'if (false) {');
+c5Kill('blank-guard-removed', runCreation(removedGuardMutation, [ownerSource], 'car-owner', '', 'blank').saves.length === 1);
+const whitespaceGuardMutation = setupSource.replace('if (!source && !trimmedName) {', 'if (!source && !newSetupName) {');
+c5Kill('blank-guard-whitespace-weakened', runCreation(whitespaceGuardMutation, [ownerSource], 'car-owner', '   ', 'blank').saves.length === 1);
+const copyBlockedMutation = setupSource.replace('if (!source && !trimmedName) {', 'if (!trimmedName) {');
+c5Kill('blankless-copy-blocked', runCreation(copyBlockedMutation, [ownerSource], 'car-owner', '', 'copy').saves.length === 0);
+const trimRemovedMutation = setupSource.replace('const trimmedName = newSetupName.trim();', 'const trimmedName = newSetupName;');
+c5Kill('name-trim-removed', runCreation(trimRemovedMutation, [ownerSource], 'car-owner', '  Spaced Name  ', 'blank').saves[0].setups[0].chassis !== 'Spaced Name');
+const rawSourceTruthinessMutation = setupSource.replace(
+  "? source.track.trim() || source.chassis.trim() || displayVersionLabel(source).trim() || 'Current setup'",
+  "? source.track || source.chassis || displayVersionLabel(source) || 'Current setup'",
+);
+c5Kill(
+  'copy-source-whitespace-untrimmed',
+  !runCreation(rawSourceTruthinessMutation, [whitespaceTrackSource], 'car-owner', '', 'copy').saves[0].setups[0].chassis.includes('Meaningful Chassis'),
+);
+const hintRemovedMutation = setupSource.replace('Name this setup</p>', '</p>');
+c5Kill('inline-hint-removed', !renderCreationForm(hintRemovedMutation, null, '', true).includes('Name this setup'));
+const blankDisabledRemovedMutation = setupSource.replace("disabled={!activeSetup && !newSetupName.trim()}", 'disabled={false}');
+c5Kill('blank-control-disabled-removed', !renderCreationForm(blankDisabledRemovedMutation, null, '', false).includes('disabled=""'));
+const explicitBlankDisabledRemovedMutation = setupSource.replace("disabled={!newSetupName.trim()} onClick={(event) => handleAddNewSetup(event, 'blank')}", "disabled={false} onClick={(event) => handleAddNewSetup(event, 'blank')}");
+const explicitBlankMutationMarkup = renderCreationForm(explicitBlankDisabledRemovedMutation, ownerSource, '', false);
+c5Kill('explicit-blank-disabled-removed', !explicitBlankMutationMarkup.slice(explicitBlankMutationMarkup.lastIndexOf('<button')).includes('disabled=""'));
+const copyRequiredMutation = setupSource.replace('required={!activeSetup}', 'required');
+c5Kill('copy-required-added', renderCreationForm(copyRequiredMutation, ownerSource, '', false).includes('required=""'));
+const errorRelationshipMutation = setupSource.replace("aria-describedby={newSetupNameError ? 'new-setup-name-error' : undefined}", 'aria-describedby={undefined}');
+c5Kill('blank-error-relationship-removed', !renderCreationForm(errorRelationshipMutation, null, '', true).includes('aria-describedby="new-setup-name-error"'));
+
+const pencilExpressionSource = (source: string): string | null => {
+  const anchor = source.indexOf('<button type="button" title="Rename setup"');
+  if (anchor < 0) return null;
+  const start = source.lastIndexOf('{', anchor);
+  const close = source.indexOf('</button>}', start);
+  return close < 0 ? null : source.slice(start, close + '</button>}'.length);
+};
+const renderPencil = (source: string, isReadOnly: boolean): string => {
+  const expression = pencilExpressionSource(source);
+  if (!expression) return '';
+  const Button = compileInlineExport(
+    `export function RenameButton(props: any) { const { isReadOnly, handleRenameSetup, setupItem } = props; return (<React.Fragment>${expression}</React.Fragment>); }`,
+    'RenameButton',
+    { React },
+  );
+  return renderToStaticMarkup(React.createElement(Button as React.ComponentType<any>, {
+    isReadOnly,
+    handleRenameSetup: () => undefined,
+    setupItem: ownerSource,
+  }));
+};
+const editablePencilMarkup = renderPencil(setupSource, false);
+c5Equal((setupSource.match(/aria-label="Rename setup"/g) ?? []).length, 1, 'C5 product has one rename affordance definition');
+c5Ok(editablePencilMarkup.includes('title="Rename setup"') && editablePencilMarkup.includes('aria-label="Rename setup"'), 'C5 editable pencil is accessible');
+c5Ok(editablePencilMarkup.includes('min-h-11') && editablePencilMarkup.includes('min-w-11'), 'C5 editable pencil has at least 44x44px target at 360px');
+const c5CssCompiler = await compile(cssSource, { base: process.cwd(), onDependency: () => undefined });
+const c5PencilCss = c5CssCompiler.build(['flex', 'min-h-11', 'min-w-11', 'shrink-0', 'items-center', 'justify-center', 'rounded']);
+c5Ok(/--spacing:\s*0\.25rem/.test(c5PencilCss), 'C5 compiled production CSS retains 4px spacing unit');
+c5Ok(/\.min-h-11\s*\{\s*min-height:\s*calc\(var\(--spacing\) \* 11\)/.test(c5PencilCss), 'C5 compiled production CSS resolves pencil height to 11 spacing units = 44px');
+c5Ok(/\.min-w-11\s*\{\s*min-width:\s*calc\(var\(--spacing\) \* 11\)/.test(c5PencilCss), 'C5 compiled production CSS resolves pencil width to 11 spacing units = 44px');
+c5Equal(renderPencil(setupSource, true), '', 'C5 read-only card renders no rename pencil');
+
+const runRename = (source: string, target: Setup, activeSetupId: string | undefined) => {
+  let stopped = 0;
+  let expanded: string | null = null;
+  let pendingFocus: string | null = null;
+  let persisted = 0;
+  const rename = compileLocalHandler(source, 'handleRenameSetup', 'handleDeleteSetup', {
+    getSetupEditability,
+    weekends: c1Weekends,
+    activeEventSetupId: activeSetupId,
+    setExpandedId: (id: string) => { expanded = id; },
+    setRenameFocusSetupId: (id: string) => { pendingFocus = id; },
+    handleMetadataChange: () => { persisted += 1; },
+  });
+  rename({ stopPropagation: () => { stopped += 1; } }, target);
+  return { stopped, expanded, pendingFocus, persisted };
+};
+const renameEffectSource = (source: string): string => {
+  const marker = '  React.useEffect(() => {\n    if (!renameFocusSetupId || expandedId !== renameFocusSetupId) return;';
+  const start = source.indexOf(marker);
+  const bodyStart = source.indexOf('\n', start) + 1;
+  const end = source.indexOf('\n  }, [expandedId, renameFocusSetupId]);', bodyStart);
+  assert.ok(start >= 0 && end > bodyStart, 'C5 real rename focus effect exists');
+  return source.slice(bodyStart, end);
+};
+const runRenameFocus = (source: string, renameFocusSetupId: string | null, expandedId: string | null) => {
+  const focused: string[] = [];
+  const cleared: Array<string | null> = [];
+  const refs = {
+    current: {
+      [ownerSource.id]: { focus: () => { focused.push(ownerSource.id); } },
+      'wrong-setup': { focus: () => { focused.push('wrong-setup'); } },
+    },
+  };
+  const effect = compileInlineExport(
+    `export function runEffect(renameFocusSetupId: string | null, expandedId: string | null, chassisInputRefs: any, setRenameFocusSetupId: any) {\n${renameEffectSource(source)}\n}`,
+    'runEffect',
+    {},
+  );
+  effect(renameFocusSetupId, expandedId, refs, (value: string | null) => { cleared.push(value); });
+  return { focused, cleared };
+};
+
+const renameResult = runRename(setupSource, ownerSource, 'in-play');
+c5Equal(renameResult, { stopped: 1, expanded: ownerSource.id, pendingFocus: ownerSource.id, persisted: 0 }, 'C5 pencil stops propagation, expands exact editable card, queues exact focus, and persists nothing');
+const renameFocusResult = runRenameFocus(setupSource, renameResult.pendingFocus, renameResult.expanded);
+c5Equal(renameFocusResult.focused, [ownerSource.id], 'C5 post-mount effect focuses exact setup Chassis input');
+c5Equal(renameFocusResult.cleared, [null], 'C5 focus request is consumed once');
+c5Equal(runRename(setupSource, c1Baseline, 'in-play').pendingFocus, null, 'C5 historical baseline cannot invoke rename handler');
+c5Equal(runRename(setupSource, c1Final, 'in-play').pendingFocus, null, 'C5 historical final cannot invoke rename handler');
+c5Equal(runRename(setupSource, c1Locked, 'in-play').pendingFocus, null, 'C5 explicitly locked setup cannot invoke rename handler');
+c5Equal(runRename(setupSource, c1Finished, 'in-play').pendingFocus, null, 'C5 finished-weekend setup cannot invoke rename handler');
+c5Equal(runRename(setupSource, c1InPlay, 'in-play').pendingFocus, null, 'C5 active event-owned setup cannot invoke rename handler');
+c5Equal(runRename(setupSource, c1Unrelated, 'in-play').pendingFocus, c1Unrelated.id, 'C5 unrelated Current Setup remains renameable with live Race Day');
+
+const metadataSave = (source: string) => {
+  const saved: Array<{ setups: Setup[]; activeId: string }> = [];
+  const change = compileLocalHandler(source, 'handleMetadataChange', 'handleAddNewSetup', {
+    setups: [ownerSource],
+    updateAndSaveSetups: (setups: Setup[], activeId: string) => { saved.push({ setups, activeId }); },
+    activeId: ownerSource.id,
+  });
+  change(ownerSource.id, 'chassis', 'Renamed Owner Setup');
+  return saved;
+};
+const metadataSaves = metadataSave(setupSource);
+c5Equal(metadataSaves.length, 1, 'C5 actual Chassis typing uses existing save path once');
+c5Equal(metadataSaves[0].setups[0].chassis, 'Renamed Owner Setup', 'C5 actual Chassis typing persists new name immediately');
+c5Equal(metadataSaves[0].activeId, ownerSource.id, 'C5 rename typing preserves active selection');
+const appSetupSaveBlock = appSource.slice(appSource.indexOf('const handleSaveSetups'), appSource.indexOf('const handleUpdateSession'));
+c5Ok(appSetupSaveBlock.indexOf("localStorage.setItem('race_notes_saved_setups'") < appSetupSaveBlock.indexOf('markSavedDirty();'), 'C5 existing App path keeps immediate local rename persistence before C4 dirty mark');
+c5Ok(!localHandlerSource(setupSource, 'handleRenameSetup', 'handleDeleteSetup').includes('updateAndSaveSetups'), 'C5 pencil handler itself has zero write path');
+
+const pencilRemovedMutation = setupSource.replace('{!isReadOnly && <button type="button" title="Rename setup"', '{false && <button type="button" title="Rename setup"');
+c5Kill('rename-pencil-removed', renderPencil(pencilRemovedMutation, false) === '');
+const pencilUndersizedMutation = setupSource.replace('flex min-h-11 min-w-11 shrink-0 items-center', 'flex min-h-10 min-w-10 shrink-0 items-center');
+const undersizedMarkup = renderPencil(pencilUndersizedMutation, false);
+c5Kill('rename-pencil-undersized', !undersizedMarkup.includes('min-h-11') && !undersizedMarkup.includes('min-w-11'));
+const stopRemovedMutation = setupSource.replace('    event.stopPropagation();\n    if (!getSetupEditability', '    if (!getSetupEditability');
+c5Kill('rename-stop-propagation-removed', runRename(stopRemovedMutation, ownerSource, 'in-play').stopped === 0);
+const expandRemovedMutation = setupSource.replace('    setExpandedId(target.id);\n    setRenameFocusSetupId(target.id);', '    setRenameFocusSetupId(target.id);');
+c5Kill('rename-expand-removed', runRename(expandRemovedMutation, ownerSource, 'in-play').expanded === null);
+const focusRemovedMutation = setupSource.replace('    chassisInputRefs.current[renameFocusSetupId]?.focus();', '    void chassisInputRefs.current[renameFocusSetupId];');
+c5Kill('rename-focus-removed', runRenameFocus(focusRemovedMutation, ownerSource.id, ownerSource.id).focused.length === 0);
+const wrongFocusMutation = setupSource.replace('chassisInputRefs.current[renameFocusSetupId]?.focus();', "chassisInputRefs.current['wrong-setup']?.focus();");
+c5Kill('rename-wrong-input-focused', runRenameFocus(wrongFocusMutation, ownerSource.id, ownerSource.id).focused[0] === 'wrong-setup');
+const readOnlyPencilMutation = setupSource.replace('{!isReadOnly && <button type="button" title="Rename setup"', '{true && <button type="button" title="Rename setup"');
+c5Kill('rename-exposed-read-only', renderPencil(readOnlyPencilMutation, true).includes('Rename setup'));
+const renameGuardMutation = setupSource.replace('if (!getSetupEditability(target, weekends, activeEventSetupId).editable) return;', 'if (false) return;');
+c5Kill('rename-handler-read-only-guard-removed', runRename(renameGuardMutation, c1Baseline, 'in-play').pendingFocus === c1Baseline.id);
+const focusPersistenceMutation = setupSource.replace(
+  '    setRenameFocusSetupId(target.id);\n  };',
+  "    setRenameFocusSetupId(target.id);\n    handleMetadataChange(target.id, 'chassis', target.chassis);\n  };",
+);
+c5Kill('rename-focus-adds-persistence', runRename(focusPersistenceMutation, ownerSource, 'in-play').persisted === 1);
+
+const c5MutationSources = [
+  numberedFallbackMutation,
+  removedGuardMutation,
+  whitespaceGuardMutation,
+  copyBlockedMutation,
+  trimRemovedMutation,
+  rawSourceTruthinessMutation,
+  hintRemovedMutation,
+  blankDisabledRemovedMutation,
+  explicitBlankDisabledRemovedMutation,
+  copyRequiredMutation,
+  errorRelationshipMutation,
+  pencilRemovedMutation,
+  pencilUndersizedMutation,
+  stopRemovedMutation,
+  expandRemovedMutation,
+  focusRemovedMutation,
+  wrongFocusMutation,
+  readOnlyPencilMutation,
+  renameGuardMutation,
+  focusPersistenceMutation,
+];
+c5Ok(c5MutationSources.every(source => source !== setupSource), 'C5 every mutation changes real SetupView source');
+c5Equal(new Set(c5MutationSources).size, c5MutationSources.length, 'C5 killed production mutations are unique');
+c5Equal(new Set(killedC5Mutations).size, killedC5Mutations.length, 'C5 killed mutation labels are unique');
+c5Ok(!setupSource.includes('Setup #${'), 'C5 final product contains no numbered anonymous setup fallback');
+
+console.log(`C5 assertions: ${c5AssertionCount}`);
+console.log(`C5 killed mutations: ${killedC5Mutations.join(', ')}`);
 
 console.log('CHUNK5_SETUP_HARNESS PASS');

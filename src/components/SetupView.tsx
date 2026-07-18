@@ -332,6 +332,9 @@ export default function SetupView({
   const [activeId, setActiveId] = useState<string>(activeSetupId);
   const [expandedId, setExpandedId] = useState<string | null>(activeSetupId);
   const [newSetupName, setNewSetupName] = useState('');
+  const [newSetupNameError, setNewSetupNameError] = useState(false);
+  const [renameFocusSetupId, setRenameFocusSetupId] = useState<string | null>(null);
+  const chassisInputRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
   const [uploadingSetupId, setUploadingSetupId] = useState<string | null>(null);
   const [sharingSetupId, setSharingSetupId] = useState<string | null>(null);
   const [pendingDeleteSetupId, setPendingDeleteSetupId] = useState<string | null>(null);
@@ -341,6 +344,11 @@ export default function SetupView({
 
   React.useEffect(() => { setSetups(savedSetups); }, [savedSetups]);
   React.useEffect(() => { setActiveId(activeSetupId); }, [activeSetupId]);
+  React.useEffect(() => {
+    if (!renameFocusSetupId || expandedId !== renameFocusSetupId) return;
+    chassisInputRefs.current[renameFocusSetupId]?.focus();
+    setRenameFocusSetupId(null);
+  }, [expandedId, renameFocusSetupId]);
 
   // ── Setup CRUD ────────────────────────────────────────────────────────────────
 
@@ -402,9 +410,19 @@ export default function SetupView({
   const handleAddNewSetup = (e: { preventDefault: () => void }, mode: 'copy' | 'blank' = 'copy') => {
     e.preventDefault();
     const source = mode === 'copy' ? pickLatestSetupForCar(setups, activeCarId) : null;
+    const trimmedName = newSetupName.trim();
+    if (!source && !trimmedName) {
+      setNewSetupNameError(true);
+      return;
+    }
+    setNewSetupNameError(false);
     const today = new Date().toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' });
-    const sourceLabel = source ? `${source.track || source.chassis}${source.date ? ` ${source.date}` : ''}` : '';
-    const name = newSetupName.trim() || (source ? `${source.track || source.chassis} ${today} — from ${sourceLabel}` : `Setup #${displayedSetups.length + 1}`);
+    const sourceName = source
+      ? source.track.trim() || source.chassis.trim() || displayVersionLabel(source).trim() || 'Current setup'
+      : '';
+    const sourceDate = source?.date.trim() || '';
+    const sourceLabel = source ? `${sourceName}${sourceDate ? ` ${sourceDate}` : ''}` : '';
+    const name = trimmedName || `${sourceName} ${today} — from ${sourceLabel || sourceName}`;
     const overrides: Partial<Setup> = {
       id: `setup-rec-${Date.now()}`,
       chassis: name,
@@ -433,6 +451,13 @@ export default function SetupView({
     setNewSetupName('');
     setActiveId(newSetup.id);
     updateAndSaveSetups(updatedList, newSetup.id, !!source);
+  };
+
+  const handleRenameSetup = (event: React.MouseEvent<HTMLButtonElement>, target: Setup) => {
+    event.stopPropagation();
+    if (!getSetupEditability(target, weekends, activeEventSetupId).editable) return;
+    setExpandedId(target.id);
+    setRenameFocusSetupId(target.id);
   };
 
   const handleDeleteSetup = (setupId: string) => {
@@ -590,15 +615,22 @@ export default function SetupView({
               <div className="flex-grow">
                 <label className="block text-[10px] uppercase font-bold text-on-surface-variant mb-1 font-mono">Create New Setup</label>
                 <input id="new-setup-name" type="text" placeholder="e.g. Chassis #42 - Slick Track Soft" value={newSetupName}
-                  onChange={(e) => setNewSetupName(e.target.value)}
+                  required={!activeSetup}
+                  aria-invalid={newSetupNameError || undefined}
+                  aria-describedby={newSetupNameError ? 'new-setup-name-error' : undefined}
+                  onChange={(e) => {
+                    setNewSetupName(e.target.value);
+                    if (e.target.value.trim()) setNewSetupNameError(false);
+                  }}
                   className="w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm px-3 py-2 outline-none rounded" />
+                {newSetupNameError && <p id="new-setup-name-error" role="alert" className="mt-1 text-xs font-mono text-primary">Name this setup</p>}
               </div>
-              <button type="submit"
-                className="self-end sm:self-auto h-10 px-4 bg-surface-bright border border-outline text-primary hover:bg-primary/10 hover:border-primary uppercase font-mono text-xs font-bold transition-all flex items-center gap-2 rounded">
+              <button type="submit" disabled={!activeSetup && !newSetupName.trim()}
+                className="self-end sm:self-auto min-h-11 px-4 bg-surface-bright border border-outline text-primary hover:bg-primary/10 hover:border-primary uppercase font-mono text-xs font-bold transition-all flex items-center gap-2 rounded disabled:cursor-not-allowed disabled:opacity-40">
                 <span className="material-symbols-outlined text-[16px]">content_copy</span>{activeSetup ? 'Copy latest' : 'Create starting setup'}
               </button>
-              {activeSetup && <button type="button" onClick={(event) => handleAddNewSetup(event, 'blank')}
-                className="self-end sm:self-auto h-10 px-4 border border-outline-variant text-on-surface-variant hover:text-on-surface uppercase font-mono text-xs font-bold transition-all rounded">
+              {activeSetup && <button type="button" disabled={!newSetupName.trim()} onClick={(event) => handleAddNewSetup(event, 'blank')}
+                className="self-end sm:self-auto min-h-11 px-4 border border-outline-variant text-on-surface-variant hover:text-on-surface uppercase font-mono text-xs font-bold transition-all rounded disabled:cursor-not-allowed disabled:opacity-40">
                 Start blank
               </button>}
             </form>
@@ -636,6 +668,10 @@ export default function SetupView({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="min-w-0 break-words font-display text-base font-bold text-on-surface uppercase tracking-wide">{setupItem.chassis}</h3>
+                          {!isReadOnly && <button type="button" title="Rename setup" aria-label="Rename setup" onClick={(event) => handleRenameSetup(event, setupItem)}
+                            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded text-on-surface-variant transition-colors hover:text-primary">
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                          </button>}
                           {isActive && <span className="bg-primary/15 text-primary border border-primary/30 text-[9px] uppercase font-bold px-1.5 py-0.5 rounded tracking-wide">Active trackside</span>}
                           {isReadOnly && <span className="border border-outline-variant text-on-surface-variant text-[9px] uppercase font-bold px-1.5 py-0.5 rounded tracking-wide">View only</span>}
                         </div>
@@ -694,8 +730,8 @@ export default function SetupView({
                       {/* Metadata grid */}
                       <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Chassis</label>
-                          <input type="text" value={setupItem.chassis} onChange={(e) => handleMetadataChange(setupItem.id, 'chassis', e.target.value)}
+                          <label htmlFor={`setup-chassis-${setupItem.id}`} className="block text-[10px] font-mono font-bold uppercase text-on-surface-variant mb-1">Chassis</label>
+                          <input id={`setup-chassis-${setupItem.id}`} ref={(node) => { chassisInputRefs.current[setupItem.id] = node; }} type="text" value={setupItem.chassis} onChange={(e) => handleMetadataChange(setupItem.id, 'chassis', e.target.value)}
                             className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm font-mono font-semibold px-3 py-1.5 outline-none rounded" />
                         </div>
                         <div>
