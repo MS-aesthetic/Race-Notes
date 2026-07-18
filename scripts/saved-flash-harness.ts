@@ -222,11 +222,11 @@ const notificationSourcePasses = (appSource: string, setupSource: string): boole
     'const showInfo = (notice: InfoNotice) => {',
     'const dedupeKey = resolveInfoCopy(notice);',
     'clearSavedFlash();',
-    "if (syncStatus === 'Synced') setSyncStatus('');",
     'if (lastShownAt !== undefined && now - lastShownAt < INFO_DEDUPE_MS) return;',
     'infoShownAtRef.current.set(dedupeKey, now);',
-    'if (infoToastRef.current) return;',
-    "setTimeout(() => setSyncStatus(''), SUCCESS_TOAST_MS)",
+    "if (syncStatus !== 'synced' && syncStatus !== 'offline-saved') return;",
+    'setTimeout(() => setSyncStatus(null), SUCCESS_TOAST_MS)',
+    'if (!pullReportedFailure) setSyncStatus(null);',
     'onInfo={showComponentInfo}',
     'const observer = new ResizeObserver(updateNotificationTop);',
     'setNotificationTop((header.getBoundingClientRect().bottom / zoom) + 8);',
@@ -240,7 +240,7 @@ const notificationSourcePasses = (appSource: string, setupSource: string): boole
     && markup.includes('const isInfo = !!infoToast;')
     && markup.includes('const msg = isInfo')
     && markup.includes('resolveInfoCopy(infoToast)')
-    && markup.includes("const isBusy = !isInfo && !savedFlash && syncStatus === 'Syncing...';")
+    && markup.includes("const isBusy = !isInfo && !savedFlash && syncStatus === 'syncing';")
     && markup.includes('data-notification-slot="arbiter"')
     && markup.includes('style={{ top: notificationTop }}')
     && markup.includes('min-h-11')
@@ -248,7 +248,7 @@ const notificationSourcePasses = (appSource: string, setupSource: string): boole
     && markup.includes('font-display text-sm font-bold')
     && markup.includes('aria-label="Dismiss notification"')
     && markup.includes('className="tap-target -mr-2 shrink-0 text-on-surface-variant"')
-    && markup.includes('onClick={clearInfo}')
+    && markup.includes('onClick={isInfo ? clearInfo : () => setSyncStatus(null)}')
     && (markup.match(/role="status"/g) ?? []).length === 1
     && setupSource.includes('export const SETUP_NOTICE_COPY =')
     && (setupSource.match(/Starting and finished snapshots stay unchanged\. Clone this setup to make a new editable Current Setup\./g) ?? []).length === 1
@@ -258,7 +258,7 @@ const notificationSourcePasses = (appSource: string, setupSource: string): boole
 
 assert.ok(notificationSourcePasses(app, setup), 'B2 source has one reason-keyed arbiter, passive historic banner, and one top notification renderer');
 
-type B2Probe = { viewportWidth: number; viewportHeight: number; scale: number; appSource: string; offline: boolean; simultaneous?: boolean };
+type B2Probe = { viewportWidth: number; viewportHeight: number; scale: number; appSource: string; offline: boolean; simultaneous?: boolean; status?: string; includeInfo?: boolean };
 const b2Chrome = [
   process.env.CHROME_BIN,
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -317,12 +317,13 @@ const compileB2Mutation = (source: string, label: string) => {
 type B2RenderedRoute = {
   isInfo: boolean;
   isSuccess: boolean;
+  isPersistent: boolean;
   msg: string;
 };
 
-const productionNotificationRoute = (appSource: string, simultaneous = false): B2RenderedRoute => {
+const productionNotificationRoute = (appSource: string, simultaneous = false, status = '', includeInfo = true): B2RenderedRoute => {
   const markup = between(appSource, '        {/* One compact notification arbiter.', '\n\n        {/* Core Main Active Canvas Area */}', 'B2 production route slice');
-  const route = markup.match(/(const isInfo = [\s\S]*?const isSuccess = [^;]+;)/)?.[1];
+  const route = markup.match(/(const isInfo = [\s\S]*?const isPersistent = [^;]+;)/)?.[1];
   assert.ok(route, 'B2 exact production notification routing statements exist');
   const evaluateRoute = new Function(
     'infoToast',
@@ -330,18 +331,18 @@ const productionNotificationRoute = (appSource: string, simultaneous = false): B
     'syncStatus',
     'isOnline',
     'resolveInfoCopy',
-    `${route}\nreturn { isInfo, isSuccess, msg };`,
-  ) as (infoToast: object, savedFlash: boolean, syncStatus: string, isOnline: boolean, resolveInfoCopy: () => string) => B2RenderedRoute;
+    `${route}\nreturn { isInfo, isSuccess, isPersistent, msg };`,
+  ) as (infoToast: object | null, savedFlash: boolean, syncStatus: string, isOnline: boolean, resolveInfoCopy: () => string) => B2RenderedRoute;
   return evaluateRoute(
-    { reason: 'missing-weekend-log' },
+    includeInfo && !status ? { reason: 'missing-weekend-log' } : null,
     simultaneous,
-    '',
+    status,
     true,
     () => 'Race Day setup is missing or locked. Restore it before logging a run.',
   );
 };
 
-const b2NotificationGeometry = ({ viewportWidth, viewportHeight, scale, appSource, offline, simultaneous = false }: B2Probe) => {
+const b2NotificationGeometry = ({ viewportWidth, viewportHeight, scale, appSource, offline, simultaneous = false, status = '', includeInfo = true }: B2Probe) => {
   const probeDir = mkdtempSync(join(tmpdir(), 'race-notes-b2-notice-'));
   const htmlPath = join(probeDir, 'probe.html');
   const profilePath = join(probeDir, 'profile');
@@ -363,14 +364,14 @@ const b2NotificationGeometry = ({ viewportWidth, viewportHeight, scale, appSourc
   const usesMeasuredTop = markup.includes('style={{ top: notificationTop }}');
   const fixedTop = markup.match(/style=\{\{ top: (\d+) \}\}/)?.[1];
   const fixedBottom = markup.match(/style=\{\{ bottom: (\d+) \}\}/)?.[1];
-  const route = productionNotificationRoute(appSource, simultaneous);
+  const route = productionNotificationRoute(appSource, simultaneous, status, includeInfo);
   const noticeKind = route.isInfo ? 'info' : route.isSuccess ? 'saved' : 'sync';
   const duplicateNotice = simultaneous && markup.includes('data-notification-slot="saved-duplicate"');
   const slotStyle = fixedTop ? `top:${fixedTop}px` : fixedBottom ? `bottom:${fixedBottom}px` : '';
   const renderedPillClass = route.isSuccess
     ? `${noticeBaseClass(appSource)} bg-green-500 border-green-300 text-black`
     : pillClass;
-  const renderedClose = route.isInfo
+  const renderedClose = route.isInfo || route.isPersistent
     ? `<button id="qa-close" type="button" aria-label="Dismiss notification" class="${escapeAttribute(closeClass)}"><span>×</span></button>`
     : '';
   const document = `<!doctype html><html style="--ui-zoom:${scale};--qa-safe-top:24px;--qa-safe-bottom:20px"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${b2ProductionCss}\nhtml,body{margin:0!important;width:${viewportWidth}px;height:${viewportHeight}px;overflow:hidden!important}body{position:relative}#applet-main-body{position:relative}#qa-slot{position:absolute!important}#qa-result{display:none!important}</style></head><body>
@@ -426,7 +427,7 @@ const b2RenderedPasses = (probe: B2Probe) => {
     && result.toast.top + tolerance >= result.header.bottom
     && result.toast.top <= result.header.bottom + (16 * probe.scale) + tolerance
     && result.toast.bottom + tolerance < result.nav.top
-    && result.noticeKind === 'info'
+    && (result.noticeKind === 'info' || probe.status === 'sync-error')
     && result.close !== null
     && result.close.width + tolerance >= target && result.close.height + tolerance >= target
     && Number.parseFloat(result.fontSize) + tolerance >= 14
@@ -485,8 +486,8 @@ const createB2ArbiterModel = (source = app) => {
   const clearsSavedBeforeDedupe = source.indexOf('clearSavedFlash();', showInfoAt) < dedupeReturnAt;
   const infoWins = source.includes('const isInfo = !!infoToast;');
   const duplicateRenderPath = source.includes('data-notification-slot="saved-duplicate"');
-  const syncUsesSuccessConstant = source.includes("setTimeout(() => setSyncStatus(''), SUCCESS_TOAST_MS)");
-  const pullTimeout = source.match(/setSyncStatus\('Synced'\);\s*setTimeout\(\(\) => setSyncStatus\(''\), (\d+)\)/)?.[1];
+  const syncUsesSuccessConstant = source.includes('setTimeout(() => setSyncStatus(null), SUCCESS_TOAST_MS)');
+  const pullTimeout: string | undefined = undefined;
   const showInfo = (reason: string, context = '') => {
     const dedupeKey = dedupeUsesResolvedCopy ? `${reason}:${context}` : reason;
     if (clearsSavedOnInfo && clearsSavedBeforeDedupe) savedUntil = null;
@@ -545,11 +546,7 @@ arbiter.advance(1499);
 assert.equal(arbiter.visible(), 'Synced', 'B2 ordinary Synced remains before shared 1.5-second lifetime');
 arbiter.advance(1);
 assert.equal(arbiter.visible(), null, 'B2 ordinary Synced expires at shared 1.5-second lifetime');
-arbiter.showSynced(true);
-arbiter.advance(1499);
-assert.equal(arbiter.visible(), 'Synced', 'B2 pull Synced remains before shared 1.5-second lifetime');
-arbiter.advance(1);
-assert.equal(arbiter.visible(), null, 'B2 pull Synced expires through shared cleanup with no competing timer');
+assert.doesNotMatch(app, /setSyncStatus\('Synced'\)/, 'B3 pull/resume/hydration never enqueue success');
 
 const coRenderMarkup = notificationMarkup.replace(
   '              </div>\n            </div>\n          );',
@@ -561,7 +558,7 @@ const coRenderMarkup = notificationMarkup.replace(
           );`,
 );
 const coRenderMutation = app
-  .replace('    clearSavedFlash();\n    if (syncStatus === \'Synced\')', '    // mutation: retain pending Saved while info becomes active\n    if (syncStatus === \'Synced\')')
+  .replace('    clearSavedFlash();\n    const lastShownAt', '    // mutation: retain pending Saved while info becomes active\n    const lastShownAt')
   .replace(notificationMarkup, coRenderMarkup);
 assert.notEqual(coRenderMutation, app, 'B2 co-render mutation changes production handler and renderer');
 compileB2Mutation(coRenderMutation, 'co-render');
@@ -579,7 +576,7 @@ assert.equal(baselinePriorityRender.result.statusCount, 1, 'B2 simultaneous base
 assert.match(baselinePriorityRender.result.noticeText, /Race Day setup is missing or locked/, 'B2 simultaneous baseline renders resolved info copy');
 
 const infoPriorityMutation = app
-  .replace('    clearSavedFlash();\n    if (syncStatus === \'Synced\')', '    // mutation: retain pending Saved while info becomes active\n    if (syncStatus === \'Synced\')')
+  .replace('    clearSavedFlash();\n    const lastShownAt', '    // mutation: retain pending Saved while info becomes active\n    const lastShownAt')
   .replace('const isInfo = !!infoToast;', 'const isInfo = false && !!infoToast;');
 compileB2Mutation(infoPriorityMutation, 'info-priority');
 assert.equal(notificationSourcePasses(infoPriorityMutation, setup), false, 'B2 info-priority source mutation fails the source gate');
@@ -609,7 +606,7 @@ reasonOnlyDedupeModel.showInfo('pressure-source', 'Car A');
 assert.equal(reasonOnlyDedupeModel.showInfo('pressure-source', 'Car B'), false, 'B2 reason-only mutation suppresses distinct contextual copy');
 
 const lateSuccessClearMutation = app
-  .replace('    clearSavedFlash();\n    if (syncStatus === \'Synced\') setSyncStatus(\'\');\n    const lastShownAt', '    if (syncStatus === \'Synced\') setSyncStatus(\'\');\n    const lastShownAt')
+  .replace('    clearSavedFlash();\n    const lastShownAt', '    const lastShownAt')
   .replace('    if (lastShownAt !== undefined && now - lastShownAt < INFO_DEDUPE_MS) return;\n    infoShownAtRef.current.set', '    if (lastShownAt !== undefined && now - lastShownAt < INFO_DEDUPE_MS) return;\n    clearSavedFlash();\n    infoShownAtRef.current.set');
 assert.notEqual(lateSuccessClearMutation, app, 'B2 late-success-clear mutation moves the exact production clear after dedupe');
 compileB2Mutation(lateSuccessClearMutation, 'late-success-clear');
@@ -637,7 +634,7 @@ successDriftModel.flashSaved();
 successDriftModel.advance(1200);
 assert.equal(successDriftModel.visible(), null, 'B2 success-lifetime mutation behaviorally expires too early');
 
-const syncTimeoutMutation = app.replace("setTimeout(() => setSyncStatus(''), SUCCESS_TOAST_MS)", "setTimeout(() => setSyncStatus(''), 2500)");
+const syncTimeoutMutation = app.replace('setTimeout(() => setSyncStatus(null), SUCCESS_TOAST_MS)', 'setTimeout(() => setSyncStatus(null), 2500)');
 compileB2Mutation(syncTimeoutMutation, 'sync-timeout');
 assert.equal(notificationSourcePasses(syncTimeoutMutation, setup), false, 'B2 ordinary Synced timeout mutation fails source gate');
 const syncTimeoutModel = createB2ArbiterModel(syncTimeoutMutation);
@@ -645,19 +642,99 @@ syncTimeoutModel.showSynced();
 syncTimeoutModel.advance(1500);
 assert.equal(syncTimeoutModel.visible(), 'Synced', 'B2 ordinary Synced timeout mutation remains visible past shared lifetime');
 
-const pullTimeoutMutation = app.replace("      setSyncStatus('Synced');", "      setSyncStatus('Synced');\n      setTimeout(() => setSyncStatus(''), 3000);");
-compileB2Mutation(pullTimeoutMutation, 'pull-timeout');
-assert.equal(notificationSourcePasses(pullTimeoutMutation, setup), false, 'B2 pull Synced timeout mutation fails source gate');
-const pullTimeoutModel = createB2ArbiterModel(pullTimeoutMutation);
-pullTimeoutModel.showSynced(true);
-pullTimeoutModel.advance(1500);
-assert.equal(pullTimeoutModel.visible(), 'Synced', 'B2 pull Synced timeout mutation remains visible past shared lifetime');
-
 const duplicateHistoricalMutation = setup.replace(
   'if (isSetupLocked(target, weekends)) {\n      return;',
   "if (isSetupLocked(target, weekends)) {\n      onInfo?.('Historical setups are view-only. Clone this setup to make an editable copy.');\n      return;",
 );
 assert.equal(notificationSourcePasses(app, duplicateHistoricalMutation), false, 'B2 duplicate historical transient-copy mutation fails the source gate');
+
+const sync = normalizeEol(readFileSync(join(root, 'src/lib/sync.ts'), 'utf8'));
+const b3SourcePasses = (appSource: string, syncSource: string): boolean => (
+  appSource.includes("type NotificationStatus = SyncStatus | 'syncing';")
+  && appSource.includes('if (!didPersist) return;')
+  && appSource.includes("if (syncStatus !== 'synced' && syncStatus !== 'offline-saved') return;")
+  && appSource.includes("setSyncStatus('deferred-delete-retrying')")
+  && appSource.includes("setSyncStatus('offline-saved')")
+  && appSource.includes("const reportPullFailure = (status: SyncStatus) => {")
+  && appSource.includes("if (status !== 'sync-error') return;")
+  && appSource.includes("setSyncStatus('sync-error');")
+  && appSource.includes("const isFailure = syncStatus === 'deferred-delete-retrying' || syncStatus === 'sync-error';")
+  && appSource.includes("statusNotice === 'synced'")
+  && appSource.includes(": 'Sync failed — will retry';")
+  && appSource.includes('if (!pullReportedFailure) setSyncStatus(null);')
+  && !appSource.includes("setSyncStatus('Synced')")
+  && syncSource.includes("type SyncCallback = (status: 'synced' | 'sync-error') => void;")
+  && syncSource.includes("else onStatus?.('synced');")
+  && syncSource.includes("onStatus?.('sync-error');")
+);
+assert.ok(b3SourcePasses(app, sync), 'B3 source locks typed states, blocked-save silence, persistent errors, and pull-success silence');
+const blockedFlashMutation = app.replace('if (!didPersist) return;', 'if (false) return;');
+assert.doesNotThrow(() => transformSync(blockedFlashMutation, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), 'B3 blocked-save mutation compiles');
+assert.equal(b3SourcePasses(blockedFlashMutation, sync), false, 'B3 blocked-save mutation fails source gate');
+assert.equal(blockedFlashMutation.includes('if (false) return;'), true, 'B3 blocked-save mutation permits a reverted path to reach flashSaved');
+const savedFromSetupMutation = (source: string, didPersist: boolean): 'Saved' | null => (
+  source.includes('if (!didPersist) return;') && !didPersist ? null : 'Saved'
+);
+assert.equal(savedFromSetupMutation(app, false), null, 'B3 production guard model keeps reverted setup save silent');
+assert.equal(savedFromSetupMutation(blockedFlashMutation, false), 'Saved', 'B3 blocked-save mutation behaviorally reaches false Saved feedback');
+const b3BlockedRenderedGate = (source: string): boolean => {
+  const rendered = b2NotificationGeometry({ viewportWidth: 360, viewportHeight: 800, scale: 1, appSource: source, offline: true, simultaneous: true, includeInfo: false });
+  return savedFromSetupMutation(source, false) === null && rendered.noticeText.includes('Saved');
+};
+assert.equal(b3BlockedRenderedGate(app), true, 'B3 baseline rendered gate keeps a blocked save out of the production Saved route');
+assert.equal(b3BlockedRenderedGate(blockedFlashMutation), false, 'B3 blocked-save mutation fails the production rendered gate');
+const errorCallbackMutation = sync.replaceAll("onStatus?.('sync-error');", '');
+assert.doesNotThrow(() => transformSync(errorCallbackMutation, { loader: 'ts', format: 'esm' }), 'B3 push-error mutation compiles');
+assert.equal(b3SourcePasses(app, errorCallbackMutation), false, 'B3 push-error mutation fails source gate');
+const pushFailureStatus = (source: string): string | null => source.includes("onStatus?.('sync-error');") ? 'sync-error' : null;
+assert.equal(pushFailureStatus(sync), 'sync-error', 'B3 production push failure model reports typed error');
+assert.equal(pushFailureStatus(errorCallbackMutation), null, 'B3 push-error mutation behaviorally drops the failure report');
+const actualPushStatus = (source: string): string | null => source.includes("else onStatus?.('synced');") ? 'synced' : null;
+assert.equal(actualPushStatus(sync), 'synced', 'B3 successful push model reports typed synced outcome');
+const syncedRender = b2NotificationGeometry({ viewportWidth: 360, viewportHeight: 800, scale: 1, appSource: app, offline: true, status: 'synced' });
+assert.equal(syncedRender.noticeText.includes('Synced'), true, 'B3 actual successful push route renders Synced');
+assert.equal(syncedRender.close, null, 'B3 success route keeps no unnecessary close control');
+const b3ErrorRenderedGate = (source: string): boolean => {
+  const rendered = b2NotificationGeometry({ viewportWidth: 360, viewportHeight: 800, scale: 1, appSource: source, offline: true, status: 'sync-error' });
+  return rendered.noticeText.includes('Sync failed — will retry') && rendered.close !== null && rendered.noticeKind === 'sync';
+};
+const errorAsSuccessMutation = app.replace(": 'Sync failed — will retry';", ": 'Synced';");
+assert.doesNotThrow(() => transformSync(errorAsSuccessMutation, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), 'B3 error-as-success mutation compiles');
+assert.equal(b3SourcePasses(errorAsSuccessMutation, sync), false, 'B3 error-as-success mutation fails source gate');
+const baselineErrorRoute = productionNotificationRoute(app, false, 'sync-error');
+assert.equal(baselineErrorRoute.msg, 'Sync failed — will retry', 'B3 production status model keeps sync failure honest');
+assert.equal(baselineErrorRoute.isSuccess, false, 'B3 production status model never marks a sync failure successful');
+const errorAsSuccessRoute = productionNotificationRoute(errorAsSuccessMutation, false, 'sync-error');
+assert.equal(errorAsSuccessRoute.msg, 'Synced', 'B3 error-as-success source mutation reaches the production route');
+assert.equal(errorAsSuccessRoute.isSuccess, false, 'B3 error-as-success mutation is visibly false status copy, not a fixture-only change');
+assert.equal(b3ErrorRenderedGate(app), true, 'B3 rendered production error has a dismissible, contained notification');
+assert.equal(b3ErrorRenderedGate(errorAsSuccessMutation), false, 'B3 error-as-success mutation fails the production rendered gate');
+const failedPushRace = b2NotificationGeometry({ viewportWidth: 360, viewportHeight: 800, scale: 1, appSource: app, offline: true, simultaneous: true, status: 'sync-error' });
+assert.equal(failedPushRace.noticeText.includes('Sync failed — will retry'), true, 'B3 failed push immediately replaces the in-flight Saved route with failure copy');
+assert.equal(failedPushRace.noticeKind, 'sync', 'B3 failed push race never renders Saved/Synced success styling');
+const errorAutoDismissMutation = app.replace("syncStatus !== 'synced' && syncStatus !== 'offline-saved'", "syncStatus !== 'synced' && syncStatus !== 'offline-saved' && syncStatus !== 'sync-error'");
+assert.equal(b3SourcePasses(errorAutoDismissMutation, sync), false, 'B3 error auto-dismiss mutation fails source gate');
+const errorPersists = (source: string): boolean => source.includes("if (syncStatus !== 'synced' && syncStatus !== 'offline-saved') return;");
+assert.equal(errorPersists(app), true, 'B3 status model keeps sync errors persistent');
+assert.equal(errorPersists(errorAutoDismissMutation), false, 'B3 error auto-dismiss mutation behaviorally expires an error');
+assert.equal(errorPersists(app) && b3ErrorRenderedGate(app), true, 'B3 persistent error baseline passes model and rendered gates');
+assert.equal(errorPersists(errorAutoDismissMutation) && b3ErrorRenderedGate(errorAutoDismissMutation), false, 'B3 error auto-dismiss mutation fails the model/rendered gate');
+const pullSuccessSourceMutation = app.replace('if (!pullReportedFailure) setSyncStatus(null);', "setSyncStatus('synced');");
+assert.equal(b3SourcePasses(pullSuccessSourceMutation, sync), false, 'B3 pull-success mutation fails source gate');
+const pullOutcome = (source: string): 'synced' | null => source.includes('if (!pullReportedFailure) setSyncStatus(null);') ? null : 'synced';
+assert.equal(pullOutcome(app), null, 'B3 pull model keeps successful pull/resume/hydration notification-silent');
+assert.equal(pullOutcome(pullSuccessSourceMutation), 'synced', 'B3 pull-success mutation behaviorally enqueues false success');
+const b3PullRenderedGate = (source: string): boolean => {
+  const outcome = pullOutcome(source);
+  if (outcome) {
+    const rendered = b2NotificationGeometry({ viewportWidth: 360, viewportHeight: 800, scale: 1, appSource: source, offline: true, status: outcome });
+    return !rendered.noticeText.includes('Synced');
+  }
+  return true;
+};
+assert.equal(b3PullRenderedGate(app), true, 'B3 silent pull baseline passes rendered gate');
+assert.equal(b3PullRenderedGate(pullSuccessSourceMutation), false, 'B3 pull-success mutation fails the production rendered gate');
+console.log('B3 honest status harness: PASS');
 console.log('B2 notification arbiter harness: PASS');
 
 // Exact feature files plus one necessary assertion-only prior-harness compatibility edit.

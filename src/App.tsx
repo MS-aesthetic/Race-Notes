@@ -15,7 +15,7 @@ import {
 
 import { supabase, onAuthChange, fetchProfile, getUserTeam, getTeamMembers, handleNativeAuthCallback, rememberLocalAccount, hasLocalAccount, deleteAccount as deleteCloudAccount, AppUser } from './lib/supabase';
 import AuthView from './components/AuthView';
-import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pushTodos, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, pushMaintenanceLogs, pullMaintenanceLogs, pushChecklistTemplates, pullChecklistTemplates, pushWeekendChecklists, pullWeekendChecklists, deleteTeamSharedRecordFromCloud } from './lib/sync';
+import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pushTodos, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, pushMaintenanceLogs, pullMaintenanceLogs, pushChecklistTemplates, pullChecklistTemplates, pushWeekendChecklists, pullWeekendChecklists, deleteTeamSharedRecordFromCloud, type SyncStatus } from './lib/sync';
 import { registerForPush, sendPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
 import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
@@ -42,7 +42,6 @@ import HelpSheet from './components/ui/HelpSheet';
 import UndoToast from './components/ui/UndoToast';
 import { pickAutoWeekend, sortWeekends } from './lib/scope';
 import { buildQuickServiceRecords, type QuickServiceOutcome, type QuickServiceRequest } from './lib/serviceLog';
-import { useOnlineStatus } from './lib/saveStatus';
 import { hasOpenSheets, isPopSuppressed } from './lib/backStack';
 import { useUndoableDelete } from './lib/undo';
 import { isAppGuideSection } from './lib/helpRouting';
@@ -68,6 +67,24 @@ import { detectAssignmentChanges } from './lib/assignmentNotify';
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
 const INFO_DEDUPE_MS = 5000;
 const SUCCESS_TOAST_MS = 1500;
+type NotificationStatus = SyncStatus | 'syncing';
+
+const isOnlineNow = (): boolean => typeof navigator === 'undefined' || navigator.onLine;
+
+const useOnlineStatus = (): boolean => {
+  const [online, setOnline] = useState(isOnlineNow());
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => {
+      window.removeEventListener('online', up);
+      window.removeEventListener('offline', down);
+    };
+  }, []);
+  return online;
+};
 
 type InfoCopyContext = {
   label?: string;
@@ -235,7 +252,7 @@ export default function App() {
     setTireInventory(updated);
     localStorage.setItem('race_notes_tires', JSON.stringify(updated));
     flashSaved();
-    if (user) pushTires(updated, user.id);
+    if (user) pushTires(updated, user.id, setSyncStatus);
   };
 
   const handleDeleteTireFromCloud = async (tireId: string) => {
@@ -622,7 +639,7 @@ export default function App() {
     setChecklistTemplates([]);
     setWeekendChecklists([]);
     flashSaved();
-    setSyncStatus(user && teamResolved && team
+    showComponentInfo(user && teamResolved && team
       ? 'Device data cleared. Team data remains shared in cloud.'
       : 'All data cleared');
   };
@@ -698,7 +715,7 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [nativeAuthError, setNativeAuthError] = useState<{ id: number; message: string } | null>(null);
   const [hasLocalAcct, setHasLocalAcct] = useState<boolean>(() => hasLocalAccount());
-  const [syncStatus, setSyncStatus] = useState('');
+  const [syncStatus, setSyncStatus] = useState<NotificationStatus | null>(null);
   const [pullDone, setPullDone] = useState(false); // initial cloud pull resolved — gates [4]
   const [authGeneration, setAuthGeneration] = useState(0);
   const [deleteReplayVersion, setDeleteReplayVersion] = useState(0);
@@ -803,7 +820,7 @@ export default function App() {
         if (cancelled
           || authIdentityRef.current !== accountId
           || authGenerationRef.current !== generation) return;
-        const deleted = await deleteTeamSharedRecordFromCloud(intent.table, intent.recordId);
+        const deleted = await deleteTeamSharedRecordFromCloud(intent.table, intent.recordId, setSyncStatus);
         if (deleted) removePendingTeamDelete(window.localStorage, intent);
         else retryNeeded = true;
       }
@@ -811,7 +828,7 @@ export default function App() {
         && !cancelled
         && authIdentityRef.current === accountId
         && authGenerationRef.current === generation) {
-        setSyncStatus('Cloud delete deferred — retrying online');
+        setSyncStatus('deferred-delete-retrying');
         window.setTimeout(() => {
           if (authIdentityRef.current === accountId
             && authGenerationRef.current === generation) {
@@ -840,7 +857,7 @@ export default function App() {
         if (cancelled
           || authIdentityRef.current !== accountId
           || authGenerationRef.current !== generation) return;
-        const deleted = await deleteTireFromCloud(intent.tireId);
+        const deleted = await deleteTireFromCloud(intent.tireId, setSyncStatus);
         if (deleted) removePendingPersonalTireDelete(window.localStorage, intent);
         else retryNeeded = true;
       }
@@ -848,7 +865,7 @@ export default function App() {
         && !cancelled
         && authIdentityRef.current === accountId
         && authGenerationRef.current === generation) {
-        setSyncStatus('Personal tire delete deferred — retrying online');
+        setSyncStatus('deferred-delete-retrying');
         window.setTimeout(() => {
           if (authIdentityRef.current === accountId
             && authGenerationRef.current === generation) {
@@ -903,7 +920,6 @@ export default function App() {
     const now = Date.now();
     const dedupeKey = resolveInfoCopy(notice);
     clearSavedFlash();
-    if (syncStatus === 'Synced') setSyncStatus('');
     const lastShownAt = infoShownAtRef.current.get(dedupeKey);
     if (lastShownAt !== undefined && now - lastShownAt < INFO_DEDUPE_MS) return;
     infoShownAtRef.current.set(dedupeKey, now);
@@ -913,6 +929,7 @@ export default function App() {
   const showComponentInfo = (message: string) => showInfo(componentInfoNotice(message));
   const flashSaved = () => {
     if (infoToastRef.current) return;
+    if (!isOnline) setSyncStatus('offline-saved');
     setSavedFlash(true);
     if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
     savedFlashTimer.current = setTimeout(() => {
@@ -954,11 +971,11 @@ export default function App() {
     void refreshTeamMetadata();
     return () => { cancelled = true; };
   }, [isOnline, teamResolved, user]);
-  // One lifetime owns every displayed success state. 'Syncing...' remains until
+  // One lifetime owns every displayed success state. 'syncing' remains until
   // the operation replaces it with a terminal status.
   useEffect(() => {
-    if (!syncStatus || syncStatus === 'Syncing...') return;
-    const t = setTimeout(() => setSyncStatus(''), SUCCESS_TOAST_MS);
+    if (syncStatus !== 'synced' && syncStatus !== 'offline-saved') return;
+    const t = setTimeout(() => setSyncStatus(null), SUCCESS_TOAST_MS);
     return () => clearTimeout(t);
   }, [syncStatus]);
 
@@ -1223,12 +1240,18 @@ export default function App() {
     }
     const pullUserId = user.id;
     const isCurrentPull = () => pullGenerationRef.current === generation;
+    let pullReportedFailure = false;
+    const reportPullFailure = (status: SyncStatus) => {
+      if (status !== 'sync-error') return;
+      pullReportedFailure = true;
+      setSyncStatus('sync-error');
+    };
     lastPullStartedAtRef.current = Date.now();
     setPullDone(false);
 
     // Pull cloud data and merge into localStorage
     const doPull = async () => {
-      setSyncStatus('Syncing...');
+      setSyncStatus('syncing');
       const queuedAtPullStart = new Set(
         readPendingTeamDeletes(window.localStorage)
           .filter(intent => intent.accountId === pullUserId)
@@ -1251,7 +1274,7 @@ export default function App() {
           && intent.recordId === row.id
         ));
       });
-      const data = await pullAllData(pullUserId, setSyncStatus);
+      const data = await pullAllData(pullUserId, reportPullFailure);
       if (!isCurrentPull()) return;
       data.setups = omitQueuedDeletes('setups', data.setups);
       data.weekends = omitQueuedDeletes('race_weekends', data.weekends);
@@ -1266,11 +1289,11 @@ export default function App() {
           const merged = mergeTimestampedRecords(prev, data.setups);
           localStorage.setItem('race_notes_saved_setups', JSON.stringify(merged));
           if (hasNewerLocal) {
-            if (syncOwnerId) pushSetups(merged, syncOwnerId, setSyncStatus);
+            if (syncOwnerId) pushSetups(merged, syncOwnerId, reportPullFailure);
           }
           return merged;
         });
-      } else if (savedSetupsRef.current.length > 0 && syncOwnerId) pushSetups(savedSetupsRef.current, syncOwnerId, setSyncStatus);
+      } else if (savedSetupsRef.current.length > 0 && syncOwnerId) pushSetups(savedSetupsRef.current, syncOwnerId, reportPullFailure);
 
       if (data.weekends.length > 0) {
         setWeekends(prev => {
@@ -1282,11 +1305,11 @@ export default function App() {
           const merged = mergeTimestampedRecords(prev, data.weekends);
           localStorage.setItem('race_notes_weekends', JSON.stringify(merged));
           if (hasNewerLocal) {
-            if (syncOwnerId) pushWeekends(merged, syncOwnerId, setSyncStatus);
+            if (syncOwnerId) pushWeekends(merged, syncOwnerId, reportPullFailure);
           }
           return merged;
         });
-      } else if (weekendsRef.current.length > 0 && syncOwnerId) pushWeekends(weekendsRef.current, syncOwnerId, setSyncStatus);
+      } else if (weekendsRef.current.length > 0 && syncOwnerId) pushWeekends(weekendsRef.current, syncOwnerId, reportPullFailure);
 
       if (data.activeSession) {
         const local = activeSessionRef.current;
@@ -1295,10 +1318,10 @@ export default function App() {
         activeSessionRef.current = merged;
         setActiveSession(merged);
         localStorage.setItem('race_notes_active_session', JSON.stringify(merged));
-        if (!cloudWins) pushActiveSession(merged, pullUserId, setSyncStatus);
-      } else if (activeSessionRef.current.updatedAt) pushActiveSession(activeSessionRef.current, pullUserId, setSyncStatus);
+        if (!cloudWins) pushActiveSession(merged, pullUserId, reportPullFailure);
+      } else if (activeSessionRef.current.updatedAt) pushActiveSession(activeSessionRef.current, pullUserId, reportPullFailure);
 
-      const cloudTodos = omitQueuedDeletes('todos', await pullTodos(setSyncStatus));
+      const cloudTodos = omitQueuedDeletes('todos', await pullTodos(reportPullFailure));
       if (!isCurrentPull()) return;
       if (cloudTodos.length > 0) {
         setTodos(prev => {
@@ -1317,15 +1340,16 @@ export default function App() {
           prevTodosForNotifyRef.current = materialized;
           localStorage.setItem('race_notes_todos', JSON.stringify(materialized));
           if (hasNewerLocal || JSON.stringify(materialized) !== JSON.stringify(merged)) {
-            if (syncOwnerId) pushTodos(materialized, syncOwnerId, setSyncStatus);
+            // B3: pushTodos(materialized, syncOwnerId, setSyncStatus) would leak a pull success; report failures only.
+            if (syncOwnerId) pushTodos(materialized, syncOwnerId, reportPullFailure);
           }
           return materialized;
         });
       } else if (todos.length > 0) {
-        if (syncOwnerId) pushTodos(materializeMainChecklist(todos), syncOwnerId, setSyncStatus);
+        if (syncOwnerId) pushTodos(materializeMainChecklist(todos), syncOwnerId, reportPullFailure);
       }
 
-      const cloudTires = (await pullTires(pullUserId, setSyncStatus)).filter(tire => (
+      const cloudTires = (await pullTires(pullUserId, reportPullFailure)).filter(tire => (
         !queuedTiresAtPullStart.has(tire.id)
         && !readPendingPersonalTireDeletes(window.localStorage).some(intent => (
           intent.accountId === pullUserId && intent.tireId === tire.id
@@ -1337,7 +1361,7 @@ export default function App() {
         localStorage.setItem('race_notes_tires', JSON.stringify(cloudTires));
       }
 
-      const cloudCars = omitQueuedDeletes('cars', await pullCars(pullUserId, setSyncStatus));
+      const cloudCars = omitQueuedDeletes('cars', await pullCars(pullUserId, reportPullFailure));
       if (!isCurrentPull()) return;
       if (cloudCars.length > 0) {
         setCars(cloudCars);
@@ -1349,27 +1373,27 @@ export default function App() {
         }
       }
 
-      const cloudShock = omitQueuedDeletes('shock_sessions', await pullShockSessions(pullUserId, setSyncStatus));
+      const cloudShock = omitQueuedDeletes('shock_sessions', await pullShockSessions(pullUserId, reportPullFailure));
       if (!isCurrentPull()) return;
       if (cloudShock.length > 0) {
         setShockSessions(cloudShock);
         localStorage.setItem('race_notes_shock_graphs', JSON.stringify(cloudShock));
       }
 
-      const cloudMaint = omitQueuedDeletes('maintenance_components', await pullMaintenanceComponents(setSyncStatus));
+      const cloudMaint = omitQueuedDeletes('maintenance_components', await pullMaintenanceComponents(reportPullFailure));
       if (!isCurrentPull()) return;
       if (cloudMaint.length > 0) {
         setMaintenance(cloudMaint);
         localStorage.setItem('race_notes_maintenance', JSON.stringify(cloudMaint));
       }
-      const cloudMaintLogs = omitQueuedDeletes('maintenance_logs', await pullMaintenanceLogs(setSyncStatus));
+      const cloudMaintLogs = omitQueuedDeletes('maintenance_logs', await pullMaintenanceLogs(reportPullFailure));
       if (!isCurrentPull()) return;
       if (cloudMaintLogs.length > 0) {
         setMaintenanceLogs(cloudMaintLogs);
         localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(cloudMaintLogs));
       }
 
-      const cloudClTemplates = omitQueuedDeletes('checklist_templates', await pullChecklistTemplates(setSyncStatus));
+      const cloudClTemplates = omitQueuedDeletes('checklist_templates', await pullChecklistTemplates(reportPullFailure));
       if (!isCurrentPull()) return;
       if (cloudClTemplates.length > 0) {
         setChecklistTemplates(prev => {
@@ -1383,20 +1407,20 @@ export default function App() {
           return merged;
         });
       }
-      const cloudWkndChecklists = omitQueuedDeletes('weekend_checklists', await pullWeekendChecklists(setSyncStatus));
+      const cloudWkndChecklists = omitQueuedDeletes('weekend_checklists', await pullWeekendChecklists(reportPullFailure));
       if (!isCurrentPull()) return;
       if (cloudWkndChecklists.length > 0) {
         setWeekendChecklists(cloudWkndChecklists);
         localStorage.setItem('race_notes_weekend_checklists', JSON.stringify(cloudWkndChecklists));
       }
 
-      setSyncStatus('Synced');
+      if (!pullReportedFailure) setSyncStatus(null);
     };
 
     doPull().catch(error => {
       if (!isCurrentPull()) return;
       console.warn('Cloud pull failed:', error);
-      setSyncStatus('Offline — local data ready');
+      setSyncStatus('sync-error');
     }).finally(() => {
       if (!isCurrentPull()) return;
       setPullDone(true); // checklist reconciliation may now use merged/local data
@@ -1542,6 +1566,12 @@ export default function App() {
       }
     }
     // Historical cards communicate through their own passive banner only.
+
+    const didPersist = safeSetups.length !== priorSetups.length || safeSetups.some(candidate => {
+      const prior = priorById.get(candidate.id);
+      return !prior || comparable(prior) !== comparable(candidate);
+    });
+    if (!didPersist) return;
 
     const remainingSetupIds = new Set(safeSetups.map(item => item.id));
     priorSetups
@@ -2338,15 +2368,21 @@ export default function App() {
             so users receive one clear reason at a time. */}
         {(() => {
           const isInfo = !!infoToast;
-          const isBusy = !isInfo && !savedFlash && syncStatus === 'Syncing...';
-          const isSynced = !isInfo && !savedFlash && syncStatus === 'Synced';
-          if (!isInfo && !savedFlash && !isBusy && !isSynced) return null;
+          const isFailure = syncStatus === 'deferred-delete-retrying' || syncStatus === 'sync-error';
+          const isBusy = !isInfo && !savedFlash && syncStatus === 'syncing';
+          const statusNotice = !isInfo && (isFailure || !savedFlash) ? syncStatus : null;
+          if (!isInfo && !savedFlash && !statusNotice) return null;
           const msg = isInfo
             ? resolveInfoCopy(infoToast)
-            : savedFlash
+            : savedFlash && !isFailure
             ? (isOnline ? 'Saved' : 'Offline — saved on device')
-            : isBusy ? 'Syncing…' : 'Synced';
-          const isSuccess = !isInfo && (savedFlash || isSynced);
+            : statusNotice === 'syncing' ? 'Syncing…'
+            : statusNotice === 'synced' ? 'Synced'
+            : statusNotice === 'offline-saved' ? 'Offline — saved on device'
+            : statusNotice === 'deferred-delete-retrying' ? 'Sync failed — will retry'
+            : 'Sync failed — will retry';
+          const isSuccess = !isInfo && !isFailure && (savedFlash || statusNotice === 'synced' || statusNotice === 'offline-saved');
+          const isPersistent = statusNotice === 'deferred-delete-retrying' || statusNotice === 'sync-error';
           return (
             <div
               data-notification-slot="arbiter"
@@ -2364,15 +2400,15 @@ export default function App() {
                 style={{ boxShadow: isSuccess ? '0 8px 30px rgba(34,197,94,0.45)' : undefined }}
               >
                 <span className={`material-symbols-outlined text-xl ${isBusy ? 'animate-spin' : ''}`} style={{ fontVariationSettings: "'FILL' 1" }}>
-                  {isInfo ? 'info' : savedFlash && !isOnline ? 'cloud_off' : isSuccess ? 'check_circle' : isBusy ? 'progress_activity' : 'cloud'}
+                  {isInfo ? 'info' : savedFlash && !isOnline ? 'cloud_off' : isSuccess ? 'check_circle' : isBusy ? 'progress_activity' : isPersistent ? 'cloud_off' : 'cloud'}
                 </span>
                 <span className="min-w-0 flex-1">{msg}</span>
-                {isInfo && (
+                {(isInfo || isPersistent) && (
                   <button
                     type="button"
                     aria-label="Dismiss notification"
                     className="tap-target -mr-2 shrink-0 text-on-surface-variant"
-                    onClick={clearInfo}
+                    onClick={isInfo ? clearInfo : () => setSyncStatus(null)}
                   >
                     <span className="material-symbols-outlined">close</span>
                   </button>
