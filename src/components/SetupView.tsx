@@ -66,6 +66,7 @@ const computeStagger = (rightSize: string, leftSize: string): string => {
 
 const INP = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-1.5 min-h-11 outline-none rounded';
 const LBL = 'block min-h-4 truncate text-xs uppercase font-mono font-semibold text-on-surface-variant mb-1 leading-tight';
+const STACKED_CORNER_FIELD_CLASS = 'min-w-0 min-[360px]:col-span-2 min-[768px]:col-span-1';
 
 // ─── Corner Form Sub-component ────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ function NumericCornerFieldInput({ label, field, data, onFieldChange }: {
   const spec = SETUP_STEPS[field];
   const legacy = legacyValueNote(raw);
   return (
-    <div className="min-w-0">
+    <div className={STACKED_CORNER_FIELD_CLASS}>
       <label className={LBL}>
         {label}{field === 'loadCtoC' && data.rideHeightNeedsReview ? ' *' : ''}
       </label>
@@ -212,7 +213,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
           <label className={LBL}>Tire Size</label>
           <input type="text" value={data.tireSize || ''} onChange={e => onFieldChange('tireSize', e.target.value)} className={INP} />
         </div>
-        <div className="min-w-0">
+        <div className={STACKED_CORNER_FIELD_CLASS}>
           <NumericCornerFieldInput label="Pressure" field="tirePress" data={data} onFieldChange={onFieldChange} />
           {data.pressureSourceNote && <p className="mt-1 font-mono text-xs text-on-surface-variant">{displayLifecycleText(data.pressureSourceNote)}</p>}
         </div>

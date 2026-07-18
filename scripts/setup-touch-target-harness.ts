@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { transformSync } from 'esbuild';
+import { compile } from '@tailwindcss/node';
 import NumberStepper from '../src/components/ui/NumberStepper';
 
 const root = process.cwd();
@@ -50,6 +51,9 @@ assert.match(setup, /min-w-0 p-2 sm:p-3 grid grid-cols-1 min-\[360px\]:grid-cols
 assert.match(setup, /min-w-0 grid grid-cols-1 min-\[360px\]:grid-cols-2 gap-1\.5 min-\[360px\]:gap-2/, 'four corner cards have compact two-column gutter');
 assert.match(setup, /className="min-w-0 p-2 sm:p-3 border-t border-outline-variant\/50 bg-surface-container-low"/, 'expanded Setup chrome is locked for rendered width proof');
 assert.match(setup, /const LBL = 'block min-h-4 truncate text-xs .*leading-tight';/, 'Setup labels reserve one compact line');
+const stackedCornerFieldClass = setup.match(/const STACKED_CORNER_FIELD_CLASS = '([^']+)';/)?.[1];
+assert.equal(stackedCornerFieldClass, 'min-w-0 min-[360px]:col-span-2 min-[768px]:col-span-1', 'stacked corner fields span both phone columns until safe tablet width');
+assert.equal((setup.match(/className=\{STACKED_CORNER_FIELD_CLASS\}/g) ?? []).length, 2, 'shared numeric field and pressure-note parent both receive responsive span repair');
 
 assert.match(fourBar, /const barLength = bar\.measurements\[1\];/, 'FourBar puts Bar Length above the hole controls');
 assert.match(fourBar, /const holeMeasurements = \[bar\.measurements\[0\], bar\.measurements\[2\]\];/, 'FourBar keeps Frame and Birdcage Hole controls together');
@@ -207,6 +211,169 @@ assert.ok(stackedRender.value.height >= TARGET_PX && stackedRender.buttons.every
 assert.ok(Math.abs(stackedRender.buttons[0].width - stackedRender.buttons[1].width) <= 0.5, 'stacked minus and plus render equal width');
 assert.ok(Math.abs(stackedRender.row.width - stackedRender.value.width) <= 0.5, 'stacked value and button row each use full available width');
 assert.match(stackedRender.text, /12\.5\s*psi/, 'stacked real value region keeps formatted value and unit');
+
+const lockC25ProductionClass = (source: string, className: string, label: string) => {
+  assert.ok(source.includes(className), `${label}: exact production class is locked`);
+  return className;
+};
+const c25Classes = {
+  main: lockC25ProductionClass(app, 'app-main-scroll flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto custom-scrollbar', 'App main'),
+  setupCard: lockC25ProductionClass(setup, 'bg-surface-container border rounded-lg overflow-hidden transition-all duration-200', 'Setup accordion card'),
+  expanded: lockC25ProductionClass(setup, 'min-w-0 p-2 sm:p-3 border-t border-outline-variant/50 bg-surface-container-low', 'Setup expanded body'),
+  cornerGrid: lockC25ProductionClass(setup, 'min-w-0 grid grid-cols-1 min-[360px]:grid-cols-2 gap-1.5 min-[360px]:gap-2', 'paired corner grid'),
+  cornerCard: lockC25ProductionClass(setup, 'min-w-0 bg-surface-container border border-outline-variant flex flex-col rounded overflow-hidden', 'corner card'),
+  cornerHeader: lockC25ProductionClass(setup, 'min-w-0 border-b border-outline-variant px-1.5 sm:px-4 py-2 flex flex-wrap items-center gap-1 sm:gap-2 bg-surface-container-low', 'corner header'),
+  innerGrid: lockC25ProductionClass(setup, 'min-w-0 p-2 sm:p-3 grid grid-cols-1 min-[360px]:grid-cols-2 gap-2 items-start', 'corner field grid'),
+  label: lockC25ProductionClass(setup, 'block min-h-4 truncate text-xs uppercase font-mono font-semibold text-on-surface-variant mb-1 leading-tight', 'corner label'),
+  note: lockC25ProductionClass(setup, 'mt-1 font-mono text-xs text-on-surface-variant', 'corner note'),
+};
+
+const classCandidates = (...values: string[]) => {
+  const candidates = new Set<string>();
+  for (const value of values) {
+    const markupClasses = [...value.matchAll(/class="([^"]+)"/g)].map(match => match[1]);
+    for (const classList of markupClasses.length ? markupClasses : [value]) {
+      for (const candidate of classList.split(/\s+/).filter(Boolean)) candidates.add(candidate);
+    }
+  }
+  return [...candidates];
+};
+const c25Compiler = await compile(css, { base: root, onDependency: () => undefined });
+const compiledC25Css = c25Compiler.build(classCandidates(
+  ...Object.values(c25Classes),
+  stackedCornerFieldClass!,
+  stackedStepperMarkup,
+  'w-full border border-outline-variant',
+)).replace(/@import url\([^;]+;\s*/g, '');
+assert.ok(compiledC25Css.includes('.min-\\[360px\\]\\:col-span-2'), 'compiled production CSS contains phone span utility');
+assert.ok(compiledC25Css.includes('.min-\\[768px\\]\\:col-span-1'), 'compiled production CSS contains safe-width return utility');
+
+type C25IntegrationProbe = {
+  name: string;
+  viewportWidth: number;
+  viewportHeight: number;
+  scale: number;
+  numericClass: string;
+};
+type C25Rect = { left: number; right: number; top: number; bottom: number; width: number; height: number };
+type C25IntegrationResult = {
+  innerWidth: number;
+  viewportClient: number;
+  viewportScroll: number;
+  documentScroll: number;
+  cards: Array<{ name: string; rect: C25Rect }>;
+  groups: Array<{
+    card: string;
+    field: C25Rect;
+    inner: C25Rect;
+    group: C25Rect;
+    value: C25Rect;
+    row: C25Rect & { clientWidth: number; scrollWidth: number };
+    groupClientWidth: number;
+    groupScrollWidth: number;
+    buttons: Array<C25Rect>;
+  }>;
+};
+
+const renderC25IntegrationProbe = ({ name, viewportWidth, viewportHeight, scale, numericClass }: C25IntegrationProbe): C25IntegrationResult => {
+  const probeDir = mkdtempSync(join(tmpdir(), 'race-notes-c25-integration-'));
+  const htmlPath = join(probeDir, 'probe.html');
+  const profilePath = join(probeDir, 'profile');
+  const card = (cardName: string, note = '') => `<section data-card="${cardName}" class="${c25Classes.cornerCard}">
+    <div class="${c25Classes.cornerHeader}"><span>${cardName} Corner</span></div>
+    <div data-inner class="${c25Classes.innerGrid}">
+      <div data-numeric class="${numericClass}"><label class="${c25Classes.label}">Scale Weight</label>${stackedStepperMarkup}${note ? `<p class="${c25Classes.note}">${note}</p>` : ''}</div>
+    </div>
+  </section>`;
+  const document = `<!doctype html><html style="--ui-zoom:${scale}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${compiledC25Css}</style></head><body>
+  <div class="viewport" style="width:${viewportWidth}px;min-width:0">
+    <div id="applet-main-body" class="w-full">
+      <main class="${c25Classes.main}">
+        <div class="${c25Classes.setupCard} border-outline-variant/60">
+          <div class="${c25Classes.expanded}">
+            <div data-corner-grid class="${c25Classes.cornerGrid}">
+              ${card('LF', 'Pressure source note')}${card('RF')}${card('LR', 'Legacy measurement note')}${card('RR')}
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div><pre id="result"></pre><script>
+  const rect=node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};
+  const cards=[...document.querySelectorAll('[data-card]')].map(card=>({name:card.dataset.card,rect:rect(card)}));
+  const groups=[...document.querySelectorAll('[data-numeric]')].map(field=>{const group=field.querySelector('[role=group]');const value=group.children[0];const row=group.children[1];const inner=field.closest('[data-inner]');return {card:field.closest('[data-card]').dataset.card,field:rect(field),inner:rect(inner),group:rect(group),value:rect(value),row:{...rect(row),clientWidth:row.clientWidth,scrollWidth:row.scrollWidth},groupClientWidth:group.clientWidth,groupScrollWidth:group.scrollWidth,buttons:[...row.querySelectorAll(':scope > button')].map(rect)}});
+  const viewport=document.querySelector('.viewport');document.querySelector('#result').textContent=JSON.stringify({innerWidth:window.innerWidth,viewportClient:viewport.clientWidth,viewportScroll:viewport.scrollWidth,documentScroll:document.documentElement.scrollWidth,cards,groups});
+  </script></body></html>`;
+  try {
+    writeFileSync(htmlPath, document);
+    const dumped = execFileSync(chrome, [
+      '--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars', '--force-device-scale-factor=1',
+      `--user-data-dir=${profilePath}`, `--window-size=${viewportWidth},${viewportHeight}`,
+      '--dump-dom', '--virtual-time-budget=1000', pathToFileURL(htmlPath).href,
+    ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const encoded = dumped.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1];
+    assert.ok(encoded, `${name}: compiled-CSS integration probe returned measurements`);
+    return JSON.parse(encoded.replaceAll('&quot;', '"').replaceAll('&amp;', '&')) as C25IntegrationResult;
+  } finally {
+    rmSync(probeDir, { recursive: true, force: true });
+  }
+};
+
+const c25IntegrationPasses = (probe: C25IntegrationProbe, expectFullSpan: boolean) => {
+  const result = renderC25IntegrationProbe(probe);
+  const tolerance = 0.75;
+  const pairAligned = ([left, right]: [number, number]) =>
+    Math.abs(result.cards[left].rect.top - result.cards[right].rect.top) <= tolerance
+    && Math.abs(result.cards[left].rect.bottom - result.cards[right].rect.bottom) <= tolerance
+    && Math.abs(result.cards[left].rect.width - result.cards[right].rect.width) <= tolerance;
+  const cardsAligned = pairAligned([0, 1]) && pairAligned([2, 3]);
+  const twoCornerColumns = result.cards[0].rect.right <= result.cards[1].rect.left + tolerance
+    && result.cards[2].rect.right <= result.cards[3].rect.left + tolerance;
+  const groupGeometry = result.groups.every(item => {
+    const [minus, plus] = item.buttons;
+    const noOverlap = minus.right <= plus.left + tolerance;
+    const contained = minus.left + tolerance >= item.row.left && plus.right <= item.row.right + tolerance
+      && minus.left + tolerance >= item.group.left && plus.right <= item.group.right + tolerance;
+    const targets = minus.width + tolerance >= TARGET_PX && plus.width + tolerance >= TARGET_PX
+      && minus.height + tolerance >= TARGET_PX && plus.height + tolerance >= TARGET_PX;
+    const equal = Math.abs(minus.width - plus.width) <= tolerance;
+    const unclipped = item.row.scrollWidth <= item.row.clientWidth + 1 && item.groupScrollWidth <= item.groupClientWidth + 1;
+    const valueAbove = item.value.bottom <= item.row.top + tolerance;
+    const fullSpan = item.field.width >= item.inner.width * 0.75;
+    const singleColumn = item.field.width <= item.inner.width * 0.65;
+    return item.row.width + tolerance >= TARGET_PX * 2 && noOverlap && contained && targets && equal && unclipped && valueAbove
+      && (expectFullSpan ? fullSpan : singleColumn);
+  });
+  const noPageOverflow = result.viewportScroll <= result.viewportClient && result.documentScroll <= result.innerWidth;
+  const exactLayoutWidth = result.viewportClient === probe.viewportWidth;
+  const responsiveState = expectFullSpan
+    ? result.innerWidth >= 360 && result.innerWidth < 768
+    : result.innerWidth >= 768;
+  return { passes: exactLayoutWidth && responsiveState && cardsAligned && twoCornerColumns && groupGeometry && noPageOverflow, result, checks: { exactLayoutWidth, responsiveState, cardsAligned, twoCornerColumns, groupGeometry, noPageOverflow } };
+};
+
+for (const [scaleName, scale] of [['default', 1], ['large', 1.15]] as const) {
+  for (const [viewportWidth, viewportHeight] of [[360, 800], [390, 844], [412, 915]] as const) {
+    const probe = { name: `c25-${scaleName}-${viewportWidth}x${viewportHeight}`, viewportWidth, viewportHeight, scale, numericClass: stackedCornerFieldClass! };
+    const integration = c25IntegrationPasses(probe, true);
+    assert.ok(integration.passes, `${probe.name}: production-derived compiled layout keeps paired cards and every stacked control aligned, >=88px, contained, and overflow-free: ${JSON.stringify({ checks: integration.checks, groups: integration.result.groups })}`);
+  }
+}
+for (const [scaleName, scale] of [['default', 1], ['large', 1.15]] as const) {
+  const probe = { name: `c25-safe-return-${scaleName}`, viewportWidth: 800, viewportHeight: 1024, scale, numericClass: stackedCornerFieldClass! };
+  const integration = c25IntegrationPasses(probe, false);
+  assert.ok(integration.passes, `${probe.name}: stacked fields return to one inner column only with two contained 44px buttons: ${JSON.stringify({ checks: integration.checks, groups: integration.result.groups })}`);
+}
+
+const spanRepairDeclaration = `const STACKED_CORNER_FIELD_CLASS = '${stackedCornerFieldClass}';`;
+const spanRemovalMutation = setup.replace(spanRepairDeclaration, "const STACKED_CORNER_FIELD_CLASS = 'min-w-0';");
+assert.notEqual(spanRemovalMutation, setup, 'C2.5 responsive span mutation changes production source');
+assert.doesNotThrow(() => transformSync(spanRemovalMutation, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), 'C2.5 responsive span removal remains compile-real TSX');
+const mutatedCornerFieldClass = spanRemovalMutation.match(/const STACKED_CORNER_FIELD_CLASS = '([^']+)';/)?.[1];
+assert.equal(mutatedCornerFieldClass, 'min-w-0', 'C2.5 mutation removes only responsive span repair');
+const spanRemovalRender = c25IntegrationPasses({ name: 'c25-span-removal-mutation', viewportWidth: 360, viewportHeight: 800, scale: 1, numericClass: mutatedCornerFieldClass! }, false);
+assert.equal(spanRemovalRender.passes, false, 'C2.5 compiled real-DOM gate kills responsive span removal mutation');
+assert.equal(spanRemovalRender.checks.groupGeometry, false, 'C2.5 span removal recreates detected overlap or clipping instead of only failing a source lock');
 
 const renderProbe = ({ name, viewportWidth, scale, target = TARGET_PX, fieldBorder = 0, forceTwoColumns = false }: RenderProbe) => {
   const probeDir = mkdtempSync(join(tmpdir(), 'race-notes-a4-render-'));
