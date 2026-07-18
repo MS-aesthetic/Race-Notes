@@ -10,6 +10,8 @@ const PARENT = '89845e8';
 const UXP18_COMMIT = '38e9828';
 const APP_PATH = 'src/App.tsx';
 const SETUP_PATH = 'src/components/SetupView.tsx';
+const SETTINGS_PATH = 'src/components/SettingsView.tsx';
+const EXPORT_PATH = 'src/components/ExportView.tsx';
 const HARNESS_PATH = 'scripts/saved-flash-harness.ts';
 const UXP17_ASSERTION_PATH = 'scripts/muted-text-color-harness.ts';
 const STEPPER_PATH = 'src/components/ui/NumberStepper.tsx';
@@ -17,6 +19,8 @@ const root = process.cwd();
 const normalizeEol = (value: string) => value.replace(/\r\n/g, '\n');
 const app = normalizeEol(readFileSync(join(root, APP_PATH), 'utf8'));
 const setup = normalizeEol(readFileSync(join(root, SETUP_PATH), 'utf8'));
+const settings = normalizeEol(readFileSync(join(root, SETTINGS_PATH), 'utf8'));
+const exportView = normalizeEol(readFileSync(join(root, EXPORT_PATH), 'utf8'));
 const parent = normalizeEol(execFileSync('git', ['show', `${PARENT}:${APP_PATH}`], { cwd: root, encoding: 'utf8' }));
 const stepper = normalizeEol(readFileSync(join(root, STEPPER_PATH), 'utf8'));
 
@@ -481,10 +485,12 @@ const createB2ArbiterModel = (source = app) => {
   const dedupeEnabled = source.includes('if (lastShownAt !== undefined && now - lastShownAt < INFO_DEDUPE_MS) return;');
   const dedupeUsesResolvedCopy = source.includes('const dedupeKey = resolveInfoCopy(notice);');
   const successMs = numericConstant(source, 'SUCCESS_TOAST_MS');
-  const clearsSavedOnInfo = source.includes('clearSavedFlash();');
   const showInfoAt = source.indexOf('const showInfo = (notice: InfoNotice) => {');
+  const showInfoEnd = source.indexOf('const showComponentInfo =', showInfoAt);
+  const clearSavedAt = source.indexOf('clearSavedFlash();', showInfoAt);
+  const clearsSavedOnInfo = clearSavedAt >= showInfoAt && clearSavedAt < showInfoEnd;
   const dedupeReturnAt = source.indexOf('if (lastShownAt !== undefined && now - lastShownAt < INFO_DEDUPE_MS) return;', showInfoAt);
-  const clearsSavedBeforeDedupe = source.indexOf('clearSavedFlash();', showInfoAt) < dedupeReturnAt;
+  const clearsSavedBeforeDedupe = clearsSavedOnInfo && clearSavedAt < dedupeReturnAt;
   const infoWins = source.includes('const isInfo = !!infoToast;');
   const duplicateRenderPath = source.includes('data-notification-slot="saved-duplicate"');
   const syncUsesSuccessConstant = source.includes("setSyncStatusState(current => current === 'synced' || current === 'offline-saved' ? null : current);\n    }, SUCCESS_TOAST_MS);");
@@ -679,9 +685,22 @@ const pushErrorsPass = (syncSource: string): boolean => {
   return (block.match(/onStatus\?\.\('sync-error'\);/g) ?? []).length === 2
     && block.includes("else onStatus?.('synced');");
 };
-const b3SourcePasses = (appSource: string, syncSource: string): boolean => (
+const sharedPullCallerPasses = (appSource: string, settingsSource: string, exportSource: string): boolean => (
+  appSource.includes('onSyncStatus={setSyncStatus}')
+  && settingsSource.includes('onSyncStatus?: (status: SyncStatus) => void;')
+  && settingsSource.includes('onSyncStatus={onSyncStatus}')
+  && exportSource.includes('onSyncStatus?: (status: SyncStatus) => void;')
+  && exportSource.includes('pullSharedData(user.id, onSyncStatus)')
+);
+const b3SourcePasses = (
+  appSource: string,
+  syncSource: string,
+  settingsSource = settings,
+  exportSource = exportView,
+): boolean => (
   appSource.includes("type NotificationStatus = SyncStatus | 'syncing';")
   && appSource.includes("status === 'deferred-delete-retrying' || status === 'sync-error'")
+  && appSource.includes('if (isTerminalSyncStatus(next)) clearSavedFlash();')
   && appSource.includes('isTerminalSyncStatus(current) && !isTerminalSyncStatus(next) ? current : next')
   && appSource.includes('setSyncStatusState(current => isTerminalSyncStatus(current) ? current : null);')
   && appSource.includes('const acknowledgeSyncStatus = () => setSyncStatusState(null);')
@@ -693,6 +712,7 @@ const b3SourcePasses = (appSource: string, syncSource: string): boolean => (
   && appSource.includes("setSyncStatus('offline-saved')")
   && appSource.includes("const reportPullFailure = (status: SyncStatus) => {")
   && appSource.includes("if (status !== 'sync-error') return;")
+  && appSource.includes("if (status !== 'sync-error') return;\n      if (!isCurrentPull()) return;\n      pullReportedFailure = true;")
   && appSource.includes("setSyncStatus('sync-error');")
   && appSource.includes('if (!pullReportedFailure) clearTransientSyncStatus();')
   && appSource.includes("current === 'synced' || current === 'offline-saved' ? null : current")
@@ -704,8 +724,76 @@ const b3SourcePasses = (appSource: string, syncSource: string): boolean => (
   && syncSource.includes("else onStatus?.('synced');")
   && pushErrorsPass(syncSource)
   && pullErrorsPass(syncSource)
+  && sharedPullCallerPasses(appSource, settingsSource, exportSource)
 );
 assert.ok(b3SourcePasses(app, sync), 'B3 source locks selection, terminal precedence, pull errors, truthful rendering, and pull-success silence');
+
+const reportPullFailureBlock = (source: string): string => between(
+  source,
+  '    const reportPullFailure = (status: SyncStatus) => {',
+  '    lastPullStartedAtRef.current = Date.now();',
+  'B3 reportPullFailure block',
+);
+const pullFailureStatus = (source: string, currentGeneration: boolean): 'sync-error' | null => {
+  const block = reportPullFailureBlock(source);
+  const generationGuarded = block.includes("if (status !== 'sync-error') return;\n      if (!isCurrentPull()) return;\n      pullReportedFailure = true;");
+  return currentGeneration || !generationGuarded ? 'sync-error' : null;
+};
+assert.equal(pullFailureStatus(app, false), null, 'B3 stale pull generation cannot publish global failure');
+assert.equal(pullFailureStatus(app, true), 'sync-error', 'B3 current pull generation publishes terminal failure');
+const staleGenerationMutation = app.replace(
+  "if (status !== 'sync-error') return;\n      if (!isCurrentPull()) return;\n      pullReportedFailure = true;",
+  "if (status !== 'sync-error') return;\n      pullReportedFailure = true;",
+);
+compileB2Mutation(staleGenerationMutation, 'stale-pull-generation');
+assert.equal(b3SourcePasses(staleGenerationMutation, sync), false, 'B3 stale-generation mutation fails source gate');
+assert.equal(pullFailureStatus(staleGenerationMutation, false), 'sync-error', 'B3 stale-generation mutation behaviorally poisons current status');
+const staleBaselineRoute = productionNotificationRoute(app, false, pullFailureStatus(app, false) ?? '', false, true);
+const staleMutationRoute = productionNotificationRoute(staleGenerationMutation, false, pullFailureStatus(staleGenerationMutation, false) ?? '', false, true);
+assert.equal(staleBaselineRoute.visible, false, 'B3 stale generation renders no notification');
+assert.equal(staleMutationRoute.isPersistent && staleMutationRoute.msg === 'Sync failed — will retry', true, 'B3 stale-generation mutation independently fails rendered route');
+
+const savedAfterTerminalEntry = (source: string, pendingSaved: boolean): boolean => (
+  pendingSaved && !source.includes('if (isTerminalSyncStatus(next)) clearSavedFlash();')
+);
+for (const terminal of ['sync-error', 'deferred-delete-retrying'] as const) {
+  assert.equal(savedAfterTerminalEntry(app, true), false, `B3 ${terminal} entry clears pending Saved and timer`);
+  const acknowledgedRoute = productionNotificationRoute(app, savedAfterTerminalEntry(app, true), '', false, true);
+  assert.equal(acknowledgedRoute.visible, false, `B3 acknowledgement after ${terminal} cannot resurrect Saved`);
+}
+const retainSavedMutation = app.replace('    if (isTerminalSyncStatus(next)) clearSavedFlash();\n', '');
+compileB2Mutation(retainSavedMutation, 'terminal-retains-saved');
+assert.equal(b3SourcePasses(retainSavedMutation, sync), false, 'B3 terminal-retains-Saved mutation fails source gate');
+assert.equal(savedAfterTerminalEntry(retainSavedMutation, true), true, 'B3 terminal-retains-Saved mutation preserves stale success');
+const resurrectedSavedRoute = productionNotificationRoute(retainSavedMutation, savedAfterTerminalEntry(retainSavedMutation, true), '', false, true);
+assert.equal(resurrectedSavedRoute.visible && resurrectedSavedRoute.isSuccess && resurrectedSavedRoute.msg === 'Saved', true, 'B3 terminal-retains-Saved mutation resurrects Saved after acknowledgement');
+
+const sharedPullFailureStatus = (
+  appSource: string,
+  settingsSource: string,
+  exportSource: string,
+): 'sync-error' | 'syncing' => sharedPullCallerPasses(appSource, settingsSource, exportSource) ? 'sync-error' : 'syncing';
+assert.equal(sharedPullFailureStatus(app, settings, exportView), 'sync-error', 'B3 actual shared-pull caller routes failures to App terminal status');
+const missingAppCallbackMutation = app.replace('\n                  onSyncStatus={setSyncStatus}', '');
+const missingSettingsCallbackMutation = settings.replace(' onSyncStatus={onSyncStatus}', '');
+const missingExportCallbackMutation = exportView.replace('pullSharedData(user.id, onSyncStatus)', 'pullSharedData(user.id)');
+compileB2Mutation(missingAppCallbackMutation, 'shared-pull-App-callback');
+assert.doesNotThrow(() => transformSync(missingSettingsCallbackMutation, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), 'B3 shared-pull Settings callback mutation compiles');
+assert.doesNotThrow(() => transformSync(missingExportCallbackMutation, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), 'B3 shared-pull Export callback mutation compiles');
+const sharedPullMutations = [
+  ['App', missingAppCallbackMutation, settings, exportView],
+  ['Settings', app, missingSettingsCallbackMutation, exportView],
+  ['Export', app, settings, missingExportCallbackMutation],
+] as const;
+for (const [label, appSource, settingsSource, exportSource] of sharedPullMutations) {
+  assert.equal(b3SourcePasses(appSource, sync, settingsSource, exportSource), false, `B3 ${label} shared-pull callback mutation fails source gate`);
+  const status = sharedPullFailureStatus(appSource, settingsSource, exportSource);
+  assert.equal(status, 'syncing', `B3 ${label} callback mutation behaviorally loses terminal failure`);
+  const route = productionNotificationRoute(appSource, false, status, false, true);
+  assert.equal(route.isPersistent || route.msg === 'Sync failed — will retry', false, `B3 ${label} callback mutation independently fails rendered failure gate`);
+}
+const sharedPullSuccessRoute = productionNotificationRoute(app, false, '', false, true);
+assert.equal(sharedPullSuccessRoute.visible, false, 'B3 successful shared pull remains notification-silent');
 
 type SetupSaveOutcome = { activated: boolean; cloudSetupWrite: boolean; feedback: 'Saved' | null; pressuresPropagated: boolean };
 const setupSaveOutcome = (source: string, didPersist: boolean, activeSelectionChanged: boolean): SetupSaveOutcome => {

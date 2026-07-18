@@ -720,6 +720,7 @@ export default function App() {
     status === 'deferred-delete-retrying' || status === 'sync-error'
   );
   const setSyncStatus = (next: NotificationStatus) => {
+    if (isTerminalSyncStatus(next)) clearSavedFlash();
     setSyncStatusState(current => isTerminalSyncStatus(current) && !isTerminalSyncStatus(next) ? current : next);
   };
   const clearTransientSyncStatus = () => {
@@ -1255,6 +1256,7 @@ export default function App() {
     let pullReportedFailure = false;
     const reportPullFailure = (status: SyncStatus) => {
       if (status !== 'sync-error') return;
+      if (!isCurrentPull()) return;
       pullReportedFailure = true;
       setSyncStatus('sync-error');
     };
@@ -2563,6 +2565,7 @@ export default function App() {
                   onClearAllData={handleClearAllData}
                   onDeleteAccount={handleDeleteAccount}
                   tireInventory={tireInventory}
+                  onSyncStatus={setSyncStatus}
                 />
               )}
 

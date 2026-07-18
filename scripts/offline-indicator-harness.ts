@@ -69,7 +69,13 @@ assert.match(toast, /onClick=\{isInfo \? clearInfo : acknowledgeSyncStatus\}/);
 assert.match(app, /const SUCCESS_TOAST_MS = 1500;/);
 assert.match(app, /setSyncStatusState\(current => current === 'synced' \|\| current === 'offline-saved' \? null : current\);\s*\}, SUCCESS_TOAST_MS\);/);
 assert.match(app, /const acknowledgeSyncStatus = \(\) => setSyncStatusState\(null\);/);
+assert.match(app, /if \(isTerminalSyncStatus\(next\)\) clearSavedFlash\(\);/);
 assert.match(app, /setSyncStatusState\(current => isTerminalSyncStatus\(current\) \? current : null\);/);
+
+const pendingSavedAfterFailureThenAck = (source: string): boolean => !source.includes('if (isTerminalSyncStatus(next)) clearSavedFlash();');
+assert.equal(pendingSavedAfterFailureThenAck(app), false, 'terminal entry clears pending Saved before explicit acknowledgement');
+const staleSavedMutation = app.replace('    if (isTerminalSyncStatus(next)) clearSavedFlash();\n', '');
+assert.equal(pendingSavedAfterFailureThenAck(staleSavedMutation), true, 'terminal-clear mutation would resurrect stale Saved after acknowledgement');
 
 const routeSource = toast.match(/(const isInfo = [\s\S]*?const isPersistent = [^;]+;)/)?.[1];
 assert.ok(routeSource, 'exact production typed status route extracts');

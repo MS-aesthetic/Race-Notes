@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Setup, ActiveSession, RaceWeekend, AccountingEntry, Todo, TireInventoryItem } from '../types';
 import { User } from '@supabase/supabase-js';
 import { pullSharedData } from '../lib/sync';
+import type { SyncStatus } from '../lib/sync';
 import { sortWeekends } from '../lib/scope';
 import {
   buildMasterReport,
@@ -26,6 +27,7 @@ interface ExportViewProps {
   accounting?: AccountingEntry[];
   tireInventory?: TireInventoryItem[];
   onStartWeekend?: () => void;
+  onSyncStatus?: (status: SyncStatus) => void;
 }
 
 export default function ExportView({
@@ -38,7 +40,7 @@ export default function ExportView({
   weekends = [],
   todos = [],
   accounting = [],
-  tireInventory = [], onStartWeekend,
+  tireInventory = [], onStartWeekend, onSyncStatus,
 }: ExportViewProps) {
   const [cloudSync, setCloudSync] = useState(true);
   const [sharedSetups, setSharedSetups] = useState<Setup[]>([]);
@@ -68,7 +70,7 @@ export default function ExportView({
   useEffect(() => {
     if (user) {
       setLoadingShared(true);
-      pullSharedData(user.id).then((res) => {
+      pullSharedData(user.id, onSyncStatus).then((res) => {
         setSharedSetups(res.sharedSetups);
         setSharedWeekends(res.sharedWeekends);
         setLoadingShared(false);

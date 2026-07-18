@@ -8,6 +8,7 @@ import BottomSheet from './ui/BottomSheet';
 import { User } from '@supabase/supabase-js';
 import { AppUser } from '../lib/supabase';
 import { DELETE_ACCOUNT_CONFIRMATION, isDeleteAccountConfirmed } from '../lib/accountDeletion';
+import type { SyncStatus } from '../lib/sync';
 import { Setup, ActiveSession, AppTheme, RaceWeekend, AccountingEntry, Todo, Car, TireInventoryItem } from '../types';
 
 export type SettingsSubTab = 'garage' | 'account' | 'appearance' | 'export' | 'guide';
@@ -39,6 +40,7 @@ interface SettingsViewProps {
   onDeleteAccount: () => Promise<void>;
   tireInventory?: TireInventoryItem[];
   onStartWeekend?: () => void;
+  onSyncStatus?: (status: SyncStatus) => void;
 }
 
 const ACCENT_PRESETS = [
@@ -50,7 +52,7 @@ const ACCENT_PRESETS = [
   { label: 'Cyan',        hex: '#7de8e8' },
 ];
 
-export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, subTabRequestKey = 0, onClearAllData, onDeleteAccount, tireInventory = [], onStartWeekend }: SettingsViewProps) {
+export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, subTabRequestKey = 0, onClearAllData, onDeleteAccount, tireInventory = [], onStartWeekend, onSyncStatus }: SettingsViewProps) {
   const [subTab, setSubTab] = useState<SettingsSubTab>(initialSubTab ?? 'garage');
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0); // 0=idle, 1=confirm, 2=clearing
   const [privacyOpen, setPrivacyOpen] = useState(false);
@@ -348,7 +350,7 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
           </div>
         )}
 
-        {subTab === 'export' && <ExportView user={user} setup={setup} savedSetups={savedSetups} activeSession={activeSession} weekends={weekends} todos={todos} accounting={accounting} tireInventory={tireInventory} onStartWeekend={onStartWeekend} />}
+        {subTab === 'export' && <ExportView user={user} setup={setup} savedSetups={savedSetups} activeSession={activeSession} weekends={weekends} todos={todos} accounting={accounting} tireInventory={tireInventory} onStartWeekend={onStartWeekend} onSyncStatus={onSyncStatus} />}
 
         {subTab === 'guide' && <GuideView />}
       </div>
