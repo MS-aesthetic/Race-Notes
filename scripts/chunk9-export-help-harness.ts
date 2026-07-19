@@ -217,8 +217,7 @@ const E1_PRODUCT_PATHS = [
 ] as const;
 const FROZEN_FOUR_BAR_PATH = 'src/components/FourBarQuickAdjust.tsx';
 const normalizeE1ScopePaths = (paths: readonly string[]): string[] => paths
-  .map(path => path.trim().replace(/\\/g, '/'))
-  .filter(Boolean)
+  .map(path => path.replace(/\\/g, '/'))
   .sort();
 const validatesE1ImplementationScope = (paths: readonly string[]): boolean => {
   const normalized = normalizeE1ScopePaths(paths);
@@ -248,6 +247,14 @@ e1Kill(
 e1Kill(
   'implementation-scope-duplicate-authorized-path',
   !validatesE1ImplementationScope([...e1ProductChangedPaths, 'src/App.tsx']),
+);
+e1Kill(
+  'implementation-scope-empty-extra-path-added',
+  !validatesE1ImplementationScope([...e1ProductChangedPaths, '']),
+);
+e1Kill(
+  'implementation-scope-authorized-path-whitespace-altered',
+  !validatesE1ImplementationScope(e1ProductChangedPaths.map(path => path === 'src/App.tsx' ? ' src/App.tsx ' : path)),
 );
 for (const [name, path] of [
   ['implementation-scope-protected-path-added', 'src/lib/sync.ts'],
