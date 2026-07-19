@@ -646,28 +646,46 @@ export default function App() {
   };
 
   // ── Clear All Data ────────────────────────────────────────────────────────────
+  const clearAllDataModeRef = useRef<'device-only' | 'everywhere'>('device-only');
   const handleClearAllData = async () => {
     // Clear All owns deletion now; cancel the render-only car slot without committing it.
     carUndo.undo();
+    const mode = clearAllDataModeRef.current;
+    const isResolvedTeam = !!(user && teamResolved && team);
+    const resolvedMode = isResolvedTeam ? mode : 'legacy';
+    const sharedRows: Array<[TeamSharedSyncTable, string[]]> = [
+      ['setups', savedSetups.map(item => item.id)],
+      ['race_weekends', weekends.map(item => item.id)],
+      ['todos', todos.map(item => item.id)],
+      ['cars', cars.map(item => item.id)],
+      ['shock_sessions', shockSessions.map(item => item.id)],
+      ['maintenance_components', maintenance.map(item => item.id)],
+      ['maintenance_logs', maintenanceLogs.map(item => item.id)],
+      ['checklist_templates', checklistTemplates.map(item => item.id)],
+      ['weekend_checklists', weekendChecklists.map(item => item.id)],
+    ];
     // Clearing a device must not erase team data. When membership is unresolved,
     // retain solo-only intents until resolution proves the account is solo.
     if (user && (!teamResolved || !team)) {
-      const sharedRows: Array<[TeamSharedSyncTable, string[]]> = [
-        ['setups', savedSetups.map(item => item.id)],
-        ['race_weekends', weekends.map(item => item.id)],
-        ['todos', todos.map(item => item.id)],
-        ['cars', cars.map(item => item.id)],
-        ['shock_sessions', shockSessions.map(item => item.id)],
-        ['maintenance_components', maintenance.map(item => item.id)],
-        ['maintenance_logs', maintenanceLogs.map(item => item.id)],
-        ['checklist_templates', checklistTemplates.map(item => item.id)],
-        ['weekend_checklists', weekendChecklists.map(item => item.id)],
-      ];
       sharedRows.forEach(([table, ids]) => {
         ids.forEach(id => queueSharedCloudDelete(table, id, true));
       });
     }
-    if (user) {
+    if (user && resolvedMode !== 'device-only') {
+      if (isResolvedTeam && syncOwnerId === user.id) {
+        sharedRows.forEach(([table, ids]) => {
+          ids.forEach(id => queueSharedCloudDelete(table, id, false, user.id));
+        });
+        pushSetups([], user.id, setSyncStatus);
+        pushWeekends([], user.id, setSyncStatus);
+        pushTodos([], user.id, setSyncStatus);
+        pushCars([], user.id, team.id, setSyncStatus);
+        pushShockSessions([], user.id, setSyncStatus);
+        pushMaintenanceComponents([], user.id, setSyncStatus);
+        pushMaintenanceLogs([], user.id, setSyncStatus);
+        pushChecklistTemplates([], user.id, setSyncStatus);
+        pushWeekendChecklists([], user.id, setSyncStatus);
+      }
       tireInventory.forEach(item => {
         enqueuePendingPersonalTireDelete(window.localStorage, {
           accountId: user.id,
@@ -675,6 +693,7 @@ export default function App() {
           queuedAt: new Date().toISOString(),
         });
       });
+      if (isResolvedTeam) pushTires([], user.id, setSyncStatus);
       setDeleteReplayVersion(version => version + 1);
     }
 
@@ -709,8 +728,10 @@ export default function App() {
     setChecklistTemplates([]);
     setWeekendChecklists([]);
     markSavedDirty();
-    showComponentInfo(user && teamResolved && team
-      ? 'Device data cleared. Team data remains shared in cloud.'
+    showComponentInfo(isResolvedTeam
+      ? resolvedMode === 'device-only'
+        ? 'Device data cleared. Shared team data will re-download on next sync.'
+        : 'Your records are queued for deletion. Team records you do not own remain in cloud.'
       : 'All data cleared');
   };
 
@@ -2680,7 +2701,12 @@ export default function App() {
                   onStartWeekend={() => openRaceWeekendAction('new-weekend')}
                   initialSubTab={settingsSubTab}
                   subTabRequestKey={settingsViewKey}
-                  onClearAllData={handleClearAllData}
+                  onClearAllData={async (mode) => {
+                    clearAllDataModeRef.current = mode ?? 'device-only';
+                    await handleClearAllData();
+                  }}
+                  showTeamClearChoices={!!user && teamResolved && !!team}
+                  canDeleteTeamSharedRecords={!!user && teamResolved && !!team && syncOwnerId === user.id}
                   onDeleteAccount={handleDeleteAccount}
                   tireInventory={tireInventory}
                   onSyncStatus={setSyncStatus}

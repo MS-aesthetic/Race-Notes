@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import AuthView from './AuthView';
 import ExportView from './ExportView';
 import GarageView from './GarageView';
@@ -36,7 +36,9 @@ interface SettingsViewProps {
   shockCount: (carId: string) => number;
   initialSubTab?: SettingsSubTab;
   subTabRequestKey?: number;
-  onClearAllData?: () => Promise<void>;
+  onClearAllData?: (mode?: 'device-only' | 'everywhere') => Promise<void>;
+  showTeamClearChoices?: boolean;
+  canDeleteTeamSharedRecords?: boolean;
   onDeleteAccount: () => Promise<void>;
   tireInventory?: TireInventoryItem[];
   onStartWeekend?: () => void;
@@ -52,9 +54,10 @@ const ACCENT_PRESETS = [
   { label: 'Cyan',        hex: '#7de8e8' },
 ];
 
-export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, subTabRequestKey = 0, onClearAllData, onDeleteAccount, tireInventory = [], onStartWeekend, onSyncStatus }: SettingsViewProps) {
+export default function SettingsView({ user, profile, onAuthChange, setup, savedSetups = [], activeSession, theme, onThemeChange, weekends = [], todos = [], accounting = [], cars, activeCarId, onSelectCar, onSaveCars, onDeleteCar, setupCount, tireCount, shockCount, initialSubTab, subTabRequestKey = 0, onClearAllData, showTeamClearChoices = false, canDeleteTeamSharedRecords = false, onDeleteAccount, tireInventory = [], onStartWeekend, onSyncStatus }: SettingsViewProps) {
   const [subTab, setSubTab] = useState<SettingsSubTab>(initialSubTab ?? 'garage');
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0); // 0=idle, 1=confirm, 2=clearing
+  const clearingRef = useRef(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePhrase, setDeletePhrase] = useState('');
@@ -77,6 +80,18 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
     } catch (error) {
       setDeleteError(error instanceof Error ? error.message : 'Account deletion did not finish. Device data was kept. Sign in again and retry.');
       setDeletingAccount(false);
+    }
+  };
+
+  const clearRacingData = async (mode?: 'device-only' | 'everywhere') => {
+    if (clearingRef.current) return;
+    clearingRef.current = true;
+    setClearStep(2);
+    try {
+      await onClearAllData?.(mode);
+    } finally {
+      clearingRef.current = false;
+      setClearStep(0);
     }
   };
 
@@ -177,22 +192,49 @@ export default function SettingsView({ user, profile, onAuthChange, setup, saved
               {clearStep === 1 && (
                 <div className="flex flex-col gap-2">
                   <p className="text-sm font-mono text-red-400 text-center font-bold">Clear racing records but keep this account?</p>
+                  {showTeamClearChoices ? (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => clearRacingData('device-only')}
+                        className="min-h-11 rounded-lg border border-red-500/50 px-3 py-2 text-left font-mono text-sm font-bold text-red-400 hover:bg-red-500/10"
+                      >
+                        Clear this device only
+                      </button>
+                      <p className="text-sm font-mono text-on-surface-variant">
+                        Clears local racing records; shared team data will re-download on next sync.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => clearRacingData('everywhere')}
+                        className="min-h-11 rounded-lg border border-red-500 bg-red-500/20 px-3 py-2 text-left font-mono text-sm font-bold text-red-400 hover:bg-red-500/30"
+                      >
+                        Delete my records everywhere
+                      </button>
+                      <p className="text-sm font-mono text-on-surface-variant">
+                        {canDeleteTeamSharedRecords
+                          ? 'This queues your shared records and personal tires for deletion.'
+                          : 'This queues personal records such as tires for deletion.'}
+                      </p>
+                      <p className="text-sm font-mono text-on-surface-variant">
+                        Team records you do not own remain in cloud.
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => clearRacingData()}
+                      className="flex-1 min-h-11 py-2 rounded-lg bg-red-500/20 border border-red-500 text-red-400 font-mono text-xs uppercase tracking-wider font-bold hover:bg-red-500/30 transition-colors"
+                    >
+                      Yes, Clear Records
+                    </button>
+                  )}
                   <div className="flex gap-2">
                     <button
                       onClick={() => setClearStep(0)}
                       className="flex-1 min-h-11 py-2 rounded-lg border border-outline-variant text-on-surface-variant font-mono text-xs uppercase tracking-wider hover:bg-surface transition-colors"
                     >
                       Cancel
-                    </button>
-                    <button
-                      onClick={async () => {
-                        setClearStep(2);
-                        await onClearAllData?.();
-                        setClearStep(0);
-                      }}
-                      className="flex-1 min-h-11 py-2 rounded-lg bg-red-500/20 border border-red-500 text-red-400 font-mono text-xs uppercase tracking-wider font-bold hover:bg-red-500/30 transition-colors"
-                    >
-                      Yes, Clear Records
                     </button>
                   </div>
                 </div>

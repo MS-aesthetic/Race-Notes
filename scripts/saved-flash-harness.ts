@@ -2300,3 +2300,386 @@ d1Ok(killedD1Mutations.length >= 10, 'D1 kills at least ten independent mutation
 console.log(`D1 assertions: ${d1AssertionCount}`);
 console.log(`D1 killed mutations (${killedD1Mutations.length}): ${killedD1Mutations.join(', ')}`);
 console.log('D1 zero-row delete harness: PASS');
+
+// D2 Clear Racing Data proof. Compile and execute the real App handler and
+// Settings submit guard with deterministic dependencies; no live database exists.
+type D2Mode = 'device-only' | 'everywhere';
+type D2Identity = 'signed-out' | 'solo' | 'unresolved' | 'owner' | 'member' | 'missing-owner';
+type D2Queue = { table: string; recordId: string; soloOnly: boolean; accountId: string };
+type D2TireQueue = { accountId: string; tireId: string };
+type D2Push = { name: string; args: unknown[] };
+type D2Run = {
+  shared: D2Queue[];
+  tires: D2TireQueue[];
+  pushes: D2Push[];
+  removedKeys: string[];
+  states: string[];
+  dirty: number;
+  undo: number;
+  info: string[];
+  events: string[];
+};
+
+let d2AssertionCount = 0;
+const killedD2Mutations: string[] = [];
+const d2Ok = (value: unknown, message: string): void => {
+  d2AssertionCount += 1;
+  assert.ok(value, message);
+};
+const d2Equal = (actual: unknown, expected: unknown, message: string): void => {
+  d2AssertionCount += 1;
+  assert.deepEqual(actual, expected, message);
+};
+const d2Kill = (name: string, killed: boolean): void => {
+  d2AssertionCount += 1;
+  assert.equal(killed, true, `D2 mutation killed: ${name}`);
+  killedD2Mutations.push(name);
+};
+const d2Replace = (source: string, before: string, after: string, label: string): string => {
+  const mutated = source.replace(before, after);
+  d2Ok(mutated !== source, `D2 ${label} mutation changes exact production source`);
+  return mutated;
+};
+
+const D2_TABLES = [
+  'setups',
+  'race_weekends',
+  'todos',
+  'cars',
+  'shock_sessions',
+  'maintenance_components',
+  'maintenance_logs',
+  'checklist_templates',
+  'weekend_checklists',
+] as const;
+const D2_PUSHES = [
+  'pushSetups',
+  'pushWeekends',
+  'pushTodos',
+  'pushCars',
+  'pushShockSessions',
+  'pushMaintenanceComponents',
+  'pushMaintenanceLogs',
+  'pushChecklistTemplates',
+  'pushWeekendChecklists',
+] as const;
+const D2_KEYS = [
+  'race_notes_setup', 'race_notes_saved_setups', 'race_notes_weekends',
+  'race_notes_active_session', 'race_notes_todos', 'race_notes_tires',
+  'race_notes_accounting', 'race_notes_accounting_draft', 'race_notes_shopping', 'race_notes_cars',
+  'race_notes_active_car', 'race_notes_shock_graphs',
+  'race_notes_maintenance', 'race_notes_maintenance_logs',
+  'race_notes_checklist_templates', 'race_notes_weekend_checklists',
+  'race_notes_active_weekend',
+];
+const D2_STATE_NAMES = [
+  'savedSetups', 'weekends', 'activeWeekendId', 'tireInventory', 'cars',
+  'shockSessions', 'activeCarId', 'activeSession', 'todos', 'accounting',
+  'shopping', 'maintenance', 'maintenanceLogs', 'checklistTemplates', 'weekendChecklists',
+];
+const d2Fixture = Object.fromEntries(D2_TABLES.map(table => [table, [
+  { id: `${table}-1` },
+  { id: `${table}-2` },
+]])) as Record<(typeof D2_TABLES)[number], Array<{ id: string }>>;
+const d2ClearBlock = (source: string): string => between(
+  source,
+  '  const handleClearAllData =',
+  '  const handleDeleteAccount',
+  'D2 real clear handler',
+);
+
+const compileD2Clear = (source: string, dependencies: Record<string, unknown>): RuntimeExport => (
+  compileHandler(source, 'handleClearAllData', '  const handleDeleteAccount', dependencies)
+);
+
+const runD2Clear = async (
+  source: string,
+  identity: D2Identity,
+  mode?: D2Mode,
+): Promise<D2Run> => {
+  const shared: D2Queue[] = [];
+  const tires: D2TireQueue[] = [];
+  const pushes: D2Push[] = [];
+  const removedKeys: string[] = [];
+  const states: string[] = [];
+  const info: string[] = [];
+  const events: string[] = [];
+  let dirty = 0;
+  let undo = 0;
+  const signedIn = identity !== 'signed-out';
+  const resolved = identity !== 'unresolved' && identity !== 'signed-out';
+  const hasTeam = identity === 'owner' || identity === 'member' || identity === 'missing-owner';
+  const user = signedIn ? { id: 'account-1' } : null;
+  const team = hasTeam ? { id: 'team-1' } : null;
+  const syncOwnerId = identity === 'owner' ? 'account-1' : identity === 'member' ? 'owner-2' : identity === 'solo' ? 'account-1' : null;
+  const localStorage = {
+    removeItem: (key: string) => { removedKeys.push(key); events.push(`remove:${key}`); },
+  };
+  const stateSetter = (name: string) => (_value: unknown) => { states.push(name); events.push(`state:${name}`); };
+  const push = (name: string) => (...args: unknown[]) => { pushes.push({ name, args }); events.push(`push:${name}`); };
+  const dependencies: Record<string, unknown> = {
+    carUndo: { undo: () => { undo += 1; events.push('undo'); } },
+    clearAllDataModeRef: { current: mode ?? 'device-only' },
+    user,
+    teamResolved: resolved,
+    team,
+    syncOwnerId,
+    savedSetups: d2Fixture.setups,
+    weekends: d2Fixture.race_weekends,
+    todos: d2Fixture.todos,
+    cars: d2Fixture.cars,
+    shockSessions: d2Fixture.shock_sessions,
+    maintenance: d2Fixture.maintenance_components,
+    maintenanceLogs: d2Fixture.maintenance_logs,
+    checklistTemplates: d2Fixture.checklist_templates,
+    weekendChecklists: d2Fixture.weekend_checklists,
+    tireInventory: [{ id: 'tire-1' }, { id: 'tire-2' }],
+    queueSharedCloudDelete: (table: string, recordId: string, soloOnly = false, expectedAccountId?: string) => {
+      shared.push({ table, recordId, soloOnly, accountId: expectedAccountId ?? user?.id ?? '' });
+      events.push(`queue:${table}:${recordId}`);
+    },
+    enqueuePendingPersonalTireDelete: (_storage: unknown, entry: D2TireQueue) => {
+      tires.push({ accountId: entry.accountId, tireId: entry.tireId });
+      events.push(`tire:${entry.tireId}`);
+    },
+    window: { localStorage },
+    localStorage,
+    setDeleteReplayVersion: (update: (value: number) => number) => { update(0); events.push('replay'); },
+    ACCOUNTING_DRAFT_KEY: 'race_notes_accounting_draft',
+    ACTIVE_WEEKEND_KEY: 'race_notes_active_weekend',
+    carsRef: { current: d2Fixture.cars },
+    activeCarIdRef: { current: 'cars-1' },
+    INITIAL_ACTIVE_SESSION: { id: 'initial-session' },
+    prevTodosForNotifyRef: { current: d2Fixture.todos },
+    markSavedDirty: () => { dirty += 1; events.push('dirty'); },
+    showComponentInfo: (message: string) => { info.push(message); events.push(`info:${message}`); },
+    setSyncStatus: () => undefined,
+  };
+  for (const name of D2_PUSHES) dependencies[name] = push(name);
+  dependencies.pushTires = push('pushTires');
+  for (const name of D2_STATE_NAMES) {
+    const setter = `set${name[0].toUpperCase()}${name.slice(1)}`;
+    dependencies[setter] = stateSetter(name);
+  }
+  const clear = compileD2Clear(source, dependencies);
+  await clear();
+  return { shared, tires, pushes, removedKeys, states, dirty, undo, info, events };
+};
+
+const d2SettingsBlock = (source: string): string => between(
+  source,
+  '  const clearRacingData =',
+  '\n\n  useEffect',
+  'D2 real Settings clear submit',
+);
+const compileD2SettingsClear = (
+  source: string,
+  dependencies: Record<string, unknown>,
+): RuntimeExport => {
+  const block = d2SettingsBlock(source).replace('  const clearRacingData =', 'export const clearRacingData =');
+  const compiled = transformSync(block, { loader: 'tsx', format: 'cjs' }).code;
+  const moduleBox = { exports: {} as Record<string, unknown> };
+  const names = Object.keys(dependencies);
+  new Function('module', 'exports', ...names, compiled)(
+    moduleBox,
+    moduleBox.exports,
+    ...names.map(name => dependencies[name]),
+  );
+  return moduleBox.exports.clearRacingData as RuntimeExport;
+};
+
+const d2SourcePasses = (appSource: string, settingsSource: string): boolean => {
+  const clear = d2ClearBlock(appSource);
+  const settingsClear = d2SettingsBlock(settingsSource);
+  return D2_TABLES.every(table => clear.includes(`['${table}',`))
+    && D2_PUSHES.every(name => clear.includes(`${name}([], user.id`))
+    && appSource.includes("const clearAllDataModeRef = useRef<'device-only' | 'everywhere'>('device-only');")
+    && clear.includes('const mode = clearAllDataModeRef.current;')
+    && clear.includes("const resolvedMode = isResolvedTeam ? mode : 'legacy';")
+    && clear.includes("if (user && resolvedMode !== 'device-only')")
+    && clear.includes('if (isResolvedTeam && syncOwnerId === user.id)')
+    && clear.includes('queueSharedCloudDelete(table, id, false, user.id)')
+    && clear.includes('queueSharedCloudDelete(table, id, true)')
+    && clear.includes('if (isResolvedTeam) pushTires([], user.id, setSyncStatus);')
+    && clear.indexOf('carUndo.undo();') < clear.indexOf('localStorage.removeItem')
+    && clear.indexOf('localStorage.removeItem') < clear.indexOf('markSavedDirty();')
+    && (clear.match(/markSavedDirty\(\);/g) ?? []).length === 1
+    && !clear.includes('supabase.')
+    && !clear.includes('deleteTeamSharedRecordFromCloud')
+    && settingsSource.includes('Clear this device only')
+    && settingsSource.includes('shared team data will re-download on next sync')
+    && settingsSource.includes('Delete my records everywhere')
+    && settingsSource.includes('Team records you do not own remain in cloud.')
+    && settingsSource.includes("clearRacingData('device-only')")
+    && settingsSource.includes("clearRacingData('everywhere')")
+    && settingsSource.includes('showTeamClearChoices ? (')
+    && settingsSource.includes('canDeleteTeamSharedRecords')
+    && settingsClear.includes('if (clearingRef.current) return;')
+    && settingsClear.includes('clearingRef.current = true;')
+    && settingsClear.includes('clearingRef.current = false;')
+    && appSource.includes('showTeamClearChoices={!!user && teamResolved && !!team}')
+    && appSource.includes('canDeleteTeamSharedRecords={!!user && teamResolved && !!team && syncOwnerId === user.id}')
+    && appSource.includes("clearAllDataModeRef.current = mode ?? 'device-only';")
+    && appSource.includes('await handleClearAllData();');
+};
+
+d2Ok(d2SourcePasses(app, settings), 'D2 real production source binds owner/device/everywhere semantics and Settings modes');
+d2Ok(d1ReplaySourcePasses(app), 'D2 preserves D1 true-only removal, retry, status, and auth/generation guards');
+d2Ok(d1DeleteSourcePasses(sync), 'D2 preserves D1 selected-row cloud proof');
+d2Ok(b3SourcePasses(app, sync, settings, exportView), 'D2 preserves B3 terminal status priority');
+d2Ok(c4SourcePasses(app), 'D2 preserves C4 one-dirty boundary contract');
+d2Ok(!d2ClearBlock(app).includes('PENDING_'), 'D2 adds no queue key or direct queue implementation');
+d2Ok(!d2ClearBlock(app).includes('.delete('), 'D2 adds no direct cloud delete primitive');
+assert.doesNotThrow(() => transformSync(settings, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), 'D2 real SettingsView compiles');
+d2AssertionCount += 1;
+
+const ownerDevice = await runD2Clear(app, 'owner', 'device-only');
+d2Equal(ownerDevice.shared, [], 'D2 owner device-only queues zero shared rows');
+d2Equal(ownerDevice.tires, [], 'D2 owner device-only queues zero tires');
+d2Equal(ownerDevice.pushes, [], 'D2 owner device-only invokes zero cloud push/delete paths');
+d2Equal(ownerDevice.removedKeys, D2_KEYS, 'D2 device-only removes exact 17 existing local keys');
+d2Equal(ownerDevice.states, D2_STATE_NAMES, 'D2 device-only preserves every existing in-memory reset');
+d2Equal(ownerDevice.undo, 1, 'D2 device-only cancels car Undo exactly once');
+d2Equal(ownerDevice.dirty, 1, 'D2 device-only marks C4 dirty exactly once');
+d2Ok(ownerDevice.events[0] === 'undo', 'D2 car Undo happens before queue, push, wipe, or dirty work');
+d2Equal(ownerDevice.info, ['Device data cleared. Shared team data will re-download on next sync.'], 'D2 device-only status is honest');
+
+const ownerEverywhere = await runD2Clear(app, 'owner', 'everywhere');
+const expectedShared = D2_TABLES.flatMap(table => d2Fixture[table].map(item => ({
+  table,
+  recordId: item.id,
+  soloOnly: false,
+  accountId: 'account-1',
+})));
+d2Equal(ownerEverywhere.shared, expectedShared, 'D2 canonical owner queues every local id across exact nine shared tables');
+d2Equal(ownerEverywhere.tires, [
+  { accountId: 'account-1', tireId: 'tire-1' },
+  { accountId: 'account-1', tireId: 'tire-2' },
+], 'D2 canonical owner queues all personal tires under signed-in account');
+d2Equal(ownerEverywhere.pushes.map(call => call.name), [...D2_PUSHES, 'pushTires'], 'D2 owner pairs all nine empty shared pushes plus personal tires');
+for (const call of ownerEverywhere.pushes) {
+  d2Equal(call.args[0], [], `D2 ${call.name} uses matching empty dataset`);
+  d2Equal(call.args[1], 'account-1', `D2 ${call.name} uses canonical owner/account id`);
+}
+const ownerCarsPush = ownerEverywhere.pushes.find(call => call.name === 'pushCars');
+d2Equal(ownerCarsPush?.args[2], 'team-1', 'D2 cars empty push retains resolved canonical team id');
+d2Equal(ownerEverywhere.removedKeys, D2_KEYS, 'D2 everywhere preserves exact local wipe');
+d2Equal(ownerEverywhere.dirty, 1, 'D2 everywhere marks C4 dirty once');
+d2Ok(ownerEverywhere.events.indexOf('queue:setups:setups-1') < ownerEverywhere.events.indexOf('push:pushSetups'), 'D2 owner queues shared intent before matching cloud push');
+d2Ok(ownerEverywhere.events.indexOf('tire:tire-1') < ownerEverywhere.events.indexOf('push:pushTires'), 'D2 owner queues tire intent before empty tire push');
+
+for (const identity of ['member', 'missing-owner'] as const) {
+  const outcome = await runD2Clear(app, identity, 'everywhere');
+  d2Equal(outcome.shared, [], `D2 ${identity} queues zero shared records`);
+  d2Equal(outcome.pushes.map(call => call.name), ['pushTires'], `D2 ${identity} invokes only personal tire push path`);
+  d2Equal(outcome.tires.map(item => item.tireId), ['tire-1', 'tire-2'], `D2 ${identity} queues personal tires`);
+  d2Equal(outcome.removedKeys, D2_KEYS, `D2 ${identity} keeps same local wipe`);
+  d2Ok(outcome.info[0].includes('Team records you do not own remain in cloud.'), `D2 ${identity} status does not imply shared deletion`);
+}
+
+const signedOut = await runD2Clear(app, 'signed-out');
+d2Equal(signedOut.shared, [], 'D2 signed-out clear stays local-only');
+d2Equal(signedOut.tires, [], 'D2 signed-out clear keeps zero personal queue');
+d2Equal(signedOut.pushes, [], 'D2 signed-out clear keeps zero cloud path');
+for (const identity of ['solo', 'unresolved'] as const) {
+  const outcome = await runD2Clear(app, identity);
+  d2Equal(outcome.shared, expectedShared.map(entry => ({ ...entry, soloOnly: true })), `D2 ${identity} retains provisional soloOnly shared intents`);
+  d2Equal(outcome.tires.map(item => item.tireId), ['tire-1', 'tire-2'], `D2 ${identity} retains personal tire intents`);
+  d2Equal(outcome.pushes, [], `D2 ${identity} retains no immediate empty pushes`);
+}
+
+for (const table of D2_TABLES) {
+  const queuedAtPullStart = new Set(ownerEverywhere.shared.map(intent => `${intent.table}:${intent.recordId}`));
+  const filtered = compileD1PullFilter(app)(table, [
+    ...d2Fixture[table],
+    { id: `${table}-nonowned` },
+  ], {
+    queuedAtPullStart,
+    readPendingTeamDeletes: () => ownerEverywhere.shared,
+    pullUserId: 'account-1',
+    window: { localStorage: {} },
+  });
+  d2Equal(filtered, [{ id: `${table}-nonowned` }], `D2 queued ${table} fixtures cannot resurrect during pull/resume filtering`);
+}
+
+const runSettingsDoubleSubmit = async (source: string) => {
+  let calls = 0;
+  const modes: Array<D2Mode | undefined> = [];
+  const steps: number[] = [];
+  let finish: (() => void) | null = null;
+  const pending = new Promise<void>(resolve => { finish = resolve; });
+  const clear = compileD2SettingsClear(source, {
+    clearingRef: { current: false },
+    setClearStep: (step: number) => { steps.push(step); },
+    onClearAllData: (mode?: D2Mode) => { calls += 1; modes.push(mode); return pending; },
+  });
+  const first = clear('everywhere');
+  const second = clear('device-only');
+  await Promise.resolve();
+  const beforeFinish = { calls, modes: [...modes], steps: [...steps] };
+  finish?.();
+  await Promise.all([first, second]);
+  return { beforeFinish, calls, modes, steps };
+};
+const guardedSubmit = await runSettingsDoubleSubmit(settings);
+d2Equal(guardedSubmit.beforeFinish, { calls: 1, modes: ['everywhere'], steps: [2] }, 'D2 real Settings guard blocks double-submit and preserves first mode');
+d2Equal(guardedSubmit.steps, [2, 0], 'D2 real Settings clearing state closes only after work settles');
+
+const deviceQueuesShared = d2Replace(app, "if (user && (!teamResolved || !team)) {", "if (user && resolvedMode === 'device-only') {", 'device-queues-shared');
+d2Kill('device-only-queues-shared', (await runD2Clear(deviceQueuesShared, 'owner', 'device-only')).shared.length > 0);
+const deviceQueuesCloud = d2Replace(app, "if (user && resolvedMode !== 'device-only') {", 'if (user) {', 'device-queues-cloud');
+const deviceCloudOutcome = await runD2Clear(deviceQueuesCloud, 'owner', 'device-only');
+d2Kill('device-only-queues-tire-cloud', deviceCloudOutcome.tires.length > 0 && deviceCloudOutcome.pushes.length > 0);
+const missingWarning = d2Replace(settings, 'shared team data will re-download on next sync', 'team data stays available', 'missing-warning');
+d2Kill('device-warning-removed', !d2SourcePasses(app, missingWarning));
+const memberQueuesShared = d2Replace(app, 'if (isResolvedTeam && syncOwnerId === user.id) {', 'if (isResolvedTeam) {', 'member-queues-shared');
+d2Kill('member-queues-shared', (await runD2Clear(memberQueuesShared, 'member', 'everywhere')).shared.length > 0);
+const ownerOmitsTable = d2Replace(app, "      ['todos', todos.map(item => item.id)],\n", '', 'owner-omits-table');
+d2Kill('owner-omits-table-ids', (await runD2Clear(ownerOmitsTable, 'owner', 'everywhere')).shared.length !== expectedShared.length);
+const wrongSoloOnly = d2Replace(app, 'queueSharedCloudDelete(table, id, false, user.id)', 'queueSharedCloudDelete(table, id, true, user.id)', 'wrong-soloOnly');
+d2Kill('owner-wrong-soloOnly', (await runD2Clear(wrongSoloOnly, 'owner', 'everywhere')).shared.some(intent => intent.soloOnly));
+const wrongAccount = d2Replace(app, 'queueSharedCloudDelete(table, id, false, user.id)', "queueSharedCloudDelete(table, id, false, 'wrong-account')", 'wrong-account');
+d2Kill('owner-wrong-account', (await runD2Clear(wrongAccount, 'owner', 'everywhere')).shared.some(intent => intent.accountId === 'wrong-account'));
+const wrongTable = d2Replace(app, 'queueSharedCloudDelete(table, id, false, user.id)', "queueSharedCloudDelete('setups', id, false, user.id)", 'wrong-table');
+d2Kill('owner-wrong-table', new Set((await runD2Clear(wrongTable, 'owner', 'everywhere')).shared.map(intent => intent.table)).size === 1);
+const wrongId = d2Replace(app, 'queueSharedCloudDelete(table, id, false, user.id)', "queueSharedCloudDelete(table, 'wrong-id', false, user.id)", 'wrong-id');
+d2Kill('owner-wrong-id', (await runD2Clear(wrongId, 'owner', 'everywhere')).shared.every(intent => intent.recordId === 'wrong-id'));
+const pairingLost = d2Replace(app, '        pushTodos([], user.id, setSyncStatus);\n', '', 'pairing-lost');
+d2Kill('queue-push-pairing-lost', (await runD2Clear(pairingLost, 'owner', 'everywhere')).pushes.length === D2_PUSHES.length);
+const wrongTeam = d2Replace(app, 'pushCars([], user.id, team.id, setSyncStatus)', 'pushCars([], user.id, null, setSyncStatus)', 'wrong-team');
+d2Kill('cars-push-wrong-team', (await runD2Clear(wrongTeam, 'owner', 'everywhere')).pushes.find(call => call.name === 'pushCars')?.args[2] === null);
+const tiresOmitted = d2Replace(app, '      tireInventory.forEach(item => {', '      [].forEach(item => {', 'tires-omitted');
+d2Kill('personal-tires-omitted', (await runD2Clear(tiresOmitted, 'owner', 'everywhere')).tires.length === 0);
+const tireWrongAccount = d2Replace(app, '          accountId: user.id,\n          tireId: item.id,', "          accountId: 'wrong-account',\n          tireId: item.id,", 'tire-wrong-account');
+d2Kill('personal-tire-wrong-account', (await runD2Clear(tireWrongAccount, 'member', 'everywhere')).tires.every(intent => intent.accountId === 'wrong-account'));
+const labelsRemoved = d2Replace(settings, 'Delete my records everywhere', 'Delete records', 'choice-label-removed');
+d2Kill('exact-choice-label-removed', !d2SourcePasses(app, labelsRemoved));
+const modesSwapped = d2Replace(settings, "clearRacingData('device-only')", "clearRacingData('everywhere')", 'choice-modes-swapped');
+d2Kill('choice-callback-modes-swapped', !d2SourcePasses(app, modesSwapped));
+const appWiringLost = d2Replace(app, 'showTeamClearChoices={!!user && teamResolved && !!team}', 'showTeamClearChoices={false}', 'settings-wiring-lost');
+d2Kill('settings-choice-wiring-lost', !d2SourcePasses(appWiringLost, settings));
+const legacyChanged = d2Replace(app, 'if (user && (!teamResolved || !team)) {', 'if (user && !teamResolved) {', 'legacy-solo-changed');
+d2Kill('resolved-solo-behavior-changed', (await runD2Clear(legacyChanged, 'solo')).shared.length === 0);
+const undoMoved = d2Replace(app, '    carUndo.undo();\n', '', 'car-undo-removed');
+d2Kill('car-undo-removed', (await runD2Clear(undoMoved, 'owner', 'device-only')).undo === 0);
+const localKeyRemoved = d2Replace(app, "      ACTIVE_WEEKEND_KEY,\n", '', 'local-key-removed');
+d2Kill('local-key-reset-removed', (await runD2Clear(localKeyRemoved, 'owner', 'device-only')).removedKeys.length === 16);
+const stateResetRemoved = d2Replace(app, '    setAccounting([]);\n', '', 'state-reset-removed');
+d2Kill('state-reset-removed', !(await runD2Clear(stateResetRemoved, 'owner', 'device-only')).states.includes('accounting'));
+const dirtyRemoved = d2Replace(
+  app,
+  '    markSavedDirty();\n    showComponentInfo(isResolvedTeam',
+  '    showComponentInfo(isResolvedTeam',
+  'dirty-removed',
+);
+d2Kill('c4-dirty-mark-removed', (await runD2Clear(dirtyRemoved, 'owner', 'device-only')).dirty === 0);
+const directSupabase = d2Replace(app, '    const isResolvedTeam =', "    supabase.from('setups').delete();\n    const isResolvedTeam =", 'direct-supabase');
+d2Kill('direct-supabase-delete-added', !d2SourcePasses(directSupabase, settings));
+const doubleSubmitGuardRemoved = d2Replace(settings, '    if (clearingRef.current) return;\n', '', 'double-submit-guard');
+d2Kill('double-submit-guard-removed', (await runSettingsDoubleSubmit(doubleSubmitGuardRemoved)).beforeFinish.calls === 2);
+
+d2Equal(new Set(killedD2Mutations).size, killedD2Mutations.length, 'D2 killed mutation labels are unique');
+d2Ok(killedD2Mutations.length >= 20, 'D2 kills at least twenty independent mutation classes');
+console.log(`D2 assertions: ${d2AssertionCount}`);
+console.log(`D2 killed mutations (${killedD2Mutations.length}): ${killedD2Mutations.join(', ')}`);
+console.log('D2 Clear Racing Data harness: PASS');
