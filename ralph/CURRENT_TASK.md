@@ -1,59 +1,103 @@
-# Current Task — Final QA Repair 1: Modernize the Muted-Text Harness
+# Current Task — UX Overhaul v2 Final Full-Sprint QA Attempt 2 and Handoff
 
-**Status:** ACTIVE bounded SOL High repair after final full-sprint QA attempt 1 failed 96/100 at clean governance HEAD `306c6fe0f383d22dca765f40d76b9e6f3d35ba20`.
+**Status:** ACTIVE Part 6.3 read-only QA attempt 2. Final QA Repair 1 passed 100/100 at `810d918d4d492270f4474c898f160c3a4450e387`; all product work A1–E3 is complete. Primary `gpt-5.6-sol` Extra High owns QA, plan authority, Ralph, owner reporting, and the Part 6.4 handoff. Any failed gate creates a separate bounded SOL High repair work order; primary does not implement unless the plan's three-consecutive-failure escalation is reached.
 **Branch/worktree:** existing `codex/ux-overhaul` at `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`; do not create or switch any branch or worktree.
-**Implementation runtime:** persistent `gpt-5.6-sol` High worker only. Primary `gpt-5.6-sol` Extra High remains QA and plan authority. Terra at every tier and `cavecrew-builder` are forbidden.
-**Owner approval:** Maxx authorized the primary to approve subordinate task scopes when required. The primary approves exactly this one-file harness-only repair. No product change is approved or indicated.
-**Communication/delegation:** `/caveman full`; cavecrew investigator/reviewer contracts only.
+**QA base:** exact clean `810d918d4d492270f4474c898f160c3a4450e387`, including one-file muted-text proof repair on governance parent `50cc686f43ee46414c7a377f2640fccae8dc5ef5` and E3 product ancestor `f6e918174cc22a16eeabf59ef106bcb26b97a8b2`.
+**Authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` Parts 2–4, 5.2, 6.3, 6.4, all acceptance targets, and the binding v2.1 Owner Addendum; `ralph/STATE.md`; `SPRINT_INDEX.md`; `AGENTS.md`.
+**Communication/delegation:** `/caveman full`; cavecrew investigator/reviewer contracts only. Terra at every tier and `cavecrew-builder` remain forbidden.
 
-## Failure evidence
+## Repair closure
 
-The final raw Windows matrix is exactly 23/24. `scripts/muted-text-color-harness.ts` stops at line 71 because current `src/components/RaceWeekendView.tsx` has 15 `text-on-surface-muted` sites while the historical inventory expects 16.
+Independent QA verifies Repair 1 exactly:
 
-This is a stale harness, not a product regression:
+- `scripts/muted-text-color-harness.ts` only; product, governance, native, config, and every other harness byte frozen.
+- 232 assertions and 11/11 independent mutations pass.
+- Historical UXP-17 remains exact 105 migrations, 16 components, eight historical opacity exceptions, and 17 source files against pinned history.
+- Current state remains exact 105 muted sites across the same 16 components: Setup `+1`, Race Weekend `-1`; accepted C3 and D3 deltas leave exactly six current opacity exceptions.
+- Raw Windows matrix is exact 24/24; lint is the exact three known product errors; build is exactly 566 modules; cavecrew review PASS 100; tree clean.
 
-- `e8d7016^` has 16 sites; accepted C3 commit `e8d70165ca7600e3b47d597e444fc953e6624fc7` and current product have 15.
-- C3 intentionally removed the obsolete disabled `Compare setup` action, including its `text-on-surface-muted opacity-40 cursor-not-allowed` branch.
-- C3 replaced that mutable comparison with frozen per-session `Bound setup changes` plus `Log setup changes` navigation.
-- `scripts/chunk5-setup-harness.ts` already behaviorally and mutation-binds the bound renderer, exact snapshot rows, legacy removal, navigation wiring, and button callback.
-- Independent cavecrew review also found latent stale locks after the first failure: current components, Four Bar, source-diff scope, and CSS are compared to historical parents despite accepted later changes.
+The attempt-1 work order incorrectly said seven current opacity exceptions. Exact history proves six: original eight minus accepted C3 Race Compare and accepted D3 Garage disabled-state changes. The harness and this work order carry the corrected value.
 
-## Authorized file
+## Read-only QA rule
 
-- `scripts/muted-text-color-harness.ts`
+Until a verdict is reached, do not edit product, harness, Ralph, plan, owner report, handoff, Git history, or external data except the explicitly authorized bounded QA interactions below. If any acceptance, suite, visual, data-trust, boundary, or reviewer gate fails, stop final certification, record a strict FAIL and exact repair order in governance only, then dispatch one SOL High worker. Do not silently waive or repair a failure during QA.
 
-Every product file is frozen. Do not restore the old Compare action or muted token. Do not edit Ralph, plan, owner report, handoff, Git history outside the single task commit, generated output, dependencies, native files, schema/RLS/migrations/edge code, package/config, or any other harness.
+## Required final gates
 
-## Required repair
+### 1. Runtime, ref, ancestry, and task map
 
-Modernize the harness without weakening the original UXP-17 proof:
+- Verify primary runtime metadata is `gpt-5.6-sol`, effort `xhigh`; missing metadata is unverified and cannot produce a verified final verdict.
+- Verify exact pinned 203f worktree, branch, clean tree, repair/E3 ancestry, and one task-identifying commit chain for every A1–E3 task, repair, and chunk gate.
+- Produce exact task-to-accepted-commit map, including failed attempts and SOL-only v2.1 routing deviations.
 
-1. Keep current-tree global assertions for zero old alpha utilities, no replacement hex in JSX/TS, exact dark/light muted tokens, contrast on all named surfaces, and preservation of semantic status token families.
-2. Preserve the original migration proof at pinned history: parent `a68731a`, implementation `89845e8`, exactly 105 migrated alpha tokens across 16 components, eight original opacity exceptions, and exactly 17 changed source files including `src/index.css`.
-3. Run the historical component reverse-byte checks against `89845e8` contents, not the evolved current files.
-4. Run the historical CSS reverse-byte check against `89845e8` CSS, while leaving current CSS token and contrast checks bound to HEAD.
-5. Pin the phone-layout reversal to implementation commit `d047791`, not current Four Bar bytes.
-6. Model exact current deltas from the original inventory: `SetupView.tsx` is `+1`, `RaceWeekendView.tsx` is `-1`, all other components are unchanged, current total is exactly 105, and the same 16 components contain muted utilities.
-7. Bind the Race Weekend `-1` delta to exact C3 commit `e8d7016` and parent `3559282fc02f5e28d24e08155673defeab060e4c`: the old disabled Compare block is gone and the bound-summary/Log replacement is present.
-8. Assert exactly seven surviving current opacity exceptions and exact zero for the removed C3 Compare opacity branch.
-9. Add independent mutation proof that fails if the removed disabled Compare muted site is reintroduced, the accepted `-1` delta is lost, a current muted token or declaration is removed, an old alpha utility returns, or a required historical migration/exception is changed. Every mutation must change its target and be killed by the advertised assertion.
-10. Make Git reads and EOL handling Windows-safe and deterministic. Do not use current whole-file equality to historical parents.
+### 2. Complete Windows proof
 
-## Required worker gates
+- Run all 24 `scripts/*-harness.ts` files in one raw capture: exact 24/24 required.
+- Run the focused cross-task set covering scale/density/touch, Save Run reservation, stepper pointer behavior, status/Saved arbitration, resume/offline, lifecycle/snapshots/diffs/Quick Adjust, setup naming, help, labels, confirmation, ownership, D1/D2/D3 deletion, native auth, E3 scrollbar/source boundaries, and muted-text history/current contracts.
+- `npm run lint` must report exactly the three known baseline errors and no new error.
+- `npm run build` must succeed with exactly 566 transformed modules.
 
-- `npx tsx scripts/muted-text-color-harness.ts` passes and prints exact assertion/mutation totals.
-- Demonstrate every new mutation changes the intended source and is killed.
-- Run all 24 `scripts/*-harness.ts` files in one raw Windows capture: exact 24/24 required.
-- Run the focused cross-task set from the final-QA work order, including `chunk5-setup-harness.ts`, `setup-touch-target-harness.ts`, `saved-flash-harness.ts`, lifecycle, Quick Adjust, offline/resume, D1/D2/D3, help, labels, native auth, and confirmation.
-- `npm run lint` reports exactly the three known baseline errors and no new error.
-- `npm run build` succeeds with exactly 566 transformed modules.
-- Exact one-file diff, `git diff --check`, protected paths unchanged, and clean worktree after one task-identifying commit.
-- Obtain cavecrew reviewer findings-first PASS.
+### 3. Cross-task interaction matrix
 
-## Independent QA after worker
+Exercise and record:
 
-Primary reruns the repaired harness, its mutation audit, the raw 24/24 matrix, focused cross-task group, exact lint/build, ancestry/scope/protected/clean checks, and cavecrew review. Product bytes must remain identical to `f6e918174cc22a16eeabf59ef106bcb26b97a8b2` plus prior accepted product ancestry. A PASS resumes the remaining final browser, Android, authorized data-cleanup, whole-branch boundary, Part 6.4 handoff, governance, draft/debug artifact, and saving-point push gates. A FAIL receives an exact new SOL High repair order with the failure count carried forward.
+1. A1 scale × A4 density × A2 sticky Save Run reservation.
+2. B1 pointer semantics × B2 notification arbiter × B3 terminal status × C4 commit boundaries.
+3. C1 editability × C2/C3 snapshots/diffs × D1/D2/D3 deletion integrity.
+4. C4 immediate persistence/quiet feedback × D2 device/everywhere clear behavior.
+5. D1 selected-row zero detection × D2 ownership enumeration × D3 dependency/car-last cascade and pull filtering.
+
+### 4. Owner complaint and v2.1 scenarios
+
+- Scale migration/reset and Default/Large/Extra Large behavior; pinch enabled; scale/theme device-local.
+- App-wide density/readability: visible values >=14px, controls >=44px, no overlap/clipping/overflow, two setup columns, accepted Four Bar/Tire geometry, nothing behind bottom nav.
+- Dirty-only Save Run reservation and four distinct tire-pressure regions at both visible scales.
+- Touch scroll over steppers gives zero writes/toasts; tap commits once; hold remains 350ms then 100ms.
+- Historical setup byte immutability, unrelated live-event edit/delete, rename, blank-name zero-write, and copy auto-name.
+- Starting Setup → Hot Laps → Quick Adjust → Qualifying: pending/bound deltas match; older snapshot immutable; legacy log/navigation preserved.
+- Immediate local persistence plus one boundary Saved; clean boundaries silent; process death loses no edit; info/terminal states truthfully suppress Saved.
+- Context-aware App Guide every tab, Setup/Four Bar targets, Tuning Guide separation, Back/tab stale-context clearing.
+- All Add/New opener → Create submit pairs and Save edit labels.
+- Setup corner picker label exactly `Tire`; no visible `Tire from Inventory`; placeholder/options/handler/persistence unchanged; no collision with `Bound Load Graph` at 360/390/412 Default+Large.
+- C2.5 corner alignment/stacked steppers at 360/390/412 Default+Large; NumberStepper timing unchanged.
+- E3 active guards/cleanup catch, fine-pointer visible scrollbars, coarse-pointer hidden scrollbars, comments-only location runtime.
+
+### 5. Browser and Android matrix
+
+- Create one final Netlify draft only. Inspect signed-out shell at 360×800, 390×844, 412×915, and 1080×2118: exact viewport, auth gate, no overflow, >=44px controls, pinch metadata, fine-pointer scrollbar affordance, zero console warning/error.
+- Build with Java 21 using `npx cap sync android` and `gradlew assembleDebug`; install only debug APK on the already-running emulator. No version, signing, release, or native-source change.
+- In existing authenticated Android state, inspect Dashboard, Setups, Loads, Tires, Compare, Runs, Checklist, Maintenance Logs, Accounting, Garage, Account, Style, Export, Guide, and relevant sheets/forms at required phone widths, Default/Large, light/dark. Use DOM-derived targets.
+- Verify 1080×2118 capture behavior, focus/keyboard, safe areas, bottom-nav clearance, no horizontal overflow, no undersized control. Restore emulator display/theme/scale and close forms.
+- Capture crash buffer and product JavaScript errors. Known WebView variations-seed and pre-root Capacitor safe-area diagnostics remain residuals only if unchanged.
+
+### 6. Authorized data-trust sequence
+
+Use only the dedicated signed-in account already present on the emulator; never expose/store credentials. Complete all data-dependent visual/session scenarios before destructive cleanup.
+
+- Use deterministic mocks for RLS blocked/zero-row/Nth-failure branches.
+- Verify device-only clear first and confirm cloud data returns as warned.
+- Run everywhere deletion last; target only canonically owned racing records and personal tires. Never another member's data, account, authentication record, team, or membership.
+- Wait through resume pulls; verify no owned racing-data resurrection; leave owned racing data cleared.
+- Remove all bounded QA fixtures before PASS.
+
+### 7. Whole-branch boundary audit
+
+Audit `master...final HEAD` against §5.2. Only D1 selected-row zero detection, D2 ownership-limited clear-data, and C1 bounded `in-play-elsewhere` demotion may change protected meaning. Confirm unchanged dual weekend delete, canonical ownership writes, deferred queue format/five-second retry, UXN-1 pull filtering, 30-second resume throttle, auth-generation isolation, lifecycle roles/history, device-local active IDs, pinch/focus/keyboard/safe-area, and Sprint 4 IA deferral. Confirm zero schema/RLS/migration/edge, native source/version, package/config, release/signing, production deploy, master merge, or unauthorized remote action.
+
+Document these accepted plan/code tensions:
+
+- “3 four-bar columns” shorthand versus accepted Bar Length full-width plus two adaptive hole columns;
+- title-case preference versus accepted uppercase-styled `CREATE RACE DAY` source;
+- historical Terra wording in `SPRINT_INDEX.md` versus binding v2.1 SOL-only override.
+
+### 8. Review, verdict, and deliverables
+
+- Obtain independent cavecrew whole-branch findings-first verdict.
+- PASS only if every gate and cleanup passes. Otherwise record exact repair files, behavior, proof, and bans.
+- On PASS update `ralph/STATE.md`, `ralph/CURRENT_TASK.md`, this plan snapshot, and `docs/OWNER_REPORT_UX_OVERHAUL.md`; create `docs/HANDOFF_UX_OVERHAUL_V2_2026-07-19.md` exactly to Part 6.4. Handoff is a briefing packet, not a third-party verdict.
+- Commit only final governance/handoff files after cavecrew review. Push `codex/ux-overhaul` as owner-requested saving point. No PR or merge.
+- Return detailed owner explanation: completed work, failures/repairs, what remains, final draft URL, debug APK path/size/hash, push SHA, residuals, and confirmation production/release/master untouched.
 
 ## Hard bans
 
-No product edits; no primary implementation before three consecutive failed repair attempts; no Terra; no `cavecrew-builder`; no other harness; no credential disclosure/storage; no live data mutation during this repair; no deploy; no APK build; no push; no PR; no merge/master; no production Netlify; no release/signing; no schema/RLS/migration/edge; no Sprint 4 IA.
+No primary implementation before three consecutive failed repair attempts; no Terra or cavecrew-builder; no product/harness edits during QA; no other user's data; no account/auth/team/membership deletion; no credential disclosure/storage; no production Netlify publish; no signed/release APK/AAB or `release/` change; no schema/RLS/migration/edge; no PR, master merge, or master push; no Sprint 4 IA. Draft previews, debug emulator APKs, exact-owner data cleanup, governance/handoff documentation, and final `codex/ux-overhaul` saving-point push are authorized.
