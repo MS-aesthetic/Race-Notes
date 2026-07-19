@@ -66,6 +66,7 @@ interface RaceWeekendViewProps {
   onCommitQuickAdjust?: (command: QuickAdjustCommand) => { ok: boolean; error?: string };
   onInfo?: (message: string) => void;
   onHelp?: (section: string) => void;
+  onFourBarVisibilityChange?: (visible: boolean) => void;
   onGoToGarage: () => void;
   onLogSetupChanges: () => void;
   accounting?: AccountingEntry[];
@@ -246,7 +247,7 @@ export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
   onUpdateSession: persistSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
   activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
-  activeSetup = null, shockSessions = [], onCommitQuickAdjust, onInfo, onHelp, onGoToGarage, onLogSetupChanges, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
+  activeSetup = null, shockSessions = [], onCommitQuickAdjust, onInfo, onHelp, onFourBarVisibilityChange, onGoToGarage, onLogSetupChanges, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -302,6 +303,14 @@ export default function RaceWeekendView({
   useBackClosable(wkFormOpen, () => setWkFormOpen(false));
   useBackClosable(nsOpen, () => setNsOpen(false));
   useBackClosable(fourBarOpen, () => setFourBarOpen(false));
+
+  // App owns contextual help routing; report this child-local sheet state.
+  useEffect(() => {
+    onFourBarVisibilityChange?.(fourBarOpen);
+  }, [fourBarOpen, onFourBarVisibilityChange]);
+  useEffect(() => () => {
+    onFourBarVisibilityChange?.(false);
+  }, [onFourBarVisibilityChange]);
 
   // Weekend pending delete stays hidden everywhere until undo/commit resolves.
   const pendingDeleteId = weekendUndo.pending?.id ?? null;

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { transformSync } from 'esbuild';
 import { INITIAL_ACTIVE_SESSION, INITIAL_SETUP } from '../src/data';
 import type { RaceWeekend, Setup } from '../src/types';
 import {
@@ -18,7 +20,12 @@ import {
 import { shareOrDownloadReport, type ReportShareAdapter } from '../src/lib/reportShare';
 import { plainRacerEffect } from '../src/components/QuickReferenceView';
 import GuideView from '../src/components/GuideView';
-import { isAppGuideSection } from '../src/lib/helpRouting';
+import {
+  APP_GUIDE_ROOT,
+  isAppGuideSection,
+  resolveContextualAppGuideSection,
+  type ContextualAppGuideContext,
+} from '../src/lib/helpRouting';
 
 const setup: Setup = {
   ...structuredClone(INITIAL_SETUP),
@@ -103,7 +110,7 @@ assert.equal((await shareOrDownloadReport(file, 'Race Day', adapter({
 assert.deepEqual(calls, []);
 assert.equal((await shareOrDownloadReport(file, 'Race Day', adapter({ download: () => { throw new Error('Disk full'); } }))).status, 'failed');
 
-const source = (relative: string) => readFileSync(join(process.cwd(), relative), 'utf8');
+const source = (relative: string) => readFileSync(join(process.cwd(), relative), 'utf8').replace(/\r\n/g, '\n');
 const quickRef = source('src/components/QuickReferenceView.tsx');
 const helpSheet = source('src/components/ui/HelpSheet.tsx');
 const bottomSheet = source('src/components/ui/BottomSheet.tsx');
@@ -116,6 +123,7 @@ const weekendView = source('src/components/RaceWeekendView.tsx');
 const loadsView = source('src/components/SmasherLoadsView.tsx');
 const diffView = source('src/components/SetupDiffView.tsx');
 const pdfSource = source('src/lib/exportPdf.ts');
+const helpRoutingSource = source('src/lib/helpRouting.ts');
 
 for (const anchor of ['setup', 'four-bar', 'loads', 'setup-diff']) {
   assert.doesNotMatch(quickRef, new RegExp(`data-help-anchor="${anchor}"`));
@@ -124,6 +132,7 @@ for (const anchor of ['setup', 'four-bar', 'loads', 'setup-diff']) {
 assert.doesNotMatch(quickRef, /Before You Change Anything|Setup Sheet<\/h2>|Load Sessions<\/h2>|Compare Setups<\/h2>/);
 assert.ok(quickRef.indexOf('Pit-Side Adjustment Finder') < quickRef.indexOf('What Shock Changes Do'));
 assert.equal(isAppGuideSection(undefined), false);
+assert.equal(isAppGuideSection(APP_GUIDE_ROOT), true);
 assert.equal(isAppGuideSection('setup'), true);
 assert.equal(isAppGuideSection('four-bar'), true);
 assert.equal(isAppGuideSection('loads'), true);
@@ -138,6 +147,7 @@ assert.match(guideView, /const shownOpen = active \|\| open/);
 assert.match(guideView, /data-help-anchor=\{section\.id\}/);
 const setupGuideMarkup = renderToStaticMarkup(createElement(GuideView, { activeSection: 'setup', embedded: true }));
 const loadsGuideMarkup = renderToStaticMarkup(createElement(GuideView, { activeSection: 'loads', embedded: true }));
+const rootGuideMarkup = renderToStaticMarkup(createElement(GuideView, { activeSection: APP_GUIDE_ROOT, embedded: true }));
 const guideSectionMarkup = (markup: string, id: string) => {
   const start = markup.indexOf(`data-help-anchor="${id}"`);
   const end = markup.indexOf('data-help-anchor="', start + 20);
@@ -149,14 +159,232 @@ assert.match(guideSectionMarkup(setupGuideMarkup, 'loads'), /aria-expanded="fals
 assert.match(guideSectionMarkup(loadsGuideMarkup, 'setup'), /aria-expanded="false"/);
 assert.match(guideSectionMarkup(loadsGuideMarkup, 'loads'), /aria-expanded="true"[\s\S]*guide-panel-loads/);
 assert.doesNotMatch(setupGuideMarkup, /How to use CREW CHIEF/);
+assert.doesNotMatch(rootGuideMarkup, /aria-expanded="true"|How to use CREW CHIEF/);
 assert.match(renderToStaticMarkup(createElement(GuideView)), /How to use CREW CHIEF/);
+
+// E1 context-aware App Guide relocation. Compile real resolver, execute the
+// real Race Day visibility reporter, and mutation-check every route boundary.
+type HelpRoutingRuntime = {
+  isAppGuideSection: (section?: string) => boolean;
+  resolveContextualAppGuideSection: (context: ContextualAppGuideContext) => string | undefined;
+};
+let e1AssertionCount = 0;
+const killedE1Mutations: string[] = [];
+const e1Ok: (value: unknown, message: string) => asserts value = (value, message) => {
+  e1AssertionCount += 1;
+  assert.ok(value, message);
+};
+const e1Equal = (actual: unknown, expected: unknown, message: string): void => {
+  e1AssertionCount += 1;
+  assert.equal(actual, expected, message);
+};
+const e1Kill = (name: string, killed: boolean): void => {
+  e1AssertionCount += 1;
+  assert.equal(killed, true, `E1 mutation killed: ${name}`);
+  killedE1Mutations.push(name);
+};
+const e1Replace = (input: string, before: string, after: string, label: string): string => {
+  const mutated = input.replace(before, after);
+  e1Ok(mutated !== input, `E1 ${label} mutation changes exact production source`);
+  return mutated;
+};
+const compileHelpRouting = (input: string): HelpRoutingRuntime => {
+  const compiled = transformSync(input, { loader: 'ts', format: 'cjs', target: 'es2022' }).code;
+  const moduleBox = { exports: {} as Record<string, unknown> };
+  new Function('module', 'exports', compiled)(moduleBox, moduleBox.exports);
+  return moduleBox.exports as HelpRoutingRuntime;
+};
+const routing = compileHelpRouting(helpRoutingSource);
+const context = (activeTab: ContextualAppGuideContext['activeTab'], fourBarVisible = false, mappedSection?: ContextualAppGuideContext['mappedSection']): ContextualAppGuideContext => ({
+  activeTab,
+  fourBarVisible,
+  mappedSection,
+});
+
+e1Equal(resolveContextualAppGuideSection(context('setups', true)), 'four-bar', 'E1 FourBar visibility overrides Setups');
+e1Equal(resolveContextualAppGuideSection(context('raceweekend', true)), 'four-bar', 'E1 open Race Day FourBar resolves four-bar');
+e1Equal(resolveContextualAppGuideSection(context('raceweekend', false)), APP_GUIDE_ROOT, 'E1 closed Race Day FourBar resolves App Guide root');
+e1Equal(resolveContextualAppGuideSection(context('setups')), 'setup', 'E1 Setups resolves setup');
+e1Equal(resolveContextualAppGuideSection(context('settings', false, 'loads')), 'loads', 'E1 explicit mapped context resolves existing topic');
+e1Equal(resolveContextualAppGuideSection(context('setups', false, 'loads')), 'setup', 'E1 Setups outranks mapped context');
+for (const tab of ['dashboard', 'settings', 'trackers', 'quickref'] as const) {
+  e1Equal(resolveContextualAppGuideSection(context(tab)), APP_GUIDE_ROOT, `E1 ${tab} resolves App Guide root`);
+}
+e1Equal(routing.isAppGuideSection(APP_GUIDE_ROOT), true, 'E1 compiled real classifier accepts root sentinel');
+
+const fourBarRemoved = e1Replace(helpRoutingSource, "if (fourBarVisible) return 'four-bar';", "if (false) return 'four-bar';", 'FourBar override removed');
+e1Kill('fourbar-override-removed', compileHelpRouting(fourBarRemoved).resolveContextualAppGuideSection(context('raceweekend', true)) !== 'four-bar');
+const fourBarLowered = e1Replace(
+  helpRoutingSource,
+  "if (fourBarVisible) return 'four-bar';\n  if (activeTab === 'setups') return 'setup';",
+  "if (activeTab === 'setups') return 'setup';\n  if (fourBarVisible) return 'four-bar';",
+  'FourBar priority lowered',
+);
+e1Kill('fourbar-priority-lowered', compileHelpRouting(fourBarLowered).resolveContextualAppGuideSection(context('setups', true)) !== 'four-bar');
+const everyRaceDayFourBar = e1Replace(helpRoutingSource, 'if (fourBarVisible) return', "if (fourBarVisible || activeTab === 'raceweekend') return", 'closed Race Day forced FourBar');
+e1Kill('closed-race-day-forced-fourbar', compileHelpRouting(everyRaceDayFourBar).resolveContextualAppGuideSection(context('raceweekend', false)) === 'four-bar');
+const setupsMappingRemoved = e1Replace(helpRoutingSource, "if (activeTab === 'setups') return 'setup';", "if (false) return 'setup';", 'Setups mapping removed');
+e1Kill('setups-mapping-removed', compileHelpRouting(setupsMappingRemoved).resolveContextualAppGuideSection(context('setups')) !== 'setup');
+const mappedContextRemoved = e1Replace(helpRoutingSource, 'if (mappedSection) return mappedSection;', 'if (false) return mappedSection;', 'mapped context removed');
+e1Kill('mapped-context-removed', compileHelpRouting(mappedContextRemoved).resolveContextualAppGuideSection(context('settings', false, 'loads')) !== 'loads');
+const undefinedRoot = e1Replace(helpRoutingSource, 'return APP_GUIDE_ROOT;', 'return undefined as never;', 'root fallback undefined');
+e1Kill('root-fallback-undefined', compileHelpRouting(undefinedRoot).resolveContextualAppGuideSection(context('dashboard')) !== APP_GUIDE_ROOT);
+const rootClassificationRemoved = e1Replace(helpRoutingSource, '[APP_GUIDE_ROOT, ...APP_GUIDE_SECTIONS]', '[...APP_GUIDE_SECTIONS]', 'root classification removed');
+e1Kill('root-classification-removed', compileHelpRouting(rootClassificationRemoved).isAppGuideSection(APP_GUIDE_ROOT) !== true);
+
+const buttonBlock = (input: string, label: string): { start: number; end: number; text: string } => {
+  const labelAt = input.indexOf(`aria-label="${label}"`);
+  e1Ok(labelAt !== -1, `E1 ${label} button label exists`);
+  const start = input.lastIndexOf('<button', labelAt);
+  const end = input.indexOf('</button>', labelAt) + '</button>'.length;
+  e1Ok(start !== -1 && end >= '</button>'.length, `E1 ${label} button block extracts`);
+  return { start, end, text: input.slice(start, end) };
+};
+const appSourcePasses = (input: string): boolean => {
+  const headerStart = input.indexOf('<header ref={notificationHeaderRef}');
+  const headerEnd = input.indexOf('</header>', headerStart);
+  if (headerStart === -1 || headerEnd === -1) return false;
+  const header = input.slice(headerStart, headerEnd);
+  const actionsStart = header.indexOf('<div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1">');
+  const actionsEnd = header.indexOf('{/* Active-car chip moved into ContextStrip', actionsStart);
+  if (actionsStart === -1 || actionsEnd === -1) return false;
+  const actions = header.slice(actionsStart, actionsEnd);
+  const tuningLabel = actions.indexOf('aria-label="Tuning Guide"');
+  const guideLabel = actions.indexOf('aria-label="App Guide"');
+  const themeLabel = actions.indexOf('aria-label={theme.mode');
+  if (!(tuningLabel !== -1 && tuningLabel < guideLabel && guideLabel < themeLabel)) return false;
+  const tuningStart = actions.lastIndexOf('<button', tuningLabel);
+  const tuningEnd = actions.indexOf('</button>', tuningLabel) + '</button>'.length;
+  const guideStart = actions.lastIndexOf('<button', guideLabel);
+  const guideEnd = actions.indexOf('</button>', guideLabel) + '</button>'.length;
+  const tuningButton = actions.slice(tuningStart, tuningEnd);
+  const guideButton = actions.slice(guideStart, guideEnd);
+  return actions.slice(tuningEnd, guideStart).trim() === ''
+    && /onClick=\{\(\) => openHelp\(\)\}/.test(tuningButton)
+    && /aria-label="Tuning Guide"/.test(tuningButton)
+    && /title="Tuning Guide"/.test(tuningButton)
+    && /onClick=\{\(\) => openHelp\(resolveContextualAppGuideSection\(\{ activeTab, fourBarVisible: raceDayFourBarVisible \}\)\)\}/.test(guideButton)
+    && /aria-label="App Guide"/.test(guideButton)
+    && /title="App Guide"/.test(guideButton)
+    && /min-h-11/.test(guideButton)
+    && /min-w-11/.test(guideButton)
+    && /const reportRaceDayFourBarVisibility = useCallback\([\s\S]*?\}, \[\]\);/.test(input)
+    && /onFourBarVisibilityChange=\{reportRaceDayFourBarVisibility\}/.test(input)
+    && /appGuideHelp \? <GuideView activeSection=\{helpSection\} embedded \/> : <QuickReferenceView \/>/.test(input);
+};
+e1Ok(appSourcePasses(appSource), 'E1 App source keeps exact authenticated header route and App Guide rendering');
+const tuningBlock = buttonBlock(appSource, 'Tuning Guide');
+const guideBlock = buttonBlock(appSource, 'App Guide');
+e1Equal(tuningBlock.end <= guideBlock.start, true, 'E1 App Guide follows Tuning Guide');
+
+const bareHeader = e1Replace(appSource, guideBlock.text.match(/onClick=\{[^\n]+/)?.[0] ?? '', 'onClick={() => openHelp()}', 'contextual header bare openHelp');
+e1Kill('contextual-header-bare-openhelp', !appSourcePasses(bareHeader));
+const staleHeader = e1Replace(appSource, guideBlock.text.match(/onClick=\{[^\n]+/)?.[0] ?? '', 'onClick={() => openHelp(helpSection)}', 'contextual header stale section');
+e1Kill('contextual-header-stale-section', !appSourcePasses(staleHeader));
+const tuningRewired = e1Replace(appSource, 'onClick={() => openHelp()}\n                aria-label="Tuning Guide"', 'onClick={() => openHelp(resolveContextualAppGuideSection({ activeTab, fourBarVisible: raceDayFourBarVisible }))}\n                aria-label="Tuning Guide"', 'Tuning Guide rewire');
+e1Kill('tuning-guide-rewired', !appSourcePasses(tuningRewired));
+const rootRendersTuning = e1Replace(appSource, '{appGuideHelp ? <GuideView activeSection={helpSection} embedded /> : <QuickReferenceView />}', '{appGuideHelp ? <QuickReferenceView /> : <GuideView activeSection={helpSection} embedded />}', 'root opens Tuning Guide');
+e1Kill('root-opens-tuning-guide', !appSourcePasses(rootRendersTuning));
+const undersizedHeader = e1Replace(appSource, 'className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors"', 'className="flex min-h-10 min-w-10 items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors"', 'header target undersized');
+e1Kill('header-help-under-44px', !appSourcePasses(undersizedHeader));
+const unlabeledHeader = e1Replace(appSource, 'aria-label="App Guide"\n                title="App Guide"', 'aria-label="Help"\n                title="Help"', 'header label weakened');
+e1Kill('header-help-label-weakened', !appSourcePasses(unlabeledHeader));
+const separatedHeader = e1Replace(appSource, '</button>\n              <button\n                type="button"\n                onClick={() => openHelp(resolveContextualAppGuideSection', '</button>\n              <span aria-hidden="true" />\n              <button\n                type="button"\n                onClick={() => openHelp(resolveContextualAppGuideSection', 'header adjacency broken');
+e1Kill('header-help-separated-from-tuning', !appSourcePasses(separatedHeader));
+const outsideHeader = appSource.slice(0, guideBlock.start) + appSource.slice(guideBlock.end).replace('</header>', `${guideBlock.text}\n        </header>`);
+e1Kill('header-help-outside-action-group', !appSourcePasses(outsideHeader));
+const propRouteRemoved = e1Replace(appSource, '                  onFourBarVisibilityChange={reportRaceDayFourBarVisibility}\n', '', 'RaceWeekend prop route removed');
+e1Kill('raceweekend-prop-route-removed', !appSourcePasses(propRouteRemoved));
+const unstableCallback = e1Replace(appSource, 'const reportRaceDayFourBarVisibility = useCallback((visible: boolean) => {\n    setRaceDayFourBarVisible(visible);\n  }, []);', 'const reportRaceDayFourBarVisibility = (visible: boolean) => {\n    setRaceDayFourBarVisible(visible);\n  };', 'stable callback removed');
+e1Kill('raceweekend-callback-unstable', !appSourcePasses(unstableCallback));
+
+type EffectCleanup = void | (() => void);
+type RaceReporter = (fourBarOpen: boolean, onFourBarVisibilityChange: (visible: boolean) => void, useEffect: (effect: () => EffectCleanup, dependencies: unknown[]) => void) => void;
+const raceReporterBlock = (input: string): string => {
+  const start = input.indexOf('  // App owns contextual help routing; report this child-local sheet state.');
+  const end = input.indexOf('  // Weekend pending delete stays hidden everywhere until undo/commit resolves.', start);
+  e1Ok(start !== -1 && end !== -1, 'E1 real RaceWeekend visibility reporter extracts');
+  return input.slice(start, end);
+};
+const compileRaceReporter = (input: string): RaceReporter => {
+  const wrapped = `export const runRaceReporter = (fourBarOpen, onFourBarVisibilityChange, useEffect) => {\n${raceReporterBlock(input)}\n};`;
+  const compiled = transformSync(wrapped, { loader: 'tsx', format: 'cjs', target: 'es2022' }).code;
+  const moduleBox = { exports: {} as Record<string, unknown> };
+  new Function('module', 'exports', compiled)(moduleBox, moduleBox.exports);
+  return moduleBox.exports.runRaceReporter as RaceReporter;
+};
+const runRaceReporter = (input: string, visible: boolean) => {
+  const events: boolean[] = [];
+  const cleanups: Array<() => void> = [];
+  compileRaceReporter(input)(visible, value => events.push(value), effect => {
+    const cleanup = effect();
+    if (cleanup) cleanups.push(cleanup);
+  });
+  return { events, unmount: () => cleanups.reverse().forEach(cleanup => cleanup()) };
+};
+const raceSourcePasses = (input: string): boolean => /onFourBarVisibilityChange\?: \(visible: boolean\) => void;/.test(input)
+  && /onOpenFourBar=\{\(\) => setFourBarOpen\(true\)\}/.test(input)
+  && /useBackClosable\(fourBarOpen, \(\) => setFourBarOpen\(false\)\);/.test(input)
+  && /<BottomSheet open=\{fourBarOpen\} onClose=\{\(\) => setFourBarOpen\(false\)\}/.test(input)
+  && /onFourBarVisibilityChange\?\.\(fourBarOpen\);/.test(input)
+  && /useEffect\(\(\) => \(\) => \{\n    onFourBarVisibilityChange\?\.\(false\);\n  \}, \[onFourBarVisibilityChange\]\);/.test(input);
+e1Ok(raceSourcePasses(weekendView), 'E1 RaceWeekend source reports every FourBar lifecycle route');
+const openReporter = runRaceReporter(weekendView, true);
+e1Equal(openReporter.events.length, 1, 'E1 real RaceWeekend reporter emits one current-state event');
+e1Equal(openReporter.events[0], true, 'E1 real RaceWeekend reporter publishes true when open');
+openReporter.unmount();
+e1Equal(openReporter.events.at(-1), false, 'E1 real RaceWeekend reporter clears false on unmount');
+e1Equal(runRaceReporter(weekendView, false).events[0], false, 'E1 real RaceWeekend reporter publishes false when closed');
+
+const trueSignalRemoved = e1Replace(weekendView, 'onFourBarVisibilityChange?.(fourBarOpen);', 'if (!fourBarOpen) onFourBarVisibilityChange?.(fourBarOpen);', 'open true signal removed');
+e1Kill('raceweekend-open-true-signal-removed', runRaceReporter(trueSignalRemoved, true).events[0] !== true);
+const closeSignalRemoved = e1Replace(weekendView, 'onFourBarVisibilityChange?.(fourBarOpen);', 'if (fourBarOpen) onFourBarVisibilityChange?.(fourBarOpen);', 'close false signal removed');
+e1Kill('raceweekend-close-false-signal-removed', runRaceReporter(closeSignalRemoved, false).events[0] !== false);
+const unmountSignalRemoved = e1Replace(weekendView, 'useEffect(() => () => {\n    onFourBarVisibilityChange?.(false);\n  }, [onFourBarVisibilityChange]);', 'useEffect(() => () => undefined, [onFourBarVisibilityChange]);', 'unmount false signal removed');
+const unmountMutationRun = runRaceReporter(unmountSignalRemoved, true);
+unmountMutationRun.unmount();
+e1Kill('raceweekend-unmount-false-signal-removed', unmountMutationRun.events.at(-1) !== false);
+const backCloseRemoved = e1Replace(weekendView, 'useBackClosable(fourBarOpen, () => setFourBarOpen(false));', 'useBackClosable(fourBarOpen, () => setFourBarOpen(true));', 'Android back close removed');
+e1Kill('raceweekend-android-back-close-removed', !raceSourcePasses(backCloseRemoved));
+const sheetCloseRemoved = e1Replace(weekendView, '<BottomSheet open={fourBarOpen} onClose={() => setFourBarOpen(false)}', '<BottomSheet open={fourBarOpen} onClose={() => setFourBarOpen(true)}', 'sheet close removed');
+e1Kill('raceweekend-sheet-close-removed', !raceSourcePasses(sheetCloseRemoved));
+const openSignalRemoved = e1Replace(weekendView, 'onOpenFourBar={() => setFourBarOpen(true)}', 'onOpenFourBar={() => setFourBarOpen(false)}', 'sheet open removed');
+e1Kill('raceweekend-sheet-open-removed', !raceSourcePasses(openSignalRemoved));
+
+const nestedHelpCount = (input: string) => input.match(/onHelp=\{onHelp\}/g)?.length ?? 0;
+const setupSourcePasses = (input: string): boolean => !/aria-label="Setup help"|title="Setup sheet help"|onHelp\('setup'\)/.test(input)
+  && /onHelp\?: \(section: string\) => void;/.test(input)
+  && nestedHelpCount(input) >= 3;
+e1Ok(setupSourcePasses(setupView), 'E1 removes only Setup header help and retains nested forwarding');
+e1Equal(nestedHelpCount(setupView) >= 3, true, 'E1 Setup keeps FourBar, Loads, and Diff prop routes');
+const setupInlineRestored = e1Replace(setupView, '        </div>\n        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">', '          {onHelp && <button aria-label="Setup help" onClick={() => onHelp(\'setup\')} />}\n        </div>\n        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">', 'Setup inline help restored');
+e1Kill('setup-inline-help-restored', !setupSourcePasses(setupInlineRestored));
+const nestedHelpRemoved = e1Replace(setupView, '                        onHelp={onHelp}\n', '', 'nested FourBar help forwarding removed');
+e1Kill('setup-nested-help-forwarding-removed', !setupSourcePasses(nestedHelpRemoved));
+
+const fourBarHash = (input: string) => createHash('sha256').update(input).digest('hex');
+const acceptedFourBarHash = 'f7d4c8ff1ec216c186bd70f1fce5cf7cbcd9f9893305bf6a890703b9027cf56c';
+const fourBarSourcePasses = (input: string): boolean => fourBarHash(input) === acceptedFourBarHash
+  && /onClick=\{\(\) => onHelp\('four-bar'\)\}/.test(input)
+  && /min-h-11 min-w-11/.test(input);
+e1Ok(fourBarSourcePasses(fourBarView), 'E1 FourBarQuickAdjust stays byte-frozen with exact inline four-bar route');
+const fourBarHelpRemoved = e1Replace(fourBarView, "onClick={() => onHelp('four-bar')}", 'onClick={() => undefined}', 'FourBar inline help removed');
+e1Kill('fourbar-inline-help-removed', !fourBarSourcePasses(fourBarHelpRemoved));
+const fourBarTargetChanged = e1Replace(fourBarView, "onHelp('four-bar')", "onHelp('setup')", 'FourBar target changed');
+e1Kill('fourbar-inline-target-changed', !fourBarSourcePasses(fourBarTargetChanged));
+
+e1Equal(new Set(killedE1Mutations).size, killedE1Mutations.length, 'E1 mutation labels are unique');
+e1Ok(killedE1Mutations.length >= 20, 'E1 kills at least twenty independent mutation classes');
+console.log(`E1 assertions: ${e1AssertionCount}`);
+console.log(`E1 killed mutations (${killedE1Mutations.length}): ${killedE1Mutations.join(', ')}`);
+
 assert.match(bottomSheet, /useBackClosable\(open, onClose\)/);
 assert.match(bottomSheet, /sheet-scrim.*onClick=\{onClose\}/);
 for (const heading of ['Creating a setup', 'Recording four-bar measurements', 'Adding load sessions', 'Comparing setups']) {
   assert.match(userGuide, new RegExp(`## ${heading}`, 'i'));
 }
 assert.match(userGuide, /At 90% of its configured limit/);
-assert.match(setupView, /onHelp\('setup'\)/);
+assert.doesNotMatch(setupView, /onHelp\('setup'\)|aria-label="Setup help"/);
 assert.match(fourBarView, /onHelp\('four-bar'\)/);
 assert.match(setupView, /buildSetupReport\(target\)/);
 assert.doesNotMatch(setupView, /buildSetupReport\(target, activeSession\)/);

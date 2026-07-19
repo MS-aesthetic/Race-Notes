@@ -590,7 +590,6 @@ export default function SetupView({
               Saved as you change it
             </p>
           </div>
-          {onHelp && <button type="button" onClick={() => onHelp('setup')} aria-label="Setup help" title="Setup sheet help" className="flex min-h-11 min-w-11 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary"><span className="material-symbols-outlined">help</span></button>}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <SubTabBtn tab="setups" label="Setups" icon="settings_input_component" />

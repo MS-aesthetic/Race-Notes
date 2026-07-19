@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
@@ -44,7 +44,7 @@ import { pickAutoWeekend, sortWeekends } from './lib/scope';
 import { buildQuickServiceRecords, type QuickServiceOutcome, type QuickServiceRequest } from './lib/serviceLog';
 import { hasOpenSheets, isPopSuppressed } from './lib/backStack';
 import { useUndoableDelete } from './lib/undo';
-import { isAppGuideSection } from './lib/helpRouting';
+import { isAppGuideSection, resolveContextualAppGuideSection } from './lib/helpRouting';
 import { resolveRaceDayCreationTarget } from './lib/raceDayGate';
 import { clearCrewChiefLocalData } from './lib/accountDeletion';
 import { ACCOUNTING_DRAFT_KEY } from './lib/accountingDraft';
@@ -412,10 +412,14 @@ export default function App() {
   // ── [27] Help sheet, [37]/[5] info toast, [33] online status ──────────────
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpSection, setHelpSection] = useState<string | undefined>();
+  const [raceDayFourBarVisible, setRaceDayFourBarVisible] = useState(false);
   const openHelp = (section?: string) => {
     setHelpSection(section);
     setHelpOpen(true);
   };
+  const reportRaceDayFourBarVisibility = useCallback((visible: boolean) => {
+    setRaceDayFourBarVisible(visible);
+  }, []);
   const appGuideHelp = isAppGuideSection(helpSection);
   const [infoToast, setInfoToast] = useState<InfoNotice | null>(null);
   const notificationHeaderRef = useRef<HTMLElement | null>(null);
@@ -2592,6 +2596,15 @@ export default function App() {
                 <span className="material-symbols-outlined text-[20px]">menu_book</span>
                 <span className="font-mono text-[11px] font-semibold">Tuning Guide</span>
               </button>
+              <button
+                type="button"
+                onClick={() => openHelp(resolveContextualAppGuideSection({ activeTab, fourBarVisible: raceDayFourBarVisible }))}
+                aria-label="App Guide"
+                title="App Guide"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">help</span>
+              </button>
               {/* Sunlight / theme-mode toggle ([32]) */}
               <button
                 onClick={() => handleThemeChange({ ...theme, mode: theme.mode === 'dark' ? 'light' : 'dark' })}
@@ -2769,6 +2782,7 @@ export default function App() {
                   onCommitQuickAdjust={handleCommitQuickAdjust}
                   onInfo={showComponentInfo}
                   onHelp={openHelp}
+                  onFourBarVisibilityChange={reportRaceDayFourBarVisibility}
                   accounting={accounting}
                   onFinishWeekend={handleFinishWeekend}
                   initialAction={rwInitialAction ?? undefined}
