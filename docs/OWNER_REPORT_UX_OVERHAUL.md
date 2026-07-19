@@ -495,3 +495,21 @@ The repaired test now separates the original muted-color migration from the appl
 The independent repaired test passed 232 assertions and defeated 11 independent mutations. The complete Windows matrix is now 24 of 24. Type-checking reports exactly the three known baseline errors and no new error. The production build transforms exactly 566 modules. Exact one-file scope, protected paths, clean worktree, and independent cavecrew review all pass.
 
 Final full-sprint QA attempt 2 is now active. It still must complete the final signed-out draft matrix, authenticated Android screen and interaction matrix, authorized account data-clear/no-resurrection sequence, whole-branch boundary audit and review, cold-reader handoff document, final owner report, governance commit, debug artifact, and saving-point branch push. No deploy, APK build, live-data action, or push occurred during this repair QA.
+
+## Final whole-sprint QA — Attempt 2
+
+The second final QA attempt is a **FAIL, 88/100**. The complete automated test matrix now passes 24 of 24, type-checking still reports only the three known errors, and the production build still transforms exactly 566 modules. The final signed-out draft also passed at all four required sizes with the login gate, no horizontal overflow, pinch zoom enabled, controls at least 44 pixels, and no browser warnings or errors.
+
+The failure was found only after installing the fresh debug build and measuring the authenticated Android screens themselves. Several controls are genuinely smaller than the required 44-pixel touch area. At the active Large scale, the Setup name field is 43.39 pixels tall, Setup Clone and Compare are 41.39 pixels wide, Loads actions are between 36.8 and 41.4 pixels tall, Quick Adjust fields are 43.4 pixels tall, the Maintenance close button is 27.6 pixels square, the Accounting filter is 38.8 pixels tall, and Export filters are 43.4 pixels tall. Default scale makes the padding-only controls smaller still.
+
+This is a real final-integration defect, not a screenshot or rounding issue. The shared 44-pixel class works only where a component explicitly uses it. These controls do not. The existing touch-target test also has a blind spot: it passes 48 assertions and 12 mutations without rendering the failing Setup creation and card controls.
+
+The approved repair is deliberately small. A SOL High worker may change only `src/index.css` and `scripts/setup-touch-target-harness.ts`. The CSS will provide a global 44-pixel minimum for visible native buttons and form controls, including the actual labels used to operate hidden file, checkbox, and radio inputs. The test must compile and render the real production CSS and cover all required pages at four viewports and both scales. It must also defeat independent mutations that remove the floor, reduce it to 43 pixels, remove button width, exempt buttons, remove label coverage, or allow the 20-pixel attachment-delete control to escape the global rule.
+
+The draft created before this failure is:
+
+https://6a5d52c877706b39b44d636c--crew-chief-race-notes.netlify.app/
+
+It is a draft only. The fresh debug APK was successfully built and installed. It is 12,087,761 bytes with SHA-256 `4C7A5653B96226B094F70FB925C7FEAD10F3F299D921B9F78253C48E73424F0B`.
+
+Because the final gate failed, the authorized data-clear and no-resurrection sequence was not run. No racing data, account, login, team, or membership was deleted. The final handoff and saving-point push also remain blocked until the repair passes and final QA attempt 3 is fully green. No production deployment, release build, signing, pull request, merge, master change, database change, or native-source change occurred.
