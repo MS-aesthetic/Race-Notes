@@ -411,3 +411,23 @@ Repair commit `e2e7fe9` changes only `chunk9-export-help-harness.ts`. It correct
 The remaining defect is that the new pure scope validator trims whitespace and discards blank entries before comparison. As a result, a whitespace-padded replacement for an authorized path or an appended empty path is incorrectly treated as valid. The repair order explicitly requires every changed path to retain its identity and every extra path to fail, so this is a strict test-proof failure even though no product file is wrong. Primary QA stopped the redundant full matrix after independently reproducing this deterministic blocker.
 
 Final SOL High attempt 3 remains limited to the same one harness file. It will normalize path separators only, leave Git-output blank-line cleanup outside the validator, and add independent mutations for an empty extra and a whitespace-altered authorized path. Product files stay frozen. If attempt 3 fails QA, the plan's three-failure escalation rule transfers the fix to the primary Extra High agent. E2 and later tasks remain blocked. No new preview, APK installation, live data operation, production deployment, push, PR, or merge occurred.
+
+## Task E1 — Final result after repair
+
+E1 is a final **PASS, 100/100** on QA attempt 3. The product feature remains commit `45e60c9`. The first proof repair is `e2e7fe9`, and the final identity-preserving proof repair is `b160f7a`.
+
+The final repair changes only `chunk9-export-help-harness.ts`. It no longer trims or discards path entries inside the pure scope validator. Git output cleanup remains outside that validator. New independent tests prove that an empty extra path and a whitespace-altered authorized path both fail, while Windows and Unix path separators remain compatible. All prior proof remains intact. The E1 harness now passes 99 assertions and kills 37 independent mutations.
+
+All eight focused regressions passed. The complete matrix was exactly 23 of 24, with only the unchanged muted-text byte-count lock failing `15 !== 16`. Type-checking reported exactly the three known errors. The production build transformed exactly 566 modules. Exact implementation and repair scopes, ancestry, protected paths, clean worktree, and independent cavecrew review all passed. The final reviewer score was 100/100.
+
+Because both repairs are harness-only, the accepted product bytes are identical to the already inspected draft:
+
+https://6a5cc4ff714d1444000df60c--crew-chief-race-notes.netlify.app/
+
+Its signed-out 360×800, 390×844, and 412×915 shells remain free of horizontal overflow, undersized controls, viewport restrictions, browser warnings, and browser errors.
+
+A fresh Java 21 debug APK was synchronized, built, and installed on `emulator-5554`. It is 12,087,436 bytes with SHA-256 `8BE9442EE19F439CE73C898AA4B8ED4839E7C10909FBD10071FFD2A15FDB7B00`. It cold-launched in 5.628 seconds into the existing authenticated device state. Dashboard and Settings opened the App Guide root, Setups opened the Setup topic, the unchanged Tuning Guide remained separate, and Four Bar visibility resolved the Four Bar topic. Android back and tab departure cleared the Four Bar context. The dedicated inline Four Bar help remained reachable and unchanged. Visible controls were at least 50.59 pixels, the 448×997 viewport had no horizontal overflow, and the crash buffer was empty.
+
+The WebView initially served an older cached header. Only its service-worker registration and cached app assets were cleared so the exact APK bundle could load. Login state, account, team, local storage, and racing data were not cleared or edited. The only error-level Android diagnostics were the emulator's known missing variations signature and software-renderer rendernode messages; there was no application crash or product JavaScript error.
+
+E1 has no remaining repair. E2 is next and is copy-only: keep Add/New labels on buttons that open forms, but label the create-form submit actions Create Car, Create Tire, Create Race Day, and Create Job. The Race Day submit already complies and will be verified rather than changed. No production deployment, release build, push, PR, merge, or live-data mutation occurred.
