@@ -2,7 +2,7 @@
 
 ## Current status
 
-Tasks C2, C2.5, C3, C4, C5, the integrated Chunk C gate, and D1 are complete. D1 passed its first QA attempt with a score of 100/100. D2 is now active under an isolated work order for making Clear All Data tell the truth about device-only clearing versus deleting records owned by the signed-in user. D3 and later work remain blocked until D2 passes.
+Tasks C2, C2.5, C3, C4, C5, the integrated Chunk C gate, D1, and the owner's setup-label microfix are complete. D1 and the label microfix each passed with a score of 100/100. D2 is now active under an isolated work order for making Clear All Data tell the truth about device-only clearing versus deleting records owned by the signed-in user. D3 and later work remain blocked until D2 passes.
 
 ## Task C2 — Session snapshot model and diff engine
 
@@ -292,3 +292,13 @@ A Java 21 debug APK was synchronized, built, and installed on `emulator-5554`. I
 D1 is a final **PASS, 100/100**. No D1 repair remains.
 
 D2 is next. Team users will receive two explicit Clear All Data choices. The device-only choice will remove local data without queuing cloud deletes and will warn that cloud data can return on sync. The everywhere choice will queue deletion only for records the signed-in user actually owns; records owned by another team member will remain in the cloud and the dialog will say so. Solo and unresolved-membership behavior, the existing deferred-delete machinery, D1's proof requirement, row-level security, and the pull filter must remain unchanged. D3, Chunk D QA, Chunk E, and final full-sprint QA remain blocked behind D2. The pre-D1 save point `9d9e4e1` was pushed to `origin/codex/ux-overhaul`; the D1 implementation and these QA records remain local. No production publish or master merge occurred.
+
+## Owner setup-label microfix before D2
+
+The corner setup cards now use the short visible label **Tire** instead of **Tire from Inventory**. This removes the collision with the neighboring **Bound Load Graph** label shown in the owner's screenshot. The inventory picker itself is unchanged: it still offers the same inventory options, keeps the same selected value and handlers, and retains the existing inventory wording in its placeholder.
+
+The implementation is commit `dc5c63d`. It changes one visible label in `SetupView.tsx` and adds a production-bound regression to `setup-touch-target-harness.ts`. The focused eight-test group passed, the complete test matrix stayed at the expected 23 of 24 with only the known muted-text lock failing, type-checking stayed at exactly the three known baseline errors, and the production build transformed exactly 566 modules. Scope, diff, clean-worktree, and independent reviewer checks all passed.
+
+Draft preview `https://6a5c19518df1ec312c463f95--crew-chief-race-notes.netlify.app/` is a draft only. The mobile authentication shell remained correct, and the installed Java 21 debug APK showed the two-column corner cards with **Tire** aligned cleanly beside **Bound Load Graph**. The APK is 12,085,162 bytes with SHA-256 `EC713FBD1F251F9F6BF7D97F5DE691BB7A5EB19F0727AD16C72230A5D4128DFE`. No production deploy, release build, signing, push, or merge was performed.
+
+For D2, the owner authorized a dedicated Crew Chief account for destructive deletion testing. The implementation worker will use mocks only. During independent QA, the device-only option will be tested first to prove that cloud data can return as warned. The delete-everywhere option will be tested last, leaving that account's owned racing data cleared. The account itself, authentication record, team, membership, and any other user's records will not be deleted. Credentials are not stored in this report or any repository file.

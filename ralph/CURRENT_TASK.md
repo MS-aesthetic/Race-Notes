@@ -2,13 +2,23 @@
 
 **Status:** READY FOR one `gpt-5.6-sol` HIGH implementation worker. Primary `gpt-5.6-sol` EXTRA HIGH remains QA and plan authority. D1 is accepted at 100/100. D3 and every later task remain blocked until D2 passes independent QA.
 **Branch/worktree:** existing `codex/ux-overhaul` at `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`; do not create or switch any branch or worktree.
-**Accepted D2 product base:** `1ca35769253696a81eade02dcfd5b75cd156461f` (`fix: detect D1 zero-row shared deletes`). The exact clean dispatch HEAD is the governance commit containing this work order and must be supplied by the primary in the delegation.
+**Accepted D2 product base:** `dc5c63d1e2e65e1c8475e1cc8b02d96074820c95` (`fix: shorten setup tire label`), which descends from accepted D1 commit `1ca35769253696a81eade02dcfd5b75cd156461f`. The exact clean dispatch HEAD is the governance commit containing this work order and owner-QA amendment and must be supplied by the primary in the delegation.
 **Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` item 11b, Task D2, Part 5.2, Part 6.1, and the binding v2.1 Owner Addendum.
 **Routing:** the implementation worker must verify runtime `turn_context.payload.model=gpt-5.6-sol` and `effort=high` from rollout metadata before any edit or test. Missing metadata is unverified and cannot satisfy the gate. Terra at every tier and `cavecrew-builder` are forbidden.
 
 ## Objective
 
 Make Clear Racing Data tell the truth for a resolved team account. The owner must choose between clearing only this device, which queues no cloud delete and warns that shared data will return on sync, and deleting the signed-in user's owned records everywhere, which uses the existing deferred-delete plus push pairing and never targets another person's canonical team data. Preserve the existing signed-out, solo, and team-unresolved flow exactly.
+
+## Owner-authorized destructive QA account
+
+The owner supplied a dedicated Crew Chief account in the task thread and authorizes the primary QA agent to use it for D2 deletion testing. This authorization is narrow and binding:
+
+1. The SOL High implementation worker and every harness use deterministic mocks only. No credential and no live account data may enter a worker prompt, repository file, report, commit, test fixture, screenshot, or command output.
+2. During independent D2 QA, the primary may clear racing data owned by the supplied account through the draft/debug product flow. The primary must not delete the account, team, membership, another user's data, Supabase schema, or authentication records.
+3. Run device-only first and prove that owned cloud data can re-download. Run the everywhere choice last and leave the supplied account's owned racing data cleared after the final verification pull.
+4. Member/non-owner, malformed-owner, solo, unresolved, zero-row, retry, and anti-resurrection cases remain deterministic fixture tests unless they can be exercised without changing another person or team membership.
+5. The credential remains only in the owner-controlled task context. Never copy or echo it into durable project or QA evidence.
 
 ## Ownership rule — binding interpretation
 
@@ -77,7 +87,7 @@ Print D2 assertion count and unique mutation names/count. Retain and rerun all e
 
 ## Builder gates before commit
 
-1. Verify runtime metadata, exact branch, exact dispatch HEAD, ancestry from accepted D2 base `1ca3576`, and a clean tree before editing.
+1. Verify runtime metadata, exact branch, exact dispatch HEAD, ancestry from accepted D2 base `dc5c63d` and D1 base `1ca3576`, and a clean tree before editing.
 2. Show `git diff --name-status` and `git diff --check`; scope must be only the three authorized files and line regions.
 3. Run focused Saved/D1/D2, team ownership, car-delete/clear, confirmation/status, offline/resume, weekend-delete, and current C1-C5 setup/lifecycle/Quick Adjust/tire/touch regressions.
 4. Run the raw full 24-harness matrix. Expected result remains exactly 23/24 with only unchanged `muted-text-color-harness.ts` failing `15 !== 16`. Any other failure blocks commit.
@@ -88,7 +98,7 @@ Print D2 assertion count and unique mutation names/count. Retain and rerun all e
 
 ## Independent QA gates
 
-Primary Extra High QA must independently re-verify runtime/ref/clean/ancestry, audit every changed line against this isolated exception, rerun focused/raw/lint/build, and exercise signed-out, solo, unresolved, team-owner device-only, team-owner everywhere, member device-only, member everywhere, zero-row retry, and resume anti-resurrection fixtures. Inspect the explicit Crew Chief draft at 360x800, 390x844, and 412x915, including both team choices/copy and 44px targets. Build/install only a Java 21 debug APK and repeat the owner/member choice scenario without touching live Supabase data. Obtain a cavecrew-reviewer diff/protected-path review and score strictly. Any finding transfers repair to a SOL High implementation worker; Terra is never dispatched.
+Primary Extra High QA must independently re-verify runtime/ref/clean/ancestry, audit every changed line against this isolated exception, rerun focused/raw/lint/build, and exercise signed-out, solo, unresolved, team-owner device-only, team-owner everywhere, member device-only, member everywhere, zero-row retry, and resume anti-resurrection fixtures. Inspect the explicit Crew Chief draft at 360x800, 390x844, and 412x915, including both team choices/copy and 44px targets. Build/install only a Java 21 debug APK. Use the owner-authorized account only under the narrow destructive-QA rules above: prove device-only re-download first, then perform everywhere deletion last and leave the account's owned racing data cleared. Obtain a cavecrew-reviewer diff/protected-path review and score strictly. Any finding transfers repair to a SOL High implementation worker; Terra is never dispatched.
 
 ## Hard bans
 
