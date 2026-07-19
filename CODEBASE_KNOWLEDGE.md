@@ -58,6 +58,7 @@ Newer than older sections below; this block wins conflicts:
   association.
 - Shopping UI/export retired. `race_notes_shopping` remains untouched for rollback.
   Legacy weekend-checklist rows remain hidden, synced, and recoverable.
+- UI action labels: Add/New opens a creation form; Create submits a new record; Save applies edits.
 
 ## 0. Session 8 Summary (read this first)
 

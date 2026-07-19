@@ -211,7 +211,7 @@ export default function TiresSubView({
             </div>
             <div className="flex min-w-0 flex-wrap justify-end gap-2">
               <button type="button" onClick={closeForm} className="rounded border border-outline-variant px-3 py-2 font-mono text-xs uppercase">Cancel</button>
-              <button type="submit" className="rounded bg-primary px-3 py-2 font-mono text-xs font-bold uppercase text-on-primary">{editingId ? 'Save Tire' : 'Add Tire'}</button>
+              <button type="submit" className="rounded bg-primary px-3 py-2 font-mono text-xs font-bold uppercase text-on-primary">{editingId ? 'Save Tire' : 'Create Tire'}</button>
             </div>
           </form>
         </div>

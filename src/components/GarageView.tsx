@@ -311,7 +311,7 @@ export default function GarageView({
               disabled={!form.chassis.trim()}
               className="flex-1 py-2 bg-primary text-on-primary font-mono text-xs uppercase rounded font-bold disabled:opacity-40"
             >
-              Add Car
+              Create Car
             </button>
             <button
               onClick={() => { setShowAddForm(false); setForm(EMPTY_FORM); }}

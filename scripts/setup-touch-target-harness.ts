@@ -20,6 +20,7 @@ const sliceBetween = (source: string, start: string, end: string) => {
 };
 
 const setup = read('src/components/SetupView.tsx');
+const garage = read('src/components/GarageView.tsx');
 const tires = read('src/components/TiresSubView.tsx');
 const fourBar = read('src/components/FourBarQuickAdjust.tsx');
 const raceWeekend = read('src/components/RaceWeekendView.tsx');
@@ -729,5 +730,110 @@ assert.match(b1PointerMove, /press\.moved = true;\s*cancelPress\(\);/s, 'B1 move
 assert.match(b1FinishPress, /const releasedOutsideSlop = Math\.hypot\(event\.clientX - press\.startX, event\.clientY - press\.startY\) > STEPPER_POINTER_SLOP_PX;/, 'B1 pointerup rechecks release slop when no move event arrives');
 assert.match(b1FinishPress, /if \(!press\.moved && !releasedOutsideSlop && !press\.didRepeat\) applyStep\(press\.dir, step\);/, 'B1 pointerup commits one in-slop, non-repeat step');
 assert.doesNotMatch(stepper, /touch-none/, 'B1 removes scroll-blocking touch-none');
+
+// E2 Add/New opens creation; Create submits new records; Save applies edits.
+type E2Sources = { garage: string; tires: string; raceWeekend: string; trackers: string };
+let e2AssertionCount = 0;
+const killedE2Mutations: string[] = [];
+const e2Ok: (value: unknown, message: string) => asserts value = (value, message) => {
+  e2AssertionCount += 1;
+  assert.ok(value, message);
+};
+const e2Equal = (actual: unknown, expected: unknown, message: string): void => {
+  e2AssertionCount += 1;
+  assert.equal(actual, expected, message);
+};
+const e2DoesNotThrow = (callback: () => void, message: string): void => {
+  e2AssertionCount += 1;
+  assert.doesNotThrow(callback, message);
+};
+const e2Kill = (name: string, killed: boolean): void => {
+  e2AssertionCount += 1;
+  assert.equal(killed, true, `E2 mutation killed: ${name}`);
+  killedE2Mutations.push(name);
+};
+const e2ButtonBlock = (input: string, marker: string): string | null => {
+  const markerAt = input.indexOf(marker);
+  if (markerAt === -1) return null;
+  const start = input.lastIndexOf('<button', markerAt);
+  const closeAt = input.indexOf('</button>', markerAt);
+  if (start === -1 || closeAt === -1) return null;
+  return input.slice(start, closeAt + '</button>'.length);
+};
+const e2SourcePasses = (sources: E2Sources): boolean => {
+  const garageSubmit = e2ButtonBlock(sources.garage, 'onClick={handleAdd}');
+  const tireSubmit = e2ButtonBlock(sources.tires, "{editingId ? 'Save Tire' : 'Create Tire'}");
+  const raceSubmit = e2ButtonBlock(sources.raceWeekend, "{wkEditingId ? 'SAVE CHANGES' : 'CREATE RACE DAY'}");
+  const maintenanceSubmit = e2ButtonBlock(sources.trackers, '>Create Job</button>');
+  if (!garageSubmit || !tireSubmit || !raceSubmit || !maintenanceSubmit) return false;
+  return /onClick=\{handleAdd\}/.test(garageSubmit)
+    && /disabled=\{!form\.chassis\.trim\(\)\}/.test(garageSubmit)
+    && /className="flex-1 py-2 bg-primary text-on-primary font-mono text-xs uppercase rounded font-bold disabled:opacity-40"/.test(garageSubmit)
+    && !/\btype=/.test(garageSubmit)
+    && />\s*Create Car\s*<\/button>/.test(garageSubmit)
+    && /cta=\{\{ label: 'Add Car', onClick: focusAddCarForm, icon: 'add' \}\}/.test(sources.garage)
+    && /onClick=\{focusAddCarForm\}[\s\S]*?>\s*<span[^>]*>add<\/span>\s*Add Car\s*<\/button>/.test(sources.garage)
+    && />Add Car<\/h4>/.test(sources.garage)
+    && /<form onSubmit=\{handleSubmit\} className="min-w-0 space-y-3">/.test(sources.tires)
+    && /type="submit"/.test(tireSubmit)
+    && /className="rounded bg-primary px-3 py-2 font-mono text-xs font-bold uppercase text-on-primary"/.test(tireSubmit)
+    && /\{editingId \? 'Save Tire' : 'Create Tire'\}/.test(tireSubmit)
+    && /noCar \? 'Go to Garage' : 'Add Tire'/.test(sources.tires)
+    && /label: noCar \? 'Go to Garage' : 'Add First Tire'/.test(sources.tires)
+    && /onClick: \(\) => noCar \? onGoToGarage\?\.\(\) : openAdd\(\)/.test(sources.tires)
+    && /<form onSubmit=\{handleWeekendFormSubmit\} className="space-y-3">/.test(sources.raceWeekend)
+    && /type="submit"/.test(raceSubmit)
+    && /className="min-h-11 px-4 py-2 bg-primary text-on-primary font-bold uppercase hover:bg-primary-fixed-dim cursor-pointer rounded"/.test(raceSubmit)
+    && /\{wkEditingId \? 'SAVE CHANGES' : 'CREATE RACE DAY'\}/.test(raceSubmit)
+    && /cta=\{\{ label: 'New Race Day', icon: 'add', onClick: \(\) => openWeekendForm\(\) \}\}/.test(sources.raceWeekend)
+    && /onClick=\{\(\) => openWeekendForm\(\)\}[\s\S]*?>\s*\+ New Race Day\s*<\/button>/.test(sources.raceWeekend)
+    && /<form onSubmit=\{handleAddSubmit\} className="bg-surface-container border border-outline-variant rounded-lg p-3 space-y-2">/.test(sources.trackers)
+    && /<input required placeholder="Maintenance item name \*"/.test(sources.trackers)
+    && /type="submit"/.test(maintenanceSubmit)
+    && /className="flex-1 py-2\.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-lg tracking-wider active:opacity-80"/.test(maintenanceSubmit)
+    && />Create Job<\/button>/.test(maintenanceSubmit)
+    && /onClick=\{\(\) => setShowAddForm\(v => !v\)\}[\s\S]*?\{showAddForm \? 'Cancel' : 'Add Maintenance Job'\}/.test(sources.trackers);
+};
+const productionE2Sources: E2Sources = { garage, tires, raceWeekend, trackers };
+const dispatchRaceWeekend = execFileSync(
+  'git',
+  ['show', '8a70dd06eead68bf490417313adbad17ae6037d2:src/components/RaceWeekendView.tsx'],
+  { cwd: root, encoding: 'utf8' },
+).replace(/\r\n/g, '\n');
+
+e2Ok(e2SourcePasses(productionE2Sources), 'E2 real production sources preserve exact opener, submit, edit, handler, type, disabled, and class contracts');
+e2Equal(raceWeekend, dispatchRaceWeekend, 'E2 RaceWeekend real source has zero product diff from dispatch');
+e2Ok(/>\s*Create Car\s*<\/button>/.test(e2ButtonBlock(garage, 'onClick={handleAdd}') ?? ''), 'E2 Garage new-record submit is Create Car');
+e2Ok(/\{editingId \? 'Save Tire' : 'Create Tire'\}/.test(tires), 'E2 Tire create submit is Create Tire and edit submit remains Save Tire');
+e2Ok(/\{wkEditingId \? 'SAVE CHANGES' : 'CREATE RACE DAY'\}/.test(raceWeekend), 'E2 Race Day create and edit submits remain exact');
+e2Ok(/>Create Job<\/button>/.test(trackers), 'E2 Maintenance new-record submit is Create Job');
+e2Ok(/cta=\{\{ label: 'Add Car'[\s\S]*?>\s*<span[^>]*>add<\/span>\s*Add Car\s*<\/button>/.test(garage), 'E2 Garage openers remain Add Car');
+e2Ok(/'Add Tire'[\s\S]*'Add First Tire'/.test(tires), 'E2 Tire openers remain Add Tire and Add First Tire');
+e2Ok(/label: 'New Race Day'[\s\S]*\+ New Race Day/.test(raceWeekend), 'E2 Race Day openers remain New Race Day variants');
+e2Ok(/\{showAddForm \? 'Cancel' : 'Add Maintenance Job'\}/.test(trackers), 'E2 Maintenance opener remains Add Maintenance Job');
+
+const mutateE2 = (name: string, key: keyof E2Sources, before: string, after: string): void => {
+  const original = productionE2Sources[key];
+  const mutated = original.replace(before, after);
+  e2Ok(mutated !== original, `E2 ${name} changes exact production source`);
+  e2DoesNotThrow(() => transformSync(mutated, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), `E2 ${name} remains compile-real TSX`);
+  e2Kill(name, !e2SourcePasses({ ...productionE2Sources, [key]: mutated }));
+};
+mutateE2('garage-submit-reverted-to-opener', 'garage', '\n              Create Car\n', '\n              Add Car\n');
+mutateE2('tire-submit-reverted-to-opener', 'tires', "{editingId ? 'Save Tire' : 'Create Tire'}", "{editingId ? 'Save Tire' : 'Add Tire'}");
+mutateE2('race-day-create-branch-reverted-to-opener', 'raceWeekend', "{wkEditingId ? 'SAVE CHANGES' : 'CREATE RACE DAY'}", "{wkEditingId ? 'SAVE CHANGES' : 'NEW RACE DAY'}");
+mutateE2('maintenance-submit-reverted-to-opener', 'trackers', '>Create Job</button>', '>Add Maintenance Job</button>');
+mutateE2('garage-opener-changed-to-create', 'garage', "cta={{ label: 'Add Car', onClick: focusAddCarForm, icon: 'add' }}", "cta={{ label: 'Create Car', onClick: focusAddCarForm, icon: 'add' }}");
+mutateE2('tire-opener-changed-to-create', 'tires', "noCar ? 'Go to Garage' : 'Add Tire'", "noCar ? 'Go to Garage' : 'Create Tire'");
+mutateE2('race-day-opener-changed-to-create', 'raceWeekend', "label: 'New Race Day', icon: 'add'", "label: 'Create Race Day', icon: 'add'");
+mutateE2('maintenance-opener-changed-to-create', 'trackers', "{showAddForm ? 'Cancel' : 'Add Maintenance Job'}", "{showAddForm ? 'Cancel' : 'Create Job'}");
+mutateE2('tire-edit-save-changed-to-create', 'tires', "{editingId ? 'Save Tire' : 'Create Tire'}", "{editingId ? 'Create Tire' : 'Create Tire'}");
+mutateE2('garage-submit-handler-rewired', 'garage', 'onClick={handleAdd}', 'onClick={focusAddCarForm}');
+mutateE2('garage-submit-disabled-removed', 'garage', '              disabled={!form.chassis.trim()}\n', '');
+mutateE2('tire-submit-type-removed', 'tires', '<button type="submit" className="rounded bg-primary', '<button type="button" className="rounded bg-primary');
+e2Equal(new Set(killedE2Mutations).size, killedE2Mutations.length, 'E2 mutation names are unique');
+e2Equal(killedE2Mutations.length, 12, 'E2 kills twelve independent production mutations');
+console.log(`E2 assertions: ${e2AssertionCount}`);
+console.log(`E2 killed mutations (${killedE2Mutations.length}): ${killedE2Mutations.join(', ')}`);
 
 console.log('Setup touch-target harness: PASS');
