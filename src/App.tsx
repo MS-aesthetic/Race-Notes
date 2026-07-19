@@ -630,7 +630,7 @@ export default function App() {
       restoreToState: () => {},
       commit: () => {
         // A delayed delete must never apply a prior account's intent to new account data.
-        if (userRef.current?.id !== accountId) return;
+        if ((userRef.current?.id ?? null) !== accountId) return;
         const latestCars = carsRef.current;
         const selectedCar = latestCars.find(item => item.id === carId);
         if (!selectedCar) return;

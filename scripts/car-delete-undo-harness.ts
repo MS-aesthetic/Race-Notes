@@ -44,7 +44,8 @@ assert.doesNotMatch(deleteHandler, /car-has-data|sc \+ tc \+ shc/, 'D3 scoped da
 assert.match(app, /'car-delete-queued': \(\{ label \}: InfoCopyContext\) => `\$\{label \|\| 'Car'\} and linked records removed from this device\. Any queued cloud deletion will retry until confirmed\.`/);
 assert.match(deleteHandler, /removeFromState: \(\) => \{\},\s*restoreToState: \(\) => \{\}/s);
 assert.match(deleteHandler, /const accountId = userRef\.current\?\.id \?\? null;/);
-assert.match(deleteHandler, /if \(userRef\.current\?\.id !== accountId\) return;/);
+assert.match(deleteHandler, /if \(\(userRef\.current\?\.id \?\? null\) !== accountId\) return;/);
+assert.match(app, /const queueSharedCloudDelete = \([\s\S]*?if \(!accountId\) return;[\s\S]*?enqueuePendingTeamDelete/);
 assert.doesNotMatch(deleteHandler, /const ownerId =|const generation =|authGenerationRef\.current !==|syncOwnerIdRef\.current !==/);
 assert.match(deleteHandler, /const latestCars = carsRef\.current;/);
 assert.doesNotMatch(deleteHandler, /handleSaveCars|markSavedDirty|flashSaved/, 'D3 bypasses dirty save adapters');
@@ -421,7 +422,15 @@ type D3Run = {
 };
 
 const d3Car = (id: string) => ({ id, chassis: id, carType: 'Modified', updatedAt: `time-${id}` });
-const runD3Cascade = (sourceText = app, activeCarId = 'car-delete', replacementCars = [d3Car('car-next'), d3Car('car-third')]): D3Run => {
+type D3Identity = { accountId: string | null; syncOwnerId: string | null };
+const signedInD3Identity: D3Identity = { accountId: 'account-a', syncOwnerId: 'owner-a' };
+const signedOutD3Identity: D3Identity = { accountId: null, syncOwnerId: null };
+const runD3Cascade = (
+  sourceText = app,
+  activeCarId = 'car-delete',
+  replacementCars = [d3Car('car-next'), d3Car('car-third')],
+  identity: D3Identity = signedInD3Identity,
+): D3Run => {
   const target = d3Car('car-delete');
   const setupDelete = { id: 'setup-delete', carId: 'car-delete', chassis: 'Delete', date: 'now', lf: {}, rf: {}, lr: {}, rr: {} };
   const setupNext = { id: 'setup-next', carId: 'car-next', chassis: 'Next', date: 'later', sourceSetupId: 'setup-delete', lf: {}, rf: {}, lr: {}, rr: {} };
@@ -433,15 +442,15 @@ const runD3Cascade = (sourceText = app, activeCarId = 'car-delete', replacementC
   const otherComponent = { id: 'component-other', scope: 'car', carId: 'car-next', name: 'Other' };
   const refs: Record<string, { current: any }> = {
     carsRef: { current: [target, ...replacementCars] },
-    userRef: { current: { id: 'account-a' } },
+    userRef: { current: identity.accountId ? { id: identity.accountId } : null },
     savedSetupsRef: { current: [setupDelete, setupNext, setupThird] },
     tireInventoryRef: { current: [{ id: 'tire-delete', carId: 'car-delete' }, { id: 'tire-keep', carId: 'car-next' }] },
     shockSessionsRef: { current: [{ id: 'shock-delete', carId: 'car-delete' }, { id: 'shock-keep', carId: 'car-next' }] },
     maintenanceRef: { current: [deleteComponent, rigComponent, otherComponent] },
     maintenanceLogsRef: { current: [{ id: 'log-delete', componentId: 'component-delete' }, { id: 'log-rig', componentId: 'component-rig' }, { id: 'log-other', componentId: 'component-other' }] },
     weekendsRef: { current: [weekend] },
-    syncOwnerIdRef: { current: 'owner-a' },
-    teamRef: { current: { id: 'team-a' } },
+    syncOwnerIdRef: { current: identity.syncOwnerId },
+    teamRef: { current: identity.accountId ? { id: 'team-a' } : null },
     activeCarIdRef: { current: activeCarId },
     syncStatusRef: { current: null },
   };
@@ -467,7 +476,10 @@ const runD3Cascade = (sourceText = app, activeCarId = 'car-delete', replacementC
   const handler = make({
     ...refs,
     carUndo: { requestDelete: (value: D3DeleteDescriptor) => { descriptor = value; } },
-    queueSharedCloudDelete: (table: string, id: string, solo: boolean, account: string | null) => { sharedQueues.push([table, id, solo, account]); },
+    queueSharedCloudDelete: (table: string, id: string, solo: boolean, account: string | null) => {
+      if (!account) return;
+      sharedQueues.push([table, id, solo, account]);
+    },
     enqueuePendingPersonalTireDelete: (_target: unknown, entry: { accountId: string; tireId: string }) => { tireQueues.push(entry); },
     setDeleteReplayVersion: (updater: (value: number) => number) => { states.replay = updater(Number(states.replay ?? 0)); },
     setSavedSetups: setState('setups'), setTireInventory: setState('tires'), setShockSessions: setState('shocks'),
@@ -535,6 +547,62 @@ d3Equal(noReplacementD3.states.activeCar, null, 'D3 no-replacement clears active
 d3Equal((noReplacementD3.states.setup as any).id, 'initial-safe', 'D3 no-replacement resets safe setup');
 d3Ok(!noReplacementD3.storage.has('race_notes_active_car') && !noReplacementD3.storage.has('race_notes_setup'), 'D3 no-replacement removes stale selection storage');
 
+const signedOutActiveD3 = runD3Cascade(app, 'car-delete', [d3Car('car-next'), d3Car('car-third')], signedOutD3Identity);
+d3Deep(signedOutActiveD3.refs.userRef.current, null, 'D3 signed-out fixture has null current user');
+d3Equal(signedOutActiveD3.refs.syncOwnerIdRef.current, null, 'D3 signed-out fixture has null sync owner');
+signedOutActiveD3.commit();
+d3Deep(signedOutActiveD3.sharedQueues, [], 'D3 signed-out active cascade creates zero shared queues or null-owned intents');
+d3Deep(signedOutActiveD3.tireQueues, [], 'D3 signed-out active cascade creates zero personal tire queues');
+d3Deep(signedOutActiveD3.pushes, [], 'D3 signed-out active cascade performs zero cloud pushes');
+d3Ok(!('replay' in signedOutActiveD3.states), 'D3 signed-out active cascade does not arm cloud replay');
+d3Deep((signedOutActiveD3.states.setups as Array<any>).map(item => item.id), ['setup-next', 'setup-third'], 'D3 signed-out active cascade removes only target setups');
+d3Deep((signedOutActiveD3.states.tires as Array<any>).map(item => item.id), ['tire-keep'], 'D3 signed-out active cascade removes only target tires');
+d3Deep((signedOutActiveD3.states.shocks as Array<any>).map(item => item.id), ['shock-keep'], 'D3 signed-out active cascade removes only target shocks');
+d3Deep((signedOutActiveD3.states.maintenance as Array<any>).map(item => item.id), ['component-rig', 'component-other'], 'D3 signed-out active cascade preserves rig and unrelated maintenance');
+d3Deep((signedOutActiveD3.states.logs as Array<any>).map(item => item.id), ['log-rig', 'log-other'], 'D3 signed-out active cascade preserves rig and unrelated logs');
+d3Deep((signedOutActiveD3.states.cars as Array<any>).map(item => item.id), ['car-next', 'car-third'], 'D3 signed-out active cascade removes only target car');
+d3Deep(signedOutActiveD3.refs.savedSetupsRef.current.map((item: any) => item.id), ['setup-next', 'setup-third'], 'D3 signed-out active cascade updates canonical setup ref');
+d3Deep(signedOutActiveD3.refs.tireInventoryRef.current.map((item: any) => item.id), ['tire-keep'], 'D3 signed-out active cascade updates canonical tire ref');
+d3Deep(signedOutActiveD3.refs.shockSessionsRef.current.map((item: any) => item.id), ['shock-keep'], 'D3 signed-out active cascade updates canonical shock ref');
+d3Deep(signedOutActiveD3.refs.maintenanceRef.current.map((item: any) => item.id), ['component-rig', 'component-other'], 'D3 signed-out active cascade updates canonical maintenance ref');
+d3Deep(signedOutActiveD3.refs.maintenanceLogsRef.current.map((item: any) => item.id), ['log-rig', 'log-other'], 'D3 signed-out active cascade updates canonical maintenance-log ref');
+d3Deep(signedOutActiveD3.refs.carsRef.current.map((item: any) => item.id), ['car-next', 'car-third'], 'D3 signed-out active cascade updates canonical car ref');
+d3Equal(bytes((signedOutActiveD3.states.weekends as Array<any>)[0].sessions), signedOutActiveD3.sessionsBefore, 'D3 signed-out active cascade preserves Race Day session bytes');
+d3Deep(['setupId', 'sourceSetupId', 'baselineSetupId', 'activeSetupId', 'finalSetupId'].map(key => (signedOutActiveD3.states.weekends as Array<any>)[0][key]), [undefined, undefined, undefined, undefined, undefined], 'D3 signed-out active cascade clears only dangling Race Day pointers');
+d3Equal((signedOutActiveD3.states.weekends as Array<any>)[0].setupName, 'keep', 'D3 signed-out active cascade preserves unrelated Race Day bytes');
+d3Equal(signedOutActiveD3.states.activeCar, 'car-next', 'D3 signed-out active cascade selects safe replacement car');
+d3Equal(signedOutActiveD3.refs.activeCarIdRef.current, 'car-next', 'D3 signed-out active cascade updates canonical active-car ref');
+d3Equal((signedOutActiveD3.states.setup as any).id, 'setup-next', 'D3 signed-out active cascade selects safe replacement setup');
+d3Equal(signedOutActiveD3.storage.get('race_notes_active_car'), 'car-next', 'D3 signed-out active cascade persists replacement car');
+d3Equal(JSON.parse(signedOutActiveD3.storage.get('race_notes_setup')!).id, 'setup-next', 'D3 signed-out active cascade persists replacement setup');
+d3Deep(JSON.parse(signedOutActiveD3.storage.get('race_notes_cars')!).map((item: any) => item.id), ['car-next', 'car-third'], 'D3 signed-out active cascade persists retained cars');
+
+const signedOutNonActiveD3 = runD3Cascade(app, 'car-next', [d3Car('car-next'), d3Car('car-third')], signedOutD3Identity);
+const signedOutNonActiveSetupBytes = signedOutNonActiveD3.storage.get('race_notes_setup');
+signedOutNonActiveD3.commit();
+d3Deep(signedOutNonActiveD3.sharedQueues, [], 'D3 signed-out non-active cascade creates zero shared queues');
+d3Deep(signedOutNonActiveD3.tireQueues, [], 'D3 signed-out non-active cascade creates zero tire queues');
+d3Deep(signedOutNonActiveD3.pushes, [], 'D3 signed-out non-active cascade performs zero cloud pushes');
+d3Equal(signedOutNonActiveD3.storage.get('race_notes_active_car'), 'car-next', 'D3 signed-out non-active cascade preserves active car storage');
+d3Equal(signedOutNonActiveD3.storage.get('race_notes_setup'), signedOutNonActiveSetupBytes, 'D3 signed-out non-active cascade preserves active setup bytes');
+d3Ok(!('activeCar' in signedOutNonActiveD3.states) && !('setup' in signedOutNonActiveD3.states), 'D3 signed-out non-active cascade performs no selection state write');
+d3Equal(signedOutNonActiveD3.refs.activeCarIdRef.current, 'car-next', 'D3 signed-out non-active cascade preserves canonical active-car ref');
+d3Deep((signedOutNonActiveD3.states.cars as Array<any>).map(item => item.id), ['car-next', 'car-third'], 'D3 signed-out non-active cascade still removes target car locally');
+d3Deep((signedOutNonActiveD3.states.setups as Array<any>).map(item => item.id), ['setup-next', 'setup-third'], 'D3 signed-out non-active cascade still removes target setup locally');
+d3Equal(bytes((signedOutNonActiveD3.states.weekends as Array<any>)[0].sessions), signedOutNonActiveD3.sessionsBefore, 'D3 signed-out non-active cascade preserves Race Day session bytes');
+
+const signedOutLastD3 = runD3Cascade(app, 'car-delete', [], signedOutD3Identity);
+signedOutLastD3.commit();
+d3Deep(signedOutLastD3.sharedQueues, [], 'D3 signed-out last-car cascade creates zero shared queues');
+d3Deep(signedOutLastD3.tireQueues, [], 'D3 signed-out last-car cascade creates zero tire queues');
+d3Deep(signedOutLastD3.pushes, [], 'D3 signed-out last-car cascade performs zero cloud pushes');
+d3Equal(signedOutLastD3.states.activeCar, null, 'D3 signed-out last-car cascade clears active car safely');
+d3Equal(signedOutLastD3.refs.activeCarIdRef.current, null, 'D3 signed-out last-car cascade clears canonical active-car ref');
+d3Equal((signedOutLastD3.states.setup as any).id, 'initial-safe', 'D3 signed-out last-car cascade resets safe setup');
+d3Ok(!signedOutLastD3.storage.has('race_notes_active_car') && !signedOutLastD3.storage.has('race_notes_setup'), 'D3 signed-out last-car cascade removes stale selection storage');
+d3Deep((signedOutLastD3.states.cars as Array<any>).map(item => item.id), [], 'D3 signed-out last-car cascade persists no dangling car');
+d3Equal(bytes((signedOutLastD3.states.weekends as Array<any>)[0].sessions), signedOutLastD3.sessionsBefore, 'D3 signed-out last-car cascade preserves Race Day session bytes');
+
 const replacementWithoutSetupD3 = runD3Cascade(app, 'car-delete', [d3Car('car-empty')]);
 replacementWithoutSetupD3.commit();
 d3Equal(replacementWithoutSetupD3.states.activeCar, 'car-empty', 'D3 replacement without setup keeps first surviving car');
@@ -578,7 +646,8 @@ const d3Mutations: Array<[string, string, string]> = [
   ['personal-tire-queue-bypassed', "removedTires.forEach(item => enqueuePendingPersonalTireDelete(window.localStorage, {\n            accountId,\n            tireId: item.id,\n            queuedAt: new Date().toISOString(),\n          }));", "removedTires.forEach(item => queueSharedCloudDelete('tire_inventory', item.id, false, accountId));"],
   ['rig-maintenance-deleted', 'const retainedMaintenance = latestMaintenance.filter(item => !removedComponentIds.has(item.id));', "const retainedMaintenance = latestMaintenance.filter(item => item.scope !== 'rig' && !removedComponentIds.has(item.id));"],
   ['latest-ref-bypassed', 'const latestTires = tireInventoryRef.current;', 'const latestTires = tireInventoryRef.current.slice(1);'],
-  ['account-guard-removed', 'if (userRef.current?.id !== accountId) return;', 'if (false) return;'],
+  ['account-guard-removed', 'if ((userRef.current?.id ?? null) !== accountId) return;', 'if (false) return;'],
+  ['signed-out-null-guard-regression', 'if ((userRef.current?.id ?? null) !== accountId) return;', 'if (userRef.current?.id !== accountId) return;'],
   ['replacement-order-wrong', 'const nextCar = retainedCars[0] ?? null;', 'const nextCar = retainedCars.at(-1) ?? null;'],
   ['non-active-selection-overwritten', 'if (activeCarIdRef.current === carId) {', 'if (true) {'],
   ['session-history-mutated', 'const repaired = { ...weekend };', 'const repaired = { ...weekend, sessions: [] };'],
@@ -635,6 +704,13 @@ for (const [name, before, after] of d3Mutations) {
     terminalRace.refs.syncStatusRef.current = 'sync-error';
     terminalRace.commit();
     assert.deepEqual(terminalRace.infos, []);
+    const signedOutRace = runD3Cascade(mutated, 'car-delete', [d3Car('car-next'), d3Car('car-third')], signedOutD3Identity);
+    signedOutRace.commit();
+    assert.equal(signedOutRace.states.activeCar, 'car-next');
+    assert.equal((signedOutRace.states.setup as any).id, 'setup-next');
+    assert.deepEqual(signedOutRace.sharedQueues, []);
+    assert.deepEqual(signedOutRace.tireQueues, []);
+    assert.deepEqual(signedOutRace.pushes, []);
   } catch {
     failed = true;
   }
