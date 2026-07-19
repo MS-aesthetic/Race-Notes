@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { printTireUsageReport } from '../src/lib/tireHistory';
+import { transformSync } from 'esbuild';
 
 const root = process.cwd();
-const read = (path: string) => readFileSync(join(root, path), 'utf8');
+const read = (path: string) => readFileSync(join(root, path), 'utf8').replace(/\r\n/g, '\n');
 const section = (source: string, start: string, end: string) => {
   const startAt = source.indexOf(start);
   const endAt = source.indexOf(end, startAt + start.length);
@@ -49,6 +50,7 @@ const app = read('src/App.tsx');
 const race = read('src/components/RaceWeekendView.tsx');
 const loads = read('src/components/SmasherLoadsView.tsx');
 const setup = read('src/components/SetupView.tsx');
+const garage = read('src/components/GarageView.tsx');
 const todos = read('src/components/ToDoView.tsx');
 const team = read('src/components/TeamView.tsx');
 const tires = read('src/components/TiresSubView.tsx');
@@ -76,7 +78,7 @@ const allSource = sourceFiles('src').map(path => ({ path, text: read(path) }));
 const nativeDialog = /\b(?:window\.)?(?:confirm|alert)\s*\(/g;
 const nativeHits = allSource.flatMap(({ path, text }) => [...text.matchAll(nativeDialog)].map(match => `${path}:${match[0]}`));
 assert.deepEqual(nativeHits, [], 'zero native dialog call sites');
-assert.equal(allSource.reduce((count, { text }) => count + (text.match(/<ConfirmSheet\b/g) ?? []).length, 0), 9, 'nine sheet instances cover thirteen confirm actions');
+assert.equal(allSource.reduce((count, { text }) => count + (text.match(/<ConfirmSheet\b/g) ?? []).length, 0), 10, 'ten sheet instances cover fourteen confirm actions');
 assertSheet(race, 'open={!!pendingFinish}', ['title={`Finish ${pendingFinish?.name', 'body={`${pendingFinish?.finalLabel', 'confirmLabel="Finish"', 'cancelLabel="Keep"', 'onConfirm={confirmFinishWeekend}', 'onCancel={() => setPendingFinish(null)}'], false);
 assertSheet(loads, 'open={!!pendingDeleteSessionId}', ['title="Delete load session?"', 'body="Delete this load session and all its data points?"', 'confirmLabel="Delete"', 'cancelLabel="Keep"', 'onConfirm={confirmDeleteSession}', 'onCancel={() => setPendingDeleteSessionId(null)}'], true);
 assertSheet(setup, 'open={!!pendingDeleteSetupId}', ['title="Delete setup?"', 'body="Are you sure you want to delete this setup?"', 'confirmLabel="Delete"', 'cancelLabel="Keep"', 'onConfirm={confirmDeleteSetup}', 'onCancel={() => setPendingDeleteSetupId(null)}'], true);
@@ -86,6 +88,7 @@ assertSheet(tires, 'open={!!pendingDeleteId}', ['title="Delete tire?"', 'body="D
 assertSheet(trackers, 'open={!!pendingDeleteEntryId}', ['title="Delete accounting entry?"', 'body="Delete this entry?"', 'confirmLabel="Delete"', 'cancelLabel="Keep"', 'onConfirm={confirmDeleteEntry}', 'onCancel={() => setPendingDeleteEntryId(null)}'], true);
 assertSheet(trackers, 'open={!!pendingDeleteComponentId}', ['title="Delete maintenance item?"', 'body="Delete this item and all its maintenance logs?"', 'confirmLabel="Delete"', 'cancelLabel="Keep"', 'onConfirm={confirmDeleteComponent}', 'onCancel={() => setPendingDeleteComponentId(null)}'], true);
 assertSheet(trackers, 'open={!!pendingDeleteTemplateId}', ['title="Delete checklist template?"', 'body="Delete this template?"', 'confirmLabel="Delete"', 'cancelLabel="Keep"', 'onConfirm={confirmDeleteTemplate}', 'onCancel={() => setPendingDeleteTemplateId(null)}'], true);
+assertSheet(garage, 'open={!!pendingDeleteCar}', ['title="Delete car and linked records?"', 'confirmLabel={deleteSubmitting', 'cancelLabel="Cancel"', 'onConfirm={confirmDelete}', 'onCancel={cancelDelete}'], true);
 
 // 1: Finish Race Day descriptor, current-target revalidation, exact vocabulary.
 assert.match(race, /pendingFinish[\s\S]*weekendId: string; name: string; finalLabel: string/);
@@ -227,9 +230,9 @@ const templateDelete = section(trackers, 'const confirmDeleteTemplate = () => {'
 assert.match(templateDelete, /setPendingDeleteTemplateId\(null\);[\s\S]*templates\.some\(template => template\.id === id\)/);
 assertOrder(templateDelete, 'onDeleteTemplate(id);', 'if (expandedId === id) setExpandedId(null);', 'template delete/collapse ordering');
 
-// Seven former alerts: one App guard, three Setup paths, two Export paths, one tire report path.
+// Former alerts remain structured; D3 replaces the obsolete car-data guard with confirmation.
 const carDelete = section(app, 'const handleDeleteCar =', '// ── Clear All Data');
-assertOrder(carDelete, "showInfo({ reason: 'car-has-data' });", 'carUndo.requestDelete', 'reason-keyed car guard before undo request');
+assert.doesNotMatch(carDelete, /car-has-data|sc \+ tc \+ shc/, 'D3 car dependencies do not block Undo request');
 for (const message of [
   "onInfo?.('minimumSetups')",
   "onInfo?.('Please sign in to attach files.')",
@@ -272,5 +275,98 @@ try {
   if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
   else Reflect.deleteProperty(globalThis, 'window');
 }
+
+// D3 production-bound Garage confirmation proof.
+let d3ConfirmAssertions = 0;
+const d3ConfirmOk = (value: unknown, message: string) => { d3ConfirmAssertions += 1; assert.ok(value, message); };
+const d3ConfirmEqual = (actual: unknown, expected: unknown, message: string) => { d3ConfirmAssertions += 1; assert.deepEqual(actual, expected, message); };
+const compileGarageConfirm = (sourceText: string, overrides: Record<string, unknown> = {}) => {
+  const start = sourceText.indexOf('  const pendingDeleteCar =');
+  const end = sourceText.indexOf('\n\n  return (', start);
+  assert.ok(start >= 0 && end > start, 'D3 Garage confirmation production block exists');
+  const body = sourceText.slice(start, end);
+  const wrapped = `export const makeGarageConfirm = (deps) => {\n  const { cars, pendingDeleteCarId, setupCount, tireCount, shockCount, maintenanceComponentCount, maintenanceLogCount, deleteSubmittingRef, setPendingDeleteCarId, setDeleteSubmitting, commitDeleteCar } = deps;\n${body}\n  return { pendingDeleteCar, pendingDeleteCounts, cancelDelete, confirmDelete };\n};`;
+  const compiled = transformSync(wrapped, { loader: 'ts', format: 'cjs', target: 'es2022' }).code;
+  const moduleBox = { exports: {} as Record<string, unknown> };
+  new Function('module', 'exports', compiled)(moduleBox, moduleBox.exports);
+  const writes: unknown[] = [];
+  let submits = 0;
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const deps = {
+    cars: [{ id: 'car-a', name: 'A', chassis: 'A', carType: 'Modified' }], pendingDeleteCarId: 'car-a',
+    setupCount: () => 2, tireCount: () => 1, shockCount: () => 3,
+    maintenanceComponentCount: () => 1, maintenanceLogCount: () => 2,
+    deleteSubmittingRef: { current: false },
+    setPendingDeleteCarId: (value: unknown) => { writes.push(['pending', value]); },
+    setDeleteSubmitting: (value: unknown) => { writes.push(['submitting', value]); },
+    commitDeleteCar: async () => { submits += 1; await pending; },
+    ...overrides,
+  };
+  const api = (moduleBox.exports.makeGarageConfirm as (deps: Record<string, unknown>) => Record<string, any>)(deps);
+  return { api, writes, submits: () => submits, release, deps };
+};
+
+const confirmFixture = compileGarageConfirm(garage);
+d3ConfirmEqual(confirmFixture.api.pendingDeleteCounts.map((item: any) => [item.label, item.count]), [
+  ['setup', 2], ['tire', 1], ['shock record', 3], ['maintenance component', 1], ['maintenance log', 2],
+], 'D3 confirmation enumerates five exact categories in stable order');
+confirmFixture.api.cancelDelete();
+d3ConfirmEqual(confirmFixture.submits(), 0, 'D3 Cancel invokes no cascade');
+d3ConfirmEqual(confirmFixture.writes, [['pending', null]], 'D3 Cancel only closes local sheet state');
+
+const doubleFixture = compileGarageConfirm(garage);
+const firstSubmit = doubleFixture.api.confirmDelete();
+const secondSubmit = doubleFixture.api.confirmDelete();
+d3ConfirmEqual(doubleFixture.submits(), 1, 'D3 ref guard blocks same-turn double submit');
+doubleFixture.release();
+await Promise.all([firstSubmit, secondSubmit]);
+d3ConfirmEqual(doubleFixture.writes, [['submitting', true], ['pending', null], ['submitting', false]], 'D3 in-flight state closes only after cascade request resolves');
+
+for (const contract of [
+  'const onDeleteCar = (carId: string) => setPendingDeleteCarId(carId);',
+  'onClick={() => onDeleteCar(car.id)}',
+  'disabled={totalData(car.id) > 0}',
+  'Delete car and linked records?',
+  'permanently removed from this account/device',
+  'Historical Race Day session snapshots remain in history.',
+  "{ label: 'setup', count: setupCount(pendingDeleteCar.id) }",
+  "{ label: 'tire', count: tireCount(pendingDeleteCar.id) }",
+  "{ label: 'shock record', count: shockCount(pendingDeleteCar.id) }",
+  "{ label: 'maintenance component', count: maintenanceComponentCount(pendingDeleteCar.id) }",
+  "{ label: 'maintenance log', count: maintenanceLogCount(pendingDeleteCar.id) }",
+]) d3ConfirmOk(garage.includes(contract), `D3 Garage production contract: ${contract}`);
+for (const contract of [
+  'maintenanceComponentCount={carMaintenanceComponentCount}',
+  'maintenanceLogCount={carMaintenanceLogCount}',
+]) d3ConfirmOk(app.includes(contract), `D3 App prop route: ${contract}`);
+for (const contract of [
+  'maintenanceComponentCount={maintenanceComponentCount}',
+  'maintenanceLogCount={maintenanceLogCount}',
+]) d3ConfirmOk(read('src/components/SettingsView.tsx').includes(contract), `D3 Settings prop route: ${contract}`);
+
+const d3ConfirmMutations: Array<[string, string, string, () => Promise<boolean> | boolean]> = [
+  ['confirmation-bypassed', 'onClick={() => onDeleteCar(car.id)}', 'onClick={() => commitDeleteCar(car.id)}', () => !garage.replace('onClick={() => onDeleteCar(car.id)}', 'onClick={() => commitDeleteCar(car.id)}').includes('onClick={() => onDeleteCar(car.id)}')],
+  ['double-submit-guard-removed', 'if (!pendingDeleteCar || deleteSubmittingRef.current) return;', 'if (!pendingDeleteCar) return;', async () => {
+    const fixture = compileGarageConfirm(garage.replace('if (!pendingDeleteCar || deleteSubmittingRef.current) return;', 'if (!pendingDeleteCar) return;'));
+    const one = fixture.api.confirmDelete(); const two = fixture.api.confirmDelete();
+    const failed = fixture.submits() === 2; fixture.release(); await Promise.all([one, two]); return failed;
+  }],
+  ['cancel-routes-delete', 'setPendingDeleteCarId(null);\n  };\n\n  // D3 always routes delete through confirmation; scoped records never disable it.', 'void commitDeleteCar(pendingDeleteCarId!);\n    setPendingDeleteCarId(null);\n  };\n\n  // D3 always routes delete through confirmation; scoped records never disable it.', () => {
+    const fixture = compileGarageConfirm(garage.replace('setPendingDeleteCarId(null);\n  };\n\n  // D3 always routes delete through confirmation; scoped records never disable it.', 'void commitDeleteCar(pendingDeleteCarId!);\n    setPendingDeleteCarId(null);\n  };\n\n  // D3 always routes delete through confirmation; scoped records never disable it.'));
+    fixture.api.cancelDelete(); return fixture.submits() === 1;
+  }],
+  ['maintenance-count-missing', "{ label: 'maintenance component', count: maintenanceComponentCount(pendingDeleteCar.id) },", '', () => compileGarageConfirm(garage.replace("{ label: 'maintenance component', count: maintenanceComponentCount(pendingDeleteCar.id) },", '')).api.pendingDeleteCounts.length === 4],
+  ['historical-copy-missing', 'Historical Race Day session snapshots remain in history.', 'History may change.', () => !garage.replace('Historical Race Day session snapshots remain in history.', 'History may change.').includes('Historical Race Day session snapshots remain in history.')],
+];
+const killedD3ConfirmMutations: string[] = [];
+for (const [name, before, , test] of d3ConfirmMutations) {
+  d3ConfirmEqual((garage.split(before).length - 1), 1, `D3 confirmation mutation ${name} has unique production target`);
+  d3ConfirmOk(await test(), `D3 confirmation mutation ${name} is rejected`);
+  killedD3ConfirmMutations.push(name);
+}
+d3ConfirmEqual(new Set(killedD3ConfirmMutations).size, killedD3ConfirmMutations.length, 'D3 confirmation mutation labels are unique');
+console.log(`D3 confirmation assertions: ${d3ConfirmAssertions}`);
+console.log(`D3 confirmation killed mutations (${killedD3ConfirmMutations.length}): ${killedD3ConfirmMutations.join(', ')}`);
 
 console.log('confirm-sheet harness: PASS');

@@ -1493,4 +1493,68 @@ c5Ok(!setupSource.includes('Setup #${'), 'C5 final product contains no numbered 
 console.log(`C5 assertions: ${c5AssertionCount}`);
 console.log(`C5 killed mutations: ${killedC5Mutations.join(', ')}`);
 
+// D3: canonical disabled-delete reasons and the separate Garage route.
+let d3SetupAssertions = 0;
+const killedD3SetupMutations: string[] = [];
+const d3SetupOk = (value: unknown, message: string) => { d3SetupAssertions += 1; assert.ok(value, message); };
+const d3SetupEqual = (actual: unknown, expected: unknown, message: string) => { d3SetupAssertions += 1; assert.deepEqual(actual, expected, message); };
+const compileSetupDeleteReason = (source: string): RuntimeExport => {
+  const start = source.indexOf('const setupDeleteReason =');
+  const end = source.indexOf('\n\n// ─── Helpers', start);
+  assert.ok(start >= 0 && end > start, 'D3 production setup-delete reason exists');
+  return compileInlineExport(source.slice(start, end).replace('const setupDeleteReason =', 'export const setupDeleteReason ='), 'setupDeleteReason', {});
+};
+const reason = compileSetupDeleteReason(setupSource);
+d3SetupEqual(reason('historical-role'), 'Historical setup snapshots cannot be deleted individually.', 'D3 historical-role reason is exact');
+d3SetupEqual(reason('locked'), 'Locked setups cannot be deleted individually.', 'D3 locked reason is exact');
+d3SetupEqual(reason('finished-weekend'), 'Setups from finished Race Days cannot be deleted individually.', 'D3 finished-weekend reason is exact');
+d3SetupEqual(reason('in-play-elsewhere'), 'The active Race Day setup is managed from Race Day.', 'D3 in-play reason remains distinct and does not alter canonical deletability');
+d3SetupEqual(getSetupEditability(c1InPlay, c1Weekends, 'in-play').deletable, true, 'D3 preserves canonical in-play deletability');
+for (const contract of [
+  "title={editability.deletable ? 'Delete setup permanently' : setupDeleteReason(editability.reason)}",
+  'aria-describedby={!editability.deletable ? `setup-delete-reason-${setupItem.id}` : undefined}',
+  'disabled={!editability.deletable}',
+  'id={`setup-delete-reason-${setupItem.id}`}',
+  '{setupDeleteReason(editability.reason)}',
+  'onClick={() => onGoToGarage?.()}',
+  'Manage car in Garage',
+  'min-h-11 rounded border',
+]) d3SetupOk(setupSource.includes(contract), `D3 Setup production contract: ${contract}`);
+let garageRoutes = 0;
+const garageAction = compileInlineExport('export const routeToGarage = () => onGoToGarage?.();', 'routeToGarage', { onGoToGarage: () => { garageRoutes += 1; } });
+garageAction();
+d3SetupEqual(garageRoutes, 1, 'D3 separate production-equivalent Garage action routes exactly once');
+
+const d3SetupSourcePasses = (source: string): boolean => {
+  const compiledReason = compileSetupDeleteReason(source);
+  return compiledReason('historical-role') === 'Historical setup snapshots cannot be deleted individually.'
+    && compiledReason('locked') === 'Locked setups cannot be deleted individually.'
+    && compiledReason('finished-weekend') === 'Setups from finished Race Days cannot be deleted individually.'
+    && source.includes("title={editability.deletable ? 'Delete setup permanently' : setupDeleteReason(editability.reason)}")
+    && source.includes('aria-describedby={!editability.deletable ? `setup-delete-reason-${setupItem.id}` : undefined}')
+    && source.includes('disabled={!editability.deletable}')
+    && source.includes('id={`setup-delete-reason-${setupItem.id}`}')
+    && source.includes('onClick={() => onGoToGarage?.()}')
+    && source.includes('Manage car in Garage');
+};
+const d3SetupMutations: Array<[string, string, string]> = [
+  ['historical-reason-wrong', 'Historical setup snapshots cannot be deleted individually.', 'Historical setup can be deleted.'],
+  ['locked-reason-wrong', 'Locked setups cannot be deleted individually.', 'Locked setup.'],
+  ['accessible-title-removed', "title={editability.deletable ? 'Delete setup permanently' : setupDeleteReason(editability.reason)}", 'title="Delete setup permanently"'],
+  ['reason-description-removed', 'aria-describedby={!editability.deletable ? `setup-delete-reason-${setupItem.id}` : undefined}', 'aria-describedby={undefined}'],
+  ['garage-route-removed', 'onClick={() => onGoToGarage?.()}', 'onClick={() => undefined}'],
+  ['canonical-disable-bypassed', 'disabled={!editability.deletable}', 'disabled={false}'],
+];
+for (const [name, before, after] of d3SetupMutations) {
+  d3SetupEqual(setupSource.split(before).length - 1, 1, `D3 setup mutation ${name} has unique production target`);
+  const mutated = setupSource.replace(before, after);
+  let rejected = false;
+  try { rejected = !d3SetupSourcePasses(mutated); } catch { rejected = true; }
+  d3SetupOk(rejected, `D3 setup mutation ${name} is rejected`);
+  killedD3SetupMutations.push(name);
+}
+d3SetupEqual(new Set(killedD3SetupMutations).size, killedD3SetupMutations.length, 'D3 setup mutation labels are unique');
+console.log(`D3 setup assertions: ${d3SetupAssertions}`);
+console.log(`D3 setup killed mutations (${killedD3SetupMutations.length}): ${killedD3SetupMutations.join(', ')}`);
+
 console.log('CHUNK5_SETUP_HARNESS PASS');

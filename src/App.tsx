@@ -163,6 +163,7 @@ const INFO_COPY = {
   minimumSetups: () => SETUP_NOTICE_COPY.minimumSetups,
   'car-switch': ({ label }: InfoCopyContext) => `Now viewing ${label || 'selected car'} — setups, runs & trackers switched.`,
   'car-has-data': () => 'Reassign or delete this car\'s data first.',
+  'car-delete-queued': ({ label }: InfoCopyContext) => `${label || 'Car'} and linked records removed from this device. Any queued cloud deletion will retry until confirmed.`,
   'active-weekend': ({ name }: InfoCopyContext) => `Active: ${name || 'Race Day'}`,
   'pressure-source': ({ label }: InfoCopyContext) => `Pressures carried from ${label || 'selected setup'}`,
   'finished-weekend-read-only': () => 'Finished Race Days are view-only.',
@@ -319,6 +320,8 @@ export default function App() {
     const saved = localStorage.getItem('race_notes_tires');
     return saved ? JSON.parse(saved) : [];
   });
+  const tireInventoryRef = useRef(tireInventory);
+  useEffect(() => { tireInventoryRef.current = tireInventory; }, [tireInventory]);
 
   const handleSaveTires = (updated: TireInventoryItem[]) => {
     setTireInventory(updated);
@@ -365,9 +368,13 @@ export default function App() {
   const [maintenance, setMaintenance] = useState<MaintenanceComponent[]>(() => {
     try { const s = localStorage.getItem('race_notes_maintenance'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
+  const maintenanceRef = useRef(maintenance);
+  useEffect(() => { maintenanceRef.current = maintenance; }, [maintenance]);
   const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>(() => {
     try { const s = localStorage.getItem('race_notes_maintenance_logs'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
+  const maintenanceLogsRef = useRef(maintenanceLogs);
+  useEffect(() => { maintenanceLogsRef.current = maintenanceLogs; }, [maintenanceLogs]);
   const [trackersSubTab, setTrackersSubTab] = useState<'checklist' | 'service' | 'templates' | 'accounting'>('checklist');
 
   // Lifted smasher/shock-session state (Decision 1: cloud sync)
@@ -375,6 +382,8 @@ export default function App() {
     try { const s = localStorage.getItem('race_notes_shock_graphs'); return s ? JSON.parse(s) : INITIAL_SHOCK_SESSIONS; }
     catch { return INITIAL_SHOCK_SESSIONS; }
   });
+  const shockSessionsRef = useRef(shockSessions);
+  useEffect(() => { shockSessionsRef.current = shockSessions; }, [shockSessions]);
 
   const activeCar = cars.find(c => c.id === activeCarId) ?? null;
   const pendingCarId = carUndo.pending?.id ?? null;
@@ -608,13 +617,6 @@ export default function App() {
   };
 
   const handleDeleteCar = (carId: string) => {
-    const sc = savedSetups.filter(s => s.carId === carId).length;
-    const tc = tireInventory.filter(t => t.carId === carId).length;
-    const shc = shockSessions.filter(s => s.carId === carId).length;
-    if (sc + tc + shc > 0) {
-      showInfo({ reason: 'car-has-data' });
-      return;
-    }
     const car = carsRef.current.find(item => item.id === carId);
     if (!car) return;
     const accountId = userRef.current?.id ?? null;
@@ -630,18 +632,109 @@ export default function App() {
         // A delayed delete must never apply a prior account's intent to new account data.
         if (userRef.current?.id !== accountId) return;
         const latestCars = carsRef.current;
-        const updated = latestCars.filter(item => item.id !== carId);
-        if (updated.length === latestCars.length) return;
-        handleSaveCars(updated, accountId);
-        // Keep the active car through Undo; choose a replacement only at commit.
-        if (activeCarIdRef.current === carId) {
-          const next = updated[0] ?? null;
-          if (next) handleSelectCar(next.id);
-          else {
-            activeCarIdRef.current = null;
-            setActiveCarId(null);
-            localStorage.removeItem('race_notes_active_car');
+        const selectedCar = latestCars.find(item => item.id === carId);
+        if (!selectedCar) return;
+
+        // Resolve every dependency from canonical refs at commit time. The order
+        // below is also the cloud-delete dependency order; cars always run last.
+        const latestSetups = savedSetupsRef.current;
+        const removedSetupIds = new Set<string>(latestSetups.filter(item => item.carId === carId).map(item => item.id));
+        const retainedSetups = latestSetups
+          .filter(item => !removedSetupIds.has(item.id))
+          .map(item => item.sourceSetupId && removedSetupIds.has(item.sourceSetupId)
+            ? { ...item, sourceSetupId: undefined }
+            : item);
+        const latestTires = tireInventoryRef.current;
+        const removedTires = latestTires.filter(item => item.carId === carId);
+        const retainedTires = latestTires.filter(item => item.carId !== carId);
+        const latestShocks = shockSessionsRef.current;
+        const removedShocks = latestShocks.filter(item => item.carId === carId);
+        const retainedShocks = latestShocks.filter(item => item.carId !== carId);
+        const latestMaintenance = maintenanceRef.current;
+        const removedComponents = latestMaintenance.filter(item => item.scope === 'car' && item.carId === carId);
+        const removedComponentIds = new Set(removedComponents.map(item => item.id));
+        const retainedMaintenance = latestMaintenance.filter(item => !removedComponentIds.has(item.id));
+        const latestLogs = maintenanceLogsRef.current;
+        const removedLogs = latestLogs.filter(item => removedComponentIds.has(item.componentId));
+        const retainedLogs = latestLogs.filter(item => !removedComponentIds.has(item.componentId));
+        const retainedCars = latestCars.filter(item => item.id !== carId);
+        const currentOwnerId = syncOwnerIdRef.current;
+
+        const repairedWeekends = weekendsRef.current.map(weekend => {
+          let changed = false;
+          const repaired = { ...weekend };
+          for (const key of ['setupId', 'sourceSetupId', 'baselineSetupId', 'activeSetupId', 'finalSetupId'] as const) {
+            if (repaired[key] && removedSetupIds.has(repaired[key]!)) {
+              delete repaired[key];
+              changed = true;
+            }
           }
+          return changed ? repaired : weekend;
+        });
+        if (repairedWeekends.some((weekend, index) => weekend !== weekendsRef.current[index])) {
+          weekendsRef.current = repairedWeekends;
+          setWeekends(repairedWeekends);
+          localStorage.setItem('race_notes_weekends', JSON.stringify(repairedWeekends));
+          if (currentOwnerId) void pushWeekends(repairedWeekends, currentOwnerId, setSyncStatus);
+        }
+
+        removedSetupIds.forEach(id => queueSharedCloudDelete('setups', id, false, accountId));
+        savedSetupsRef.current = retainedSetups;
+        setSavedSetups(retainedSetups);
+        localStorage.setItem('race_notes_saved_setups', JSON.stringify(retainedSetups));
+        if (currentOwnerId) void pushSetups(retainedSetups, currentOwnerId, setSyncStatus);
+
+        if (accountId) {
+          removedTires.forEach(item => enqueuePendingPersonalTireDelete(window.localStorage, {
+            accountId,
+            tireId: item.id,
+            queuedAt: new Date().toISOString(),
+          }));
+          if (removedTires.length > 0) setDeleteReplayVersion(version => version + 1);
+        }
+        tireInventoryRef.current = retainedTires;
+        setTireInventory(retainedTires);
+        localStorage.setItem('race_notes_tires', JSON.stringify(retainedTires));
+        if (accountId) void pushTires(retainedTires, accountId, setSyncStatus);
+
+        removedShocks.forEach(item => queueSharedCloudDelete('shock_sessions', item.id, false, accountId));
+        shockSessionsRef.current = retainedShocks;
+        setShockSessions(retainedShocks);
+        localStorage.setItem('race_notes_shock_graphs', JSON.stringify(retainedShocks));
+        if (currentOwnerId) void pushShockSessions(retainedShocks, currentOwnerId, setSyncStatus);
+
+        removedLogs.forEach(item => queueSharedCloudDelete('maintenance_logs', item.id, false, accountId));
+        maintenanceLogsRef.current = retainedLogs;
+        setMaintenanceLogs(retainedLogs);
+        localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(retainedLogs));
+        if (currentOwnerId) void pushMaintenanceLogs(retainedLogs, currentOwnerId, setSyncStatus);
+
+        removedComponents.forEach(item => queueSharedCloudDelete('maintenance_components', item.id, false, accountId));
+        maintenanceRef.current = retainedMaintenance;
+        setMaintenance(retainedMaintenance);
+        localStorage.setItem('race_notes_maintenance', JSON.stringify(retainedMaintenance));
+        if (currentOwnerId) void pushMaintenanceComponents(retainedMaintenance, currentOwnerId, setSyncStatus);
+
+        queueSharedCloudDelete('cars', carId, false, accountId);
+        carsRef.current = retainedCars;
+        setCars(retainedCars);
+        localStorage.setItem('race_notes_cars', JSON.stringify(retainedCars));
+        if (currentOwnerId) void pushCars(retainedCars, currentOwnerId, teamRef.current?.id ?? null, setSyncStatus);
+
+        // Keep the active car/setup through Undo; choose replacements only now.
+        if (activeCarIdRef.current === carId) {
+          const nextCar = retainedCars[0] ?? null;
+          activeCarIdRef.current = nextCar?.id ?? null;
+          setActiveCarId(nextCar?.id ?? null);
+          if (nextCar) localStorage.setItem('race_notes_active_car', nextCar.id);
+          else localStorage.removeItem('race_notes_active_car');
+          const nextSetup = nextCar ? pickLatestSetupForCar(retainedSetups, nextCar.id) : null;
+          setSetup(nextSetup ?? INITIAL_SETUP);
+          if (nextSetup) localStorage.setItem('race_notes_setup', JSON.stringify(nextSetup));
+          else localStorage.removeItem('race_notes_setup');
+        }
+        if (!isTerminalSyncStatus(syncStatusRef.current)) {
+          showInfo({ reason: 'car-delete-queued', context: { label } });
         }
       },
     });
@@ -752,6 +845,11 @@ export default function App() {
   const carSetupCount = (carId: string) => savedSetups.filter(s => s.carId === carId).length;
   const carTireCount = (carId: string) => tireInventory.filter(t => t.carId === carId).length;
   const carShockCount = (carId: string) => shockSessions.filter(s => s.carId === carId).length;
+  const carMaintenanceComponentCount = (carId: string) => maintenance.filter(item => item.scope === 'car' && item.carId === carId).length;
+  const carMaintenanceLogCount = (carId: string) => {
+    const componentIds = new Set(maintenance.filter(item => item.scope === 'car' && item.carId === carId).map(item => item.id));
+    return maintenanceLogs.filter(item => componentIds.has(item.componentId)).length;
+  };
 
   const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('garage');
   const [settingsViewKey, setSettingsViewKey] = useState(0);
@@ -815,6 +913,10 @@ export default function App() {
   );
   const setSyncStatus = (next: NotificationStatus) => {
     if (isTerminalSyncStatus(next)) clearSavedFlash();
+    if (isTerminalSyncStatus(next) && infoToastRef.current?.reason === 'car-delete-queued') {
+      infoToastRef.current = null;
+      setInfoToast(null);
+    }
     const current = syncStatusRef.current;
     const resolved = isTerminalSyncStatus(current) && !isTerminalSyncStatus(next) ? current : next;
     syncStatusRef.current = resolved;
@@ -2700,6 +2802,8 @@ export default function App() {
                   setupCount={carSetupCount}
                   tireCount={carTireCount}
                   shockCount={carShockCount}
+                  maintenanceComponentCount={carMaintenanceComponentCount}
+                  maintenanceLogCount={carMaintenanceLogCount}
                   onStartWeekend={() => openRaceWeekendAction('new-weekend')}
                   initialSubTab={settingsSubTab}
                   subTabRequestKey={settingsViewKey}

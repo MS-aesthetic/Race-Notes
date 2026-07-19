@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Car, CAR_TYPES } from '../types';
 import EmptyState from './ui/EmptyState';
+import ConfirmSheet from './ui/ConfirmSheet';
 
 interface GarageViewProps {
   cars: Car[];
@@ -11,6 +12,8 @@ interface GarageViewProps {
   setupCount: (carId: string) => number;
   tireCount: (carId: string) => number;
   shockCount: (carId: string) => number;
+  maintenanceComponentCount: (carId: string) => number;
+  maintenanceLogCount: (carId: string) => number;
 }
 
 const EMPTY_FORM = { carType: CAR_TYPES[0] as string, chassis: '', division: '', name: '' };
@@ -20,16 +23,22 @@ export default function GarageView({
   activeCarId,
   onSelectCar,
   onSaveCars,
-  onDeleteCar,
+  onDeleteCar: commitDeleteCar,
   setupCount,
   tireCount,
   shockCount,
+  maintenanceComponentCount,
+  maintenanceLogCount,
 }: GarageViewProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const addCarInputRef = useRef<HTMLInputElement>(null);
+  const deleteSubmittingRef = useRef(false);
+  const [pendingDeleteCarId, setPendingDeleteCarId] = useState<string | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const onDeleteCar = (carId: string) => setPendingDeleteCarId(carId);
 
   const genId = () => `car-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -74,7 +83,33 @@ export default function GarageView({
     setEditingId(car.id);
   };
 
-  const totalData = (carId: string) => setupCount(carId) + tireCount(carId) + shockCount(carId);
+  const pendingDeleteCar = cars.find(car => car.id === pendingDeleteCarId) ?? null;
+  const pendingDeleteCounts = pendingDeleteCar ? [
+    { label: 'setup', count: setupCount(pendingDeleteCar.id) },
+    { label: 'tire', count: tireCount(pendingDeleteCar.id) },
+    { label: 'shock record', count: shockCount(pendingDeleteCar.id) },
+    { label: 'maintenance component', count: maintenanceComponentCount(pendingDeleteCar.id) },
+    { label: 'maintenance log', count: maintenanceLogCount(pendingDeleteCar.id) },
+  ].filter(item => item.count > 0) : [];
+  const cancelDelete = () => {
+    if (deleteSubmittingRef.current) return;
+    setPendingDeleteCarId(null);
+  };
+
+  // D3 always routes delete through confirmation; scoped records never disable it.
+  const totalData = (_carId: string) => 0;
+  const confirmDelete = async () => {
+    if (!pendingDeleteCar || deleteSubmittingRef.current) return;
+    deleteSubmittingRef.current = true;
+    setDeleteSubmitting(true);
+    try {
+      await Promise.resolve(commitDeleteCar(pendingDeleteCar.id));
+      setPendingDeleteCarId(null);
+    } finally {
+      deleteSubmittingRef.current = false;
+      setDeleteSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-3 pb-8">
@@ -186,11 +221,12 @@ export default function GarageView({
                           onClick={() => onDeleteCar(car.id)}
                           disabled={totalData(car.id) > 0}
                           className={`tap-target p-1.5 rounded transition-colors ${
-                            totalData(car.id) > 0
-                              ? 'text-on-surface-muted opacity-20 cursor-not-allowed'
+                            pendingDeleteCarId === car.id
+                              ? 'text-on-surface-muted text-red-400'
                               : 'text-on-surface-muted hover:text-red-400'
                           }`}
-                          title={totalData(car.id) > 0 ? 'Reassign or delete this car\'s data first' : 'Delete car'}
+                          title="Delete car and linked records"
+                          aria-label={`Delete ${displayName} and linked records`}
                         >
                           <span className="material-symbols-outlined text-base">delete</span>
                         </button>
@@ -211,6 +247,30 @@ export default function GarageView({
           })}
         </div>
       )}
+
+      <ConfirmSheet
+        open={!!pendingDeleteCar}
+        title="Delete car and linked records?"
+        body={pendingDeleteCar ? (
+          <div className="space-y-3">
+            <p><strong className="text-on-surface">{pendingDeleteCar.name || `${pendingDeleteCar.chassis} · ${pendingDeleteCar.carType}`}</strong> and these linked records will be permanently removed from this account/device:</p>
+            {pendingDeleteCounts.length > 0 ? (
+              <ul className="list-disc space-y-1 pl-5 font-mono text-sm">
+                {pendingDeleteCounts.map(item => (
+                  <li key={item.label}>{item.count} {item.label}{item.count === 1 ? '' : 's'}</li>
+                ))}
+              </ul>
+            ) : <p className="font-mono text-sm">No linked records.</p>}
+            <p>Historical Race Day session snapshots remain in history.</p>
+            {deleteSubmitting && <p role="status" className="font-mono text-sm">Preparing deletion…</p>}
+          </div>
+        ) : null}
+        confirmLabel={deleteSubmitting ? 'Preparing…' : 'Delete permanently'}
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
 
       {/* Add car form */}
       {showAddForm ? (

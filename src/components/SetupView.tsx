@@ -48,6 +48,14 @@ export const SETUP_NOTICE_COPY = {
   minimumSetups: 'You must keep at least one setup configuration.',
 } as const;
 
+const setupDeleteReason = (reason: ReturnType<typeof getSetupEditability>['reason']): string => {
+  if (reason === 'historical-role') return 'Historical setup snapshots cannot be deleted individually.';
+  if (reason === 'locked') return 'Locked setups cannot be deleted individually.';
+  if (reason === 'finished-weekend') return 'Setups from finished Race Days cannot be deleted individually.';
+  if (reason === 'in-play-elsewhere') return 'The active Race Day setup is managed from Race Day.';
+  return 'This setup cannot be deleted individually.';
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const parseWeight = (val: string | undefined): number | null => {
@@ -691,6 +699,7 @@ export default function SetupView({
                         </button>
                       )}
                       <div className="w-full min-w-0 flex flex-wrap items-center justify-end gap-1 border-t border-outline-variant/60 pt-2 sm:w-auto sm:border-t-0 sm:border-l sm:pt-0 sm:pl-2">
+                        {!editability.deletable && <span id={`setup-delete-reason-${setupItem.id}`} className="sr-only">{setupDeleteReason(editability.reason)}</span>}
                         <button type="button" title="Share setup PDF" disabled={sharingSetupId === setupItem.id} onClick={(e) => { e.stopPropagation(); void handleShareSetup(setupItem); }}
                           className="flex min-h-11 min-w-11 items-center justify-center text-on-surface-variant hover:text-primary transition-colors rounded disabled:opacity-40">
                           <span className="material-symbols-outlined text-[18px]">{sharingSetupId === setupItem.id ? 'progress_activity' : 'share'}</span>
@@ -709,8 +718,8 @@ export default function SetupView({
                           className={`p-1.5 rounded ${priorSetup(setupItem) ? 'text-on-surface-variant hover:text-primary' : 'text-on-surface-muted opacity-30 cursor-not-allowed'}`}>
                           <span className="material-symbols-outlined text-[18px]">compare_arrows</span>
                         </button>
-                        <button type="button" title="Delete setup permanently" disabled={!editability.deletable} onClick={(e) => { e.stopPropagation(); handleDeleteSetup(setupItem.id); }}
-                          className="p-1.5 text-on-surface-variant hover:text-red-400 transition-colors rounded disabled:text-on-surface-muted disabled:opacity-40">
+                        <button type="button" title={editability.deletable ? 'Delete setup permanently' : setupDeleteReason(editability.reason)} aria-describedby={!editability.deletable ? `setup-delete-reason-${setupItem.id}` : undefined} disabled={!editability.deletable} onClick={(e) => { e.stopPropagation(); handleDeleteSetup(setupItem.id); }}
+                          className="flex min-h-11 min-w-11 items-center justify-center text-on-surface-variant hover:text-red-400 transition-colors rounded disabled:text-on-surface-muted disabled:opacity-40">
                           <span className="material-symbols-outlined text-[18px]">delete</span>
                         </button>
                       </div>
@@ -721,8 +730,16 @@ export default function SetupView({
                   {isExpanded && (
                     <div className="min-w-0 p-2 sm:p-3 border-t border-outline-variant/50 bg-surface-container-low">
                       {isReadOnly && (
-                        <div className="mb-4 rounded-lg border border-outline-variant bg-surface-container p-3 font-mono text-xs text-on-surface-variant">
-                          {SETUP_NOTICE_COPY.historicalSetup}
+                        <div className="mb-4 space-y-3 rounded-lg border border-outline-variant bg-surface-container p-3 font-mono text-xs text-on-surface-variant">
+                          <p>{SETUP_NOTICE_COPY.historicalSetup}</p>
+                          {!editability.deletable && (
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p>{setupDeleteReason(editability.reason)}</p>
+                              <button type="button" onClick={() => onGoToGarage?.()} className="min-h-11 rounded border border-outline-variant px-3 text-xs font-bold uppercase text-on-surface hover:border-primary hover:text-primary">
+                                Manage car in Garage
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                       <fieldset disabled={isReadOnly} className="min-w-0 space-y-6 disabled:opacity-75">

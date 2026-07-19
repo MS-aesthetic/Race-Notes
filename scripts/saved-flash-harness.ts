@@ -321,7 +321,7 @@ type B2RenderedRoute = {
   msg: string;
 };
 
-const productionNotificationRoute = (appSource: string, simultaneous = false, status = '', includeInfo = true, isOnline = true): B2RenderedRoute => {
+const productionNotificationRoute = (appSource: string, simultaneous = false, status = '', includeInfo = true, isOnline = true, forceInfoWithStatus = false): B2RenderedRoute => {
   const markup = between(appSource, '        {/* One compact notification arbiter.', '\n\n        {/* Core Main Active Canvas Area */}', 'B2 production route slice');
   const route = markup.match(/(const isInfo = [\s\S]*?const isPersistent = [^;]+;)/)?.[1];
   assert.ok(route, 'B2 exact production notification routing statements exist');
@@ -334,7 +334,7 @@ const productionNotificationRoute = (appSource: string, simultaneous = false, st
     `${route}\nreturn { visible: isInfo || savedFlash || !!statusNotice, isInfo, isSuccess, isPersistent, msg };`,
   ) as (infoToast: object | null, savedFlash: boolean, syncStatus: string, isOnline: boolean, resolveInfoCopy: () => string) => B2RenderedRoute | null;
   return evaluateRoute(
-    includeInfo && !status ? { reason: 'missing-weekend-log' } : null,
+    includeInfo && (!status || forceInfoWithStatus) ? { reason: 'missing-weekend-log' } : null,
     simultaneous,
     status,
     isOnline,
@@ -710,6 +710,7 @@ const b3SourcePasses = (
   && appSource.includes("status === 'deferred-delete-retrying' || status === 'sync-error'")
   && appSource.includes('const syncStatusRef = useRef<NotificationStatus | null>(null);')
   && appSource.includes('if (isTerminalSyncStatus(next)) clearSavedFlash();')
+  && appSource.includes("if (isTerminalSyncStatus(next) && infoToastRef.current?.reason === 'car-delete-queued') {\n      infoToastRef.current = null;\n      setInfoToast(null);\n    }")
   && appSource.includes('isTerminalSyncStatus(current) && !isTerminalSyncStatus(next) ? current : next')
   && appSource.includes('syncStatusRef.current = resolved;\n    setSyncStatusState(resolved);')
   && appSource.includes('const clearTransientSyncStatus = () => {\n    const current = syncStatusRef.current;\n    const resolved = isTerminalSyncStatus(current) ? current : null;')
@@ -2105,10 +2106,10 @@ ${d1PullFilterBlock(source)}
     deps: Record<string, unknown>,
   ) => D1Row[];
 };
-type D1ReplayPlan = { source?: string; syncSource?: string; plans: D1Plan[]; identity?: string; generation?: number };
-const createD1Replay = ({ source = app, syncSource = sync, plans, identity = 'acct-1', generation = 7 }: D1ReplayPlan) => {
+type D1ReplayPlan = { source?: string; syncSource?: string; plans: D1Plan[]; intents?: D1Intent[]; identity?: string; generation?: number };
+const createD1Replay = ({ source = app, syncSource = sync, plans, intents, identity = 'acct-1', generation = 7 }: D1ReplayPlan) => {
   const intent: D1Intent = { accountId: 'acct-1', table: 'setups', recordId: 'row-1' };
-  let queue = [intent];
+  let queue = intents?.slice() ?? [intent];
   let planIndex = 0;
   let deleteCalls = 0;
   let replayVersion = 0;
@@ -2142,7 +2143,7 @@ const createD1Replay = ({ source = app, syncSource = sync, plans, identity = 'ac
     },
     setDeleteReplayVersion: (updater: (version: number) => number) => { replayVersion = updater(replayVersion); },
   });
-  const filterPull = (rows: D1Row[]) => compileD1PullFilter(source)('setups', rows, {
+  const filterPull = (rows: D1Row[], table = 'setups') => compileD1PullFilter(source)(table, rows, {
     queuedAtPullStart: new Set(queue.map(item => `${item.table}:${item.recordId}`)),
     readPendingTeamDeletes: () => queue.slice(),
     pullUserId: 'acct-1',
@@ -2851,6 +2852,98 @@ d2Kill('everywhere-exact-copy-changed', await d2StructuredOutcomeFails(
   'clear-everywhere',
   'Your records are queued for deletion. Team records you do not own remain in cloud.',
 ));
+
+// D3: an actual Nth shared cascade delete fails while earlier/later deletes
+// succeed. Compile the real replay; the failed intent alone must survive.
+let d3StatusAssertions = 0;
+const killedD3StatusMutations: string[] = [];
+const d3StatusEqual = (actual: unknown, expected: unknown, message: string) => { d3StatusAssertions += 1; assert.deepEqual(actual, expected, message); };
+const d3StatusOk = (value: unknown, message: string) => { d3StatusAssertions += 1; assert.ok(value, message); };
+const d3Intents: D1Intent[] = [
+  { accountId: 'acct-1', table: 'setups', recordId: 'setup-1' },
+  { accountId: 'acct-1', table: 'shock_sessions', recordId: 'shock-1' },
+  { accountId: 'acct-1', table: 'maintenance_logs', recordId: 'log-1' },
+  { accountId: 'acct-1', table: 'cars', recordId: 'car-1' },
+];
+const d3NthFailure = createD1Replay({
+  intents: d3Intents,
+  plans: [
+    { selected: { data: [{ id: 'setup-1' }], error: null } },
+    { selected: { data: [{ id: 'shock-1' }], error: null } },
+    { selected: { data: null, error: { message: 'network' } } },
+    { selected: { data: [{ id: 'car-1' }], error: null } },
+  ],
+});
+await d3NthFailure.run();
+d3StatusEqual(d3NthFailure.deleteCalls(), 4, 'D3 real replay attempts every ordered cascade intent despite Nth failure');
+d3StatusEqual(d3NthFailure.queue(), [{ accountId: 'acct-1', table: 'maintenance_logs', recordId: 'log-1' }], 'D3 only actual failed intent remains queued');
+d3StatusEqual(d3NthFailure.statuses(), ['sync-error', 'deferred-delete-retrying'], 'D3 Nth failure reaches terminal retry status');
+d3StatusEqual(d3NthFailure.timers.map(timer => timer.delay), [5000], 'D3 Nth failure retries at exact 5000ms');
+d3StatusEqual(d3NthFailure.filterPull([{ id: 'log-1' }], 'maintenance_logs'), [], 'D3 failed Nth intent cannot resurrect on pull');
+const d3FailureRoute = productionNotificationRoute(app, false, d3NthFailure.status() ?? '', false, true);
+d3StatusOk(d3FailureRoute.isPersistent && !d3FailureRoute.isSuccess, 'D3 terminal rendered route is persistent and not success');
+d3StatusEqual(d3FailureRoute.msg, 'Sync failed — will retry', 'D3 terminal rendered copy is honest');
+d3StatusOk(!/Saved|Synced/.test(d3FailureRoute.msg), 'D3 Nth failure renders zero Saved/Synced copy');
+
+const d3RemoveFailedMutation = d1Replace(
+  app,
+  'if (deleted) removePendingTeamDelete(window.localStorage, intent);\n        else retryNeeded = true;',
+  "if (deleted || intent.recordId === 'log-1') removePendingTeamDelete(window.localStorage, intent);\n        else retryNeeded = true;",
+  'D3 Nth failed-intent removal',
+);
+const d3MutatedFailure = createD1Replay({
+  source: d3RemoveFailedMutation,
+  intents: d3Intents,
+  plans: [
+    { selected: { data: [{ id: 'setup-1' }], error: null } },
+    { selected: { data: [{ id: 'shock-1' }], error: null } },
+    { selected: { data: null, error: { message: 'network' } } },
+    { selected: { data: [{ id: 'car-1' }], error: null } },
+  ],
+});
+await d3MutatedFailure.run();
+d3StatusOk(d3MutatedFailure.queue().length === 0, 'D3 production mutation seeds real failed-intent loss');
+d3StatusOk(!d1ReplaySourcePasses(d3RemoveFailedMutation), 'D3 source gate rejects Nth failed-intent removal');
+killedD3StatusMutations.push('nth-failed-intent-removed');
+const d3TerminalInfoGuard = "if (!isTerminalSyncStatus(syncStatusRef.current)) {\n          showInfo({ reason: 'car-delete-queued', context: { label } });\n        }";
+d3StatusOk(app.includes(d3TerminalInfoGuard), 'D3 cascade queued-info source guard preserves pre-existing terminal status');
+const d3TerminalInfoMutation = d1Replace(
+  app,
+  d3TerminalInfoGuard,
+  "showInfo({ reason: 'car-delete-queued', context: { label } });",
+  'D3 terminal queued-info guard removed',
+);
+compileB2Mutation(d3TerminalInfoMutation, 'D3-terminal-queued-info-guard-removed');
+const queuedInfoAfterTerminal = (source: string): boolean => !source.includes(d3TerminalInfoGuard);
+d3StatusEqual(queuedInfoAfterTerminal(app), false, 'D3 model suppresses queued info under existing terminal status');
+d3StatusEqual(queuedInfoAfterTerminal(d3TerminalInfoMutation), true, 'D3 mutation publishes queued info over terminal status');
+const d3TerminalBaselineRoute = productionNotificationRoute(app, false, 'sync-error', queuedInfoAfterTerminal(app), true, true);
+const d3TerminalMutationRoute = productionNotificationRoute(d3TerminalInfoMutation, false, 'sync-error', queuedInfoAfterTerminal(d3TerminalInfoMutation), true, true);
+d3StatusOk(d3TerminalBaselineRoute.isPersistent && d3TerminalBaselineRoute.msg === 'Sync failed — will retry', 'D3 rendered baseline keeps terminal failure visible');
+d3StatusOk(d3TerminalMutationRoute.isInfo && !d3TerminalMutationRoute.isPersistent, 'D3 rendered gate exposes terminal-priority mutation');
+killedD3StatusMutations.push('preexisting-terminal-info-overwrite');
+const d3LaterFailureClear = "if (isTerminalSyncStatus(next) && infoToastRef.current?.reason === 'car-delete-queued') {\n      infoToastRef.current = null;\n      setInfoToast(null);\n    }";
+const infoSurvivesLaterTerminal = (source: string, reason: string): boolean => (
+  reason !== 'car-delete-queued' || !source.includes(d3LaterFailureClear)
+);
+d3StatusEqual(infoSurvivesLaterTerminal(app, 'car-delete-queued'), false, 'D3 later terminal failure clears queued-success notice');
+d3StatusEqual(infoSurvivesLaterTerminal(app, 'missing-weekend-log'), true, 'D3 terminal handling preserves unrelated B2 info notice');
+const d3LaterFailureMutation = d1Replace(
+  app,
+  d3LaterFailureClear,
+  d3LaterFailureClear.replace("'car-delete-queued'", "'never-clear-car-delete'"),
+  'D3 later terminal car-info clear removed',
+);
+compileB2Mutation(d3LaterFailureMutation, 'D3-later-terminal-car-info-clear-removed');
+d3StatusEqual(infoSurvivesLaterTerminal(d3LaterFailureMutation, 'car-delete-queued'), true, 'D3 mutation leaves stale queued-success notice');
+const d3LaterBaselineRoute = productionNotificationRoute(app, false, 'sync-error', infoSurvivesLaterTerminal(app, 'car-delete-queued'), true, true);
+const d3LaterMutationRoute = productionNotificationRoute(d3LaterFailureMutation, false, 'sync-error', infoSurvivesLaterTerminal(d3LaterFailureMutation, 'car-delete-queued'), true, true);
+d3StatusOk(d3LaterBaselineRoute.isPersistent && !d3LaterBaselineRoute.isInfo, 'D3 rendered later-failure baseline shows terminal status');
+d3StatusOk(d3LaterMutationRoute.isInfo && !d3LaterMutationRoute.isPersistent, 'D3 rendered gate rejects stale queued-success notice');
+killedD3StatusMutations.push('later-terminal-car-info-not-cleared');
+d3StatusEqual(new Set(killedD3StatusMutations).size, killedD3StatusMutations.length, 'D3 status mutation labels are unique');
+console.log(`D3 status assertions: ${d3StatusAssertions}`);
+console.log(`D3 status killed mutations (${killedD3StatusMutations.length}): ${killedD3StatusMutations.join(', ')}`);
 
 d2Equal(new Set(killedD2Mutations).size, killedD2Mutations.length, 'D2 killed mutation labels are unique');
 d2Ok(killedD2Mutations.length >= 20, 'D2 kills at least twenty independent mutation classes');
