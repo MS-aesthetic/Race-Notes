@@ -344,3 +344,23 @@ The blocker is in the delayed account-safety check. When the app is running from
 The repair is limited to `App.tsx` and `car-delete-undo-harness.ts`. The identity check will normalize both missing identities to the same value. The expanded test will run active-car, non-active-car, and last-car cascades with no live user, prove that all intended local records are removed and selection is safe, and prove that no cloud queue, push, or null-owned delete intent is created. It will also deliberately reintroduce the original comparison and require that mutation to fail. Signed-in account-replacement protection and every existing D3 proof remain required.
 
 No Netlify preview or APK was produced for this failed candidate. After the SOL High repair, the full focused suite, raw matrix, lint, build, isolated scope, protected-path, and cavecrew gates will run again before browser and debug-APK inspection. Chunk D QA and every later task remain blocked until repaired D3 passes.
+
+## Task D3 — Final result after repair
+
+D3 is a final **PASS, 100/100** on QA attempt 2. The original car-cascade feature is commit `120fa72`; the repair is commit `a5e72d0`. The repair changes only `App.tsx` and the car-delete production harness. It normalizes a missing signed-in identity so remembered-device/offline use can finish the local cascade, while keeping every cloud deletion queue and push behind a real signed-in account.
+
+The repaired real-handler tests cover deleting an active car, a non-active car, and the last car while signed out. In every case, the correct local records are removed, active car and setup selection remain safe, unrelated records and Race Day session history remain unchanged, and no cloud queue, push, or ownerless delete intent is created. The combined D3 proof passed 222 assertions and all 41 independent mutations. D1, D2, ownership, offline/resume, lifecycle, Quick Adjust, tire, and touch-target regressions also passed. The complete test matrix remained at the expected 23 of 24, with only the existing muted-text byte-count lock failing `15 !== 16`. Type-checking reported exactly the three known baseline errors, and the production build transformed exactly 566 modules. Scope, protected-path, clean-worktree, and independent reviewer checks all passed.
+
+The accepted draft preview is:
+
+https://6a5c406dc530a48c644693bd--crew-chief-race-notes.netlify.app/
+
+This is a draft only. The signed-out shell passed at 360×800, 390×844, and 412×915 with exact viewports, no horizontal overflow, controls at least 44 pixels tall, pinch-enabled viewport metadata, and no browser warnings or errors.
+
+A Java 21 debug APK was synchronized, built, and installed on `emulator-5554`. It is available at `android/app/build/outputs/apk/debug/app-debug.apk`, is 12,087,614 bytes, and has SHA-256 `704836E5280FC53010AF0FC92F72426EA57D35E3FE3AD5AC5D95CE8F768DE0C4`.
+
+The first Android view briefly showed the older disabled-delete screen because the embedded WebView had preserved a previous Workbox asset cache. Only that stale service-worker registration and cache were cleared; no user or racing data was cleared. The exact installed APK then showed Delete enabled for cars that had dependent setups, as intended. A temporary synthetic car and setup exercised the complete flow: strong confirmation, Cancel with no change, the five-second Undo window, permanent cascade, honest completion status, and reload/sync without resurrection. The synthetic fixture was deleted afterward. The Android crash buffer was empty and there was no product JavaScript error.
+
+The dedicated D2 account's owned racing data remains cleared. Its login, authentication record, team, and membership remain intact, and no credentials are stored in the repository or this report.
+
+No D3 repair remains. The mandatory Chunk D integrated QA is next. It will audit D1, D2, and D3 together for honest zero-row handling, ownership-safe clear modes, cascade ordering, retry and pull filtering, no orphan or resurrection, preserved Race Day history, and truthful status priority before Chunk E can begin. No production publish, release build, Git push, PR, or master merge occurred.
