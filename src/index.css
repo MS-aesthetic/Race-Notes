@@ -248,6 +248,30 @@ header.bg-surface {
    All sizes in rem so they scale under zoom: var(--ui-zoom).
    ============================================================ */
 
+/* Global native-control floor. Hidden/input-backed glyphs stay visually
+   compact; their owning label supplies the full hit area instead. */
+#root :is(#applet-main-body, #applet-auth-gate) :is(
+  button,
+  input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea,
+  label:has(input:is([type="file"], [type="checkbox"], [type="radio"]))
+) {
+  min-height: 2.75rem;
+}
+
+#root :is(#applet-main-body, #applet-auth-gate) :is(
+  button,
+  label:has(input:is([type="file"], [type="checkbox"], [type="radio"]))
+) {
+  min-width: 2.75rem;
+}
+
+#root :is(#applet-main-body, #applet-auth-gate) label:has(input:is([type="file"], [type="checkbox"], [type="radio"])) {
+  display: inline-flex;
+  align-items: center;
+}
+
 /* Minimum 44px hit area for any tappable control (2.75rem = 44px @ 16px root) */
 .tap-target {
   min-height: 2.75rem;

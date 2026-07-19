@@ -30,6 +30,11 @@ const context = read('src/components/ContextStrip.tsx');
 const trackers = read('src/components/TrackersView.tsx');
 const settings = read('src/components/SettingsView.tsx');
 const auth = read('src/components/AuthView.tsx');
+const loads = read('src/components/SmasherLoadsView.tsx');
+const quickAdjust = read('src/components/QuickAdjustPanel.tsx');
+const todo = read('src/components/ToDoView.tsx');
+const setupDiff = read('src/components/SetupDiffView.tsx');
+const exportView = read('src/components/ExportView.tsx');
 const css = read('src/index.css');
 
 assert.match(css, /\.tap-target\s*\{[\s\S]*min-height: 2\.75rem;[\s\S]*min-width: 2\.75rem;/, 'shared tap targets have 44px floors');
@@ -691,6 +696,259 @@ for (const mutation of [
     `${mutation.name}: rendered gate rejects class and content derived from mutated production span`,
   );
 }
+
+// Final QA Repair 2: compile the real shell CSS with exact production control
+// classes, then render every observed/latent native-control failure at both
+// supported scales. Hidden input glyphs remain compact; their effective label
+// or semantic row owns the measured target.
+let globalFloorAssertionCount = 0;
+const killedGlobalFloorMutations: string[] = [];
+const globalFloorOk: (value: unknown, message: string) => asserts value = (value, message) => {
+  globalFloorAssertionCount += 1;
+  assert.ok(value, message);
+};
+const globalFloorEqual = (actual: unknown, expected: unknown, message: string): void => {
+  globalFloorAssertionCount += 1;
+  assert.equal(actual, expected, message);
+};
+const lockConstClass = (source: string, name: string, label: string): string => {
+  const value = source.match(new RegExp(`const ${name}\\s*=\\s*'([^']+)'`))?.[1];
+  globalFloorOk(value, `${label}: production class constant exists`);
+  return value!;
+};
+
+const GLOBAL_FLOOR_START = '/* Global native-control floor.';
+const GLOBAL_FLOOR_END = '/* Minimum 44px hit area for any tappable control';
+const globalFloorSection = sliceBetween(css, GLOBAL_FLOOR_START, GLOBAL_FLOOR_END);
+globalFloorOk(/input:not\(\[type="hidden"\]\):not\(\[type="file"\]\):not\(\[type="checkbox"\]\):not\(\[type="radio"\]\)/.test(globalFloorSection), 'global native field selector excludes hidden/file/checkbox/radio glyphs');
+globalFloorOk((globalFloorSection.match(/min-height: 2\.75rem;/g) ?? []).length === 1, 'global native controls share one exact 2.75rem height floor');
+globalFloorOk((globalFloorSection.match(/min-width: 2\.75rem;/g) ?? []).length === 1, 'buttons and input-backed labels share one exact 2.75rem width floor');
+globalFloorOk((globalFloorSection.match(/label:has\(input:is\(\[type="file"\], \[type="checkbox"\], \[type="radio"\]\)\)/g) ?? []).length === 3, 'input-backed file/checkbox/radio labels receive size and layout coverage');
+
+const shellClasses = {
+  setupNewName: lockProductionClass(setup, 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface text-sm px-3 py-2 outline-none rounded', 'Setup new-name input'),
+  setupUse: lockProductionClass(setup, 'min-w-0 px-3 py-1 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded hover:opacity-90 transition-all shadow', 'Setup Use Setup'),
+  setupClone: lockProductionClass(setup, 'p-1.5 text-on-surface-variant hover:text-primary transition-colors rounded', 'Setup Clone'),
+  setupCompare: lockProductionClass(setup, 'p-1.5 rounded', 'Setup Compare'),
+  setupFileLabel: lockProductionClass(setup, 'text-[10px] uppercase font-mono font-bold transition-colors', 'Setup Add File label'),
+  setupAttachmentDelete: lockProductionClass(setup, 'absolute top-1 right-1 bg-black/70 rounded-full w-5 h-5 flex items-center justify-center text-white hover:bg-black/90', 'Setup attachment delete'),
+  setupDiffSelect: lockProductionClass(setupDiff, 'w-full bg-surface-container text-xs text-on-surface p-2 border border-outline-variant rounded font-mono', 'Setup Compare select'),
+  loadsCompare: lockProductionClass(loads, 'h-9 px-3 font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 border', 'Loads Compare'),
+  loadsNew: lockProductionClass(loads, 'h-9 px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded transition-all flex items-center gap-1.5 flex-shrink-0 hover:opacity-90', 'Loads New Session'),
+  loadsSession: lockProductionClass(loads, 'flex-shrink-0 px-3 py-1.5 rounded border font-mono text-[10px] uppercase font-bold transition-all', 'Loads session tab'),
+  loadsCsv: lockProductionClass(loads, 'h-7 px-2.5 border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-outline font-mono text-[9px] uppercase font-bold rounded transition-all flex items-center gap-1', 'Loads comparison CSV'),
+  loadsDeleteSession: lockProductionClass(loads, 'p-1 text-on-surface-muted hover:text-error transition-colors', 'Loads delete session'),
+  loadsExport: lockProductionClass(loads, 'flex-1 h-9 border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-outline font-mono text-[10px] uppercase font-bold rounded transition-all flex items-center justify-center gap-1.5', 'Loads export action'),
+  loadsAddPoint: lockProductionClass(loads, 'h-[34px] px-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded hover:opacity-90 transition-all flex items-center gap-1 flex-shrink-0', 'Loads Add point'),
+  loadsDeletePoint: lockProductionClass(loads, 'text-on-surface-muted hover:text-error transition-colors', 'Loads delete point'),
+  loadsFileLabel: lockProductionClass(loads, 'flex items-center gap-1.5 cursor-pointer h-8 px-3 border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary font-mono text-[10px] uppercase font-bold rounded transition-colors', 'Loads Add Photo label'),
+  loadsPhotoDelete: lockProductionClass(loads, 'absolute top-1 right-1 bg-black/70 hover:bg-error text-white rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity', 'Loads photo delete'),
+  loadsModalClose: lockProductionClass(loads, 'absolute top-4 right-4 text-on-surface-variant hover:text-primary transition-colors', 'Loads modal close'),
+  tiresAdd: lockProductionClass(tires, 'h-9 px-3 rounded bg-primary font-mono text-xs font-bold uppercase text-on-primary', 'Tires Add action'),
+  tiresClose: lockProductionClass(tires, 'absolute right-3 top-3 text-on-surface-variant', 'Tires modal close'),
+  quickInput: lockConstClass(quickAdjust, 'inputClass', 'Quick Adjust input/select'),
+  quickAction: lockConstClass(quickAdjust, 'actionClass', 'Quick Adjust action'),
+  checklistRow: lockProductionClass(todo, 'relative flex min-h-14 cursor-pointer items-start gap-3 rounded-xl border p-3', 'Checklist effective checkbox row'),
+  checklistGlyph: lockProductionClass(todo, 'mt-0.5 h-5 w-5 shrink-0 accent-primary', 'Checklist checkbox glyph'),
+  maintenanceFilter: lockProductionClass(trackers, 'w-full bg-surface-container border border-outline-variant focus:border-primary text-on-surface font-mono text-xs px-3 py-2 rounded-lg outline-none appearance-none cursor-pointer pr-7', 'Accounting filter'),
+  maintenanceFilterClear: lockProductionClass(trackers, 'w-8 h-8 flex items-center justify-center rounded border border-outline-variant text-on-surface-variant hover:text-primary shrink-0', 'Accounting filter clear'),
+  maintenanceLog: lockProductionClass(trackers, 'shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded border border-primary/40 bg-primary/10 text-primary font-mono text-[10px] uppercase font-bold hover:bg-primary/20 transition-colors', 'Maintenance Log action'),
+  maintenanceDelete: lockProductionClass(trackers, 'material-symbols-outlined text-[16px] text-on-surface-muted hover:text-error shrink-0', 'Maintenance delete action'),
+  maintenanceOpen: lockProductionClass(trackers, 'flex items-center gap-1.5 px-3 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary font-mono text-[11px] uppercase font-bold transition-colors', 'Maintenance Add action'),
+  maintenanceModalClose: lockProductionClass(trackers, 'material-symbols-outlined text-on-surface-variant text-[22px]', 'Maintenance modal close'),
+  maintenanceField: lockProductionClass(trackers, 'w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none', 'Maintenance input'),
+  maintenanceTextarea: lockProductionClass(trackers, 'w-full p-2.5 bg-surface-container border border-outline-variant focus:border-primary rounded font-mono text-sm outline-none resize-none', 'Maintenance textarea'),
+  maintenanceSubmit: lockProductionClass(trackers, 'w-full py-3 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-xl tracking-wider active:opacity-80', 'Maintenance submit'),
+  exportSwitch: lockProductionClass(exportView, 'relative inline-flex items-center cursor-pointer', 'Export input-backed switch'),
+  exportSelect: lockConstClass(exportView, 'selectClass', 'Export select'),
+  exportAction: lockConstClass(exportView, 'actionBtnClass', 'Export action'),
+  headerGuide: lockProductionClass(app, 'flex min-h-11 min-w-11 items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors', 'header App Guide'),
+  contextPicker: lockProductionClass(context, 'flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 font-mono text-[11px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20', 'ContextStrip picker'),
+  fourBarHelp: lockProductionClass(fourBar, 'flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary', 'Four Bar help'),
+  bottomNav: lockProductionClass(app, 'bg-surface-container border-t border-outline-variant z-40 flex justify-around items-center h-11 px-2 md:px-4 sticky bottom-0 w-full flex-shrink-0', 'bottom navigation'),
+  bottomNavButton: lockProductionClass(app, 'flex flex-1 min-w-0 flex-col items-center justify-center h-full transition-all cursor-pointer', 'bottom navigation button'),
+};
+
+const shellTarget = (name: string, tag: 'button' | 'input' | 'select' | 'textarea', className: string, type = 'text', content = name) => {
+  const width = tag === 'button' ? ' data-requires-width' : '';
+  const attrs = `data-target data-name="${name}" data-kind="${tag}"${width} class="${className}"`;
+  if (tag === 'input') return `<input ${attrs} type="${type}" value="${name}">`;
+  if (tag === 'select') return `<select ${attrs}><option>${name}</option></select>`;
+  if (tag === 'textarea') return `<textarea ${attrs}>${name}</textarea>`;
+  return `<button ${attrs}>${content}</button>`;
+};
+const positionedShellButton = (name: string, className: string) => `<div class="relative h-16 w-16 shrink-0">${shellTarget(name, 'button', `${className} attachment-delete`, 'text', '×')}</div>`;
+const fileTarget = (name: string, className: string) => `<label data-target data-name="${name}" data-kind="label" data-requires-width class="${className}">${name}<input data-backed-input type="file" class="hidden"></label>`;
+const checkboxLabelTarget = (name: string, className: string, type: 'checkbox' | 'radio' = 'checkbox') => `<label data-target data-name="${name}" data-kind="label" data-requires-width class="${className}"><input data-backed-input type="${type}" class="sr-only peer"><span>${name}</span></label>`;
+const checklistTarget = `<div data-target data-name="Checklist checkbox row" data-kind="effective" data-requires-width role="button" class="${shellClasses.checklistRow} border-outline-variant bg-surface-container"><input data-backed-input type="checkbox" class="${shellClasses.checklistGlyph}"><span>Pack tools</span></div>`;
+const shellPanel = (name: string, content: string) => `<section data-panel data-name="${name}" class="shell-panel">${content}</section>`;
+
+const shellMarkup = [
+  shellPanel('Setup', [
+    shellTarget('Setup new-name input', 'input', shellClasses.setupNewName),
+    shellTarget('Use Setup', 'button', shellClasses.setupUse),
+    shellTarget('Clone setup', 'button', shellClasses.setupClone, 'text', '<span class="material-symbols-outlined">content_copy</span>'),
+    shellTarget('Compare setup', 'button', `${shellClasses.setupCompare} text-on-surface-variant`, 'text', '<span class="material-symbols-outlined">compare_arrows</span>'),
+    fileTarget('Setup Add File', shellClasses.setupFileLabel),
+    positionedShellButton('Setup attachment delete', shellClasses.setupAttachmentDelete),
+    shellTarget('Setup Compare A', 'select', shellClasses.setupDiffSelect),
+    shellTarget('Setup Compare B', 'select', shellClasses.setupDiffSelect),
+  ].join('')),
+  shellPanel('Loads', [
+    shellTarget('Loads Compare', 'button', shellClasses.loadsCompare),
+    shellTarget('Loads New Session', 'button', shellClasses.loadsNew),
+    shellTarget('Loads session tab', 'button', shellClasses.loadsSession),
+    shellTarget('Loads CSV', 'button', shellClasses.loadsCsv, 'text', 'CSV'),
+    shellTarget('Loads delete session', 'button', shellClasses.loadsDeleteSession, 'text', '<span class="material-symbols-outlined">delete</span>'),
+    shellTarget('Loads Export CSV', 'button', shellClasses.loadsExport, 'text', 'Export CSV'),
+    shellTarget('Loads Add point', 'button', shellClasses.loadsAddPoint),
+    shellTarget('Loads delete point', 'button', shellClasses.loadsDeletePoint, 'text', '<span class="material-symbols-outlined">close</span>'),
+    fileTarget('Loads Add Photo', shellClasses.loadsFileLabel),
+    positionedShellButton('Loads photo delete', shellClasses.loadsPhotoDelete),
+    positionedShellButton('Loads modal close', shellClasses.loadsModalClose),
+  ].join('')),
+  shellPanel('Tires and Quick Adjust', [
+    shellTarget('Tires Add', 'button', shellClasses.tiresAdd),
+    positionedShellButton('Tires modal close', shellClasses.tiresClose),
+    shellTarget('Quick Adjust spring', 'input', shellClasses.quickInput),
+    shellTarget('Quick Adjust load session', 'select', shellClasses.quickInput),
+    shellTarget('Quick Adjust action', 'button', shellClasses.quickAction),
+  ].join('')),
+  shellPanel('Checklist and Maintenance', [
+    checklistTarget,
+    shellTarget('Accounting filter', 'select', shellClasses.maintenanceFilter),
+    shellTarget('Accounting filter clear', 'button', shellClasses.maintenanceFilterClear, 'text', '×'),
+    shellTarget('Maintenance Log', 'button', shellClasses.maintenanceLog),
+    shellTarget('Maintenance delete', 'button', shellClasses.maintenanceDelete, 'text', 'close'),
+    shellTarget('Maintenance Add', 'button', shellClasses.maintenanceOpen),
+    shellTarget('Maintenance modal close', 'button', shellClasses.maintenanceModalClose, 'text', 'close'),
+    shellTarget('Maintenance date', 'input', shellClasses.maintenanceField, 'date'),
+    shellTarget('Maintenance notes', 'textarea', shellClasses.maintenanceTextarea),
+    shellTarget('Maintenance submit', 'button', shellClasses.maintenanceSubmit),
+  ].join('')),
+  shellPanel('Export', [
+    checkboxLabelTarget('Export cloud switch', shellClasses.exportSwitch),
+    checkboxLabelTarget('Radio-backed label contract', shellClasses.exportSwitch, 'radio'),
+    shellTarget('Export Setup select', 'select', shellClasses.exportSelect),
+    shellTarget('Export Race Day select', 'select', shellClasses.exportSelect),
+    shellTarget('Export Trackers select', 'select', shellClasses.exportSelect),
+    shellTarget('Export action', 'button', shellClasses.exportAction),
+  ].join('')),
+  shellPanel('Existing floors', [
+    shellTarget('Auth mode', 'button', productionClasses.authMode),
+    shellTarget('Auth field', 'input', productionClasses.authField),
+    shellTarget('Settings danger', 'button', productionClasses.settingsDanger),
+    shellTarget('Race Day close', 'button', productionClasses.raceClose, 'text', '<span class="material-symbols-outlined">close</span>'),
+    shellTarget('Header guide', 'button', shellClasses.headerGuide, 'text', '<span class="material-symbols-outlined">help</span>'),
+    shellTarget('Context picker', 'button', shellClasses.contextPicker),
+    shellTarget('NumberStepper direction', 'button', 'min-h-11 min-w-11 shrink-0 select-none touch-pan-y', 'text', '−'),
+    shellTarget('Four Bar help', 'button', shellClasses.fourBarHelp, 'text', '<span class="material-symbols-outlined">help</span>'),
+  ].join('')),
+  `<nav data-panel data-name="Bottom navigation" class="shell-panel shell-nav ${shellClasses.bottomNav}">${shellTarget('Bottom nav button', 'button', `${shellClasses.bottomNavButton} text-primary`, 'text', 'Runs')}</nav>`,
+].join('');
+
+type ShellFloorMutation = 'remove-height' | 'height-43' | 'remove-button-width' | 'exempt-buttons' | 'remove-label-floor' | 'attachment-20';
+const mutateGlobalFloorCss = (source: string, mutation: ShellFloorMutation): string => {
+  const section = sliceBetween(source, GLOBAL_FLOOR_START, GLOBAL_FLOOR_END);
+  let changed = section;
+  if (mutation === 'remove-height') changed = changed.replace('  min-height: 2.75rem;\n', '');
+  if (mutation === 'height-43') changed = changed.replace('min-height: 2.75rem;', 'min-height: 2.6875rem;');
+  if (mutation === 'remove-button-width') {
+    const widthBlockAt = changed.indexOf('min-width: 2.75rem;');
+    const buttonAt = changed.lastIndexOf('  button,', widthBlockAt);
+    changed = `${changed.slice(0, buttonAt)}  button[data-width-floor],${changed.slice(buttonAt + '  button,'.length)}`;
+  }
+  if (mutation === 'exempt-buttons') changed = changed.replace('  button,', '  button[data-height-floor],');
+  if (mutation === 'remove-label-floor') changed = changed.replaceAll('label:has(input:is([type="file"], [type="checkbox"], [type="radio"]))', 'label[data-input-backed-floor]');
+  if (mutation === 'attachment-20') changed = changed.replaceAll('  button,', '  button:not(.attachment-delete),');
+  globalFloorOk(changed !== section, `${mutation}: mutates exact global floor section`);
+  return source.replace(section, changed);
+};
+
+const compileShellCss = async (source: string): Promise<string> => {
+  const compiler = await compile(source, { base: root, onDependency: () => undefined });
+  return compiler.build(classCandidates(shellMarkup, ...Object.values(shellClasses), ...Object.values(productionClasses)))
+    .replace(/@import url\([^;]+;\s*/g, '');
+};
+type ShellRect = { left: number; right: number; top: number; bottom: number; width: number; height: number };
+type ShellRenderResult = {
+  viewportClient: number;
+  viewportScroll: number;
+  targets: Array<{ name: string; kind: string; requiresWidth: boolean; rect: ShellRect; panel: ShellRect; clientWidth: number; scrollWidth: number; clientHeight: number; scrollHeight: number }>;
+  backedInputs: Array<{ type: string; display: string; rect: ShellRect }>;
+};
+const renderShellFloorProbe = (name: string, viewportWidth: number, viewportHeight: number, scale: number, compiledCss: string): ShellRenderResult => {
+  const probeDir = mkdtempSync(join(tmpdir(), 'race-notes-global-floor-render-'));
+  const htmlPath = join(probeDir, 'probe.html');
+  const profilePath = join(probeDir, 'profile');
+  const document = `<!doctype html><html style="--ui-zoom:${scale}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${compiledCss}
+html,body,#root{height:auto!important;min-height:0!important;width:auto!important;overflow:visible!important}.viewport{width:${viewportWidth}px;min-width:0;overflow:visible}.shell-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:8px;padding:8px;min-width:0}.shell-panel{position:relative;min-width:0;max-width:100%;border:1px solid #777;padding:8px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px}.shell-nav{padding:0!important}.shell-panel>[data-target]{max-width:100%}[data-target]{font-family:Arial,sans-serif}.relative{position:relative}
+  </style></head><body><div class="viewport"><div id="root"><div id="applet-main-body"><main class="shell-grid">${shellMarkup}</main></div></div></div><pre id="result"></pre><script>
+const rect=node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};
+const targets=[...document.querySelectorAll('[data-target]')].map(node=>({name:node.dataset.name,kind:node.dataset.kind,requiresWidth:node.hasAttribute('data-requires-width'),rect:rect(node),panel:rect(node.closest('[data-panel]')),clientWidth:node.clientWidth,scrollWidth:node.scrollWidth,clientHeight:node.clientHeight,scrollHeight:node.scrollHeight}));
+const backedInputs=[...document.querySelectorAll('[data-backed-input]')].map(node=>({type:node.type,display:getComputedStyle(node).display,rect:rect(node)}));
+const viewport=document.querySelector('.viewport');document.querySelector('#result').textContent=JSON.stringify({name:${JSON.stringify(name)},viewportClient:viewport.clientWidth,viewportScroll:viewport.scrollWidth,targets,backedInputs});
+  </script>`;
+  try {
+    writeFileSync(htmlPath, document);
+    const dumped = execFileSync(chrome, [
+      '--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars',
+      `--user-data-dir=${profilePath}`, `--window-size=${Math.max(1200, viewportWidth)},${Math.max(900, viewportHeight)}`,
+      '--dump-dom', '--virtual-time-budget=1000', pathToFileURL(htmlPath).href,
+    ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const encoded = dumped.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1];
+    globalFloorOk(encoded, `${name}: Chromium returned global floor measurements`);
+    return JSON.parse(encoded!.replaceAll('&quot;', '"').replaceAll('&amp;', '&')) as ShellRenderResult;
+  } finally {
+    rmSync(probeDir, { recursive: true, force: true });
+  }
+};
+
+const shellFloorPasses = (name: string, viewportWidth: number, viewportHeight: number, scale: number, compiledCss: string) => {
+  const result = renderShellFloorProbe(name, viewportWidth, viewportHeight, scale, compiledCss);
+  const tolerance = 0.6;
+  const borderTolerance = 1.1;
+  const floor = TARGET_PX * scale;
+  const failedTargets = result.targets.filter(target => target.rect.height + tolerance < floor
+    || (target.requiresWidth && target.rect.width + tolerance < floor)
+    || target.scrollWidth > target.clientWidth + 1 || target.scrollHeight > target.clientHeight + 1
+    || target.rect.left + borderTolerance < target.panel.left || target.rect.right > target.panel.right + borderTolerance
+    || target.rect.top + borderTolerance < target.panel.top || target.rect.bottom > target.panel.bottom + borderTolerance);
+  const glyphsStayCompact = result.backedInputs.every(input => input.type === 'file'
+    ? input.display === 'none' && input.rect.width === 0 && input.rect.height === 0
+    : input.rect.width <= 24 * scale && input.rect.height <= 24 * scale);
+  const noOverflow = result.viewportScroll <= result.viewportClient;
+  return { passes: failedTargets.length === 0 && glyphsStayCompact && noOverflow, result, failedTargets, glyphsStayCompact, noOverflow };
+};
+
+const compiledGlobalFloorCss = await compileShellCss(css);
+for (const [scaleName, scale] of repairScales) {
+  for (const [viewportWidth, viewportHeight] of repairViewports) {
+    const name = `global-floor-${scaleName}-${viewportWidth}x${viewportHeight}`;
+    const proof = shellFloorPasses(name, viewportWidth, viewportHeight, scale, compiledGlobalFloorCss);
+    globalFloorEqual(proof.result.viewportClient, viewportWidth, `${name}: Chromium renders exact viewport width`);
+    globalFloorOk(proof.passes, `${name}: all production-derived direct/effective controls meet floor without clipping or overflow: ${JSON.stringify({ failedTargets: proof.failedTargets, glyphsStayCompact: proof.glyphsStayCompact, noOverflow: proof.noOverflow })}`);
+  }
+}
+
+for (const mutation of [
+  { name: 'remove-global-height-floor', mutation: 'remove-height' },
+  { name: 'reduce-global-height-to-43px', mutation: 'height-43' },
+  { name: 'remove-button-width-floor', mutation: 'remove-button-width' },
+  { name: 'exempt-buttons-from-global-height', mutation: 'exempt-buttons' },
+  { name: 'remove-input-backed-label-floor', mutation: 'remove-label-floor' },
+  { name: 'restore-20px-attachment-delete', mutation: 'attachment-20' },
+] as const) {
+  const mutatedCss = mutateGlobalFloorCss(css, mutation.mutation);
+  const compiledMutationCss = await compileShellCss(mutatedCss);
+  const proof = shellFloorPasses(mutation.name, 360, 800, 1, compiledMutationCss);
+  globalFloorEqual(proof.passes, false, `${mutation.name}: independent compiled/rendered production geometry gate fails`);
+  killedGlobalFloorMutations.push(mutation.name);
+}
+globalFloorEqual(new Set(killedGlobalFloorMutations).size, killedGlobalFloorMutations.length, 'global floor mutation names are unique');
+globalFloorEqual(killedGlobalFloorMutations.length, 6, 'global floor proof kills all six required independent mutations');
+console.log(`Global floor assertions: ${globalFloorAssertionCount}`);
+console.log(`Global floor killed mutations (${killedGlobalFloorMutations.length}): ${killedGlobalFloorMutations.join(', ')}`);
 
 const runSection = sliceBetween(raceWeekend, '{/* 1 ── Identity */}', '{/* 5 ── Tires & pressures */}');
 assert.ok((runSection.match(/min-h-11/g) ?? []).length >= 4, 'Run freeform inputs have 44px floors');
