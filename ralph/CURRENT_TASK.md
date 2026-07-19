@@ -1,118 +1,117 @@
-# Current Task — UX Overhaul v2 Task D2 Clear-All-Data Trust Fix
+# Current Task — UX Overhaul v2 Task D3 Car Cascade Delete
 
-**Status:** REPAIR REQUIRED after D2 QA attempt 1 FAIL, 92/100. One `gpt-5.6-sol` HIGH implementation worker owns the bounded repair. Primary `gpt-5.6-sol` EXTRA HIGH remains QA and plan authority. D3 and every later task remain blocked until D2 passes independent QA.
+**Status:** ACTIVE after D2 QA attempt 2 PASS, 100/100. One `gpt-5.6-sol` HIGH implementation worker owns the isolated build. Primary `gpt-5.6-sol` EXTRA HIGH remains QA and plan authority. Chunk D QA and every later task remain blocked until D3 passes independent QA.
 **Branch/worktree:** existing `codex/ux-overhaul` at `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`; do not create or switch any branch or worktree.
-**D2 attempt 1 candidate:** `803d5d0ae9cfc1a0b4d268d780d7d1a54f036ba9` (`fix: make clear racing data team-aware (D2)`) on parent `444fb4307ff6349c4cd074a8fac4581f8f1e146b`. Its data paths, dialog, isolated scope, automated gates, build, and reviewer checks pass, but it is not accepted because live device-only feedback is false. The exact clean repair dispatch HEAD is the governance commit containing this failure record and must be supplied by the primary.
-**Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` item 11b, Task D2, Part 5.2, Part 6.1, and the binding v2.1 Owner Addendum.
-**Routing:** the implementation worker must verify runtime `turn_context.payload.model=gpt-5.6-sol` and `effort=high` from rollout metadata before any edit or test. Missing metadata is unverified and cannot satisfy the gate. Terra at every tier and `cavecrew-builder` are forbidden.
+**Accepted D2 base:** attempt-1 feature `803d5d0ae9cfc1a0b4d268d780d7d1a54f036ba9` plus structured-notice repair `e29c0f0822c1f00d30ad91613a35144d4f245075`. The exact clean D3 dispatch HEAD is the governance commit containing this work order and must be supplied by the primary.
+**Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` item 12, Task D3, Parts 5.2 and 6.1, and the binding v2.1 Owner Addendum including the explicit four-product-file D3 scope correction.
+**Routing:** worker must verify rollout metadata `turn_context.payload.model=gpt-5.6-sol`, `effort=high`, and exact 203f cwd before any edit or test. Missing metadata is unverified and cannot satisfy the gate. Terra at every tier and `cavecrew-builder` are forbidden.
 
 ## Objective
 
-Make Clear Racing Data tell the truth for a resolved team account. The owner must choose between clearing only this device, which queues no cloud delete and warns that shared data will return on sync, and deleting the signed-in user's owned records everywhere, which uses the existing deferred-delete plus push pairing and never targets another person's canonical team data. Preserve the existing signed-out, solo, and team-unresolved flow exactly.
+Make car deletion reachable and trustworthy. Garage must enumerate every car-scoped dependent record, require strong destructive confirmation, then remove the dependents and car through existing queue-plus-push mechanics. Preserve active selection, unrelated data, Race Days, embedded session setup snapshots, D1/D2 retry and anti-resurrection behavior, and honest B2/B3/C4 feedback.
 
-## QA attempt 1 failure and exact repair
+## Binding data interpretation
 
-On draft `6a5c21695715094ce135f7b4`, the authorized resolved-team device-only scenario did clear all local racing data and a reload re-downloaded the owner fixtures exactly as intended. The post-action toast was nevertheless **That action could not be completed.** Root cause: `handleClearAllData` passes the new success string through `showComponentInfo()`, while `componentInfoNotice()` does not recognize either D2 success string and routes it to the existing `operation-failed` fallback.
+For selected `carId`, the cascade owns exactly:
 
-Repair only this trust failure:
+1. `Setup[]` rows where `setup.carId === carId` → shared table `setups`.
+2. `TireInventoryItem[]` rows where `tire.carId === carId` → personal table `tire_inventory` through the existing personal tire queue.
+3. `ShockSession[]` rows where `session.carId === carId` → shared table `shock_sessions`.
+4. `MaintenanceComponent[]` rows where `component.scope === 'car' && component.carId === carId` → shared table `maintenance_components`.
+5. `MaintenanceLog[]` rows whose `componentId` belongs to a removed car-scoped component → shared table `maintenance_logs`.
+6. The selected `Car` → shared table `cars`, always last.
 
-1. In `src/App.tsx`, add the minimum two dedicated `INFO_COPY` reasons for the resolved-team device-only and everywhere results, and publish them with structured `showInfo(...)` notices from `handleClearAllData`.
-2. Exact device-only result text remains **Device data cleared. Shared team data will re-download on next sync.** Exact everywhere result text remains **Your records are queued for deletion. Team records you do not own remain in cloud.** Neither result may route through `componentInfoNotice()` or `operation-failed`.
-3. Preserve the attempt-1 dialog, choice order, mode wiring, queue/push/ownership behavior, local wipe, legacy signed-out/solo/unresolved branch, and every protected file byte-for-byte.
-4. Extend only `scripts/saved-flash-harness.ts` to compile/execute the real structured info-copy route and fail independently if either result falls back to `operation-failed`, either exact result string changes, or either dedicated reason is removed. Retain all 123 D2 assertions, 23 mutations, D1 62/13, and B1-B3/C4 proof; append new assertions/mutations without weakening anything.
-5. Repair commit scope is exactly `src/App.tsx` and `scripts/saved-flash-harness.ts`. `src/components/SettingsView.tsx` must have zero repair diff because its attempt-1 UI already passes.
+Rig/global maintenance, unrelated cars' records, todos, checklist data, accounting, shopping, trips, and other datasets are not cascaded.
 
-## Owner-authorized destructive QA account
-
-The owner supplied a dedicated Crew Chief account in the task thread and authorizes the primary QA agent to use it for D2 deletion testing. This authorization is narrow and binding:
-
-1. The SOL High implementation worker and every harness use deterministic mocks only. No credential and no live account data may enter a worker prompt, repository file, report, commit, test fixture, screenshot, or command output.
-2. During independent D2 QA, the primary may clear racing data owned by the supplied account through the draft/debug product flow. The primary must not delete the account, team, membership, another user's data, Supabase schema, or authentication records.
-3. Run device-only first and prove that owned cloud data can re-download. Run the everywhere choice last and leave the supplied account's owned racing data cleared after the final verification pull.
-4. Member/non-owner, malformed-owner, solo, unresolved, zero-row, retry, and anti-resurrection cases remain deterministic fixture tests unless they can be exercised without changing another person or team membership.
-5. The credential remains only in the owner-controlled task context. Never copy or echo it into durable project or QA evidence.
-
-## Ownership rule — binding interpretation
-
-The authorized client model does not retain a per-row `user_id` on the nine shared local datasets. Under the accepted `teamDataOwnership` contract, shared data belongs to the canonical team owner resolved by `resolveSyncOwnerId`. Therefore:
-
-1. For a resolved team, the signed-in user owns the shared local set only when `syncOwnerId === user.id`.
-2. A resolved non-owner member, a missing owner, or `syncOwnerId === null` owns zero shared local rows. Never guess ownership and never queue those rows.
-3. Tire inventory is personal and account-scoped, so the signed-in user owns the local tire rows.
-4. `active_sessions`, saved trips, accounting, shopping, and other non-whitelisted data do not gain a new cloud-delete primitive in D2.
-5. `src/lib/teamDataOwnership.ts` is read-only. Any per-record ownership metadata, new primitive, or schema/type expansion is out of scope.
+Race Days are historical/global and must not be deleted. When a top-level Race Day setup pointer references a removed setup, clear only that dangling pointer and persist/push the updated weekend through the existing weekend path. Preserve the Race Day itself and every `sessions[]` byte exactly, including legacy fields, `setupId`, and detached `setupSnapshot`. Never mutate or regenerate embedded session snapshots. Surviving setups remain byte-identical except that a `sourceSetupId` pointing to a removed setup may be cleared if required to avoid a dangling lineage reference.
 
 ## ISOLATED scope
 
-D2 is the second named protected-path exception. Any unrelated change is an automatic QA failure.
+Any unrelated change is an automatic QA failure.
 
-Authorized product footprint only:
+Authorized product files exactly:
 
-1. `src/App.tsx` — attempt-1 scope remains only `handleClearAllData`, the minimum callback/type data needed for its two team choices, and the exact `SettingsView` prop wiring. Repair attempt 2 additionally permits only the two minimum structured `INFO_COPY` entries required by the failure section above.
-2. `src/components/SettingsView.tsx` — only the Clear Racing Data prop contract, `clearStep` state if needed, and the existing Danger Zone clear-data dialog (current lines about 168-203).
+1. `src/App.tsx` — D3 cascade enumeration/orchestration, minimum structured copy, active car/setup reassignment, existing Garage/Setup prop wiring, and no other behavior.
+2. `src/components/GarageView.tsx` — dependency enumeration display, accessible destructive confirmation, cancel/in-flight guard, and delete entry point.
+3. `src/components/SettingsView.tsx` — Garage prop transport only; no other Settings behavior.
+4. `src/components/SetupView.tsx` — disabled setup-delete reason text and use of the existing `onGoToGarage` link only; lifecycle meaning and persistence stay unchanged.
 
-Authorized assertion footprint only:
+Authorized assertion files exactly:
 
-3. `scripts/saved-flash-harness.ts` — extend the existing production-bound clear handler proof for D2 while retaining every B1-B3/C4/D1 assertion and mutation.
+5. `scripts/car-delete-undo-harness.ts` — extend into production-bound cascade execution while retaining all current Undo/account/add/edit/clear/lifecycle assertions.
+6. `scripts/confirm-sheet-harness.ts` — Garage confirmation contract only; retain all existing sheets and update exact count intentionally.
+7. `scripts/saved-flash-harness.ts` — actual Nth queued-delete failure/status/zero-Saved proof only; retain all B1-B3/C4/D1/D2 assertions and mutations.
+8. `scripts/chunk5-setup-harness.ts` — disabled reason plus Garage-link proof only; retain C1-C5 snapshot/lifecycle proof.
 
-No other product, harness, Ralph, plan, owner-report, native, package/config, schema, migration, RLS, edge-function, release, credential, or later-task file may change in the implementation commit. `src/lib/teamDataOwnership.ts`, `src/lib/sync.ts`, `src/lib/resumePull.ts`, the shared/personal queue implementations, replay effect, pull filter, status arbiter, and D1 proof are protected and read-only. No assertion may be removed or weakened.
+No other product, harness, Ralph, plan, report, native, package/config, schema, migration, RLS, release, or later-task file may change in the implementation commit.
+
+Protected and read-only: `src/lib/sync.ts`, `src/lib/teamDataOwnership.ts`, `src/lib/setupLifecycle.ts`, `src/lib/resumePull.ts`, all shared/personal queue implementations and formats, replay effects, pull filters, D1 selected-ID proof, D2 clear flow, B2/B3 notification arbiter, 5-second retry, 30-second resume throttle, account/auth-generation guards, payload/mappers/merge, types/schema/RLS/migrations, native files, and Supabase configuration.
 
 ## Required UI behavior
 
-1. Only a signed-in account with resolved membership and a real team gets the new two-option choice.
-2. The first action is labeled exactly **Clear this device only**. Its dialog copy must include the exact warning **shared team data will re-download on next sync**.
-3. The second action is labeled exactly **Delete my records everywhere**. One plain sentence must state that team records the user does not own remain in the cloud.
-4. For a non-owner team member, the everywhere copy must not imply shared team records will be deleted; it deletes only account-owned personal records such as tires.
-5. Cancel remains available. Each visible action remains at least 44px. While clearing, the choice cannot be submitted a second time.
-6. Signed-out, resolved-solo, and team-unresolved users keep the existing single confirmation and behavior. Do not expose the team choice early while ownership is unresolved.
+1. Garage delete is no longer disabled merely because the car has scoped data.
+2. Activating Delete opens a strong destructive confirmation; it never starts the cascade directly.
+3. The sheet identifies the car and enumerates exact nonzero categories and counts in stable order: setups, tires, shock records, maintenance components, maintenance logs. Plurals must be accurate.
+4. Copy states that the car and listed linked records will be permanently removed from this account/device and that historical Race Day session snapshots remain.
+5. Confirm and Cancel remain at least 44px. Cancel performs zero state, storage, queue, push, dirty, selection, or notification writes.
+6. While a cascade is in flight, a second submit is blocked.
+7. A setup whose canonical `getSetupEditability(...).deletable` is false states the canonical reason in accessible text/title and offers a separate action that routes to Garage through existing `onGoToGarage`. Do not change the predicate or make historical/locked setups individually deletable.
+8. Successful local cascade feedback is honest and structured. If any queued cloud delete fails later, retry/error status wins over and terminally suppresses Saved/Synced.
 
-## Required data behavior
+## Required cascade behavior
 
-1. **Device only:** clear the same 17 local keys and the same in-memory datasets/selections as today. Queue zero shared deletes, queue zero personal-tire deletes, make zero cloud push/delete calls, and publish honest copy that cloud/team data remains and may return on sync.
-2. **Everywhere, canonical team owner:** for each local ID in all nine `TEAM_SHARED_SYNC_TABLES`, queue exactly one normal account-scoped intent with `soloOnly=false`, and invoke the corresponding existing empty-dataset push with the resolved canonical owner/team arguments. Queue every personal tire ID for the signed-in account and use the existing tire push/replay path. Then perform the same local wipe.
-3. **Everywhere, resolved non-owner or missing canonical owner:** queue zero shared intents and make zero shared pushes. Queue only the signed-in account's personal tire IDs and use the existing tire path. Then perform the same local wipe. Copy must say non-owned team records remain.
-4. Existing signed-out/solo/unresolved behavior is byte- and behavior-equivalent: signed-out is local-only; solo/unresolved keeps provisional `soloOnly=true` shared intents plus personal tire intents and the existing resolution rules.
-5. Preserve `carUndo.undo()` before storage/state clearing, all 17 local keys, every current state/ref reset, one C4 dirty mark, active selections, and the existing notification priority.
-6. D1 remains authoritative: zero-row/error/exception replay failures remain queued, retry at exactly 5,000ms, never render Saved/Synced, and queued owned IDs remain filtered from a pull so they cannot resurrect before proven deletion.
-7. Reuse `queueSharedCloudDelete`, `enqueuePendingPersonalTireDelete`, existing push helpers, and the existing replay. No direct Supabase delete, no new queue, no new storage key, and no new delete primitive.
+1. Resolve the selected car and all dependent IDs from the latest refs inside the delayed commit, not stale render arrays.
+2. Preserve the accepted Undo slot. Garage confirmation requests the existing pending delete; Undo makes the car visible with zero writes. Timeout/dismiss/pagehide/unmount/forced next request commits once. Clear All cancels the pending car without committing. Account replacement cancels/blocks old-account writes exactly as today.
+3. At commit, queue every removed shared ID with the existing account-scoped shared queue and call each matching existing push with the retained array and current canonical owner/team arguments.
+4. Queue every removed personal tire ID with the existing account-scoped personal queue and call the existing tire push with the retained array.
+5. Dependency order is setups, tires, shock sessions, maintenance logs, maintenance components, then cars last. Weekend pointer repair may persist before the car, but queues no weekend delete.
+6. Persist retained arrays to React state/refs/localStorage using the existing keys. Do not call a save adapter that restores locked setups or arms an unrelated Saved path.
+7. D3 must not mark C4 dirty or publish Saved for the cascade. Structured queued/success status may render; D1 retry/error must dominate if cloud deletion is not proven.
+8. If deleting the active car, choose the first surviving car using accepted order. Update `activeCarIdRef`, React state, and `race_notes_active_car`. Select that replacement's latest setup. If no replacement or no setup exists, reset active setup safely to `INITIAL_SETUP` and remove stale `race_notes_setup`/active-car selection as appropriate. No deleted setup may remain active.
+9. If deleting a non-active car, preserve active car and active setup bytes exactly.
+10. Race Days and all session records survive byte-for-byte. Only dangling top-level setup IDs may be cleared; session `setupId`, `setupSnapshot`, `setupUsed`, notes, adjustments, and legacy fields are immutable.
+11. Surviving rig/global maintenance, unrelated-car maintenance/logs, and every unrelated dataset remain byte-identical.
+12. Queued removed IDs remain filtered from pulls before proven deletion. A zero-row/error/exception remains queued, retries at exactly 5,000ms, and cannot resurrect after resume.
 
-## Required harness proof
+No direct Supabase delete, new queue, new storage key, new delete primitive, schema/type/ownership expansion, per-record owner guess, or queue bypass.
 
-The D2 extension must compile or execute the real clear handler and bind the real Settings choice wiring. It must use deterministic mocks only and fail independently for at least:
+## Required production-bound proof
 
-1. Device-only queues any shared ID.
-2. Device-only queues any personal tire ID or calls any cloud push/delete path.
-3. Device-only warning is missing or no longer says shared team data re-downloads on next sync.
-4. A resolved member/missing-owner everywhere action queues a non-owned shared ID or invokes a shared push.
-5. A canonical owner everywhere action omits any ID or any of the nine exact shared tables.
-6. An owner everywhere intent uses `soloOnly=true`, the wrong account, table, or ID.
-7. An owned shared dataset loses its existing queue-plus-push pairing or uses the wrong owner/team argument.
-8. Personal tires are omitted from the everywhere path or attributed to the wrong account.
-9. The two labels/copy or callback modes are removed, swapped, or miswired.
-10. Signed-out, solo, or unresolved behavior changes.
-11. `carUndo.undo()` moves after storage clearing, any current local key/state reset is lost, or the C4 dirty boundary is duplicated/removed.
-12. An owned queued fixture resurrects during the next-pull/resume filter.
-13. Direct Supabase deletion, a new queue/key/primitive, or any change to the D1 helper/replay/filter/status contract appears.
-14. A choice can submit twice while its first clear is in flight.
-15. Either resolved-team success result routes through `componentInfoNotice()`/`operation-failed`, loses its dedicated structured reason, or changes its exact success text.
+The harness extension must compile/execute the real cascade and real confirmation/prop routes. Deterministic mocks only; no credential or live database. It must independently fail for at least:
 
-Print D2 assertion count and unique mutation names/count. Retain and rerun all existing B1-B3/C4/D1 proof. Synthetic-only or source-string-only ownership proof is insufficient.
+1. Any dependency category is missing or counted incorrectly.
+2. Confirmation is bypassed, Cancel writes anything, or double-submit invokes twice.
+3. Any removed ID uses the wrong account/table/ID, misses its existing queue, or misses the matching push.
+4. Car queue/push runs before any dependent category.
+5. A personal tire uses shared queue semantics or the wrong account.
+6. A car-scoped maintenance component or dependent log survives; a rig/global or unrelated-car component/log is deleted.
+7. Delayed commit uses stale arrays, applies after account replacement, duplicates through lifecycle triggers, or breaks add/edit/Undo/Clear All behavior.
+8. Active car or active setup points to removed data, replacement selection is wrong, or no-replacement reset leaves stale storage.
+9. A non-active cascade changes current car/setup bytes.
+10. A Race Day is deleted, any `sessions[]` byte changes, or any session `setupId`/`setupSnapshot` is removed/mutated.
+11. A dangling top-level weekend/setup lineage pointer remains after its setup is removed, or an unrelated pointer changes.
+12. An actual Nth queued-delete failure is treated as success, its intent is removed, retry timing changes, later push success overwrites terminal error, or Saved/Synced appears.
+13. Disabled setup-delete reason is missing/wrong, Garage link is missing, or canonical editability semantics change.
+14. Direct Supabase delete, new primitive/queue/key, sync/pull/filter/throttle/generation/lifecycle change, or later-task code appears.
+
+Print total D3 assertions and unique mutation names/count. Retain every pre-D3 assertion and mutation in the four harnesses; no assertion removal or weakening.
 
 ## Builder gates before commit
 
-1. Verify runtime metadata, exact branch, exact repair dispatch HEAD, ancestry through D2 attempt-1 candidate `803d5d0`, accepted pre-D2 base `dc5c63d`, and D1 base `1ca3576`, and a clean tree before editing.
-2. Show `git diff --name-status` and `git diff --check`; repair scope must be exactly `src/App.tsx` and `scripts/saved-flash-harness.ts`. `SettingsView.tsx` and every protected path have zero repair diff.
-3. Run focused Saved/D1/D2, team ownership, car-delete/clear, confirmation/status, offline/resume, weekend-delete, and current C1-C5 setup/lifecycle/Quick Adjust/tire/touch regressions.
-4. Run the raw full 24-harness matrix. Expected result remains exactly 23/24 with only unchanged `muted-text-color-harness.ts` failing `15 !== 16`. Any other failure blocks commit.
+1. Verify runtime metadata, exact branch, exact dispatch HEAD, ancestry through `e29c0f0`, `803d5d0`, `1ca3576`, and accepted Chunk C, plus clean tree before editing.
+2. `git diff --name-status` and `git diff --check`; scope must be exactly the eight authorized files above. Every protected path has zero diff.
+3. Run focused D1/D2/D3, car Undo, confirmation/status, team ownership, offline/resume, weekend delete, setup snapshot/lifecycle, Quick Adjust, tire, and touch-target regressions.
+4. Run raw full 24-harness matrix. Expected result is exactly 23/24 with only unchanged `muted-text-color-harness.ts` failing `15 !== 16`.
 5. `npm run lint` must report exactly the three known baseline errors and no new error.
 6. `npm run build` must succeed with exactly 566 transformed modules.
-7. Commit implementation plus harness once with a D2-identifying message. Do not update Ralph, plan, owner report, or begin D3.
-8. Return exact runtime/rollout evidence, commit/parent, file list/diff, focused/raw/lint/build results, mutation count/names, protected-path audit, and final clean status. Stop. No push, deploy, PR, merge, or live database.
+7. Obtain cavecrew-reviewer exact diff/protected-path review.
+8. Create exactly one D3-identifying implementation commit containing only the eight authorized files. Do not edit Ralph/plan/report or begin Chunk D QA/E1.
+9. Return exact runtime/rollout evidence, commit/parent, file list/diff, D3 assertions/mutations, focused/raw/lint/build evidence, protected audit, reviewer verdict, and final clean status. Stop. No live database, deploy, APK, push, PR, or merge.
 
 ## Independent QA gates
 
-Primary Extra High QA must independently re-verify runtime/ref/clean/ancestry, audit every changed line against this isolated exception, rerun focused/raw/lint/build, and exercise signed-out, solo, unresolved, team-owner device-only, team-owner everywhere, member device-only, member everywhere, zero-row retry, and resume anti-resurrection fixtures. Inspect the explicit Crew Chief draft at 360x800, 390x844, and 412x915, including both team choices/copy and 44px targets. Build/install only a Java 21 debug APK. Use the owner-authorized account only under the narrow destructive-QA rules above: prove device-only re-download first, then perform everywhere deletion last and leave the account's owned racing data cleared. Obtain a cavecrew-reviewer diff/protected-path review and score strictly. Any finding transfers repair to a SOL High implementation worker; Terra is never dispatched.
+Primary Extra High QA independently re-verifies runtime/ref/clean/ancestry and audits every changed line. Rerun focused/raw/lint/build. Exercise in fixtures: empty cascade, every dependency category, active/non-active car, no replacement, replacement without setup, rig/global maintenance survival, Race Day/session snapshot byte survival, Undo/lifecycle/account replacement, zero-row/Nth failure, retry and resume anti-resurrection. Inspect draft at 360x800, 390x844, and 412x915 for exact enumeration, reason/link, confirmation/cancel, 44px targets, no overflow, themes/scales, and no console error. Build/install Java 21 debug APK and run a bounded synthetic car cascade; never use or recreate the D2 destructive account fixtures, which are intentionally cleared. Obtain independent cavecrew review and score strictly. Any finding transfers repair to SOL High; Terra is never dispatched.
 
 ## Hard bans
 
-No D3/Chunk E work; no new delete primitive, queue, key, ownership metadata, direct Supabase delete, or per-record owner guess; no change to `teamDataOwnership.ts`, D1 helper, replay, 5-second timer, account/auth-generation guards, queue format, 30-second resume throttle, UXN-1 filtering, payload/mappers/merge, schema/RLS/migrations/Supabase configuration, native source/version/signing/release, package/config, production Netlify publish, Git push, PR, merge, `master`, or credentials. Preserve all A1-D1 acceptance, local-first persistence, account/team isolation, safe areas, pinch zoom, themes, accessibility, and the exact three-error lint baseline.
+No Chunk D QA, Chunk E, final QA, or handoff work; no change to sync primitives, queue formats, replay, pull filters, retry/throttle/auth-generation/status priority, setup lifecycle meaning, D2 clear flow, schema/RLS/migrations/Supabase configuration, native source/version/signing/release, package/config, production Netlify publish, Git push, PR, merge, `master`, credentials, account/team/membership data, or another user's data. Preserve all A1-D2 acceptance, local-first persistence, account/team isolation, safe areas, pinch zoom, themes, accessibility, and the exact three-error lint baseline.

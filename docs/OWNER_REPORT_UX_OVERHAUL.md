@@ -2,7 +2,7 @@
 
 ## Current status
 
-Tasks C2, C2.5, C3, C4, C5, the integrated Chunk C gate, D1, and the owner's setup-label microfix are complete. D1 and the label microfix each passed with a score of 100/100. D2 is now active under an isolated work order for making Clear All Data tell the truth about device-only clearing versus deleting records owned by the signed-in user. D3 and later work remain blocked until D2 passes.
+Tasks C2, C2.5, C3, C4, C5, the integrated Chunk C gate, D1, D2, and the owner's setup-label microfix are complete. D2 passed on its second QA attempt with a score of 100/100. D3, the isolated car-cascade delete task, is now active. Chunk D QA and later work remain blocked until D3 passes.
 
 ## Task C2 — Session snapshot model and diff engine
 
@@ -316,3 +316,17 @@ Draft `https://6a5c21695715094ce135f7b4--crew-chief-race-notes.netlify.app/` sho
 The blocker appeared immediately afterward. The toast said **That action could not be completed** even though the clear had succeeded. The new success sentence was passed through an older message mapper that did not recognize it and replaced it with a generic failure message. The delete-everywhere live test was deliberately not run after this finding.
 
 The repair is tightly bounded. A SOL High worker will add structured success messages for the device-only and everywhere results in `App.tsx` and extend `saved-flash-harness.ts` so either result fails the test if it ever falls back to the generic failure message. The already-passing dialog and deletion logic stay unchanged. D3 and all later work remain blocked until repaired D2 passes, including the final authorized delete-everywhere test.
+
+## Task D2 — Final result after repair
+
+D2 is a final **PASS, 100/100** on QA attempt 2. The repair is commit `e29c0f0` on governance parent `5580cb3`. It changes only `App.tsx` and `saved-flash-harness.ts`. The two team-account results now use dedicated structured notification reasons, so the device-only action reports that shared team data will return on sync and the everywhere action reports that the signed-in user's records are queued while records owned by others remain. The already-passing dialog, deletion ownership rules, queue/push pairing, local wipe, retry behavior, and legacy paths did not change.
+
+The expanded production-bound proof passed 143 D2 assertions and killed 29 independent mutations. D1 remained at 62 assertions and 13 mutations. All fourteen focused regressions passed. The complete harness matrix remained at the expected 23 of 24, with only the existing muted-text lock failing `15 !== 16`. Type-checking reported exactly the three known baseline errors, the production build transformed exactly 566 modules, the two-file repair scope was clean, protected paths had no diff, and independent cavecrew review passed 100/100.
+
+Draft preview `https://6a5c275c8df1ec557846405c--crew-chief-race-notes.netlify.app/` is a draft only. At 360×800, 390×844, and 412×915, both choices and their warning copy were present, the page had no horizontal overflow, the three clear/cancel controls were exactly 44 pixels tall, and the viewport metadata remained pinch-enabled.
+
+The authorized live sequence passed in the required order. First, device-only clearing removed the local cars, setups, and Race Day records, showed the correct success message, and a reload restored the cloud fixtures. Then the everywhere action showed the correct success message, cleared local state, and after two sync waits and reloads the account's owned car, setups, and Race Day records did not return. The login and team membership remained intact; no account, authentication record, team, membership, schema, or other user's records were deleted.
+
+A Java 21 debug APK was synchronized, built, and installed on `emulator-5554`. It is available at `android/app/build/outputs/apk/debug/app-debug.apk`, is 12,085,818 bytes, and has SHA-256 `8643DCD7FC47D7EB95E511B56397F27AA37943F0DE0A14ED795A548EE8C3F550`. It launched `nimbus.engineering.crewchief/.MainActivity` without an application crash; the only captured Android diagnostic was a benign WebView variations-seed warning.
+
+D2 has no remaining repair. D3 is next: car deletion must enumerate dependent records, require strong confirmation, cascade through existing queue-plus-push paths without orphaning or resurrecting data, preserve embedded session setup snapshots, keep active-car reassignment correct, and report a mid-cascade failure honestly instead of showing Saved. No production publish, release build, Git push, PR, or master merge occurred.
