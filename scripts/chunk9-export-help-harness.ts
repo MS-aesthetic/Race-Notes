@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -178,6 +179,10 @@ const e1Equal = (actual: unknown, expected: unknown, message: string): void => {
   e1AssertionCount += 1;
   assert.equal(actual, expected, message);
 };
+const e1DeepEqual = (actual: unknown, expected: unknown, message: string): void => {
+  e1AssertionCount += 1;
+  assert.deepEqual(actual, expected, message);
+};
 const e1Kill = (name: string, killed: boolean): void => {
   e1AssertionCount += 1;
   assert.equal(killed, true, `E1 mutation killed: ${name}`);
@@ -200,6 +205,60 @@ const context = (activeTab: ContextualAppGuideContext['activeTab'], fourBarVisib
   fourBarVisible,
   mappedSection,
 });
+
+const E1_PRODUCT_COMMIT = '45e60c95a5bf4e08fccb261cd2ecc85fe28cdddf';
+const E1_PRODUCT_PARENT = 'cbe874f491cc81e218f495e7bb50ac5f14f49aaa';
+const E1_PRODUCT_PATHS = [
+  'scripts/chunk9-export-help-harness.ts',
+  'src/App.tsx',
+  'src/components/RaceWeekendView.tsx',
+  'src/components/SetupView.tsx',
+  'src/lib/helpRouting.ts',
+] as const;
+const FROZEN_FOUR_BAR_PATH = 'src/components/FourBarQuickAdjust.tsx';
+const normalizeE1ScopePaths = (paths: readonly string[]): string[] => paths
+  .map(path => path.trim().replace(/\\/g, '/'))
+  .filter(Boolean)
+  .sort();
+const validatesE1ImplementationScope = (paths: readonly string[]): boolean => {
+  const normalized = normalizeE1ScopePaths(paths);
+  return normalized.length === E1_PRODUCT_PATHS.length
+    && normalized.every((path, index) => path === E1_PRODUCT_PATHS[index])
+    && !normalized.includes(FROZEN_FOUR_BAR_PATH);
+};
+const e1ProductParent = execFileSync('git', ['rev-parse', `${E1_PRODUCT_COMMIT}^`], {
+  cwd: process.cwd(),
+  encoding: 'utf8',
+}).trim();
+const e1ProductChangedPaths = execFileSync(
+  'git',
+  ['diff', '--name-only', e1ProductParent, E1_PRODUCT_COMMIT, '--'],
+  { cwd: process.cwd(), encoding: 'utf8' },
+).split(/\r?\n/).filter(Boolean);
+const normalizedE1ProductPaths = normalizeE1ScopePaths(e1ProductChangedPaths);
+
+e1Equal(e1ProductParent, E1_PRODUCT_PARENT, 'E1 exact product parent is bound');
+e1DeepEqual(normalizedE1ProductPaths, [...E1_PRODUCT_PATHS], 'E1 exact product diff matches sorted five-file allowlist');
+e1Ok(validatesE1ImplementationScope(e1ProductChangedPaths), 'E1 pure scope validator accepts exact Git-derived product diff');
+e1Equal(normalizedE1ProductPaths.includes(FROZEN_FOUR_BAR_PATH), false, 'E1 product diff explicitly excludes FourBarQuickAdjust');
+e1Kill(
+  'implementation-scope-missing-authorized-path',
+  !validatesE1ImplementationScope(e1ProductChangedPaths.filter(path => path !== 'src/App.tsx')),
+);
+e1Kill(
+  'implementation-scope-duplicate-authorized-path',
+  !validatesE1ImplementationScope([...e1ProductChangedPaths, 'src/App.tsx']),
+);
+for (const [name, path] of [
+  ['implementation-scope-protected-path-added', 'src/lib/sync.ts'],
+  ['implementation-scope-e2-path-added', 'src/components/GarageView.tsx'],
+  ['implementation-scope-e3-path-added', 'src/index.css'],
+  ['implementation-scope-native-path-added', 'android/app/src/main/java/nimbus/engineering/crewchief/MainActivity.java'],
+  ['implementation-scope-schema-path-added', 'supabase/migrations/99999999999999_e1_scope_mutation.sql'],
+  ['implementation-scope-package-path-added', 'package.json'],
+] as const) {
+  e1Kill(name, !validatesE1ImplementationScope([...e1ProductChangedPaths, path]));
+}
 
 e1Equal(resolveContextualAppGuideSection(context('setups', true)), 'four-bar', 'E1 FourBar visibility overrides Setups');
 e1Equal(resolveContextualAppGuideSection(context('raceweekend', true)), 'four-bar', 'E1 open Race Day FourBar resolves four-bar');
