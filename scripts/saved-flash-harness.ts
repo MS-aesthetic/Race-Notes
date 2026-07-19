@@ -2317,6 +2317,7 @@ type D2Run = {
   dirty: number;
   undo: number;
   info: string[];
+  reasons: string[];
   events: string[];
 };
 
@@ -2392,6 +2393,42 @@ const compileD2Clear = (source: string, dependencies: Record<string, unknown>): 
   compileHandler(source, 'handleClearAllData', '  const handleDeleteAccount', dependencies)
 );
 
+type D2InfoNotice = { reason: string; context?: Record<string, string> };
+const compileD2ResolveInfoCopy = (source: string): RuntimeExport => {
+  const block = between(
+    source,
+    'const INFO_COPY = {',
+    '\n\nconst componentInfoNotice',
+    'D2 real structured info-copy route',
+  ).replace('const resolveInfoCopy =', 'export const resolveInfoCopy =');
+  return compileRuntimeModule(block, 'resolveInfoCopy', {
+    SETUP_NOTICE_COPY: { minimumSetups: 'minimum setups' },
+  });
+};
+const compileD2ComponentInfoNotice = (source: string): RuntimeExport => {
+  const block = between(
+    source,
+    'const componentInfoNotice =',
+    '\n\nconst THEME_SCALE_MIGRATION_VERSION',
+    'D2 real component fallback route',
+  ).replace('const componentInfoNotice =', 'export const componentInfoNotice =');
+  return compileRuntimeModule(block, 'componentInfoNotice', {});
+};
+const renderD2StructuredNotice = (source: string, notice: D2InfoNotice): B2RenderedRoute => {
+  const markup = between(source, '        {/* One compact notification arbiter.', '\n\n        {/* Core Main Active Canvas Area */}', 'D2 real notification renderer');
+  const route = markup.match(/(const isInfo = [\s\S]*?const isPersistent = [^;]+;)/)?.[1];
+  d2Ok(route, 'D2 exact production notification route exists');
+  const evaluate = new Function(
+    'infoToast',
+    'savedFlash',
+    'syncStatus',
+    'isOnline',
+    'resolveInfoCopy',
+    `${route}\nreturn { visible: isInfo || savedFlash || !!statusNotice, isInfo, isSuccess, isPersistent, msg };`,
+  ) as (infoToast: D2InfoNotice, savedFlash: boolean, syncStatus: string, isOnline: boolean, resolveInfoCopy: RuntimeExport) => B2RenderedRoute;
+  return evaluate(notice, false, '', true, compileD2ResolveInfoCopy(source));
+};
+
 const runD2Clear = async (
   source: string,
   identity: D2Identity,
@@ -2403,6 +2440,7 @@ const runD2Clear = async (
   const removedKeys: string[] = [];
   const states: string[] = [];
   const info: string[] = [];
+  const reasons: string[] = [];
   const events: string[] = [];
   let dirty = 0;
   let undo = 0;
@@ -2412,6 +2450,8 @@ const runD2Clear = async (
   const user = signedIn ? { id: 'account-1' } : null;
   const team = hasTeam ? { id: 'team-1' } : null;
   const syncOwnerId = identity === 'owner' ? 'account-1' : identity === 'member' ? 'owner-2' : identity === 'solo' ? 'account-1' : null;
+  const resolveInfoCopy = compileD2ResolveInfoCopy(source);
+  const componentInfoNotice = compileD2ComponentInfoNotice(source);
   const localStorage = {
     removeItem: (key: string) => { removedKeys.push(key); events.push(`remove:${key}`); },
   };
@@ -2452,7 +2492,19 @@ const runD2Clear = async (
     INITIAL_ACTIVE_SESSION: { id: 'initial-session' },
     prevTodosForNotifyRef: { current: d2Fixture.todos },
     markSavedDirty: () => { dirty += 1; events.push('dirty'); },
-    showComponentInfo: (message: string) => { info.push(message); events.push(`info:${message}`); },
+    showInfo: (notice: D2InfoNotice) => {
+      const message = resolveInfoCopy(notice);
+      reasons.push(notice.reason);
+      info.push(message);
+      events.push(`info:${notice.reason}:${message}`);
+    },
+    showComponentInfo: (message: string) => {
+      const notice = componentInfoNotice(message) as D2InfoNotice;
+      const resolved = resolveInfoCopy(notice);
+      reasons.push(notice.reason);
+      info.push(resolved);
+      events.push(`info:${notice.reason}:${resolved}`);
+    },
     setSyncStatus: () => undefined,
   };
   for (const name of D2_PUSHES) dependencies[name] = push(name);
@@ -2463,7 +2515,7 @@ const runD2Clear = async (
   }
   const clear = compileD2Clear(source, dependencies);
   await clear();
-  return { shared, tires, pushes, removedKeys, states, dirty, undo, info, events };
+  return { shared, tires, pushes, removedKeys, states, dirty, undo, info, reasons, events };
 };
 
 const d2SettingsBlock = (source: string): string => between(
@@ -2501,6 +2553,10 @@ const d2SourcePasses = (appSource: string, settingsSource: string): boolean => {
     && clear.includes('queueSharedCloudDelete(table, id, false, user.id)')
     && clear.includes('queueSharedCloudDelete(table, id, true)')
     && clear.includes('if (isResolvedTeam) pushTires([], user.id, setSyncStatus);')
+    && appSource.includes("'clear-device-only': () => 'Device data cleared. Shared team data will re-download on next sync.',")
+    && appSource.includes("'clear-everywhere': () => 'Your records are queued for deletion. Team records you do not own remain in cloud.',")
+    && clear.includes("showInfo({ reason: resolvedMode === 'device-only' ? 'clear-device-only' : 'clear-everywhere' });")
+    && !clear.includes('showComponentInfo(isResolvedTeam')
     && clear.indexOf('carUndo.undo();') < clear.indexOf('localStorage.removeItem')
     && clear.indexOf('localStorage.removeItem') < clear.indexOf('markSavedDirty();')
     && (clear.match(/markSavedDirty\(\);/g) ?? []).length === 1
@@ -2543,6 +2599,15 @@ d2Equal(ownerDevice.undo, 1, 'D2 device-only cancels car Undo exactly once');
 d2Equal(ownerDevice.dirty, 1, 'D2 device-only marks C4 dirty exactly once');
 d2Ok(ownerDevice.events[0] === 'undo', 'D2 car Undo happens before queue, push, wipe, or dirty work');
 d2Equal(ownerDevice.info, ['Device data cleared. Shared team data will re-download on next sync.'], 'D2 device-only status is honest');
+d2Equal(ownerDevice.reasons, ['clear-device-only'], 'D2 device-only uses dedicated structured reason');
+const ownerDeviceRoute = renderD2StructuredNotice(app, { reason: ownerDevice.reasons[0] });
+d2Equal(ownerDeviceRoute, {
+  visible: true,
+  isInfo: true,
+  isSuccess: false,
+  isPersistent: false,
+  msg: 'Device data cleared. Shared team data will re-download on next sync.',
+}, 'D2 device-only exact copy renders through real info arbiter, never operation-failed');
 
 const ownerEverywhere = await runD2Clear(app, 'owner', 'everywhere');
 const expectedShared = D2_TABLES.flatMap(table => d2Fixture[table].map(item => ({
@@ -2567,6 +2632,15 @@ d2Equal(ownerEverywhere.removedKeys, D2_KEYS, 'D2 everywhere preserves exact loc
 d2Equal(ownerEverywhere.dirty, 1, 'D2 everywhere marks C4 dirty once');
 d2Ok(ownerEverywhere.events.indexOf('queue:setups:setups-1') < ownerEverywhere.events.indexOf('push:pushSetups'), 'D2 owner queues shared intent before matching cloud push');
 d2Ok(ownerEverywhere.events.indexOf('tire:tire-1') < ownerEverywhere.events.indexOf('push:pushTires'), 'D2 owner queues tire intent before empty tire push');
+d2Equal(ownerEverywhere.reasons, ['clear-everywhere'], 'D2 everywhere uses dedicated structured reason');
+const ownerEverywhereRoute = renderD2StructuredNotice(app, { reason: ownerEverywhere.reasons[0] });
+d2Equal(ownerEverywhereRoute, {
+  visible: true,
+  isInfo: true,
+  isSuccess: false,
+  isPersistent: false,
+  msg: 'Your records are queued for deletion. Team records you do not own remain in cloud.',
+}, 'D2 everywhere exact copy renders through real info arbiter, never operation-failed');
 
 for (const identity of ['member', 'missing-owner'] as const) {
   const outcome = await runD2Clear(app, identity, 'everywhere');
@@ -2625,6 +2699,25 @@ const guardedSubmit = await runSettingsDoubleSubmit(settings);
 d2Equal(guardedSubmit.beforeFinish, { calls: 1, modes: ['everywhere'], steps: [2] }, 'D2 real Settings guard blocks double-submit and preserves first mode');
 d2Equal(guardedSubmit.steps, [2, 0], 'D2 real Settings clearing state closes only after work settles');
 
+const d2StructuredOutcomeFails = async (
+  source: string,
+  mode: D2Mode,
+  expectedReason: string,
+  expectedCopy: string,
+): Promise<boolean> => {
+  try {
+    const outcome = await runD2Clear(source, 'owner', mode);
+    if (outcome.reasons.length !== 1 || outcome.reasons[0] !== expectedReason) return true;
+    const route = renderD2StructuredNotice(source, { reason: outcome.reasons[0] });
+    return !route.visible
+      || !route.isInfo
+      || route.msg !== expectedCopy
+      || route.msg === 'That action could not be completed.';
+  } catch {
+    return true;
+  }
+};
+
 const deviceQueuesShared = d2Replace(app, "if (user && (!teamResolved || !team)) {", "if (user && resolvedMode === 'device-only') {", 'device-queues-shared');
 d2Kill('device-only-queues-shared', (await runD2Clear(deviceQueuesShared, 'owner', 'device-only')).shared.length > 0);
 const deviceQueuesCloud = d2Replace(app, "if (user && resolvedMode !== 'device-only') {", 'if (user) {', 'device-queues-cloud');
@@ -2668,8 +2761,8 @@ const stateResetRemoved = d2Replace(app, '    setAccounting([]);\n', '', 'state-
 d2Kill('state-reset-removed', !(await runD2Clear(stateResetRemoved, 'owner', 'device-only')).states.includes('accounting'));
 const dirtyRemoved = d2Replace(
   app,
-  '    markSavedDirty();\n    showComponentInfo(isResolvedTeam',
-  '    showComponentInfo(isResolvedTeam',
+  '    markSavedDirty();\n    if (isResolvedTeam)',
+  '    if (isResolvedTeam)',
   'dirty-removed',
 );
 d2Kill('c4-dirty-mark-removed', (await runD2Clear(dirtyRemoved, 'owner', 'device-only')).dirty === 0);
@@ -2677,6 +2770,87 @@ const directSupabase = d2Replace(app, '    const isResolvedTeam =', "    supabas
 d2Kill('direct-supabase-delete-added', !d2SourcePasses(directSupabase, settings));
 const doubleSubmitGuardRemoved = d2Replace(settings, '    if (clearingRef.current) return;\n', '', 'double-submit-guard');
 d2Kill('double-submit-guard-removed', (await runSettingsDoubleSubmit(doubleSubmitGuardRemoved)).beforeFinish.calls === 2);
+
+const deviceFallbackRewire = d2Replace(
+  app,
+  "      showInfo({ reason: resolvedMode === 'device-only' ? 'clear-device-only' : 'clear-everywhere' });",
+  `      if (resolvedMode === 'device-only') {
+        showComponentInfo('Device data cleared. Shared team data will re-download on next sync.');
+      } else {
+        showInfo({ reason: 'clear-everywhere' });
+      }`,
+  'device-fallback-rewire',
+);
+d2Kill('device-success-fallback-rewire', await d2StructuredOutcomeFails(
+  deviceFallbackRewire,
+  'device-only',
+  'clear-device-only',
+  'Device data cleared. Shared team data will re-download on next sync.',
+));
+const everywhereFallbackRewire = d2Replace(
+  app,
+  "      showInfo({ reason: resolvedMode === 'device-only' ? 'clear-device-only' : 'clear-everywhere' });",
+  `      if (resolvedMode === 'everywhere') {
+        showComponentInfo('Your records are queued for deletion. Team records you do not own remain in cloud.');
+      } else {
+        showInfo({ reason: 'clear-device-only' });
+      }`,
+  'everywhere-fallback-rewire',
+);
+d2Kill('everywhere-success-fallback-rewire', await d2StructuredOutcomeFails(
+  everywhereFallbackRewire,
+  'everywhere',
+  'clear-everywhere',
+  'Your records are queued for deletion. Team records you do not own remain in cloud.',
+));
+const deviceReasonRemoved = d2Replace(
+  app,
+  "  'clear-device-only': () => 'Device data cleared. Shared team data will re-download on next sync.',\n",
+  '',
+  'device-reason-removed',
+);
+d2Kill('device-structured-reason-removed', await d2StructuredOutcomeFails(
+  deviceReasonRemoved,
+  'device-only',
+  'clear-device-only',
+  'Device data cleared. Shared team data will re-download on next sync.',
+));
+const everywhereReasonRemoved = d2Replace(
+  app,
+  "  'clear-everywhere': () => 'Your records are queued for deletion. Team records you do not own remain in cloud.',\n",
+  '',
+  'everywhere-reason-removed',
+);
+d2Kill('everywhere-structured-reason-removed', await d2StructuredOutcomeFails(
+  everywhereReasonRemoved,
+  'everywhere',
+  'clear-everywhere',
+  'Your records are queued for deletion. Team records you do not own remain in cloud.',
+));
+const deviceCopyChanged = d2Replace(
+  app,
+  'Device data cleared. Shared team data will re-download on next sync.',
+  'Device data cleared. Team data may return later.',
+  'device-copy-changed',
+);
+d2Kill('device-exact-copy-changed', await d2StructuredOutcomeFails(
+  deviceCopyChanged,
+  'device-only',
+  'clear-device-only',
+  'Device data cleared. Shared team data will re-download on next sync.',
+));
+const everywhereCopyChanged = d2Replace(
+  app,
+  'Your records are queued for deletion. Team records you do not own remain in cloud.',
+  'Records queued.',
+  'everywhere-copy-changed',
+);
+d2Kill('everywhere-exact-copy-changed', await d2StructuredOutcomeFails(
+  everywhereCopyChanged,
+  'everywhere',
+  'clear-everywhere',
+  'Your records are queued for deletion. Team records you do not own remain in cloud.',
+));
 
 d2Equal(new Set(killedD2Mutations).size, killedD2Mutations.length, 'D2 killed mutation labels are unique');
 d2Ok(killedD2Mutations.length >= 20, 'D2 kills at least twenty independent mutation classes');

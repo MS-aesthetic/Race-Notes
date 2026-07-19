@@ -187,6 +187,8 @@ const INFO_COPY = {
   'race-day-report-downloaded': () => 'Race Day PDF downloaded.',
   'race-day-report-failed': () => 'Race Day PDF could not be shared.',
   'four-bar-save-failed': () => 'Four-bar change could not be saved.',
+  'clear-device-only': () => 'Device data cleared. Shared team data will re-download on next sync.',
+  'clear-everywhere': () => 'Your records are queued for deletion. Team records you do not own remain in cloud.',
   'operation-failed': () => 'That action could not be completed.',
 } as const;
 
@@ -728,11 +730,11 @@ export default function App() {
     setChecklistTemplates([]);
     setWeekendChecklists([]);
     markSavedDirty();
-    showComponentInfo(isResolvedTeam
-      ? resolvedMode === 'device-only'
-        ? 'Device data cleared. Shared team data will re-download on next sync.'
-        : 'Your records are queued for deletion. Team records you do not own remain in cloud.'
-      : 'All data cleared');
+    if (isResolvedTeam) {
+      showInfo({ reason: resolvedMode === 'device-only' ? 'clear-device-only' : 'clear-everywhere' });
+    } else {
+      showComponentInfo('All data cleared');
+    }
   };
 
   const handleDeleteAccount = async () => {
