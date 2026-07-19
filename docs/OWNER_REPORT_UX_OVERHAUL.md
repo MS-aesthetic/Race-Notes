@@ -2,7 +2,7 @@
 
 ## Current status
 
-Tasks C2, C2.5, C3, C4, C5, the integrated Chunk C gate, D1, D2, and the owner's setup-label microfix are complete. D2 passed on its second QA attempt with a score of 100/100. D3, the isolated car-cascade delete task, is now active. Chunk D QA and later work remain blocked until D3 passes.
+Tasks C2, C2.5, C3, C4, C5, the integrated Chunk C gate, D1, D2, and the owner's setup-label microfix are complete. D2 passed on its second QA attempt with a score of 100/100. D3 remains active after its first QA attempt failed 85/100 on one offline/local-only defect. A narrowly scoped SOL High repair is next. Chunk D QA and later work remain blocked until D3 passes.
 
 ## Task C2 — Session snapshot model and diff engine
 
@@ -330,3 +330,17 @@ The authorized live sequence passed in the required order. First, device-only cl
 A Java 21 debug APK was synchronized, built, and installed on `emulator-5554`. It is available at `android/app/build/outputs/apk/debug/app-debug.apk`, is 12,085,818 bytes, and has SHA-256 `8643DCD7FC47D7EB95E511B56397F27AA37943F0DE0A14ED795A548EE8C3F550`. It launched `nimbus.engineering.crewchief/.MainActivity` without an application crash; the only captured Android diagnostic was a benign WebView variations-seed warning.
 
 D2 has no remaining repair. D3 is next: car deletion must enumerate dependent records, require strong confirmation, cascade through existing queue-plus-push paths without orphaning or resurrecting data, preserve embedded session setup snapshots, keep active-car reassignment correct, and report a mid-cascade failure honestly instead of showing Saved. No production publish, release build, Git push, PR, or master merge occurred.
+
+## Task D3 — QA attempt 1
+
+D3 attempt 1 is a **FAIL, 85/100**. Most of the feature is correct, but car deletion does not work in the app's signed-out offline mode, so the task cannot be accepted yet.
+
+Implementation commit `120fa72` adds the strong Garage confirmation, exact dependent-record counts, cascading removal for setups, personal tires, shock records, car-scoped maintenance components and their logs, and active-car/setup reassignment. It preserves Race Days and every historical session snapshot, keeps unrelated and rig-level maintenance data, uses the existing deletion queues and push paths, and makes disabled setup cards explain why they cannot be deleted individually with a separate route to Garage.
+
+The implementation is cleanly isolated to the eight authorized files. Its production-bound tests report 174 D3 assertions and kill 40 independent mutations. The complete builder matrix stayed at the expected 23 of 24 with only the known muted-text lock, type-checking stayed at exactly the three known baseline errors, the production build transformed 566 modules, and the independent focused confirmation, setup, status, and cascade harnesses all passed. Independent diff review found no second blocker.
+
+The blocker is in the delayed account-safety check. When the app is running from its remembered local account without a live signed-in user, it stores the captured account identity as `null`. The later check compares that with an optional user ID, which evaluates to `undefined`. Because `undefined` and `null` are different values, the cascade exits immediately. The confirmation and Undo UI still appear, but after the delay the car and all linked local records remain. The existing test missed this because it only ran the real handler with a signed-in account and explicitly expected the flawed comparison.
+
+The repair is limited to `App.tsx` and `car-delete-undo-harness.ts`. The identity check will normalize both missing identities to the same value. The expanded test will run active-car, non-active-car, and last-car cascades with no live user, prove that all intended local records are removed and selection is safe, and prove that no cloud queue, push, or null-owned delete intent is created. It will also deliberately reintroduce the original comparison and require that mutation to fail. Signed-in account-replacement protection and every existing D3 proof remain required.
+
+No Netlify preview or APK was produced for this failed candidate. After the SOL High repair, the full focused suite, raw matrix, lint, build, isolated scope, protected-path, and cavecrew gates will run again before browser and debug-APK inspection. Chunk D QA and every later task remain blocked until repaired D3 passes.

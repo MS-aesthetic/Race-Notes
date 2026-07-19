@@ -1,10 +1,36 @@
 # Current Task — UX Overhaul v2 Task D3 Car Cascade Delete
 
-**Status:** ACTIVE after D2 QA attempt 2 PASS, 100/100. One `gpt-5.6-sol` HIGH implementation worker owns the isolated build. Primary `gpt-5.6-sol` EXTRA HIGH remains QA and plan authority. Chunk D QA and every later task remain blocked until D3 passes independent QA.
+**Status:** ACTIVE repair after D3 QA attempt 1 FAIL, 85/100. The original SOL High implementation is commit `120fa72632587c72ea1ab6122aff34cd9a393533` on parent `0cb5d8c2c96331a9fb85436229d2638c20502d35`. One `gpt-5.6-sol` HIGH repair worker owns attempt 2. Primary `gpt-5.6-sol` EXTRA HIGH remains QA and plan authority. Chunk D QA and every later task remain blocked until D3 passes independent QA.
 **Branch/worktree:** existing `codex/ux-overhaul` at `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`; do not create or switch any branch or worktree.
 **Accepted D2 base:** attempt-1 feature `803d5d0ae9cfc1a0b4d268d780d7d1a54f036ba9` plus structured-notice repair `e29c0f0822c1f00d30ad91613a35144d4f245075`. The exact clean D3 dispatch HEAD is the governance commit containing this work order and must be supplied by the primary.
 **Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` item 12, Task D3, Parts 5.2 and 6.1, and the binding v2.1 Owner Addendum including the explicit four-product-file D3 scope correction.
 **Routing:** worker must verify rollout metadata `turn_context.payload.model=gpt-5.6-sol`, `effort=high`, and exact 203f cwd before any edit or test. Missing metadata is unverified and cannot satisfy the gate. Terra at every tier and `cavecrew-builder` are forbidden.
+
+## QA attempt 1 failure and binding SOL repair
+
+Attempt 1 is **FAIL, 85/100**. The eight-file implementation scope, signed-in cascade, confirmation, selection, history preservation, queue order, status priority, exact three-error lint baseline, 566-module build, and builder matrix all passed. Independent QA and cavecrew review found one blocking local-first defect:
+
+- `handleDeleteCar` captures a signed-out/offline identity as `accountId = null`.
+- Its delayed commit compares `userRef.current?.id !== accountId`. In a stable signed-out local-authorized session this is `undefined !== null`, so the commit always returns before any local state or localStorage deletion.
+- The current harness explicitly locks that flawed guard and only executes the real handler with a signed-in `account-a`; its queue mock records a null owner instead of reproducing the production helper's null-account no-op.
+
+Attempt 2 repair scope is exactly:
+
+1. `src/App.tsx`
+2. `scripts/car-delete-undo-harness.ts`
+
+All other D3 product and harness files from `120fa72` are accepted and frozen unless independent QA proves an unavoidable direct dependency. No Ralph, plan, report, protected, schema, native, package, release, or later-task file may enter the repair commit.
+
+Required repair:
+
+1. Normalize the current identity in the delayed account guard: `if ((userRef.current?.id ?? null) !== accountId) return;`.
+2. Keep every cloud operation authentication-gated. A signed-out/offline cascade must complete all local refs, React state, localStorage, active/non-active/no-replacement selection, and permitted weekend-pointer repair while producing zero shared-queue, tire-queue, and push entries. No null-owned intent may be created.
+3. Parameterize the production-bound real-handler fixture for `userRef.current = null`, captured `accountId = null`, and `syncOwnerIdRef.current = null`.
+4. Make the shared-queue mock reproduce production null-account no-op semantics.
+5. Assert signed-out active-car, non-active-car, and no-replacement cascades commit locally; all removed dependent categories disappear locally; unrelated/Race Day/session bytes survive; queue and push collections remain empty.
+6. Add a compile-real mutation that reverts the normalized guard to the attempt-1 `undefined !== null` bug and prove the null-account fixture rejects it. Retain signed-in account-replacement protection and every existing D3 assertion/mutation.
+
+Post-repair gates: focused four D3 harnesses plus D1/D2, Undo/lifecycle, offline/resume, setup/Quick Adjust/tire/touch regressions; raw full matrix exact 23/24 with only `muted-text-color-harness.ts` failing `15 !== 16`; lint exact three baseline errors; build exactly 566 modules; repair scope/protected/diff/clean checks; cavecrew review. Create one D3 repair commit and stop for independent Extra High QA. No deploy, APK, push, PR, merge, Chunk D QA, or later work during repair.
 
 ## Objective
 
