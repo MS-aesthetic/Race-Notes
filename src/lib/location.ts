@@ -18,7 +18,7 @@ const MIN_PUSH_INTERVAL_MS = 15_000;     // throttle upserts
 let watchId: number | null = null;
 let lastPush = 0;
 
-/** Start sharing this device's location with the team. WS-T TODO:
+/** Intentional, currently unwired WS-T scaffold for sharing this device's location with the team. TODO:
  *  Capacitor Geolocation on native / navigator.geolocation on web. */
 export async function startSharing(
   _userId: string,
@@ -40,7 +40,7 @@ export async function stopSharing(userId: string): Promise<void> {
   } catch (e) { console.warn('stopSharing delete failed', e); }
 }
 
-/** Subscribe to teammates' live locations (Supabase Realtime).
+/** Intentional, currently unwired WS-T scaffold for subscribing to teammates' live locations (Supabase Realtime).
  *  Returns an unsubscribe function. WS-T TODO: filter expired rows client-side
  *  as well (RLS already hides them on initial fetch). */
 export function subscribeTeamLocations(

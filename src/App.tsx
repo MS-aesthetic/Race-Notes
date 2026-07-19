@@ -1453,9 +1453,11 @@ export default function App() {
       handledUrls.add(url);
       void handleNativeAuthCallback(url)
         .then(handled => {
+          if (!active) return;
           if (handled) setNativeAuthError(null);
         })
         .catch((error: unknown) => {
+          if (!active) return;
           const message = error instanceof Error ? error.message : 'Google sign-in failed.';
           console.warn('Native Google sign-in callback failed:', error);
           setNativeAuthError({ id: Date.now(), message });
@@ -1469,7 +1471,9 @@ export default function App() {
       .catch(error => console.warn('Native launch URL check failed:', error));
     return () => {
       active = false;
-      void listenerPromise.then(listener => listener.remove());
+      void listenerPromise
+        .then(listener => listener.remove())
+        .catch(error => console.warn('Native app URL listener cleanup failed:', error));
     };
   }, []);
 
