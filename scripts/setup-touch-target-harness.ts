@@ -51,6 +51,23 @@ assert.match(setup, /min-w-0 p-2 sm:p-3 grid grid-cols-1 min-\[360px\]:grid-cols
 assert.match(setup, /min-w-0 grid grid-cols-1 min-\[360px\]:grid-cols-2 gap-1\.5 min-\[360px\]:gap-2/, 'four corner cards have compact two-column gutter');
 assert.match(setup, /className="min-w-0 p-2 sm:p-3 border-t border-outline-variant\/50 bg-surface-container-low"/, 'expanded Setup chrome is locked for rendered width proof');
 assert.match(setup, /const LBL = 'block min-h-4 truncate text-xs .*leading-tight';/, 'Setup labels reserve one compact line');
+const tirePickerSection = sliceBetween(setup, '{/* Tire from Inventory picker */}', '{/* Bound Load Graph */}');
+const tirePickerLabel = tirePickerSection.match(/<label className="text-\[10px\] uppercase font-mono font-semibold text-on-surface-variant flex-shrink-0">([^<]+)<\/label>/)?.[1];
+const renderTirePickerLabel = (source: string): string => {
+  const section = sliceBetween(source, '{/* Tire from Inventory picker */}', '{/* Bound Load Graph */}');
+  const label = section.match(/<label className="text-\[10px\] uppercase font-mono font-semibold text-on-surface-variant flex-shrink-0">([^<]+)<\/label>/)?.[1];
+  assert.ok(label, 'Setup tire picker production label exists');
+  return renderToStaticMarkup(createElement('label', null, label));
+};
+assert.equal(tirePickerLabel, 'Tire', 'Setup tire picker uses exact short visible label');
+assert.equal(renderTirePickerLabel(setup), '<label>Tire</label>', 'Setup tire picker production label renders exactly Tire');
+assert.doesNotMatch(tirePickerSection, />Tire from Inventory<\/label>/, 'Setup tire picker omits old long visible label');
+assert.match(tirePickerSection, /<option value="">-- Select from Inventory --<\/option>/, 'Setup tire picker placeholder stays unchanged');
+const longTireLabelMutation = setup.replace('>Tire</label>', '>Tire from Inventory</label>');
+assert.notEqual(longTireLabelMutation, setup, 'Setup tire-label restoration mutation changes production source');
+assert.doesNotThrow(() => transformSync(longTireLabelMutation, { loader: 'tsx', jsx: 'automatic', format: 'esm' }), 'Setup tire-label restoration mutation compiles');
+assert.equal(renderTirePickerLabel(longTireLabelMutation), '<label>Tire from Inventory</label>', 'Setup tire-label restoration mutation renders old long label');
+assert.notEqual(renderTirePickerLabel(longTireLabelMutation), '<label>Tire</label>', 'Setup tire-label restoration mutation fails short-label render gate');
 const stackedCornerFieldClass = setup.match(/const STACKED_CORNER_FIELD_CLASS = '([^']+)';/)?.[1];
 assert.equal(stackedCornerFieldClass, 'min-w-0 min-[360px]:col-span-2 min-[768px]:col-span-1', 'stacked corner fields span both phone columns until safe tablet width');
 assert.equal((setup.match(/className=\{STACKED_CORNER_FIELD_CLASS\}/g) ?? []).length, 2, 'shared numeric field and pressure-note parent both receive responsive span repair');

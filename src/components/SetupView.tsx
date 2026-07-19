@@ -222,7 +222,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
 
         {/* Tire from Inventory picker */}
         <div className="col-span-1 lg:col-span-2 min-w-0 bg-surface-container p-2 rounded border border-outline-variant/30 flex flex-wrap items-center justify-between gap-2">
-          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant flex-shrink-0">Tire from Inventory</label>
+          <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant flex-shrink-0">Tire</label>
           <select
             value={data.tireInventoryId || ''}
             onChange={(e) => {
