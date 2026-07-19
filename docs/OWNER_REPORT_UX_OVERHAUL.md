@@ -302,3 +302,17 @@ The implementation is commit `dc5c63d`. It changes one visible label in `SetupVi
 Draft preview `https://6a5c19518df1ec312c463f95--crew-chief-race-notes.netlify.app/` is a draft only. The mobile authentication shell remained correct, and the installed Java 21 debug APK showed the two-column corner cards with **Tire** aligned cleanly beside **Bound Load Graph**. The APK is 12,085,162 bytes with SHA-256 `EC713FBD1F251F9F6BF7D97F5DE691BB7A5EB19F0727AD16C72230A5D4128DFE`. No production deploy, release build, signing, push, or merge was performed.
 
 For D2, the owner authorized a dedicated Crew Chief account for destructive deletion testing. The implementation worker will use mocks only. During independent QA, the device-only option will be tested first to prove that cloud data can return as warned. The delete-everywhere option will be tested last, leaving that account's owned racing data cleared. The account itself, authentication record, team, membership, and any other user's records will not be deleted. Credentials are not stored in this report or any repository file.
+
+## Task D2 — QA attempt 1
+
+D2 attempt 1 is a **FAIL, 92/100**. The main deletion behavior worked, but the final confirmation message did not tell the truth, so the task cannot be accepted yet.
+
+Commit `803d5d0` adds the two team-account choices. **Clear this device only** clears the same local racing records without queuing cloud deletion. **Delete my records everywhere** queues all nine shared datasets only when the signed-in user is the canonical team owner, always handles that account's personal tires, and never targets records owned by another team member. The old signed-out, solo, and unresolved-membership paths remain unchanged.
+
+The automated checks were strong: 123 D2 assertions and all 23 D2 mutations passed, the retained D1 proof passed 62 assertions and 13 mutations, fourteen focused regressions passed, the complete matrix stayed at the expected 23 of 24 with only the known muted-text lock, type-checking stayed at exactly three known errors, the build transformed 566 modules, the three-file scope was clean, and an independent reviewer returned 100/100.
+
+Draft `https://6a5c21695715094ce135f7b4--crew-chief-race-notes.netlify.app/` showed both choices and their warning text correctly at 360×800, 390×844, and 412×915. The authorized device-only live test also proved the important data behavior: local cars, setups, and Race Day data disappeared, then returned from the cloud after reload. No cloud data was deleted by that choice.
+
+The blocker appeared immediately afterward. The toast said **That action could not be completed** even though the clear had succeeded. The new success sentence was passed through an older message mapper that did not recognize it and replaced it with a generic failure message. The delete-everywhere live test was deliberately not run after this finding.
+
+The repair is tightly bounded. A SOL High worker will add structured success messages for the device-only and everywhere results in `App.tsx` and extend `saved-flash-harness.ts` so either result fails the test if it ever falls back to the generic failure message. The already-passing dialog and deletion logic stay unchanged. D3 and all later work remain blocked until repaired D2 passes, including the final authorized delete-everywhere test.

@@ -1,14 +1,26 @@
 # Current Task — UX Overhaul v2 Task D2 Clear-All-Data Trust Fix
 
-**Status:** READY FOR one `gpt-5.6-sol` HIGH implementation worker. Primary `gpt-5.6-sol` EXTRA HIGH remains QA and plan authority. D1 is accepted at 100/100. D3 and every later task remain blocked until D2 passes independent QA.
+**Status:** REPAIR REQUIRED after D2 QA attempt 1 FAIL, 92/100. One `gpt-5.6-sol` HIGH implementation worker owns the bounded repair. Primary `gpt-5.6-sol` EXTRA HIGH remains QA and plan authority. D3 and every later task remain blocked until D2 passes independent QA.
 **Branch/worktree:** existing `codex/ux-overhaul` at `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`; do not create or switch any branch or worktree.
-**Accepted D2 product base:** `dc5c63d1e2e65e1c8475e1cc8b02d96074820c95` (`fix: shorten setup tire label`), which descends from accepted D1 commit `1ca35769253696a81eade02dcfd5b75cd156461f`. The exact clean dispatch HEAD is the governance commit containing this work order and owner-QA amendment and must be supplied by the primary in the delegation.
+**D2 attempt 1 candidate:** `803d5d0ae9cfc1a0b4d268d780d7d1a54f036ba9` (`fix: make clear racing data team-aware (D2)`) on parent `444fb4307ff6349c4cd074a8fac4581f8f1e146b`. Its data paths, dialog, isolated scope, automated gates, build, and reviewer checks pass, but it is not accepted because live device-only feedback is false. The exact clean repair dispatch HEAD is the governance commit containing this failure record and must be supplied by the primary.
 **Plan authority:** `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` item 11b, Task D2, Part 5.2, Part 6.1, and the binding v2.1 Owner Addendum.
 **Routing:** the implementation worker must verify runtime `turn_context.payload.model=gpt-5.6-sol` and `effort=high` from rollout metadata before any edit or test. Missing metadata is unverified and cannot satisfy the gate. Terra at every tier and `cavecrew-builder` are forbidden.
 
 ## Objective
 
 Make Clear Racing Data tell the truth for a resolved team account. The owner must choose between clearing only this device, which queues no cloud delete and warns that shared data will return on sync, and deleting the signed-in user's owned records everywhere, which uses the existing deferred-delete plus push pairing and never targets another person's canonical team data. Preserve the existing signed-out, solo, and team-unresolved flow exactly.
+
+## QA attempt 1 failure and exact repair
+
+On draft `6a5c21695715094ce135f7b4`, the authorized resolved-team device-only scenario did clear all local racing data and a reload re-downloaded the owner fixtures exactly as intended. The post-action toast was nevertheless **That action could not be completed.** Root cause: `handleClearAllData` passes the new success string through `showComponentInfo()`, while `componentInfoNotice()` does not recognize either D2 success string and routes it to the existing `operation-failed` fallback.
+
+Repair only this trust failure:
+
+1. In `src/App.tsx`, add the minimum two dedicated `INFO_COPY` reasons for the resolved-team device-only and everywhere results, and publish them with structured `showInfo(...)` notices from `handleClearAllData`.
+2. Exact device-only result text remains **Device data cleared. Shared team data will re-download on next sync.** Exact everywhere result text remains **Your records are queued for deletion. Team records you do not own remain in cloud.** Neither result may route through `componentInfoNotice()` or `operation-failed`.
+3. Preserve the attempt-1 dialog, choice order, mode wiring, queue/push/ownership behavior, local wipe, legacy signed-out/solo/unresolved branch, and every protected file byte-for-byte.
+4. Extend only `scripts/saved-flash-harness.ts` to compile/execute the real structured info-copy route and fail independently if either result falls back to `operation-failed`, either exact result string changes, or either dedicated reason is removed. Retain all 123 D2 assertions, 23 mutations, D1 62/13, and B1-B3/C4 proof; append new assertions/mutations without weakening anything.
+5. Repair commit scope is exactly `src/App.tsx` and `scripts/saved-flash-harness.ts`. `src/components/SettingsView.tsx` must have zero repair diff because its attempt-1 UI already passes.
 
 ## Owner-authorized destructive QA account
 
@@ -36,7 +48,7 @@ D2 is the second named protected-path exception. Any unrelated change is an auto
 
 Authorized product footprint only:
 
-1. `src/App.tsx` — only `handleClearAllData` (current lines about 649-715), the minimum callback/type data needed for its two team choices, and the exact `SettingsView` prop wiring (current line about 2683).
+1. `src/App.tsx` — attempt-1 scope remains only `handleClearAllData`, the minimum callback/type data needed for its two team choices, and the exact `SettingsView` prop wiring. Repair attempt 2 additionally permits only the two minimum structured `INFO_COPY` entries required by the failure section above.
 2. `src/components/SettingsView.tsx` — only the Clear Racing Data prop contract, `clearStep` state if needed, and the existing Danger Zone clear-data dialog (current lines about 168-203).
 
 Authorized assertion footprint only:
@@ -82,13 +94,14 @@ The D2 extension must compile or execute the real clear handler and bind the rea
 12. An owned queued fixture resurrects during the next-pull/resume filter.
 13. Direct Supabase deletion, a new queue/key/primitive, or any change to the D1 helper/replay/filter/status contract appears.
 14. A choice can submit twice while its first clear is in flight.
+15. Either resolved-team success result routes through `componentInfoNotice()`/`operation-failed`, loses its dedicated structured reason, or changes its exact success text.
 
 Print D2 assertion count and unique mutation names/count. Retain and rerun all existing B1-B3/C4/D1 proof. Synthetic-only or source-string-only ownership proof is insufficient.
 
 ## Builder gates before commit
 
-1. Verify runtime metadata, exact branch, exact dispatch HEAD, ancestry from accepted D2 base `dc5c63d` and D1 base `1ca3576`, and a clean tree before editing.
-2. Show `git diff --name-status` and `git diff --check`; scope must be only the three authorized files and line regions.
+1. Verify runtime metadata, exact branch, exact repair dispatch HEAD, ancestry through D2 attempt-1 candidate `803d5d0`, accepted pre-D2 base `dc5c63d`, and D1 base `1ca3576`, and a clean tree before editing.
+2. Show `git diff --name-status` and `git diff --check`; repair scope must be exactly `src/App.tsx` and `scripts/saved-flash-harness.ts`. `SettingsView.tsx` and every protected path have zero repair diff.
 3. Run focused Saved/D1/D2, team ownership, car-delete/clear, confirmation/status, offline/resume, weekend-delete, and current C1-C5 setup/lifecycle/Quick Adjust/tire/touch regressions.
 4. Run the raw full 24-harness matrix. Expected result remains exactly 23/24 with only unchanged `muted-text-color-harness.ts` failing `15 !== 16`. Any other failure blocks commit.
 5. `npm run lint` must report exactly the three known baseline errors and no new error.
