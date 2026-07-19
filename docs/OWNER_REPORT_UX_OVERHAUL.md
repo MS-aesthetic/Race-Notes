@@ -451,3 +451,27 @@ A fresh Java 21 debug APK was synchronized, built, and installed on `emulator-55
 The WebView initially served an older cached label. Only its stale service-worker registration and Workbox asset cache were removed so the exact installed APK bundle could load. Login, account, team, local storage, and racing data were left intact.
 
 E2 has no remaining repair. E3 is next and is the final bounded implementation task: prevent native-auth callbacks from updating state after unmount, handle a rejected native listener cleanup, keep desktop scrollbar affordances by limiting universal scrollbar hiding to coarse-pointer devices, and explicitly mark the unused team-location functions as intentional scaffolding. After E3 light QA, the required whole-sprint QA and independent-review handoff document remain. No production deployment, release build, push, PR, merge, or live-data mutation occurred.
+
+## Task E3 — Final result
+
+E3 is a **PASS, 100/100** on its first QA attempt. Implementation commit `f6e9181` closes the four small technical findings without changing any feature flow or visible wording.
+
+The Android Google-sign-in callback now checks whether its screen is still active before clearing or showing an authentication error. That prevents late asynchronous work from updating an unmounted app. The native URL-listener cleanup still removes the listener, and now also handles a rejected listener or cleanup promise with a diagnostic warning instead of leaving an unhandled rejection.
+
+Scrollbar hiding is now limited to coarse-pointer devices such as phones and tablets. Touch devices retain the clean full-screen appearance, while desktop and fine-pointer browsers keep their normal scrollbar affordance. The two unused team-location functions are now explicitly documented as intentional, currently unwired scaffolding; their runtime code did not change.
+
+The commit changes exactly `App.tsx`, `index.css`, and `location.ts`. The App change is confined to the native-auth deep-link effect, the CSS change only wraps the existing scrollbar rules, and the location change is comments only. Resume sync, Saved feedback, other authentication behavior, help, labels, setup and session history, deletion, local storage, cloud data, Android native source, packages, and database files are unchanged. Independent diff review returned 100/100 with no findings.
+
+Eleven focused regression files passed, covering native authentication, offline/resume behavior, Saved boundaries, D1/D2/D3 deletion safety, help routing, setup touch behavior, lifecycle, Quick Adjust, tires, and confirmation. The complete 24-test matrix remained at the expected 23 passes and one known stale muted-text assertion (`15 !== 16`). Type-checking reported exactly the three existing baseline errors, and the production build transformed exactly 566 modules.
+
+The accepted draft preview is:
+
+https://6a5ce8943c4efd00286ee3d1--crew-chief-race-notes.netlify.app/
+
+This is a draft only. At 360×800, 390×844, and 412×915 it had no horizontal overflow, every visible control was at least 44 pixels tall, the viewport remained pinch-enabled, and the browser console was clean. The fine-pointer browser reported normal scrollbar behavior, confirming desktop scrollbars are no longer universally hidden.
+
+A fresh Java 21 debug APK was synchronized, built, and installed on `emulator-5554`. It is available at `android/app/build/outputs/apk/debug/app-debug.apk`, is 11,745,666 bytes, and has SHA-256 `E0726E1793A2D3A8AD1384EAA96D0F211EF5A5F9C252AE1CF5DA27C30EC2E8E3`. It cold-launched successfully into the existing authenticated device state. The Android WebView reported a coarse pointer and confirmed that the scrollbar rules are inside the coarse-pointer media rule. The 448×997 page had no horizontal overflow and the crash buffer was empty.
+
+The WebView initially retained pre-E3 cached CSS. Only the service-worker registration and Workbox app-asset cache were removed so the exact installed APK bundle could load. Login, account, team, local storage, and racing data were not cleared or edited. The known WebView variations-seed warning and the existing pre-root Capacitor safe-area injection diagnostics remain recorded as platform residuals; no E3 authentication or listener-cleanup error occurred.
+
+E3 has no remaining repair. All planned implementation tasks are now built. The required final whole-sprint QA is active next: it will test every owner complaint and cross-task interaction, run the complete harness and boundary audit, inspect authenticated layouts across the required sizes/themes/scales, and produce the independent-review handoff document. No production deployment, release build, push, PR, merge, or live-data mutation occurred.
