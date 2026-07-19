@@ -431,3 +431,23 @@ A fresh Java 21 debug APK was synchronized, built, and installed on `emulator-55
 The WebView initially served an older cached header. Only its service-worker registration and cached app assets were cleared so the exact APK bundle could load. Login state, account, team, local storage, and racing data were not cleared or edited. The only error-level Android diagnostics were the emulator's known missing variations signature and software-renderer rendernode messages; there was no application crash or product JavaScript error.
 
 E1 has no remaining repair. E2 is next and is copy-only: keep Add/New labels on buttons that open forms, but label the create-form submit actions Create Car, Create Tire, Create Race Day, and Create Job. The Race Day submit already complies and will be verified rather than changed. No production deployment, release build, push, PR, merge, or live-data mutation occurred.
+
+## Task E2 — Final result
+
+E2 is a **PASS, 100/100** on its first QA attempt. Implementation commit `2e2c277` applies the agreed creation-label convention without changing how any form works.
+
+Buttons that open creation forms still say Add or New. Once a form is open, its new-record action now says Create: Add Car opens a form with Create Car, Add Tire opens a form with Create Tire, New Race Day retains Create Race Day, and Add Maintenance Job opens a form with Create Job. Editing remains separate: Tire edits still say Save Tire, and Race Day edits still say Save Changes. Form titles, fields, validation, disabled states, handlers, styling, persistence, cloud calls, and success behavior did not change. The durable codebase reference now states the same Add/New, Create, and Save convention.
+
+The change is confined to three visible submit strings, the convention note, and production-bound test coverage. `RaceWeekendView.tsx` was verified but not changed because it already complied. The expanded test reports 48 E2 assertions and defeats 12 independent bad-change mutations, including submit labels being reverted, openers being changed, edit labels drifting, a handler being rewired, disabled behavior being removed, and a submit type being removed. Eight focused regression suites passed. The complete 24-test matrix remained at the expected 23 passes and one known stale muted-text lock (`15 !== 16`). Type-checking reported exactly the three existing baseline errors, and the production build transformed exactly 566 modules. Scope, protected-path, clean-worktree, and independent reviewer checks all passed; the reviewer score was 100/100.
+
+The accepted draft preview is:
+
+https://6a5cdf4dee7c5a9451464efb--crew-chief-race-notes.netlify.app/
+
+This is a draft only. Its signed-out shell passed at 360×800, 390×844, and 412×915 with exact viewport sizes, no horizontal overflow, controls at least 44 pixels tall, pinch-enabled viewport metadata, and no browser warnings or errors.
+
+A fresh Java 21 debug APK was synchronized, built, and installed on `emulator-5554`. It is available at `android/app/build/outputs/apk/debug/app-debug.apk`, is 12,087,738 bytes, and has SHA-256 `8FA4583766CAFBEF3E5F5CA642E1B149D990A98B3C9C754B65FB4C18D94BEFF3`. The installed app cold-launched successfully. All four creation forms were opened and inspected in the existing authenticated device state, then cancelled without typing, submitting, deleting, or changing racing data. The native 448×997 view had no horizontal overflow, the Android crash buffer was empty, and there was no application JavaScript error. The only captured diagnostic was Android WebView's benign missing variations-seed signature warning.
+
+The WebView initially served an older cached label. Only its stale service-worker registration and Workbox asset cache were removed so the exact installed APK bundle could load. Login, account, team, local storage, and racing data were left intact.
+
+E2 has no remaining repair. E3 is next and is the final bounded implementation task: prevent native-auth callbacks from updating state after unmount, handle a rejected native listener cleanup, keep desktop scrollbar affordances by limiting universal scrollbar hiding to coarse-pointer devices, and explicitly mark the unused team-location functions as intentional scaffolding. After E3 light QA, the required whole-sprint QA and independent-review handoff document remain. No production deployment, release build, push, PR, merge, or live-data mutation occurred.
