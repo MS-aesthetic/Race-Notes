@@ -364,3 +364,26 @@ The first Android view briefly showed the older disabled-delete screen because t
 The dedicated D2 account's owned racing data remains cleared. Its login, authentication record, team, and membership remain intact, and no credentials are stored in the repository or this report.
 
 No D3 repair remains. The mandatory Chunk D integrated QA is next. It will audit D1, D2, and D3 together for honest zero-row handling, ownership-safe clear modes, cascade ordering, retry and pull filtering, no orphan or resurrection, preserved Race Day history, and truthful status priority before Chunk E can begin. No production publish, release build, Git push, PR, or master merge occurred.
+
+## Chunk D — Integrated deletion and data-trust QA
+
+Chunk D is a final **PASS, 100/100**. This was a read-only whole-chunk review; it did not add or change product behavior. It tested D1, D2, and D3 together and reviewed every accepted change from the pre-D1 save point through the repaired D3 candidate.
+
+The cumulative product scope is exactly five files: the existing shared-delete helper, the main app orchestration, and the Settings, Garage, and Setup views. Five production-bound test files and four governance documents account for the remaining changes. Database schema and policy, native Android source, packages, release files, queue formats, ownership and setup-lifecycle helpers, resume timing, authentication-generation guards, and all Chunk E product paths remained untouched.
+
+The integrated checks confirmed the complete deletion chain:
+
+- A shared cloud delete succeeds only when Supabase returns the exact requested row ID. Empty, missing, wrong-ID, error, and exception results remain queued, retry after exactly five seconds, stay filtered out of pulls, and cannot be reported as Saved or Synced.
+- Clear this device only performs no cloud deletion and truthfully warns that shared records can return. Delete my records everywhere targets only the signed-in user's canonically owned shared records and personal tires; it never targets another team member's records.
+- Car deletion counts and removes setups, tires, shock records, car-scoped maintenance components and their logs, then the car last. Active, non-active, and last-car selection remain safe. Unrelated and rig-level records survive.
+- Undo and strong confirmation remain one-shot and cancel-safe. Clear All cancels a pending car deletion instead of committing it. Account replacement and signed-out use remain isolated.
+- Race Days and every embedded session snapshot remain unchanged. Only permitted dangling top-level pointers are repaired. Queued records cannot reappear after a resume pull.
+- Signed-out/offline deletion completes all intended local writes while creating no cloud queue entry, push, or ownerless intent. A real mid-cascade failure remains queued and its error message wins over Saved or Synced.
+
+The focused proof retained the exact totals: D1 passed 62 assertions and 13 mutations; D2 passed 143 assertions and 29 mutations; D3 passed 222 assertions and 41 mutations. Ownership, offline, resume, confirmation, Undo, lifecycle, Quick Adjust, tire, touch-target, and status regressions all passed. The complete 24-test matrix was exactly 23 passes and one expected failure: the unchanged `muted-text-color-harness.ts` byte-count lock reported `15 !== 16`. Type-checking reported exactly the three known baseline errors, and the production build transformed exactly 566 modules. Independent cumulative review returned PASS, 100/100, and the worktree remained clean.
+
+No product bytes changed after the accepted D3 candidate, so Chunk D reused its exact inspected artifacts. Draft preview `https://6a5c406dc530a48c644693bd--crew-chief-race-notes.netlify.app/` had already passed the signed-out 360×800, 390×844, and 412×915 shells with no overflow, undersized controls, or browser errors. The installed Java 21 debug APK remains 12,087,614 bytes with SHA-256 `704836E5280FC53010AF0FC92F72426EA57D35E3FE3AD5AC5D95CE8F768DE0C4`; `emulator-5554` was present and its Android crash buffer was empty.
+
+The temporary D3 synthetic car and setup remain deleted and did not return. The dedicated D2 account's owned racing data remains cleared. No destructive D2 fixture was recreated, no account, authentication record, team, membership, or other user's data was deleted, and no credential was stored.
+
+Chunk D has no remaining repair. Task E1 is next: move context-aware App Guide help to a header question-mark button beside the unchanged Tuning Guide button, preserve the dedicated four-bar help control, and remove the redundant inline Setup help button. E2 will clarify Create labels, E3 will make the bounded closeout fixes, then the whole branch receives final full-sprint QA. No production publish, release build, Git push, PR, or master merge occurred.
