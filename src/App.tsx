@@ -287,6 +287,7 @@ export default function App() {
   const skipWeekendRecoveryRef = useRef(false);
   const [activeSession, setActiveSession] = useState<ActiveSession>(INITIAL_ACTIVE_SESSION);
   const activeSessionRef = useRef(activeSession);
+  const currentSetupRef = useRef(setup);
   const weekendsRef = useRef(weekends);
   const savedSetupsRef = useRef(savedSetups);
   const sessionCloudQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -297,6 +298,7 @@ export default function App() {
   const markSavedDirty = () => { savedFeedbackControllerRef.current?.markDirty(); };
   const flushSavedBoundary = () => savedFeedbackControllerRef.current?.flush() ?? false;
   useEffect(() => { activeSessionRef.current = activeSession; }, [activeSession]);
+  useEffect(() => { currentSetupRef.current = setup; }, [setup]);
   useEffect(() => { weekendsRef.current = weekends; }, [weekends]);
   useEffect(() => { savedSetupsRef.current = savedSetups; }, [savedSetups]);
   const [todos, setTodos] = useState<Todo[]>(() => {
@@ -679,8 +681,9 @@ export default function App() {
         localStorage.setItem('race_notes_saved_setups', JSON.stringify(retainedSetups));
         if (currentOwnerId) void pushSetups(retainedSetups, currentOwnerId, setSyncStatus);
 
-        const repairedActiveSetup = setupReferenceRepair.changedSetupIds.includes(setup.id)
-          ? retainedSetups.find(item => item.id === setup.id)
+        const currentSetup = currentSetupRef.current;
+        const repairedActiveSetup = setupReferenceRepair.changedSetupIds.includes(currentSetup.id)
+          ? retainedSetups.find(item => item.id === currentSetup.id)
           : null;
         if (repairedActiveSetup && activeCarIdRef.current !== carId) {
           setSetup(repairedActiveSetup);

@@ -399,7 +399,7 @@ const compileD3Handler = (sourceText: string) => {
     'setMaintenance', 'setCars', 'setWeekends', 'setActiveCarId', 'setSetup',
     'pushSetups', 'pushTires', 'pushShockSessions', 'pushMaintenanceLogs',
     'pushMaintenanceComponents', 'pushCars', 'pushWeekends', 'setSyncStatus', 'repairSetupDeletionReferences',
-    'activeCarIdRef', 'syncStatusRef', 'isTerminalSyncStatus', 'pickLatestSetupForCar', 'INITIAL_SETUP', 'showInfo', 'setup', 'localStorage', 'window',
+    'activeCarIdRef', 'currentSetupRef', 'syncStatusRef', 'isTerminalSyncStatus', 'pickLatestSetupForCar', 'INITIAL_SETUP', 'showInfo', 'setup', 'localStorage', 'window',
   ];
   const wrapped = `export const makeD3Handler = (deps) => {\n  const { ${dependencyNames.join(', ')} } = deps;\n${handler}\n  return handleDeleteCar;\n};`;
   const compiled = transformSync(wrapped, { loader: 'ts', format: 'cjs', target: 'es2022' }).code;
@@ -453,6 +453,7 @@ const runD3Cascade = (
     syncOwnerIdRef: { current: identity.syncOwnerId },
     teamRef: { current: identity.accountId ? { id: 'team-a' } : null },
     activeCarIdRef: { current: activeCarId },
+    currentSetupRef: { current: setupNext },
     syncStatusRef: { current: null },
   };
   const sessionsBefore = bytes(weekend.sessions);
@@ -541,6 +542,27 @@ nonActiveD3.commit();
 d3Equal(nonActiveD3.storage.get('race_notes_active_car'), 'car-next', 'D3 non-active delete preserves active car');
 d3Equal(JSON.parse(nonActiveD3.storage.get('race_notes_setup')!).sourceSetupId, undefined, 'Repair 3 repairs only the exact active saved-twin cache');
 d3Ok(!('activeCar' in nonActiveD3.states) && (nonActiveD3.states.setup as any)?.id === 'setup-next', 'Repair 3 changes no active-car selection while repairing the exact active cache');
+
+const switchedDuringUndoD3 = runD3Cascade(app, 'car-next');
+const switchedSetup = { id: 'setup-switched', carId: 'car-next', chassis: 'Switched', date: 'latest', lf: {}, rf: {}, lr: {}, rr: {} };
+switchedDuringUndoD3.refs.savedSetupsRef.current.push(switchedSetup);
+switchedDuringUndoD3.refs.currentSetupRef.current = switchedSetup;
+const switchedSetupBytes = JSON.stringify(switchedSetup);
+switchedDuringUndoD3.storage.set('race_notes_setup', switchedSetupBytes);
+switchedDuringUndoD3.commit();
+d3Ok(!('setup' in switchedDuringUndoD3.states), 'Repair 3 delayed commit does not overwrite a Current Setup switched during Undo');
+d3Equal(switchedDuringUndoD3.storage.get('race_notes_setup'), switchedSetupBytes, 'Repair 3 delayed commit preserves switched Current Setup cache bytes exactly');
+
+const latestSetupRead = 'const currentSetup = currentSetupRef.current;';
+d3Equal((app.match(new RegExp(latestSetupRead.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length, 1, 'Repair 3 latest Current Setup ref mutation target is unique');
+const capturedSetupMutation = app.replace(latestSetupRead, 'const currentSetup = setup;');
+const mutatedSwitchD3 = runD3Cascade(capturedSetupMutation, 'car-next');
+mutatedSwitchD3.refs.savedSetupsRef.current.push(switchedSetup);
+mutatedSwitchD3.refs.currentSetupRef.current = switchedSetup;
+mutatedSwitchD3.storage.set('race_notes_setup', switchedSetupBytes);
+mutatedSwitchD3.commit();
+d3Ok('setup' in mutatedSwitchD3.states && mutatedSwitchD3.storage.get('race_notes_setup') !== switchedSetupBytes, 'Repair 3 captured-render Setup mutation is rejected');
+console.log('Repair 3 delayed-Undo killed mutation (1): current-setup-latest-ref-bypassed');
 
 const noReplacementD3 = runD3Cascade(app, 'car-delete', []);
 noReplacementD3.commit();
