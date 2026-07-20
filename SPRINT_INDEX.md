@@ -1,20 +1,20 @@
 # CREW CHIEF — Sprint Index (UX tracks)
 
 Release baseline `master` remains at `C:\Users\maxx\antigravity\Race-Notes`.
-Active development is **UX Overhaul v2** on `codex/ux-overhaul` at
+UX Overhaul v2 is **complete** on `codex/ux-overhaul` at
 `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`. Its authority is
 `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` plus the v2.1 addenda,
 `ralph/CURRENT_TASK.md`, and `ralph/STATE.md`. Detailed cold-start procedure is
 `docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`.
 
 The older numbered sprint files below describe Release 5.0 planning lineage and
-future deferred work. Do not start Sprint 2, 3, or 4 while v2 Final QA remains open.
+future deferred work. Do not start Sprint 2, 3, or 4 until the owner separately opens that work.
 
 | Sprint | File | Content | Status |
 |---|---|---|---|
-| UX Overhaul v2 | `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` | Mobile density, persistence semantics, deletion integrity, navigation polish, final QA | **ACTIVE — product/artifact/handoff gates PASS at `ab2d031`; authority-doc review, governance commit, and saving-point push remain** |
+| UX Overhaul v2 | `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` | Mobile density, persistence semantics, deletion integrity, navigation polish, final QA | **COMPLETE — product `ab2d031`; reviewed Part 6.4 handoff `22dc112`; final saving-point branch pushed** |
 | 1 | `docs/archive/plan-v3-ux-corrections.md` | UXF-1…10 — owner-correction batch (2026-07-14 handoff) | COMPLETE — released as 5.0 |
-| 2 | `sprint-2-quick-wins.md` | UXP-1,2,3,4,5,6,7,8,9,11,12,13,19,20 + gate — Low-difficulty audit items | deferred — blocked by v2 final QA |
+| 2 | `sprint-2-quick-wins.md` | UXP-1,2,3,4,5,6,7,8,9,11,12,13,19,20 + gate — Low-difficulty audit items | deferred — requires separate owner opening/approval |
 | 3 | `sprint-3-second-wave.md` | UXP-10,14,15,16,17,18 + gate — Medium-difficulty audit items | pending — blocked by sprint 2 |
 | 4 | `sprint-4-design-needed.md` | UXP-21,22 — High-difficulty IA items with their own Maxx design session | pending — design session gates build |
 

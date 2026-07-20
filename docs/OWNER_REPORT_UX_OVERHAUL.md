@@ -2,7 +2,7 @@
 
 ## Current status
 
-All A1–E3 tasks, integrated chunk gates, Repair 3, and final product/artifact gates are complete and pass at product commit `ab2d031`. The final raw suite is 24/24, lint is the exact three-error baseline, build is 566 modules, the final draft/browser matrix and fresh debug APK/stable-emulator lifecycle checks pass, and no product blocker remains. Corrected authority-document re-review, the final governance commit, and the requested saving-point branch push are the only active closeout actions.
+All A1–E3 tasks, integrated chunk gates, Repair 3, and final product/artifact gates are complete and pass at product commit `ab2d031`. The final raw suite is 24/24, lint is the exact three-error baseline, build is 566 modules, the final draft/browser matrix and fresh debug APK/stable-emulator lifecycle checks pass, and no product blocker remains. The authority documents and Part 6.4 packet passed review, final governance/closure was committed, and the complete branch was pushed as the requested saving point.
 
 ## Task C2 — Session snapshot model and diff engine
 
@@ -598,3 +598,7 @@ The previously authorized device-only and everywhere data-deletion sequence was 
 The cold-reader handoff is `docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It contains the base and final commit, task-to-commit/file map, before/after owner-complaint evidence, verbatim 24-harness output, every material kickback and deviation, residual risks, protected boundaries, and the future-review reading order. It reports this sprint's QA result but does not claim that a future third-party review has already passed.
 
 The only remaining delivery action after the corrected documentation is reviewed and committed is the requested saving-point push of `codex/ux-overhaul`. No production publish, release/signing, AAB, schema change, pull request, master merge, or Sprint 4 work is included.
+
+## Final delivery
+
+The corrected cold-reader handoff and synchronized project documentation passed independent review 100/100 and were committed as `22dc112`. A final Ralph/Sprint closure commit was then created and the complete `codex/ux-overhaul` branch was pushed as the requested saving point. UX Overhaul v2 is complete. No pull request or master merge was created, and Netlify production, release/signing, AAB, database/schema, and Sprint 4 remained untouched.

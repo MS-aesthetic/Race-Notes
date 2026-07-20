@@ -1,6 +1,6 @@
-# Current Task — UX Overhaul v2 Final Closeout
+# Current Task — UX Overhaul v2 Complete
 
-**Status:** Repair 3 and all product/artifact gates passed. Corrected authority-doc review, governance commit, and saving-point push remain active.
+**Status:** COMPLETE. Product, artifact, documentation, reviewer, governance, and saving-point delivery gates passed.
 **Branch/worktree:** `codex/ux-overhaul` in `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`.
 **Accepted product HEAD:** `ab2d03117c0475aa0abbef9ad38f2907edd3e881`.
 **Roles:** primary `gpt-5.6-sol` Extra High owns QA, plans, Ralph, and owner reporting. Implementation work, if any new blocker appears, goes to a separate `gpt-5.6-sol` High task. Terra and `cavecrew-builder` remain forbidden.
@@ -36,10 +36,10 @@ Primary independent QA result: **PASS, 100/100** under the owner-approved reduce
 2. **PASS:** final draft `6a5d7c9221f0e85b0eda6228`; signed-out 360×800, 390×844, 412×915, and 1080×2118 auth shells have zero overflow, six controls at least 44px, pinch not disabled, and zero console warnings/errors.
 3. **PASS:** fresh Java 21 debug APK is 12,088,501 bytes, SHA-256 `59E20FDCB74F37AE3C3393202A458B7BBF97320994BF7FEE87D736C7BC8C8D42`; install and 3/3 app-only lifecycle cycles pass on stable Android 15/WebView 124 with empty warning/error and crash buffers. The emulator was signed out after the authorized data-clear work; the previously accepted authenticated Default/Large matrix is carried because Repair 3 has no UI/CSS change.
 4. **PASS:** stale-cloud/no-resurrection fixtures pass; the previously authorized live data result remains accepted and was not destructively repeated.
-5. **PASS product / doc re-review active:** final cavecrew product review is 100/100. Its documentation-only blockers were repaired and are being re-reviewed.
-6. **ACTIVE:** Part 6.4 packet and synchronized handoff/knowledge/owner/Ralph/plan documents are written; commit after reviewer PASS.
-7. **PENDING:** commit final governance/docs.
-8. **PENDING:** push `codex/ux-overhaul` as a saving point after the commit. No PR or merge.
+5. **PASS:** final cavecrew product review and corrected documentation review are both 100/100.
+6. **PASS:** Part 6.4 packet and synchronized handoff/knowledge/owner/Ralph/plan documents are complete in reviewed commit `22dc112a4b47c7b0c0591b66149ca916942aee88`.
+7. **PASS:** final governance/docs committed with zero product/harness bytes.
+8. **PASS:** final closure commit is the branch-tip saving point pushed to `origin/codex/ux-overhaul`. No PR or merge.
 
 ## Hard bans
 
