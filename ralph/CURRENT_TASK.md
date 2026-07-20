@@ -1,99 +1,113 @@
-# Current Task — Final QA Repair 2: Global 44px Native-Control Floor
+# Current Task — Final QA Repair 3: Setup-Deletion Relationship Integrity
 
-**Status:** ACTIVE SOL High implementation repair after Final Full-Sprint QA attempt 2 failed 88/100 on authenticated Android touch-target geometry.
-**Branch/worktree:** existing `codex/ux-overhaul` at `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`; do not create or switch any branch or worktree.
-**Repair base:** exact governance HEAD containing this work order, on QA base `e92bf29411ebf9521740acd90296c41c6986c69b` and accepted Repair 1 `810d918d4d492270f4474c898f160c3a4450e387`.
-**Roles:** one `gpt-5.6-sol` High implementation worker; primary `gpt-5.6-sol` Extra High independently QAs. Terra at every tier and `cavecrew-builder` remain forbidden.
+**Status:** PLANNED, NOT STARTED. Owner requested documentation only; do not dispatch an implementation worker until a later explicit resume instruction.
+**Final QA state:** attempt 3 FAIL, 82/100. Touch-target Repair 2 at `c897cfd406ff074ad1a06535bdc015bb7198bf89` passed its product/proof/runtime gates; final whole-branch review found two deletion-integrity blockers.
+**Branch/worktree:** existing `codex/ux-overhaul` at `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`; do not create or switch branch/worktree.
+**Roles when resumed:** one `gpt-5.6-sol` High implementation task; primary `gpt-5.6-sol` Extra High independently QAs. Terra at every tier and `cavecrew-builder` remain forbidden.
 **Communication/delegation:** `/caveman full`; cavecrew investigator/reviewer contracts only.
+**Detailed runbook:** `docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`.
 
-## Failure evidence
+Final QA has three failed passes, but Part 6.3 scopes kickbacks to the offending
+task. These are newly discovered reopened C1/D3 defects after earlier task PASS
+verdicts, not three consecutive failed implementation attempts of either repair;
+the direct-primary escalation has not triggered.
 
-Fresh installed debug product was inspected through the Android WebView DOM at its actual 448×997 CSS viewport while the visible Large scale was active (`--ui-zoom: 1.15`). Required native controls below the absolute 44px touch floor include:
+## Accepted state before Repair 3
 
-- Setup new-name input: 43.39px high.
-- Setup Clone and Compare buttons: 41.39px wide.
-- Loads actions: 36.8–41.4px high.
-- Tires Add action: 41.4px high.
-- Quick Adjust fields: 43.4px high.
-- Maintenance Logs close action: 27.6px square.
-- Accounting filter: 38.8px high.
-- Export filters: 43.4px high.
+- Touch-target Repair 2 commit `c897cfd` changes exactly `src/index.css` and `scripts/setup-touch-target-harness.ts`.
+- Focused touch proof passes 52 global-floor assertions and kills 6/6 required mutations while retaining prior proof.
+- Raw Windows harness matrix is exact 24/24.
+- `npm run lint` reports only the exact three known baseline errors.
+- `npm run build` transforms exactly 566 modules.
+- Draft `6a5d5df113e70a34d7bf2539` passes signed-out 360×800, 390×844, 412×915, and 1080×2118 checks.
+- Fresh debug APK is 12,087,764 bytes, SHA-256 `29E9A3A1CE0B51CA38759B6D7D1393C3352B46A61F315A361EDAE67A0E84F6A6`.
+- Authenticated Android Default/Large page and form matrix has zero undersized targets or page overflow.
+- Authorized device-only then everywhere deletion test passed; owned racing data remains cleared without old-data resurrection. Account, auth, team, and membership remain intact.
+- Android 17/API 37 dev emulator WebView 150 has a reproducible system-library `onTrimMemory` SIGILL. Exact APK passes 3/3 lifecycle cycles on stable Android 15/WebView 124. No product repair is indicated for this runtime residual.
 
-Default scale uses `1.0`, so every padding-only control is smaller there. Source proves `src/index.css` has an opt-in `.tap-target` 2.75rem floor; the failing controls never opt in. Setup Clone/Compare are 24px icons plus 6px padding per side, exactly matching the measured 36px nominal and 41.4px Large result. Latent Setup states also include Use Setup, input-backed Add File, and the 20×20px attachment-delete button.
+## Blocker 1 — active Race Day setup can be deleted
 
-Current `scripts/setup-touch-target-harness.ts` incorrectly passes 48 assertions and 12 mutations because it counts selected class tokens and hand-builds limited fixtures; it never renders the failing Setup create/card controls or enforces a shell-wide native-control floor.
+`src/lib/setupLifecycle.ts` currently returns `{ editable: false, deletable: true, reason: 'in-play-elsewhere' }` for the exact active Race Day setup. `SetupView` therefore sends a real deletion to `handleSaveSetups`. `src/App.tsx` removes/pushes the Setup only; the Race Day keeps `activeSetupId`. `resolveWeekendSetup` returns null and `handleCreateNewSession` stops before writing the next run.
+
+Required lifecycle amendment:
+
+- Exact active Race Day setup becomes non-editable and non-deletable while its Race Day is active.
+- Unrelated Current setups remain editable/deletable.
+- Do not create, clone, or bind a replacement automatically; that would change protected lifecycle meaning.
+
+Generic cleanup for every other permitted setup deletion:
+
+- Calculate removed Setup IDs once.
+- Clear surviving Setup `sourceSetupId` only when it targets a removed ID.
+- Clear only matching Race Day top-level `setupId`, `sourceSetupId`, `baselineSetupId`, `activeSetupId`, and `finalSetupId`.
+- Stamp only changed surviving Setups and Race Days with one fresh ISO timestamp.
+- Update canonical refs, React state, localStorage, and existing setup/weekend pushes with identical repaired arrays.
+- Queue exact removed Setup IDs through existing delete machinery.
+- Preserve every existing `sessions[]` byte.
+
+## Blocker 2 — car cascade does not timestamp relationship repair
+
+`src/App.tsx` car cascade clears surviving Setup lineage and Race Day top-level pointers without advancing `updatedAt`. `mergeTimestampedRecords` gives an equal-timestamp cloud record precedence. If the debounced push fails or races a pull, stale cloud rows can restore cleared pointers; strict no-resurrection/no-dangling acceptance fails.
+
+Required repair:
+
+- Create one cascade commit timestamp.
+- Apply it only to surviving Setups whose `sourceSetupId` is cleared.
+- Apply it only to Race Days whose top-level pointer is cleared.
+- Preserve untouched Setup/Race Day objects and JSON bytes.
+- Preserve Race Day `sessions[]`, session `setupId`, and embedded `setupSnapshot` byte-for-byte.
+- If `race_notes_setup` represents the same repaired surviving Setup, update it to that repaired record; preserve unrelated active Setup bytes.
+- Keep delete queue IDs/order, push ordering, retry/filter rules, statuses, ownership, and account capture unchanged.
 
 ## Exact repair scope
 
 Edit only:
 
-1. `src/index.css`
-2. `scripts/setup-touch-target-harness.ts`
+1. `src/lib/setupLifecycle.ts`
+2. `src/App.tsx`
+3. `scripts/chunk5-setup-harness.ts`
+4. `scripts/car-delete-undo-harness.ts`
 
-No component file is authorized. If these two files cannot close the gate without changing semantics, stop and return `needs-confirm` with exact evidence. Do not expand scope.
+No `sync.ts`, component, type, native, package, config, schema, RLS, migration, Edge Function, release, or Sprint 4 file is authorized. If these four files cannot close the gate without broader semantics, stop with exact evidence.
 
-## Required product repair
+## Required production-bound proof
 
-In `src/index.css`, add one auditable global hardening rule that:
+`scripts/chunk5-setup-harness.ts` must compile/exercise the real editability and `handleSaveSetups` paths and prove:
 
-- gives every visible native `button`, text-like `input`, `select`, and `textarea` a minimum height of exactly 2.75rem;
-- gives every native `button` a minimum width of exactly 2.75rem;
-- gives labels that are the actual hit area for nested file, checkbox, or radio inputs a minimum 2.75rem hit area in both dimensions;
-- excludes hidden/file/checkbox/radio native inputs themselves where applying the native field box would expose hidden controls or enlarge only the visual glyph;
-- preserves existing `.tap-target`, `.tap-target-block`, NumberStepper, bottom-nav, zoom, focus, keyboard, disabled, pointer, safe-area, and fine/coarse-scrollbar rules;
-- changes no visible text, handler, state, persistence, sync, data shape, or component markup.
+- Exact active Race Day setup deletion attempt performs zero state/ref/localStorage/queue/push writes and no false Saved.
+- Historical/locked/finished setup protections remain unchanged.
+- Unrelated Current setup edit/delete behavior remains allowed.
+- Permitted source deletion clears every required surviving lineage/top-level pointer, stamps only changed records, persists/pushes repaired setups/weekends, queues exact removed IDs, and preserves sessions.
 
-The rule must work at both Default `1.0` and Large `1.15`; scale multiplies the floor, never reduces it.
+`scripts/car-delete-undo-harness.ts` must execute the real cascade plus real timestamp merge and prove:
 
-## Required proof repair
+- Repaired local Setup/Race Day rows have one strictly newer ISO timestamp and beat captured stale cloud copies after a simulated push failure/pull.
+- Untouched records remain exact bytes.
+- Signed-out cascade followed by later sign-in/pull cannot restore stale pointers.
+- Active setup cache changes only for the exact repaired saved twin.
+- All existing delete categories, account ownership, queue/push order, Undo, no-replacement, mid-failure, terminal status, and session-history assertions remain.
 
-Extend `scripts/setup-touch-target-harness.ts` with production-derived compiled/rendered proof. It must read the real CSS and relevant production source; a regex-only or hand-written class approximation is insufficient.
+Independent mutations must remove or corrupt at least: active-delete guard, each lineage/pointer repair class, Setup timestamp, Race Day timestamp, strict-newer timestamp, changed-only behavior, active-cache repair, ref/state/localStorage writes, weekend push, setup push, exact queue ID, and session preservation. Every mutation must fail behaviorally.
 
-Cover at 360×800, 390×844, 412×915, and 1080×2118, each at Default `1.0` and Large `1.15`:
+## Worker gates when implementation is later resumed
 
-- Setup new-name input, Clone, Compare, conditional Use Setup, input-backed Add File, and attachment delete;
-- Loads actions and compact icon actions;
-- Tires Add action;
-- Setup Compare selects;
-- Quick Adjust inputs/selects;
-- Checklist effective checkbox row target;
-- Maintenance Log action/close controls;
-- Accounting filter;
-- Export input-backed switch and selects;
-- existing Auth, Settings, Race Day, header, ContextStrip, NumberStepper, Four Bar, and bottom-nav floors.
-
-For each visible direct native control, rendered height must be at least `44 * scale`; compact/icon buttons must also be at least `44 * scale` wide. For checkbox/file/radio glyphs, prove their actual input-backed label or existing semantic row hit area is at least `44 * scale` without requiring the visual glyph itself to become 44px. Prove zero horizontal overflow and no control clipping at every case.
-
-Kill at least these independent mutations through rendered production geometry:
-
-1. remove the global height floor;
-2. change 2.75rem to 2.6875rem / 43px;
-3. remove the button width floor;
-4. accidentally exempt buttons from the rule;
-5. remove the input-backed label floor;
-6. restore/retain the 20px attachment-delete geometry without the global override.
-
-Every mutation must independently fail a rendered gate, not only a source regex.
-
-## Worker gates before commit
-
-1. Verify runtime metadata is `gpt-5.6-sol`, effort `high`; missing metadata is unverified and must be reported.
-2. Verify exact worktree, branch, repair-base HEAD, and clean tree.
-3. Run focused `scripts/setup-touch-target-harness.ts`; report exact assertions and killed mutations.
-4. Run focused scale, density, stepper, C2.5, Loads, Tires, Quick Adjust, checklist, accounting, export, help, offline/resume, and Saved/status regressions.
-5. Run all 24 harness files in one raw Windows capture; exact 24/24 required.
-6. `npm run lint`: exact three known baseline errors only.
+1. Verify runtime metadata: `gpt-5.6-sol`, effort `high`; absent metadata is unverified.
+2. Verify exact 203f worktree, `codex/ux-overhaul`, expected base HEAD, and clean tree.
+3. Run focused `chunk5-setup-harness.ts` and `car-delete-undo-harness.ts`; report exact assertions and mutation counts.
+4. Run lifecycle, Quick Adjust, tire, Saved/status, offline/resume, clear-data, touch-target, and confirmation regressions.
+5. Run all 24 harnesses in one raw Windows capture; exact 24/24 required.
+6. `npm run lint`: exact three known errors only.
 7. `npm run build`: exactly 566 transformed modules.
-8. Verify exact two-file diff, `git diff --check`, protected paths, and clean post-commit tree.
+8. Verify exact four-file diff, `git diff --check`, protected paths, and clean post-commit tree.
 9. Obtain cavecrew reviewer findings-first PASS.
-10. Commit exactly the two authorized files with a task-identifying repair message. No deploy, APK, data action, push, PR, merge, production, release, native, package, config, schema/RLS/migration/edge, or Sprint 4 change.
+10. Commit exactly the four authorized files with a task-identifying repair message.
 
-## Independent QA after worker commit
+## Independent QA and final closeout after repair
 
-Primary reruns all worker gates from clean exact commit, then installs a fresh Java 21 debug APK and remeasures every required authenticated Android page at Default and Large. PASS requires zero direct native target below 44px, every input-backed/effective target at least 44px, zero overflow/clipping, unchanged interaction behavior, raw 24/24, lint3, build566, exact scope, clean tree, and independent review.
+Primary reruns all gates, then the Part 6.3 whole-sprint matrix, fresh draft/browser matrix, fresh Java 21 debug APK, stable Android lifecycle/geometry/interactions, stale-cloud/no-resurrection fixtures, whole-branch boundary review, and clean-tree checks. Only a strict green result closes Final QA.
 
-Only after Repair 2 passes does Final Full-Sprint QA attempt 3 resume. Authorized device-only/everywhere cleanup remains last. Handoff, final governance, draft/debug deliverables, and saving-point push remain blocked until final PASS.
+After PASS: produce Part 6.4 cold-reader handoff, update all governance/owner docs, commit final docs, deploy one final Netlify draft, build one final debug APK, and push `codex/ux-overhaul` as a saving point.
 
 ## Hard bans
 
-No primary product implementation before the three-consecutive-failure escalation; no Terra or cavecrew-builder; no component edit; no weakened/removed assertion; no credentials in files/output/contracts; no live-data deletion during repair; no other-user/account/auth/team/membership deletion; no production Netlify publish; no signed/release APK/AAB or `release/` change; no native source/version; no package/config; no schema/RLS/migration/edge; no PR, master merge/push, or Sprint 4 IA.
+No implementation dispatch during the current documentation-only request; no primary product edit before the plan's escalation rule; no Terra or cavecrew-builder; no credential storage/output; no new destructive live-data test without owner scope; no other-user/account/auth/team/membership deletion; no production Netlify publish; no signed/release APK/AAB or `release/` change; no native source/version; no package/config; no schema/RLS/migration/Edge Function; no PR, master merge/push, or Sprint 4 IA.

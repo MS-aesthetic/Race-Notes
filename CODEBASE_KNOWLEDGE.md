@@ -1,10 +1,10 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-15 (Play privacy/account deletion follow-up)
-> Branch at time of writing: `master` (release baseline; future work branches from here)
+> Last updated: 2026-07-19 (UX Overhaul v2 Final QA attempt 3 documentation handoff)
+> Branches: `master` is Release 5.0; active v2 is `codex/ux-overhaul` in `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
-> ⚠️ **2026-07-14:** UX Chunks 1–9 and correction Sprint 1 were owner-approved and released to **`master`** as 5.0. Start with `SPRINT_INDEX.md`, then use `HANDOFF.md`, `ralph/CURRENT_TASK.md`, and `ralph/STATE.md` for current authority. This file remains the deep technical reference.
+> ⚠️ **2026-07-19:** Release 5.0 remains on `master`; active UX Overhaul v2 Final QA is on `codex/ux-overhaul`. Start with `AGENTS.md`, `ralph/CURRENT_TASK.md`, the v2 technical review/addenda, `ralph/STATE.md`, and `docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`. This file remains the deep domain/history reference.
 
 ## 2026-07-15 Play privacy/account deletion override
 
@@ -1556,3 +1556,129 @@ See §2 "UI scaling — 2-choice `zoom` system" for the full mechanism (constant
   package/version/API, AAB JAR signature, and matching certificate pass.
 - Existing emulator had a debug-signature install, so release `adb install -r` was not forced;
   uninstalling it would destroy local test data. Separate Claude authenticated QA was not run.
+
+## 37. UX Overhaul v2 — Current Architecture and Strategy (2026-07-19)
+
+The active post-Release-5.0 work is `codex/ux-overhaul` in
+`C:\Users\maxx\.codex\worktrees\203f\Race-Notes`. Do not resume from the old
+`preview-v3` worktree or copy its `dist` through `master`. Direct web, Netlify draft,
+Capacitor sync, and debug Gradle builds now run in 203f.
+
+Canonical active references:
+
+- `ralph/CURRENT_TASK.md` — exact current file allowlist and gates.
+- `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` — Part 5/6 plan plus v2.1 addenda.
+- `ralph/STATE.md` — complete attempt/score/commit history.
+- `docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md` — consolidated tools, build, QA,
+  deletion-test, runtime, and outstanding-repair runbook.
+
+Major v2 changes now in the branch:
+
+- Default/Large UI scales are 1.0/1.15 with phone-first density and safe-area/nav reservation.
+- NumberStepper commits on pointerup, cancels scroll gestures, and retains hold-repeat.
+- Native controls and input-backed labels have a global 2.75rem hit-area floor.
+- Setup corner steppers use value-on-top and side-by-side minus/plus rows.
+- Saved feedback is coalesced at tab/background/pagehide/native-inactive/30-second/session-create boundaries while local writes remain immediate.
+- Typed status arbitration prevents blocked/failed work from rendering Saved/Synced.
+- One canonical `getSetupEditability` policy guards SetupView and App persistence.
+- Session creation captures a deep plain `setupSnapshot` plus `setupId`; session-over-session diffs are computed, and live setup edits no longer append press-by-press historical log noise.
+- Clear Data exposes honest device-only and owned-records-everywhere paths.
+- Cloud delete zero-row responses remain queued as failures.
+- Car deletion uses a confirmed dependency cascade and preserves Race Day session history.
+- Header App Guide routing is context-aware; setup/four-bar deep links remain.
+
+Protected deletion invariant: top-level Setup/Race Day relationship repair may remove
+dangling IDs, but existing Race Day `sessions[]`, each session `setupId`, and embedded
+`setupSnapshot` stay byte-identical. `updatedAt` controls local/cloud precedence; changed
+relationship records need a newer timestamp, while unchanged records must not be stamped.
+
+## 38. UX Overhaul v2 — Tools, Build, and QA Baseline
+
+Verified local tools:
+
+- Windows PowerShell, Git, `rg`, Node/npm/npx, Vite, TypeScript, `tsx`, esbuild.
+- Netlify CLI for manual draft deploys; Git push never deploys this site.
+- Java 21 at `C:\Program Files\Microsoft\jdk-21.0.11.10-hotspot`.
+- Android SDK/adb at `C:\Users\maxx\AppData\Local\Android\Sdk`.
+- Capacitor 8 plus the tracked Android Gradle wrapper.
+- Codex in-app Browser, image inspection, cavecrew investigator/reviewer, explicit
+  model task/thread tools, and authorized Supabase/Netlify/Android integrations.
+
+Current hard automated baselines:
+
+- All 24 `scripts/*-harness.ts` files pass in one raw Windows run.
+- `npm run lint` has exactly three known errors: the two `unknown`-to-`File`
+  upload arguments and `CornerForm`'s `key` prop mismatch. A fourth error fails.
+- `npm run build` transforms exactly 566 modules.
+- Browser sizes: 360×800, 390×844, 412×915, and 1080×2118.
+- Android surfaces: all primary tabs, setup cards/forms, Loads, Tires, Runs/Quick
+  Adjust, Checklist, Maintenance/Logs, Accounting, and all Settings subtabs at
+  Default/dark and Large/light.
+- Every direct native target is at least `44 * scale`; checkbox/file/radio effective
+  labels/rows own the floor. Page overflow/clipping is forbidden.
+- Harnesses must compile/extract real production code and independently kill mutations;
+  regex-only or synthetic-fixture-only proof is insufficient for critical behavior.
+
+Build and full procedures are intentionally centralized in
+`docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`; use that document instead of historical
+bridge commands earlier in this file.
+
+## 39. Final QA Attempt 3 Evidence and Runtime Caveat
+
+Touch-target Repair 2 commit `c897cfd406ff074ad1a06535bdc015bb7198bf89`
+passes its exact two-file scope, 52 global-floor assertions, 6/6 new mutations,
+24/24 matrix, lint baseline, 566-module build, browser matrix, Android authenticated
+geometry, and independent touch-target review.
+
+Current draft:
+`https://6a5d5df113e70a34d7bf2539--crew-chief-race-notes.netlify.app`
+
+Current debug APK:
+
+- Path: `android/app/build/outputs/apk/debug/app-debug.apk`
+- Size: 12,087,764 bytes
+- SHA-256: `29E9A3A1CE0B51CA38759B6D7D1393C3352B46A61F315A361EDAE67A0E84F6A6`
+
+Authorized device-only then everywhere deletion QA also passed. The dedicated
+account's old owned racing data remained absent after resume/pull; account, auth,
+team, and membership stayed intact. One newly bootstrapped `My Car` on a truly empty
+account is expected and is not resurrection when its ID/timestamp is new.
+
+Android runtime caveat: API 37 dev-key x86_64 16KB emulator WebView
+`150.0.7871.46` SIGILLs in `libwebviewchromium.so` during `WV.yh1.onTrimMemory`.
+No app frame or repo trim override exists. APK 16KB alignment passes. Exact APK
+survived 3/3 background/foreground cycles on stable Android 15/WebView 124. Treat
+the API 37 result as runtime residual; use stable API 36 or physical Android for
+final release confidence rather than adding an unsupported app workaround.
+
+## 40. Final Sprint Outstanding — Repair 3
+
+Final whole-branch review found two release blockers; Final QA attempt 3 is FAIL
+82/100. No Repair 3 implementation has started.
+
+1. **Active Race Day Setup deletion.** Canonical editability makes the exact active
+   setup non-editable but deletable. Removing it leaves `RaceWeekend.activeSetupId`
+   dangling and next-run creation stops. Recommended amendment: make that exact
+   active setup non-deletable while the Race Day remains active. Unrelated Current
+   setups remain editable/deletable. Permitted source deletion must also clear
+   surviving Setup lineage and matching Race Day top-level pointers, stamp only
+   changed records, persist/push both datasets, and preserve sessions.
+2. **Car-cascade timestamp resurrection.** Cascade clears surviving Setup lineage and
+   Race Day pointers without advancing `updatedAt`. Equal-timestamp cloud rows win
+   on pull, so a failed/racing push can restore stale pointers. Stamp only repaired
+   Setup/Race Day rows with one cascade timestamp and repair `race_notes_setup` only
+   when it is the same changed saved setup. Untouched records and session history
+   remain exact.
+
+Proposed exact scope:
+
+- `src/lib/setupLifecycle.ts`
+- `src/App.tsx`
+- `scripts/chunk5-setup-harness.ts`
+- `scripts/car-delete-undo-harness.ts`
+
+After repair: focused production-bound mutation proof, raw 24/24, lint3, build566,
+fresh draft/debug APK, stable Android lifecycle and authenticated matrix, stale-cloud
+merge/no-resurrection proof, whole-branch reviewer PASS, Part 6.4 cold-reader handoff,
+final governance, and saving-point push. Production Netlify, release/signing/AAB,
+schema/RLS/migration/Edge Function, PR/master merge, and Sprint 4 remain forbidden.

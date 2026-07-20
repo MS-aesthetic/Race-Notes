@@ -519,7 +519,7 @@ Value (with unit) full-width on top, tap-to-edit; below it one row with − and 
 
 *QA focus (Sol XH):* screenshot the LF/RF corner cards at 360px before/after — the staggering in the owner's 2026-07-18 screenshot must be gone; mutation-check the new layout assertions once; confirm zero timing-logic diff in NumberStepper.
 
-### v2.1-D — Current progress snapshot
+### v2.1-D — Progress snapshot through Final QA attempt 2 (historical; superseded by v2.1-G)
 
 A1–A4 + Chunk A QA: PASS. B1–B3 + Chunk B QA: PASS. C1: PASS. C2: PASS 98/100 on QA attempt 2 (`253897a` product + `13b556f` EOL-portability repair). C2.5: PASS 100/100 on QA attempt 2 (`8ab870a` feature + `2235c7d` bounded geometry repair). C3: PASS 100/100 on QA attempt 1 (`e8d7016`). C4: PASS 100/100 on QA attempt 1 (`83230c9`). C5: PASS 100/100 on QA attempt 1 (`1a3d492`). Chunk C integrated QA: PASS 100/100 on attempt 1. D1: PASS 100/100 on attempt 1 (`1ca3576`). The pre-D2 label microfix passed 100/100 at `dc5c63d`. D2: PASS 100/100 on attempt 2 (`803d5d0` + `e29c0f0`). D3: PASS 100/100 on attempt 2 (`120fa72` + `a5e72d0`). Chunk D integrated QA: PASS 100/100. E1: PASS 100/100 on attempt 3 (`45e60c9` + `e2e7fe9` + `b160f7a`). E2: PASS 100/100 on attempt 1 (`2e2c277`). E3: PASS 100/100 on attempt 1 (`f6e9181`). Final full-sprint QA attempt 1 failed 96/100 at 23/24. SOL High harness-only repair `810d918` independently passed 100/100: 232 assertions, 11/11 mutations, exact 24/24, lint3/build566, scope/clean, and reviewer. Historical UXP-17 remains exact 105/16/eight while current remains exact 105/16 with Setup +1, Race Weekend -1, and six opacity exceptions after accepted C3 and D3 deltas. Final QA attempt 2 failed 88/100 after exact 24/24, lint3/build566, signed-out draft, and debug-build gates passed: fresh authenticated Android geometry found native controls below 44px on Setup, Loads, Tires, Runs/Quick Adjust, Maintenance Logs, Accounting, and Export at Large, with Default necessarily worse. Repair 2 is limited to `src/index.css` plus `scripts/setup-touch-target-harness.ts`: a global 2.75rem native-control/input-backed-label floor and production-derived four-viewport × two-scale rendered mutation proof. Authorized final data cleanup, whole-branch review, Part 6.4 handoff, final governance, and saving-point push remain blocked until repair PASS and final QA attempt 3.
 
@@ -532,3 +532,63 @@ Owner authorizes **debug** APK builds (`gradlew assembleDebug`) installed to a l
 ### v2.1-F — QA reporting requirement
 
 At the end of every task QA and every chunk QA, the QA agent writes/updates a **plain-English owner report** at `docs/OWNER_REPORT_UX_OVERHAUL.md`: what was built, what was checked, what passed/failed, what's next — no caveman, no jargon walls. This is in addition to (not instead of) Ralph state updates.
+
+### v2.1-G — Final QA attempt 3 findings and Repair 3 scope
+
+Final touch-target Repair 2 commit `c897cfd406ff074ad1a06535bdc015bb7198bf89`
+passes its exact two-file product/proof gate. The raw suite is 24/24, lint remains
+the exact three-error baseline, build remains 566 modules, final draft
+`6a5d5df113e70a34d7bf2539` passes all four signed-out sizes, authenticated Android
+Default/Large page and form geometry has no undersized effective targets or page
+overflow, and the authorized device-only/everywhere deletion sequence leaves owned
+racing data cleared without deleting account/auth/team/membership.
+
+The Android 17/API 37 dev-key x86_64 16KB emulator with WebView `150.0.7871.46`
+reproducibly SIGILLs inside `libwebviewchromium.so` at `WV.yh1.onTrimMemory`.
+The exact APK passes 3/3 background/foreground cycles on stable Android 15/WebView
+124, and no app frame or repository trim override exists. This is a recorded runtime
+residual; it does not authorize an application workaround. Stable API 36 or a
+physical Android device remains preferred final release evidence.
+
+Final whole-branch review found two product blockers, so Final QA attempt 3 is
+**FAIL, 82/100**:
+
+1. **C1 relationship hole.** The exact active Race Day Setup remains non-editable
+   but deletable. Removing it deletes/pushes only the Setup while the Race Day keeps
+   `activeSetupId`; `resolveWeekendSetup` returns null and next-session creation
+   stops. The safe lifecycle amendment makes the exact active Race Day Setup
+   non-editable and non-deletable while its event is active. Unrelated Current
+   Setups remain editable/deletable. Permitted source deletion must clear surviving
+   Setup `sourceSetupId` and matching Race Day top-level setup pointers, timestamp
+   only changed rows, persist/push both arrays, and preserve sessions.
+2. **D3 timestamp hole.** Car cascade clears surviving Setup lineage and Race Day
+   top-level pointers without advancing `updatedAt`. Equal-timestamp cloud rows win
+   the existing merge, so failed/racing push followed by pull can restore stale
+   pointers. One cascade timestamp must stamp only repaired Setup/Race Day rows;
+   matching `race_notes_setup` cache must receive the repaired record; untouched
+   records and every session byte remain exact.
+
+Repair 3 is one serialized work order because both fixes share `App.tsx`. Exact scope:
+
+- `src/lib/setupLifecycle.ts`
+- `src/App.tsx`
+- `scripts/chunk5-setup-harness.ts`
+- `scripts/car-delete-undo-harness.ts`
+
+Per 6.3, final-gate failures are kicked back to the offending task. These are newly
+discovered reopened C1/D3 defects after earlier task PASS verdicts, not three
+consecutive failed implementation attempts of either repair. Repair 3 therefore
+uses one SOL High worker under v2.1-A; primary Extra High remains independent QA.
+
+The proof must compile/exercise real production handlers and merges, reject active
+setup deletion with zero writes, cover all permitted relationship cleanup and
+changed-only timestamps, simulate stale cloud after failed push, prove repaired
+local rows win, retain signed-out-to-sign-in behavior, preserve all historical
+session bytes, and independently kill guard/cleanup/timestamp/cache/persistence/push
+mutations. Full 24/24, lint3, build566, fresh draft/debug, stable Android lifecycle,
+whole-branch review, exact scope, protected paths, and clean tree remain hard gates.
+
+No Repair 3 implementation has started. The owner's 2026-07-19 documentation-only
+request explicitly pauses worker dispatch. No `sync.ts`, component, type, native,
+package, config, schema/RLS/migration/Edge Function, release, production, PR,
+master, or Sprint 4 change is presently authorized.

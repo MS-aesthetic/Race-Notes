@@ -1,13 +1,20 @@
 # CREW CHIEF — Sprint Index (UX tracks)
 
-Release baseline `master`, worktree `C:\Users\maxx\antigravity\Race-Notes`.
-Ralph loop consumes one sprint file at a time. Sprints run serial: 1 → 2 → 3 → 4.
-(Sprint 4's Maxx design session can be scheduled any time; its build work runs last.)
+Release baseline `master` remains at `C:\Users\maxx\antigravity\Race-Notes`.
+Active development is **UX Overhaul v2** on `codex/ux-overhaul` at
+`C:\Users\maxx\.codex\worktrees\203f\Race-Notes`. Its authority is
+`docs/UX_TECHNICAL_REVIEW_2026-07-17.md` plus the v2.1 addenda,
+`ralph/CURRENT_TASK.md`, and `ralph/STATE.md`. Detailed cold-start procedure is
+`docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`.
+
+The older numbered sprint files below describe Release 5.0 planning lineage and
+future deferred work. Do not start Sprint 2, 3, or 4 while v2 Final QA remains open.
 
 | Sprint | File | Content | Status |
 |---|---|---|---|
-| 1 | `plan-v3-ux-corrections.md` | UXF-1…10 — owner-correction batch (2026-07-14 handoff) | COMPLETE — released as 5.0 |
-| 2 | `sprint-2-quick-wins.md` | UXP-1,2,3,4,5,6,7,8,9,11,12,13,19,20 + gate — Low-difficulty audit items | pending — next after owner starts it |
+| UX Overhaul v2 | `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` | Mobile density, persistence semantics, deletion integrity, navigation polish, final QA | **ACTIVE — Final QA Repair 3 planned, not started** |
+| 1 | `docs/archive/plan-v3-ux-corrections.md` | UXF-1…10 — owner-correction batch (2026-07-14 handoff) | COMPLETE — released as 5.0 |
+| 2 | `sprint-2-quick-wins.md` | UXP-1,2,3,4,5,6,7,8,9,11,12,13,19,20 + gate — Low-difficulty audit items | deferred — blocked by v2 final QA |
 | 3 | `sprint-3-second-wave.md` | UXP-10,14,15,16,17,18 + gate — Medium-difficulty audit items | pending — blocked by sprint 2 |
 | 4 | `sprint-4-design-needed.md` | UXP-21,22 — High-difficulty IA items with their own Maxx design session | pending — design session gates build |
 
@@ -20,19 +27,23 @@ Per-sprint QA gates: UXP-QA2, UXP-QA3.
 
 ## Model routing (authoritative copy — sprint files carry a brief restate)
 
-- `ws-planner` = GPT-5.6 SOL High. All planning + STATE/sprint tracking updates.
-- `ws-builder` = GPT-5.6 Terra High. **ONE initial pass per workstream, ever.**
-- Any ws-qa FAIL routes straight to `ws-fixer` = GPT-5.6 SOL High, which loops
-  with `ws-qa` = GPT-5.6 SOL High (SOL↔SOL) until PASS. Terra never re-invoked
-  once attempt 1 fails on a workstream.
-- `cavecrew-investigator` = GPT-5.6 Terra Medium — bounded codebase
-  research/search for any role mid-workstream (already configured:
-  `.codex/agents/cavecrew-investigator.toml`).
+- **Current v2 routing:** implementation tasks use `gpt-5.6-sol` High workers;
+  primary QA/plan authority uses `gpt-5.6-sol` Extra High. Terra at every tier
+  and `cavecrew-builder` are forbidden by the v2.1 owner addendum.
+- After three consecutive failures of the same task, primary Extra High owns
+  direct implementation under the identical file and QA restrictions.
+- Cavecrew investigator/reviewer contracts remain available for bounded tracing
+  and findings-first review. They do not replace runtime model verification.
+- Older sprint role files preserve historical routing only; they do not override
+  the active v2.1 addendum.
 - `/caveman full` for all loop artifacts (`.agents/skills/caveman/SKILL.md`).
 
 ## Notes for cold-start models
 
-- Sprint 1 detail: read `plan-v3-ux-corrections.md` (architecture invariants,
+- Start active work with `ralph/CURRENT_TASK.md`, not Sprint 2.
+- Exact active checkout is the 203f worktree above; do not edit the release tree
+  or the independent 3d72 QA checkout.
+- Sprint 1 historical detail: read `docs/archive/plan-v3-ux-corrections.md` (architecture invariants,
   UXF specs, decisions log). Each sprint 2-4 file restates the invariants —
   you do not need a second file open to execute one sprint.
 - Line refs in sprint 2-4 files verified 2026-07-14 **pre-UXF**. UXF batch

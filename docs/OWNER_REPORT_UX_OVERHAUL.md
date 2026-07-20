@@ -513,3 +513,52 @@ https://6a5d52c877706b39b44d636c--crew-chief-race-notes.netlify.app/
 It is a draft only. The fresh debug APK was successfully built and installed. It is 12,087,761 bytes with SHA-256 `4C7A5653B96226B094F70FB925C7FEAD10F3F299D921B9F78253C48E73424F0B`.
 
 Because the final gate failed, the authorized data-clear and no-resurrection sequence was not run. No racing data, account, login, team, or membership was deleted. The final handoff and saving-point push also remain blocked until the repair passes and final QA attempt 3 is fully green. No production deployment, release build, signing, pull request, merge, master change, database change, or native-source change occurred.
+
+## Final whole-sprint QA — Attempt 3
+
+The third final QA attempt is a **FAIL, 82/100**. The touch-target repair itself is complete and working, but the final whole-branch review found two deletion-integrity problems that must be fixed before this sprint can be called complete.
+
+### What passed
+
+SOL High Repair 2 commit `c897cfd` changes only the shared CSS and the touch-target test. It gives visible native controls and the labels that operate hidden file, checkbox, and radio inputs a consistent 44-pixel minimum target. The expanded test passed 52 global-floor assertions and defeated all six required mutations while retaining the earlier touch-target checks.
+
+All 24 automated test files passed in one Windows run. Type-checking still reports only the same three known errors, and the production build still transforms exactly 566 modules.
+
+The fresh draft is:
+
+https://6a5d5df113e70a34d7bf2539--crew-chief-race-notes.netlify.app/
+
+It passed the signed-out 360×800, 390×844, 412×915, and 1080×2118 checks with the sign-in gate, no horizontal overflow, pinch zoom enabled, controls at least 44 pixels, and no browser warnings or errors.
+
+The fresh debug APK is 12,087,764 bytes with SHA-256 `29E9A3A1CE0B51CA38759B6D7D1393C3352B46A61F315A361EDAE67A0E84F6A6`. The authenticated Android screen and form matrix passed at Default and Large sizes. Dashboard, Setups, Loads, Tires, Runs and Quick Adjust, Checklist, Maintenance, Accounting, and every Settings section had no undersized effective controls or page overflow. The setup corner cards remained aligned, the stacked controls retained their approved layout, and the “From Inventory” heading remained removed.
+
+The owner-authorized deletion test was then completed in the required order. “Clear this device only” cleared the device and allowed shared cloud data to return honestly on sync. “Delete my records everywhere” deleted only the signed-in account's owned racing records. After cold restarts, the pull cooldown, and another resume, the old data did not return. The account, login, team, and membership remained intact. The app created one new blank “My Car” record for the now-empty account, which is the expected empty-account bootstrap and not old-data resurrection.
+
+### Android emulator runtime note
+
+The Android 17 development emulator currently has WebView 150 and crashes inside the WebView system library when a WebView application is backgrounded. The same fault reproduced without a debugger and contains no Crew Chief application frame. The exact Crew Chief APK survived three out of three background and foreground cycles on the available stable Android 15 emulator with WebView 124. This is being carried as an emulator/WebView runtime issue, not patched in the app. A stable Android 16 emulator or physical Android device is preferred for final release confidence when available.
+
+### What failed
+
+The final whole-branch review found two real edge cases:
+
+1. The exact setup used by an active Race Day is currently protected from editing but still allowed to be deleted. Deleting it removes the setup while the Race Day continues pointing to its old ID. The next run cannot resolve a valid Race Day setup and is blocked.
+2. Car cascade deletion clears stale setup links from surviving setups and Race Days, but it does not give those repaired records a newer update timestamp. If the cloud write fails or races a pull, an equal-timestamp cloud copy can win and restore the stale links.
+
+These problems are limited to deletion paths; normal setup editing, session logging, layout, and clear-all-data behavior passed. They are still release blockers because they can leave an active event unusable or restore relationships the user believes were removed.
+
+### Planned repair
+
+No repair implementation has started. The owner requested documentation only at this point.
+
+The recommended repair makes the exact active Race Day setup non-deletable while the event is active. Other normal setups remain editable and deletable. Permitted setup deletions will also clean surviving setup lineage and matching Race Day top-level pointers, give only changed records a newer timestamp, persist and sync both datasets, and preserve every historical session byte.
+
+The car cascade will use one commit timestamp for only the surviving setups and Race Days it repairs. If the active device setup is the same repaired setup, its local cache will be updated too. Unchanged records, deletion queues, ownership, retry behavior, and session history will remain unchanged.
+
+The proposed repair is limited to `src/lib/setupLifecycle.ts`, `src/App.tsx`, `scripts/chunk5-setup-harness.ts`, and `scripts/car-delete-undo-harness.ts`. It requires production-bound tests that simulate a failed cloud write and stale pull, prove repaired local data wins, and defeat independent guard, cleanup, timestamp, cache, persistence, and push mutations.
+
+After that repair passes, the remaining work is the final full regression, fresh draft and debug APK, stable Android lifecycle check, final whole-branch review, independent-review handoff document, final governance update, and saving-point branch push. Production deployment, release builds, signing, database changes, pull requests, master changes, and Sprint 4 remain outside this work.
+
+## Documentation handoff update
+
+The project's future-agent documentation was refreshed after attempt 3. `docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md` now records the active worktree and authority order, architecture invariants, prior development strategy, current model routing, available tools, direct web and Android build procedures, all 24 automated tests, browser and authenticated Android test matrices, deletion-test procedure, Workbox and Android runtime caveats, exact accepted artifacts, both outstanding blockers, the proposed four-file repair, and final closeout steps. `HANDOFF.md`, `SPRINT_INDEX.md`, `CODEBASE_KNOWLEDGE.md`, the technical plan, and Ralph state/task files now point to the same current status.

@@ -9,7 +9,7 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 >
 > **🧭 NEW AGENT? START WITH [`HANDOFF.md`](./HANDOFF.md)** — consolidated onboarding: current status, session history, worktree/branch gotchas, build/deploy procedures, and the Ralph-loop workflow.
 >
-> **🏁 Release 5.0 is the `master` baseline.** Sprint 1 and UXF-9P were owner-approved for release on 2026-07-14. Future work starts from [`SPRINT_INDEX.md`](./SPRINT_INDEX.md) on a new feature branch/worktree created from `master`. Current routing: **GPT 5.6 SOL High plans/QAs; GPT 5.6 Terra High gets one initial build pass; any QA failure transfers fixes to GPT 5.6 SOL High; `/caveman full`** for status.
+> **🏁 Release 5.0 is the `master` baseline.** Active UX Overhaul v2 work is on `codex/ux-overhaul` in the existing 203f worktree; see [`ralph/CURRENT_TASK.md`](./ralph/CURRENT_TASK.md) and [`docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`](./docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md). Current v2.1 routing: **GPT 5.6 SOL High implementation workers; GPT 5.6 SOL Extra High primary QA/plan authority; Terra and `cavecrew-builder` forbidden; `/caveman full`** for status.
 >
 > This file is current workflow authority. For active status trust
 > [`SPRINT_INDEX.md`](./SPRINT_INDEX.md), [`ralph/STATE.md`](./ralph/STATE.md), and
@@ -31,23 +31,22 @@ review, and user-facing status message in this repository.
    - `.agents/skills/caveman/SKILL.md`
 3. Delegation routing:
    - code/location tracing: `cavecrew-investigator`
-   - known surgical edit touching at most two files: `cavecrew-builder`
    - diff/branch/file verification: `cavecrew-reviewer`
-   - cross-cutting work touching three or more files: primary agent owns build;
-     cavecrew investigators/reviewers support it
-4. **Model routing:** GPT 5.6 SOL High owns analysis, specification, planning,
-   and QA. GPT 5.6 Terra High gets one initial feature implementation pass.
-   Any QA failure transfers implementation to GPT 5.6 SOL High; SOL fixer and
-   SOL QA then loop until PASS. Terra is not re-invoked for that workstream. Bounded read-only
-   `cavecrew-investigator` scans may use Terra Medium for fast evidence gathering;
-   SOL retains interpretation and decisions.
+   - implementation: explicit `gpt-5.6-sol` High worker task, regardless of file count
+   - `cavecrew-builder` and Terra are forbidden for active v2 work
+4. **Active v2.1 model routing:** implementation tasks use GPT 5.6 SOL High
+   workers; primary GPT 5.6 SOL Extra High owns analysis, specification, planning,
+   independent QA, and governance. After three consecutive failures of the same
+   task, primary Extra High implements directly under the identical restrictions.
+   Bounded cavecrew investigators/reviewers may support evidence gathering; SOL
+   retains interpretation and decisions.
 5. Model identity comes from Codex runtime metadata (`turn_context.payload.model`),
    not the agent's prose self-identification. Do not infer unavailability from a
    generic "Codex" identity message. If runtime metadata is unavailable, report
    the model as **unverified**, not unavailable. Preserve the role split with a
    fallback only after an actual dispatch failure.
 6. Model handoff uses a persistent Codex task plus an explicit model override on
-   each turn: SOL planning/QA → Terra implementation → SOL QA. The Codex
+   each turn: SOL Extra High planning/QA → SOL High implementation → SOL Extra High QA. The Codex
    `handoff_thread` operation moves checkout/worktree/host state; it does not
    select a model. Verify executed handoffs with
    `scripts/verify-agent-handoff.ps1`.
@@ -57,7 +56,10 @@ review, and user-facing status message in this repository.
 ## Branch & Deploy Workflow (READ FIRST)
 
 > **BRANCH RULE — `master` is the released baseline.** Never commit new feature work
-> directly to `master`. Create a new branch/worktree from current `master`:
+> directly to `master`. **Active v2 exception:** remain on existing
+> `codex/ux-overhaul` at `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`; do not
+> create or switch a branch/worktree. New future workstreams, after v2 closes, start
+> from current `master`:
 > ```bash
 > git switch master
 > git pull --ff-only
