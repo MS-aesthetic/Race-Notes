@@ -3,10 +3,14 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
+import {requireCloudConfig} from './scripts/viteRequireCloudConfig';
 
 export default defineConfig(() => {
   return {
     plugins: [
+      // Must stay first: aborts `vite build` when Supabase env vars are absent,
+      // instead of silently emitting a bundle in which no sign-in method works.
+      requireCloudConfig(),
       react(),
       tailwindcss(),
       VitePWA({
