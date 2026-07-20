@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { transformSync } from 'esbuild';
+import { mergeTimestampedRecords, repairSetupDeletionReferences } from '../src/lib/setupLifecycle';
 
 const source = (relative: string) => readFileSync(join(process.cwd(), relative), 'utf8');
 const app = source('src/App.tsx');
@@ -397,8 +398,8 @@ const compileD3Handler = (sourceText: string) => {
     'setSavedSetups', 'setTireInventory', 'setShockSessions', 'setMaintenanceLogs',
     'setMaintenance', 'setCars', 'setWeekends', 'setActiveCarId', 'setSetup',
     'pushSetups', 'pushTires', 'pushShockSessions', 'pushMaintenanceLogs',
-    'pushMaintenanceComponents', 'pushCars', 'pushWeekends', 'setSyncStatus',
-    'activeCarIdRef', 'syncStatusRef', 'isTerminalSyncStatus', 'pickLatestSetupForCar', 'INITIAL_SETUP', 'showInfo', 'localStorage', 'window',
+    'pushMaintenanceComponents', 'pushCars', 'pushWeekends', 'setSyncStatus', 'repairSetupDeletionReferences',
+    'activeCarIdRef', 'syncStatusRef', 'isTerminalSyncStatus', 'pickLatestSetupForCar', 'INITIAL_SETUP', 'showInfo', 'setup', 'localStorage', 'window',
   ];
   const wrapped = `export const makeD3Handler = (deps) => {\n  const { ${dependencyNames.join(', ')} } = deps;\n${handler}\n  return handleDeleteCar;\n};`;
   const compiled = transformSync(wrapped, { loader: 'ts', format: 'cjs', target: 'es2022' }).code;
@@ -487,10 +488,11 @@ const runD3Cascade = (
     setWeekends: setState('weekends'), setActiveCarId: setState('activeCar'), setSetup: setState('setup'),
     pushSetups: push('setups'), pushTires: push('tires'), pushShockSessions: push('shocks'),
     pushMaintenanceLogs: push('logs'), pushMaintenanceComponents: push('components'), pushCars: push('cars'), pushWeekends: push('weekends'),
+    repairSetupDeletionReferences,
     setSyncStatus: () => undefined,
     isTerminalSyncStatus: (status: string | null) => status === 'sync-error' || status === 'deferred-delete-retrying',
     pickLatestSetupForCar: (setups: Array<{ carId?: string }>, carId: string) => setups.find(item => item.carId === carId) ?? null,
-    INITIAL_SETUP: { id: 'initial-safe' }, showInfo: (notice: unknown) => { infos.push(notice); }, localStorage, window: { localStorage },
+    INITIAL_SETUP: { id: 'initial-safe' }, showInfo: (notice: unknown) => { infos.push(notice); }, setup: setupNext, localStorage, window: { localStorage },
   });
   handler('car-delete');
   assert.ok(descriptor, 'D3 real handler requests Undo descriptor');
@@ -535,11 +537,10 @@ d3Equal(JSON.parse(activeD3.storage.get('race_notes_weekends')!)[0].sessions[0].
 d3Deep(activeD3.infos, [{ reason: 'car-delete-queued', context: { label: 'car-delete · Modified' } }], 'D3 publishes one structured local outcome');
 
 const nonActiveD3 = runD3Cascade(app, 'car-next');
-const nonActiveSetupBytes = nonActiveD3.storage.get('race_notes_setup');
 nonActiveD3.commit();
 d3Equal(nonActiveD3.storage.get('race_notes_active_car'), 'car-next', 'D3 non-active delete preserves active car');
-d3Equal(nonActiveD3.storage.get('race_notes_setup'), nonActiveSetupBytes, 'D3 non-active delete preserves active setup bytes');
-d3Ok(!('activeCar' in nonActiveD3.states) && !('setup' in nonActiveD3.states), 'D3 non-active delete performs no selection state write');
+d3Equal(JSON.parse(nonActiveD3.storage.get('race_notes_setup')!).sourceSetupId, undefined, 'Repair 3 repairs only the exact active saved-twin cache');
+d3Ok(!('activeCar' in nonActiveD3.states) && (nonActiveD3.states.setup as any)?.id === 'setup-next', 'Repair 3 changes no active-car selection while repairing the exact active cache');
 
 const noReplacementD3 = runD3Cascade(app, 'car-delete', []);
 noReplacementD3.commit();
@@ -578,14 +579,13 @@ d3Equal(JSON.parse(signedOutActiveD3.storage.get('race_notes_setup')!).id, 'setu
 d3Deep(JSON.parse(signedOutActiveD3.storage.get('race_notes_cars')!).map((item: any) => item.id), ['car-next', 'car-third'], 'D3 signed-out active cascade persists retained cars');
 
 const signedOutNonActiveD3 = runD3Cascade(app, 'car-next', [d3Car('car-next'), d3Car('car-third')], signedOutD3Identity);
-const signedOutNonActiveSetupBytes = signedOutNonActiveD3.storage.get('race_notes_setup');
 signedOutNonActiveD3.commit();
 d3Deep(signedOutNonActiveD3.sharedQueues, [], 'D3 signed-out non-active cascade creates zero shared queues');
 d3Deep(signedOutNonActiveD3.tireQueues, [], 'D3 signed-out non-active cascade creates zero tire queues');
 d3Deep(signedOutNonActiveD3.pushes, [], 'D3 signed-out non-active cascade performs zero cloud pushes');
 d3Equal(signedOutNonActiveD3.storage.get('race_notes_active_car'), 'car-next', 'D3 signed-out non-active cascade preserves active car storage');
-d3Equal(signedOutNonActiveD3.storage.get('race_notes_setup'), signedOutNonActiveSetupBytes, 'D3 signed-out non-active cascade preserves active setup bytes');
-d3Ok(!('activeCar' in signedOutNonActiveD3.states) && !('setup' in signedOutNonActiveD3.states), 'D3 signed-out non-active cascade performs no selection state write');
+d3Equal(JSON.parse(signedOutNonActiveD3.storage.get('race_notes_setup')!).sourceSetupId, undefined, 'D3 signed-out non-active cascade repairs exact active setup cache');
+d3Ok(!('activeCar' in signedOutNonActiveD3.states) && (signedOutNonActiveD3.states.setup as any)?.id === 'setup-next', 'D3 signed-out non-active cascade leaves selection intact while repairing cache');
 d3Equal(signedOutNonActiveD3.refs.activeCarIdRef.current, 'car-next', 'D3 signed-out non-active cascade preserves canonical active-car ref');
 d3Deep((signedOutNonActiveD3.states.cars as Array<any>).map(item => item.id), ['car-next', 'car-third'], 'D3 signed-out non-active cascade still removes target car locally');
 d3Deep((signedOutNonActiveD3.states.setups as Array<any>).map(item => item.id), ['setup-next', 'setup-third'], 'D3 signed-out non-active cascade still removes target setup locally');
@@ -602,6 +602,18 @@ d3Equal((signedOutLastD3.states.setup as any).id, 'initial-safe', 'D3 signed-out
 d3Ok(!signedOutLastD3.storage.has('race_notes_active_car') && !signedOutLastD3.storage.has('race_notes_setup'), 'D3 signed-out last-car cascade removes stale selection storage');
 d3Deep((signedOutLastD3.states.cars as Array<any>).map(item => item.id), [], 'D3 signed-out last-car cascade persists no dangling car');
 d3Equal(bytes((signedOutLastD3.states.weekends as Array<any>)[0].sessions), signedOutLastD3.sessionsBefore, 'D3 signed-out last-car cascade preserves Race Day session bytes');
+
+// Signed-out local deletion must survive the later sign-in pull of stale cloud
+// rows. This runs the real cascade first, then the production timestamp merge.
+const signedOutThenSignInD3 = runD3Cascade(app, 'car-delete', [d3Car('car-next')], signedOutD3Identity);
+signedOutThenSignInD3.commit();
+const staleCloudSetup = { id: 'setup-next', carId: 'car-next', chassis: 'Next', date: 'later', sourceSetupId: 'setup-delete', updatedAt: '2026-07-19T00:00:00.000Z', lf: {}, rf: {}, lr: {}, rr: {} };
+const staleCloudWeekend = { id: 'weekend-history', name: 'History', track: 'Track', date: 'date', sessions: [{ id: 'session-history', setupId: 'setup-delete', setupSnapshot: { id: 'setup-delete' } }], activeSetupId: 'setup-delete', updatedAt: '2026-07-19T00:00:00.000Z' };
+const signInMergedSetups = mergeTimestampedRecords(signedOutThenSignInD3.refs.savedSetupsRef.current, [staleCloudSetup]);
+const signInMergedWeekends = mergeTimestampedRecords(signedOutThenSignInD3.refs.weekendsRef.current, [staleCloudWeekend]);
+d3Equal(signInMergedSetups.find(item => item.id === 'setup-next')?.sourceSetupId, undefined, 'Repair 3 signed-out cascade local Setup repair beats stale cloud after sign-in');
+d3Equal(signInMergedWeekends.find(item => item.id === 'weekend-history')?.activeSetupId, undefined, 'Repair 3 signed-out cascade Race Day repair beats stale cloud after sign-in');
+d3Equal(bytes(signInMergedWeekends.find(item => item.id === 'weekend-history')?.sessions), signedOutThenSignInD3.sessionsBefore, 'Repair 3 signed-out then sign-in merge preserves historical session bytes');
 
 const replacementWithoutSetupD3 = runD3Cascade(app, 'car-delete', [d3Car('car-empty')]);
 replacementWithoutSetupD3.commit();
@@ -632,6 +644,57 @@ preexistingTerminalD3.refs.syncStatusRef.current = 'sync-error';
 preexistingTerminalD3.commit();
 d3Deep(preexistingTerminalD3.infos, [], 'D3 pre-existing terminal failure suppresses queued-success info');
 
+// Repair 3 compiles the production relationship helper itself. This is separate
+// from the real App handler above so timestamp and merge behavior cannot hide in
+// a hand-written fixture.
+const lifecycle = source('src/lib/setupLifecycle.ts');
+const compileRelationshipRepair = (sourceText: string) => {
+  const start = sourceText.indexOf('const setupPointerKeys =');
+  const end = sourceText.indexOf('/** An active event may only receive its owned Weekend Setup', start);
+  assert.ok(start >= 0 && end > start, 'Repair 3 relationship helper slice exists');
+  const body = sourceText.slice(start, end)
+    .replace('export const repairSetupDeletionReferences =', 'const repairSetupDeletionReferences =');
+  const compiled = transformSync(`${body}\nmodule.exports = { repairSetupDeletionReferences };`, { loader: 'ts', format: 'cjs', target: 'es2022' }).code;
+  const moduleBox = { exports: {} as Record<string, unknown> };
+  new Function('module', 'exports', compiled)(moduleBox, moduleBox.exports);
+  return moduleBox.exports.repairSetupDeletionReferences as (setups: any[], weekends: any[], removed: Set<string>) => any;
+};
+const relationshipRepair = compileRelationshipRepair(lifecycle);
+const relationshipSession = { id: 'session-proof', setupId: 'removed', setupSnapshot: { id: 'removed', lf: { tirePress: '12' } } };
+const relationshipSetups = [
+  { id: 'survivor', sourceSetupId: 'removed', updatedAt: '2026-07-19T00:00:00.000Z', lf: {}, rf: {}, lr: {}, rr: {} },
+  { id: 'untouched', sourceSetupId: 'other', updatedAt: '2026-07-19T00:00:01.000Z', lf: {}, rf: {}, lr: {}, rr: {} },
+];
+const relationshipWeekends = [{
+  id: 'weekend-proof', sessions: [relationshipSession], updatedAt: '2026-07-19T00:00:02.000Z',
+  setupId: 'removed', sourceSetupId: 'removed', baselineSetupId: 'removed', activeSetupId: 'removed', finalSetupId: 'removed', setupName: 'unchanged',
+}];
+const relationshipResult = relationshipRepair(relationshipSetups, relationshipWeekends, new Set(['removed']));
+d3Equal(relationshipResult.setups[0].sourceSetupId, undefined, 'Repair 3 clears only removed Setup lineage');
+d3Equal(relationshipResult.setups[1], relationshipSetups[1], 'Repair 3 leaves unrelated Setup bytes exact');
+d3Deep(['setupId', 'sourceSetupId', 'baselineSetupId', 'activeSetupId', 'finalSetupId'].map(key => relationshipResult.weekends[0][key]), [undefined, undefined, undefined, undefined, undefined], 'Repair 3 clears every matching top-level Race Day pointer');
+d3Equal(bytes(relationshipResult.weekends[0].sessions), bytes(relationshipWeekends[0].sessions), 'Repair 3 keeps session setupId/snapshot bytes exact');
+d3Equal(relationshipResult.weekends[0].setupName, 'unchanged', 'Repair 3 leaves unrelated Race Day bytes exact');
+d3Equal(relationshipResult.setups[0].updatedAt, relationshipResult.weekends[0].updatedAt, 'Repair 3 uses one cascade commit timestamp');
+d3Ok(relationshipResult.setups[0].updatedAt > relationshipSetups[0].updatedAt && relationshipResult.weekends[0].updatedAt > relationshipWeekends[0].updatedAt, 'Repair 3 timestamp is strictly newer than every affected row');
+d3Equal(mergeTimestampedRecords(relationshipResult.setups, [{ ...relationshipSetups[0], sourceSetupId: 'removed' }])[0].sourceSetupId, undefined, 'Repair 3 repaired local Setup wins stale equal-or-older cloud merge');
+d3Equal(mergeTimestampedRecords(relationshipResult.weekends, [{ ...relationshipWeekends[0] }])[0].activeSetupId, undefined, 'Repair 3 repaired local Race Day wins stale cloud merge after sign-in');
+
+const relationshipMutations: Array<[string, string, string, (result: any) => boolean]> = [
+  ['lineage-left-dangling', '{ ...setup, sourceSetupId: undefined, updatedAt: timestamp }', '{ ...setup, updatedAt: timestamp }', result => result.setups[0].sourceSetupId === 'removed'],
+  ['pointer-class-omitted', "'setupId', 'sourceSetupId', 'baselineSetupId', 'activeSetupId', 'finalSetupId'", "'setupId', 'sourceSetupId', 'baselineSetupId', 'finalSetupId'", result => result.weekends[0].activeSetupId === 'removed'],
+  ['strict-newer-removed', 'new Date(Math.max(Date.now(), newestAffected + 1)).toISOString()', 'new Date(newestAffected).toISOString()', result => result.timestamp <= relationshipWeekends[0].updatedAt],
+  ['changed-only-removed', ': setup),', ': { ...setup, updatedAt: timestamp }),', result => result.setups[1].updatedAt === result.timestamp],
+  ['sessions-rewritten', 'const repaired: RaceWeekend = { ...weekend, updatedAt: timestamp };', 'const repaired: RaceWeekend = { ...weekend, sessions: [], updatedAt: timestamp };', result => result.weekends[0].sessions.length === 0],
+];
+for (const [name, before, after, proves] of relationshipMutations) {
+  d3Equal((lifecycle.match(new RegExp(before.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length, 1, `Repair 3 ${name} mutation target is unique`);
+  const mutated = lifecycle.replace(before, after);
+  const result = compileRelationshipRepair(mutated)(relationshipSetups, relationshipWeekends, new Set(['removed']));
+  d3Ok(proves(result), `Repair 3 production relationship mutation ${name} is rejected`);
+}
+console.log(`Repair 3 relationship killed mutations (${relationshipMutations.length}): ${relationshipMutations.map(([name]) => name).join(', ')}`);
+
 const d3Mutations: Array<[string, string, string]> = [
   ['setup-category-missing', '.filter(item => !removedSetupIds.has(item.id))', '.filter(item => true)'],
   ['tire-category-missing', "const retainedTires = latestTires.filter(item => item.carId !== carId);", 'const retainedTires = latestTires;'],
@@ -650,8 +713,8 @@ const d3Mutations: Array<[string, string, string]> = [
   ['signed-out-null-guard-regression', 'if ((userRef.current?.id ?? null) !== accountId) return;', 'if (userRef.current?.id !== accountId) return;'],
   ['replacement-order-wrong', 'const nextCar = retainedCars[0] ?? null;', 'const nextCar = retainedCars.at(-1) ?? null;'],
   ['non-active-selection-overwritten', 'if (activeCarIdRef.current === carId) {', 'if (true) {'],
-  ['session-history-mutated', 'const repaired = { ...weekend };', 'const repaired = { ...weekend, sessions: [] };'],
-  ['active-pointer-left-dangling', "'baselineSetupId', 'activeSetupId', 'finalSetupId'", "'baselineSetupId', 'finalSetupId', 'finalSetupId'"],
+  ['relationship-repair-bypassed', 'const setupReferenceRepair = repairSetupDeletionReferences(\n          latestSetups.filter(item => !removedSetupIds.has(item.id)),', 'const setupReferenceRepair = ((setups, weekends) => ({ setups, weekends, changedSetupIds: [], changedWeekendIds: [], timestamp: null }))(\n          latestSetups.filter(item => !removedSetupIds.has(item.id)),'],
+  ['active-cache-repair-bypassed', 'if (repairedActiveSetup && activeCarIdRef.current !== carId) {', 'if (false) {'],
   ['terminal-priority-guard-removed', "if (!isTerminalSyncStatus(syncStatusRef.current)) {\n          showInfo({ reason: 'car-delete-queued', context: { label } });\n        }", "showInfo({ reason: 'car-delete-queued', context: { label } });"],
   ['setup-storage-key-wrong', "localStorage.setItem('race_notes_saved_setups', JSON.stringify(retainedSetups));", "localStorage.setItem('wrong_saved_setups', JSON.stringify(retainedSetups));"],
   ['tire-storage-key-wrong', "localStorage.setItem('race_notes_tires', JSON.stringify(retainedTires));", "localStorage.setItem('wrong_tires', JSON.stringify(retainedTires));"],
@@ -659,7 +722,7 @@ const d3Mutations: Array<[string, string, string]> = [
   ['maintenance-log-storage-key-wrong', "localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(retainedLogs));", "localStorage.setItem('wrong_maintenance_logs', JSON.stringify(retainedLogs));"],
   ['maintenance-storage-key-wrong', "localStorage.setItem('race_notes_maintenance', JSON.stringify(retainedMaintenance));", "localStorage.setItem('wrong_maintenance', JSON.stringify(retainedMaintenance));"],
   ['car-storage-key-wrong', "localStorage.setItem('race_notes_cars', JSON.stringify(retainedCars));", "localStorage.setItem('wrong_cars', JSON.stringify(retainedCars));"],
-  ['weekend-storage-key-wrong', "localStorage.setItem('race_notes_weekends', JSON.stringify(repairedWeekends));", "localStorage.setItem('wrong_weekends', JSON.stringify(repairedWeekends));"],
+  ['weekend-storage-key-wrong', "if (setupReferenceRepair.changedWeekendIds.length > 0) {\n          weekendsRef.current = repairedWeekends;\n          setWeekends(repairedWeekends);\n          localStorage.setItem('race_notes_weekends', JSON.stringify(repairedWeekends));", "if (setupReferenceRepair.changedWeekendIds.length > 0) {\n          weekendsRef.current = repairedWeekends;\n          setWeekends(repairedWeekends);\n          localStorage.setItem('wrong_weekends', JSON.stringify(repairedWeekends));"],
 ];
 const killedD3Mutations: string[] = [];
 for (const [name, before, after] of d3Mutations) {
@@ -700,6 +763,7 @@ for (const [name, before, after] of d3Mutations) {
     const nonActiveRace = runD3Cascade(mutated, 'car-next');
     nonActiveRace.commit();
     assert.ok(!('activeCar' in nonActiveRace.states));
+    assert.equal(JSON.parse(nonActiveRace.storage.get('race_notes_setup')!).sourceSetupId, undefined);
     const terminalRace = runD3Cascade(mutated);
     terminalRace.refs.syncStatusRef.current = 'sync-error';
     terminalRace.commit();

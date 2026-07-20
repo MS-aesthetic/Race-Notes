@@ -19,7 +19,7 @@ import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pu
 import { registerForPush, sendPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
 import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
-import { captureSetupSnapshot, displayVersionLabel, finishWeekendLifecycle, getSetupEditability, isSetupLocked, isWeekendFinished, lifecycleLabel, mergeTimestampedRecords, selectRaceWeekendSetupForSelection, startWeekendLifecycle } from './lib/setupLifecycle';
+import { captureSetupSnapshot, displayVersionLabel, finishWeekendLifecycle, getSetupEditability, isSetupLocked, isWeekendFinished, lifecycleLabel, mergeTimestampedRecords, repairSetupDeletionReferences, selectRaceWeekendSetupForSelection, startWeekendLifecycle } from './lib/setupLifecycle';
 import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
 import { applyQuickAdjust, resolveQuickAdjustTarget, type QuickAdjustCommand } from './lib/quickAdjust';
 import { materializeMainChecklist } from './lib/mainChecklist';
@@ -643,11 +643,12 @@ export default function App() {
         // below is also the cloud-delete dependency order; cars always run last.
         const latestSetups = savedSetupsRef.current;
         const removedSetupIds = new Set<string>(latestSetups.filter(item => item.carId === carId).map(item => item.id));
-        const retainedSetups = latestSetups
-          .filter(item => !removedSetupIds.has(item.id))
-          .map(item => item.sourceSetupId && removedSetupIds.has(item.sourceSetupId)
-            ? { ...item, sourceSetupId: undefined }
-            : item);
+        const setupReferenceRepair = repairSetupDeletionReferences(
+          latestSetups.filter(item => !removedSetupIds.has(item.id)),
+          weekendsRef.current,
+          removedSetupIds,
+        );
+        const retainedSetups = setupReferenceRepair.setups;
         const latestTires = tireInventoryRef.current;
         const removedTires = latestTires.filter(item => item.carId === carId);
         const retainedTires = latestTires.filter(item => item.carId !== carId);
@@ -664,18 +665,8 @@ export default function App() {
         const retainedCars = latestCars.filter(item => item.id !== carId);
         const currentOwnerId = syncOwnerIdRef.current;
 
-        const repairedWeekends = weekendsRef.current.map(weekend => {
-          let changed = false;
-          const repaired = { ...weekend };
-          for (const key of ['setupId', 'sourceSetupId', 'baselineSetupId', 'activeSetupId', 'finalSetupId'] as const) {
-            if (repaired[key] && removedSetupIds.has(repaired[key]!)) {
-              delete repaired[key];
-              changed = true;
-            }
-          }
-          return changed ? repaired : weekend;
-        });
-        if (repairedWeekends.some((weekend, index) => weekend !== weekendsRef.current[index])) {
+        const repairedWeekends = setupReferenceRepair.weekends;
+        if (setupReferenceRepair.changedWeekendIds.length > 0) {
           weekendsRef.current = repairedWeekends;
           setWeekends(repairedWeekends);
           localStorage.setItem('race_notes_weekends', JSON.stringify(repairedWeekends));
@@ -687,6 +678,14 @@ export default function App() {
         setSavedSetups(retainedSetups);
         localStorage.setItem('race_notes_saved_setups', JSON.stringify(retainedSetups));
         if (currentOwnerId) void pushSetups(retainedSetups, currentOwnerId, setSyncStatus);
+
+        const repairedActiveSetup = setupReferenceRepair.changedSetupIds.includes(setup.id)
+          ? retainedSetups.find(item => item.id === setup.id)
+          : null;
+        if (repairedActiveSetup && activeCarIdRef.current !== carId) {
+          setSetup(repairedActiveSetup);
+          localStorage.setItem('race_notes_setup', JSON.stringify(repairedActiveSetup));
+        }
 
         if (accountId) {
           removedTires.forEach(item => enqueuePendingPersonalTireDelete(window.localStorage, {
@@ -1806,7 +1805,7 @@ export default function App() {
       && !getSetupEditability(prior, weekendsRef.current, eventSetupId).deletable
     ));
     if (hasBlockedEdit) return;
-    const safeSetups = updatedSetups.flatMap<Setup>(candidate => {
+    const submittedSetups = updatedSetups.flatMap<Setup>(candidate => {
       const prior = priorById.get(candidate.id);
       const canEdit = !prior || getSetupEditability(prior, weekendsRef.current, eventSetupId).editable;
       if (!canEdit) {
@@ -1815,39 +1814,80 @@ export default function App() {
       return [{ ...candidate, updatedAt: !prior || comparable(prior) !== comparable(candidate) ? now : candidate.updatedAt }];
     });
     for (const prior of priorSetups) {
-      if (!safeSetups.some(item => item.id === prior.id)
+      if (!submittedSetups.some(item => item.id === prior.id)
         && !getSetupEditability(prior, weekendsRef.current, eventSetupId).deletable) {
-        safeSetups.push(prior);
+        submittedSetups.push(prior);
       }
     }
     // Historical cards communicate through their own passive banner only.
 
-    const didPersist = safeSetups.length !== priorSetups.length || safeSetups.some(candidate => {
+    const removedSetupIds = new Set<string>(
+      priorSetups
+        .filter(item => !submittedSetups.some(candidate => candidate.id === item.id))
+        .map(item => item.id),
+    );
+    const relationshipPointerKeys = ['setupId', 'sourceSetupId', 'baselineSetupId', 'activeSetupId', 'finalSetupId'] as const;
+    const changedSetups = submittedSetups.filter(item => !!item.sourceSetupId && removedSetupIds.has(item.sourceSetupId));
+    const changedWeekends = weekendsRef.current.filter(weekend =>
+      relationshipPointerKeys.some(key => !!weekend[key] && removedSetupIds.has(weekend[key]!)),
+    );
+    const repairTimestamp = changedSetups.length || changedWeekends.length
+      ? new Date(Math.max(
+        Date.now(),
+        ...[...changedSetups, ...changedWeekends]
+          .map(item => Date.parse(item.updatedAt || ''))
+          .filter(Number.isFinite)
+          .map(timestamp => timestamp + 1),
+      )).toISOString()
+      : null;
+    const changedSetupIds = new Set(changedSetups.map(item => item.id));
+    const changedWeekendIds = new Set(changedWeekends.map(item => item.id));
+    const setupReferenceRepair = {
+      setups: submittedSetups.map(item => changedSetupIds.has(item.id)
+        ? { ...item, sourceSetupId: undefined, updatedAt: repairTimestamp! }
+        : item),
+      weekends: weekendsRef.current.map(weekend => {
+        if (!changedWeekendIds.has(weekend.id)) return weekend;
+        const repaired: RaceWeekend = { ...weekend, updatedAt: repairTimestamp! };
+        relationshipPointerKeys.forEach(key => {
+          if (repaired[key] && removedSetupIds.has(repaired[key]!)) delete repaired[key];
+        });
+        return repaired;
+      }),
+      changedSetupIds: [...changedSetupIds],
+      changedWeekendIds: [...changedWeekendIds],
+    };
+    const repairedSetups = setupReferenceRepair.setups;
+    const repairedWeekends = setupReferenceRepair.weekends;
+    const safeSetups = repairedSetups;
+    const didPersist = repairedSetups.length !== priorSetups.length || repairedSetups.some(candidate => {
       const prior = priorById.get(candidate.id);
       return !prior || comparable(prior) !== comparable(candidate);
     });
 
     const requestedActiveId = eventSetupId || activeId;
-    const requested = requestedActiveId ? safeSetups.find(item => item.id === requestedActiveId) : null;
+    const requested = requestedActiveId ? repairedSetups.find(item => item.id === requestedActiveId) : null;
     const nextActiveId = requested && !isSetupLocked(requested, weekendsRef.current)
       ? requested.id
-      : pickLatestSetupForCar(safeSetups, activeCarId)?.id;
+      : pickLatestSetupForCar(repairedSetups, activeCarId)?.id;
     const activeSelectionChanged = activeId !== undefined && !eventSetupId && (
       activeId === '' ? setup.id !== INITIAL_SETUP.id : nextActiveId !== setup.id
     );
     if (!didPersist && !activeSelectionChanged) return;
 
     if (didPersist) {
-      const remainingSetupIds = new Set(safeSetups.map(item => item.id));
-      priorSetups
-        .filter(item => !remainingSetupIds.has(item.id))
-        .forEach(item => queueSharedCloudDelete('setups', item.id));
-      savedSetupsRef.current = safeSetups;
-      setSavedSetups(safeSetups);
-      localStorage.setItem('race_notes_saved_setups', JSON.stringify(safeSetups));
+      removedSetupIds.forEach(id => queueSharedCloudDelete('setups', id));
+      savedSetupsRef.current = repairedSetups;
+      setSavedSetups(repairedSetups);
+      localStorage.setItem('race_notes_saved_setups', JSON.stringify(repairedSetups));
+    }
+    if (setupReferenceRepair.changedWeekendIds.length > 0) {
+      weekendsRef.current = repairedWeekends;
+      setWeekends(repairedWeekends);
+      localStorage.setItem('race_notes_weekends', JSON.stringify(repairedWeekends));
     }
 
-    const nextActive = nextActiveId ? safeSetups.find(item => item.id === nextActiveId) : null;
+    const nextActive = nextActiveId ? repairedSetups.find(item => item.id === nextActiveId) : null;
     if (activeId === '' && !eventSetupId) {
       setSetup(INITIAL_SETUP);
       localStorage.removeItem('race_notes_setup');
@@ -1879,6 +1919,9 @@ export default function App() {
     markSavedDirty();
     if (didPersist) {
       if (syncOwnerId) pushSetups(safeSetups, syncOwnerId, setSyncStatus);
+    }
+    if (setupReferenceRepair.changedWeekendIds.length > 0) {
+      if (syncOwnerId) pushWeekends(repairedWeekends, syncOwnerId, setSyncStatus);
     }
   };
 

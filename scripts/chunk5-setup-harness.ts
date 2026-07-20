@@ -7,7 +7,7 @@ import { compile } from '@tailwindcss/node';
 import type { ActiveSession, RaceWeekend, SessionRecord, Setup, SetupSnapshot, SetupSnapshotCorner } from '../src/types';
 import { cloneSetup, makeBlankSetup, normalizeSetup, pickImmediatePriorSetupForCar, pickLatestSetupForCar } from '../src/lib/setupCompat';
 import { calculateTireStagger, SETUP_STEPS, formatPressureBlock, formatPsiValue, formatStoredNumber, fourBarAdjustmentId, fourBarAdjustmentLabel, legacyValueNote, mirrorPressureBlockToTires, parseStoredNumber, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from '../src/lib/setupSteps';
-import { captureSetupSnapshot, diffSetupSnapshots, displayLifecycleText, getSetupEditability, isSetupLocked, isWeekendFinished, lifecycleSetupId, withSetupDiffLog } from '../src/lib/setupLifecycle';
+import { captureSetupSnapshot, diffSetupSnapshots, displayLifecycleText, getSetupEditability, isSetupLocked, isWeekendFinished, lifecycleSetupId, mergeTimestampedRecords, repairSetupDeletionReferences, withSetupDiffLog } from '../src/lib/setupLifecycle';
 import { applyQuickAdjust } from '../src/lib/quickAdjust';
 
 const setup = (id: string, carId: string, date: string, tireId = 'tire-a'): Setup => ({
@@ -203,7 +203,7 @@ const lifecycleSource = readNormalizedSource(new URL('../src/lib/setupLifecycle.
 assert.match(lifecycleSource, /export type SetupEditabilityReason =/, 'C1 exports typed editability reasons');
 assert.match(lifecycleSource, /'historical-role'[\s\S]*'locked'[\s\S]*'finished-weekend'[\s\S]*'in-play-elsewhere'/, 'C1 keeps every required typed reason');
 assert.match(lifecycleSource, /export const getSetupEditability = \(/, 'C1 exports one canonical predicate');
-assert.match(lifecycleSource, /if \(activeEventSetupId && setup\.id === activeEventSetupId\) \{\s*return \{ editable: false, deletable: true, reason: 'in-play-elsewhere' \};/, 'C1 freezes only active event setup while retaining deletion');
+assert.match(lifecycleSource, /if \(activeEventSetupId && setup\.id === activeEventSetupId\) \{\s*return \{ editable: false, deletable: false, reason: 'in-play-elsewhere' \};/, 'Repair 3 blocks deletion of the exact active Race Day setup');
 assert.match(setupSource, /getSetupEditability\(target, weekends, activeEventSetupId\)\.deletable/, 'C1 Setup delete paths use canonical deletability');
 assert.match(setupSource, /const editability = getSetupEditability\(setupItem, weekends, activeEventSetupId\);/, 'C1 Setup card uses canonical predicate');
 assert.match(setupSource, /disabled=\{!editability\.deletable\}/, 'C1 Setup delete control follows canonical deletability');
@@ -230,7 +230,7 @@ assert.deepEqual(getSetupEditability(c1Baseline, c1Weekends, 'in-play'), c1Expec
 assert.deepEqual(getSetupEditability(c1Final, c1Weekends, 'in-play'), c1Expected(false, false, 'historical-role'), 'C1 final remains immutable');
 assert.deepEqual(getSetupEditability(c1Locked, c1Weekends, 'in-play'), c1Expected(false, false, 'locked'), 'C1 explicit lock remains immutable');
 assert.deepEqual(getSetupEditability(c1Finished, c1Weekends, 'in-play'), c1Expected(false, false, 'finished-weekend'), 'C1 finished Weekend Setup remains immutable');
-assert.deepEqual(getSetupEditability(c1InPlay, c1Weekends, 'in-play'), c1Expected(false, true, 'in-play-elsewhere'), 'C1 active event setup is edit-frozen but deletable');
+assert.deepEqual(getSetupEditability(c1InPlay, c1Weekends, 'in-play'), c1Expected(false, false, 'in-play-elsewhere'), 'Repair 3 active event setup is edit-frozen and non-deletable');
 assert.deepEqual(getSetupEditability(c1Unrelated, c1Weekends, 'in-play'), c1Expected(true, true, null), 'C1 unrelated live-Race-Day setup remains editable and deletable');
 assert.equal(isSetupLocked(c1InPlay, c1Weekends), false, 'C1 in-play rule does not redefine historical locking');
 assert.equal(getSetupEditability({ ...c1Unrelated, chassis: 'Renamed live setup' }, c1Weekends, 'in-play').editable, true, 'C1 owner live-Race-Day chassis rename remains enabled');
@@ -238,7 +238,7 @@ assert.equal(getSetupEditability({ ...c1Unrelated, chassis: 'Renamed live setup'
 const c1SourcePasses = (lifecycle: string, setupView: string, app: string): boolean => (
   lifecycle.includes("setup.lifecycleRole === 'baseline' || setup.lifecycleRole === 'final'")
   && lifecycle.includes("if (activeEventSetupId && setup.id === activeEventSetupId)")
-  && lifecycle.includes("deletable: true, reason: 'in-play-elsewhere'")
+  && lifecycle.includes("deletable: false, reason: 'in-play-elsewhere'")
   && setupView.includes('getSetupEditability(setupItem, weekends, activeEventSetupId)')
   && setupView.includes('disabled={!editability.deletable}')
   && app.includes('const canEdit = !prior || getSetupEditability(prior, weekendsRef.current, eventSetupId).editable;')
@@ -254,8 +254,8 @@ const c1ModelEditability = (lifecycle: string, candidate: Setup, activeEventSetu
   if (lifecycle.includes('if (activeEventSetupId) {') && activeEventSetupId) {
     return c1Expected(false, true, 'in-play-elsewhere');
   }
-  if (!lifecycle.includes("deletable: true, reason: 'in-play-elsewhere'") && candidate.id === activeEventSetupId) {
-    return c1Expected(false, false, 'in-play-elsewhere');
+  if (!lifecycle.includes("deletable: false, reason: 'in-play-elsewhere'") && candidate.id === activeEventSetupId) {
+    return c1Expected(false, true, 'in-play-elsewhere');
   }
   return getSetupEditability(candidate, c1Weekends, activeEventSetupId);
 };
@@ -282,12 +282,12 @@ assert.equal(c1SourcePasses(broadEventMutation, setupSource, appSource), false, 
 assert.equal(c1ModelEditability(broadEventMutation, c1Unrelated, 'in-play').editable, false, 'C1 broad-event mutation freezes unrelated setup');
 assert.equal(c1ModelEditability(lifecycleSource, c1Unrelated, 'in-play').editable, true, 'C1 baseline keeps unrelated setup editable');
 
-const deleteBlockMutation = lifecycleSource.replace("return { editable: false, deletable: true, reason: 'in-play-elsewhere' };", "return { editable: false, deletable: false, reason: 'in-play-elsewhere' };");
-assert.notEqual(deleteBlockMutation, lifecycleSource, 'C1 delete-block mutation changes production predicate');
-compileC1Mutation(deleteBlockMutation, 'ts', 'in-play delete block');
-assert.equal(c1SourcePasses(deleteBlockMutation, setupSource, appSource), false, 'C1 delete-block mutation fails source gate');
-assert.equal(c1ModelEditability(deleteBlockMutation, c1InPlay, 'in-play').deletable, false, 'C1 delete-block mutation prevents required deletion');
-assert.equal(c1ModelEditability(lifecycleSource, c1InPlay, 'in-play').deletable, true, 'C1 baseline permits in-play deletion');
+const activeDeleteUnblockedMutation = lifecycleSource.replace("return { editable: false, deletable: false, reason: 'in-play-elsewhere' };", "return { editable: false, deletable: true, reason: 'in-play-elsewhere' };");
+assert.notEqual(activeDeleteUnblockedMutation, lifecycleSource, 'Repair 3 active-delete guard mutation changes production predicate');
+compileC1Mutation(activeDeleteUnblockedMutation, 'ts', 'active delete unblocked');
+assert.equal(c1SourcePasses(activeDeleteUnblockedMutation, setupSource, appSource), false, 'Repair 3 active-delete guard mutation fails source gate');
+assert.equal(c1ModelEditability(activeDeleteUnblockedMutation, c1InPlay, 'in-play').deletable, true, 'Repair 3 mutation exposes active Race Day deletion');
+assert.equal(c1ModelEditability(lifecycleSource, c1InPlay, 'in-play').deletable, false, 'Repair 3 baseline blocks active Race Day deletion');
 
 const divergentAppMutation = appSource.replace(
   'const canEdit = !prior || getSetupEditability(prior, weekendsRef.current, eventSetupId).editable;',
@@ -341,6 +341,106 @@ for (const historical of c1HistoricalFixtures) {
   assert.equal(result.savedFlashes, 1, `C1 mutation exposes false Saved for ${historical.id}`);
   assert.equal(result.cloudWrites, 1, `C1 mutation exposes cloud write for ${historical.id}`);
 }
+
+// Repair 3 executes the real generic persistence boundary, not a parallel model.
+let repair3SetupAssertions = 0;
+const repair3SetupOk = (value: unknown, message: string) => { repair3SetupAssertions += 1; assert.ok(value, message); };
+const repair3SetupEqual = (actual: unknown, expected: unknown, message: string) => { repair3SetupAssertions += 1; assert.deepEqual(actual, expected, message); };
+const compileRepair3Save = (sourceText: string) => {
+  const start = sourceText.indexOf('  const handleSaveSetups = (updatedSetups: Setup[], activeId?: string, preserveInfoToast = false) => {');
+  const end = sourceText.indexOf('\n\n  const handleUpdateSession', start);
+  assert.ok(start >= 0 && end > start, 'Repair 3 generic production handler slice exists');
+  const names = [
+    'savedSetupsRef', 'weekendsRef', 'activeWeekendId', 'isWeekendFinished', 'getSetupEditability', 'repairSetupDeletionReferences',
+    'activeCarId', 'setup', 'pickLatestSetupForCar', 'isSetupLocked', 'INITIAL_SETUP', 'queueSharedCloudDelete',
+    'setSavedSetups', 'setWeekends', 'setSetup', 'localStorage', 'handleUpdateSession', 'setupPressureBlock',
+    'pressureBlockHasValue', 'displayVersionLabel', 'mirrorPressureBlockToTires', 'showInfo', 'clearInfo', 'markSavedDirty',
+    'syncOwnerId', 'pushSetups', 'pushWeekends', 'setSyncStatus',
+  ];
+  const wrapped = `export const makeRepair3Save = (deps) => { const { ${names.join(', ')} } = deps;\n${sourceText.slice(start, end)}\nreturn handleSaveSetups; };`;
+  const compiled = transformSync(wrapped, { loader: 'tsx', jsx: 'automatic', format: 'cjs', target: 'es2022' }).code;
+  const box = { exports: {} as Record<string, unknown> };
+  new Function('module', 'exports', compiled)(box, box.exports);
+  return box.exports.makeRepair3Save as (deps: Record<string, unknown>) => (setups: Setup[], activeId?: string) => void;
+};
+const runRepair3Generic = (sourceText = appSource, deleteActive = false) => {
+  const active = { ...legacy, id: 'active-event', lifecycleRole: 'weekend' as const, weekendId: 'repair-weekend', updatedAt: '2099-07-19T00:00:00.000Z' };
+  const removed = { ...legacy, id: 'generic-removed', lifecycleRole: 'current' as const, updatedAt: '2099-07-19T00:00:01.000Z' };
+  const survivor = { ...legacy, id: 'generic-survivor', lifecycleRole: 'current' as const, sourceSetupId: removed.id, updatedAt: '2099-07-19T00:00:02.000Z' };
+  const sessions = [{ id: 'historic-session', setupId: removed.id, setupSnapshot: { id: removed.id, lf: { tirePress: '12' } } }] as unknown as SessionRecord[];
+  const weekend: RaceWeekend = {
+    id: 'repair-weekend', name: 'Repair', track: 'Track', date: 'Jul 19, 2026', status: 'active', activeSetupId: active.id,
+    setupId: removed.id, sourceSetupId: removed.id, baselineSetupId: removed.id, finalSetupId: removed.id, sessions, updatedAt: '2099-07-19T00:00:03.000Z',
+  };
+  const prior = deleteActive ? [active] : [active, removed, survivor];
+  const refs = { savedSetupsRef: { current: prior }, weekendsRef: { current: [weekend] } };
+  const storage = new Map<string, string>();
+  const queues: string[] = [];
+  const pushes: Array<[string, string[]]> = [];
+  const state: Record<string, unknown> = {};
+  const handler = compileRepair3Save(sourceText)({
+    ...refs, activeWeekendId: weekend.id, isWeekendFinished, getSetupEditability, repairSetupDeletionReferences,
+    activeCarId: 'car-a', setup: deleteActive ? active : survivor, pickLatestSetupForCar: (rows: Setup[]) => rows[0] ?? null,
+    isSetupLocked, INITIAL_SETUP: { id: 'initial-safe' }, queueSharedCloudDelete: (_table: string, id: string) => { queues.push(id); },
+    setSavedSetups: (value: Setup[]) => { state.setups = value; }, setWeekends: (value: RaceWeekend[]) => { state.weekends = value; },
+    setSetup: (value: Setup) => { state.setup = value; }, localStorage: { setItem: (key: string, value: string) => { storage.set(key, value); }, removeItem: (key: string) => { storage.delete(key); } },
+    handleUpdateSession: () => undefined, setupPressureBlock: () => ({ lf: '', rf: '', lr: '', rr: '' }), pressureBlockHasValue: () => false,
+    displayVersionLabel: () => '', mirrorPressureBlockToTires: (value: unknown) => value, showInfo: () => undefined, clearInfo: () => undefined,
+    markSavedDirty: () => { state.dirty = true; }, syncOwnerId: 'owner-a', pushSetups: (rows: Setup[]) => { pushes.push(['setups', rows.map(row => row.id)]); },
+    pushWeekends: (rows: RaceWeekend[]) => { pushes.push(['weekends', rows.map(row => row.id)]); }, setSyncStatus: () => undefined,
+  });
+  handler(deleteActive ? [] : [active, survivor], deleteActive ? active.id : survivor.id);
+  return { refs, storage, queues, pushes, state, sessions: JSON.stringify(sessions) };
+};
+const genericRepair = runRepair3Generic();
+repair3SetupEqual(genericRepair.queues, ['generic-removed'], 'Repair 3 generic deletion queues the exact removed ID once');
+repair3SetupEqual((genericRepair.state.setups as Setup[]).find(item => item.id === 'generic-survivor')?.sourceSetupId, undefined, 'Repair 3 generic deletion clears surviving lineage only');
+repair3SetupEqual(['setupId', 'sourceSetupId', 'baselineSetupId', 'activeSetupId', 'finalSetupId'].map(key => (genericRepair.state.weekends as RaceWeekend[])[0][key as keyof RaceWeekend]), [undefined, undefined, undefined, 'active-event', undefined], 'Repair 3 generic deletion clears only matching Race Day pointers');
+repair3SetupEqual(JSON.stringify((genericRepair.state.weekends as RaceWeekend[])[0].sessions), genericRepair.sessions, 'Repair 3 generic deletion keeps sessions byte-stable');
+repair3SetupEqual(genericRepair.pushes, [['setups', ['active-event', 'generic-survivor']], ['weekends', ['repair-weekend']]], 'Repair 3 generic deletion pushes the canonical repaired arrays');
+repair3SetupOk((genericRepair.state.setups as Setup[]).find(item => item.id === 'generic-survivor')!.updatedAt! > '2099-07-19T00:00:02.000Z', 'Repair 3 generic survivor timestamp advances');
+repair3SetupOk((genericRepair.state.weekends as RaceWeekend[])[0].updatedAt! > '2099-07-19T00:00:03.000Z', 'Repair 3 generic Race Day timestamp advances');
+repair3SetupEqual(JSON.parse(genericRepair.storage.get('race_notes_saved_setups')!).map((item: Setup) => item.id), ['active-event', 'generic-survivor'], 'Repair 3 generic writes repaired setup state to localStorage');
+repair3SetupEqual(JSON.parse(genericRepair.storage.get('race_notes_weekends')!)[0].sessions, JSON.parse(genericRepair.sessions), 'Repair 3 generic writes repaired Race Day state without session mutation');
+repair3SetupEqual(JSON.parse(genericRepair.storage.get('race_notes_setup')!).sourceSetupId, undefined, 'Repair 3 generic repairs only the exact active cache twin');
+const blockedActiveDelete = runRepair3Generic(appSource, true);
+repair3SetupEqual(blockedActiveDelete.queues, [], 'Repair 3 active Race Day deletion queues nothing');
+repair3SetupEqual(blockedActiveDelete.state, {}, 'Repair 3 active Race Day deletion performs zero state, local, push, dirty, or Saved-path writes');
+
+const genericMutations: Array<[string, string, string]> = [
+  ['generic-lineage-repair-bypassed', 'const changedSetups = submittedSetups.filter(item => !!item.sourceSetupId && removedSetupIds.has(item.sourceSetupId));', 'const changedSetups = [] as Setup[];'],
+  ['generic-setup-pointer-omitted', "const relationshipPointerKeys = ['setupId', 'sourceSetupId', 'baselineSetupId', 'activeSetupId', 'finalSetupId'] as const;", "const relationshipPointerKeys = ['sourceSetupId', 'baselineSetupId', 'activeSetupId', 'finalSetupId'] as const;"],
+  ['generic-final-pointer-omitted', "const relationshipPointerKeys = ['setupId', 'sourceSetupId', 'baselineSetupId', 'activeSetupId', 'finalSetupId'] as const;", "const relationshipPointerKeys = ['setupId', 'sourceSetupId', 'baselineSetupId', 'activeSetupId'] as const;"],
+  ['generic-changed-only-removed', '? { ...item, sourceSetupId: undefined, updatedAt: repairTimestamp! }\n        : item', '? { ...item, sourceSetupId: undefined, updatedAt: repairTimestamp! }\n        : { ...item, updatedAt: repairTimestamp! }'],
+  ['generic-strict-newer-removed', '.map(timestamp => timestamp + 1),', '.map(timestamp => timestamp),'],
+  ['generic-session-history-rewritten', 'const repaired: RaceWeekend = { ...weekend, updatedAt: repairTimestamp! };', 'const repaired: RaceWeekend = { ...weekend, sessions: [], updatedAt: repairTimestamp! };'],
+  ['generic-setup-storage-wrong', "localStorage.setItem('race_notes_saved_setups', JSON.stringify(repairedSetups));", "localStorage.setItem('wrong_saved_setups', JSON.stringify(repairedSetups));"],
+  ['generic-weekend-storage-wrong', "if (setupReferenceRepair.changedWeekendIds.length > 0) {\n      weekendsRef.current = repairedWeekends;\n      setWeekends(repairedWeekends);\n      localStorage.setItem('race_notes_weekends', JSON.stringify(repairedWeekends));", "if (setupReferenceRepair.changedWeekendIds.length > 0) {\n      weekendsRef.current = repairedWeekends;\n      setWeekends(repairedWeekends);\n      localStorage.setItem('wrong_weekends', JSON.stringify(repairedWeekends));"],
+  ['generic-exact-queue-id-wrong', "removedSetupIds.forEach(id => queueSharedCloudDelete('setups', id));", "removedSetupIds.forEach(() => queueSharedCloudDelete('setups', 'wrong-id'));"],
+  ['generic-weekend-push-missing', 'if (syncOwnerId) pushWeekends(repairedWeekends, syncOwnerId, setSyncStatus);', 'if (syncOwnerId) void repairedWeekends;'],
+];
+const killedGenericMutations: string[] = [];
+for (const [name, before, after] of genericMutations) {
+  repair3SetupEqual((appSource.match(new RegExp(before.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length, 1, `Repair 3 ${name} target is unique`);
+  const mutated = runRepair3Generic(appSource.replace(before, after));
+  const failed = JSON.stringify(mutated.queues) !== JSON.stringify(['generic-removed'])
+    || (mutated.state.setups as Setup[] | undefined)?.find(item => item.id === 'generic-survivor')?.sourceSetupId !== undefined
+    || (mutated.state.weekends as RaceWeekend[] | undefined)?.[0].setupId !== undefined
+    || (mutated.state.weekends as RaceWeekend[] | undefined)?.[0].finalSetupId !== undefined
+    || (mutated.state.weekends as RaceWeekend[] | undefined)?.[0].activeSetupId !== 'active-event'
+    || (mutated.state.setups as Setup[] | undefined)?.find(item => item.id === 'active-event')?.updatedAt !== '2099-07-19T00:00:00.000Z'
+    || ((mutated.state.setups as Setup[] | undefined)?.find(item => item.id === 'generic-survivor')?.updatedAt ?? '') <= '2099-07-19T00:00:02.000Z'
+    || ((mutated.state.weekends as RaceWeekend[] | undefined)?.[0].updatedAt ?? '') <= '2099-07-19T00:00:03.000Z'
+    || JSON.stringify((mutated.state.weekends as RaceWeekend[] | undefined)?.[0].sessions) !== mutated.sessions
+    || !mutated.storage.has('race_notes_saved_setups')
+    || !mutated.storage.has('race_notes_weekends')
+    || !mutated.pushes.some(([kind]) => kind === 'weekends');
+  repair3SetupOk(failed, `Repair 3 production generic mutation ${name} is rejected`);
+  killedGenericMutations.push(name);
+}
+repair3SetupEqual(new Set(killedGenericMutations).size, killedGenericMutations.length, 'Repair 3 generic mutation labels are unique');
+console.log(`Repair 3 generic assertions: ${repair3SetupAssertions}`);
+console.log(`Repair 3 generic killed mutations (${killedGenericMutations.length}): ${killedGenericMutations.join(', ')}`);
 
 const snapshotSourceSetup: Setup = {
   ...legacy,
@@ -1509,7 +1609,7 @@ d3SetupEqual(reason('historical-role'), 'Historical setup snapshots cannot be de
 d3SetupEqual(reason('locked'), 'Locked setups cannot be deleted individually.', 'D3 locked reason is exact');
 d3SetupEqual(reason('finished-weekend'), 'Setups from finished Race Days cannot be deleted individually.', 'D3 finished-weekend reason is exact');
 d3SetupEqual(reason('in-play-elsewhere'), 'The active Race Day setup is managed from Race Day.', 'D3 in-play reason remains distinct and does not alter canonical deletability');
-d3SetupEqual(getSetupEditability(c1InPlay, c1Weekends, 'in-play').deletable, true, 'D3 preserves canonical in-play deletability');
+d3SetupEqual(getSetupEditability(c1InPlay, c1Weekends, 'in-play').deletable, false, 'Repair 3 blocks active Race Day setup deletion before cascade');
 for (const contract of [
   "title={editability.deletable ? 'Delete setup permanently' : setupDeleteReason(editability.reason)}",
   'aria-describedby={!editability.deletable ? `setup-delete-reason-${setupItem.id}` : undefined}',

@@ -73,9 +73,72 @@ export const getSetupEditability = (
     return { editable: false, deletable: false, reason: 'finished-weekend' };
   }
   if (activeEventSetupId && setup.id === activeEventSetupId) {
-    return { editable: false, deletable: true, reason: 'in-play-elsewhere' };
+    return { editable: false, deletable: false, reason: 'in-play-elsewhere' };
   }
   return { editable: true, deletable: true, reason: null };
+};
+
+const setupPointerKeys = [
+  'setupId', 'sourceSetupId', 'baselineSetupId', 'activeSetupId', 'finalSetupId',
+] as const;
+
+export interface SetupDeletionReferenceRepair {
+  setups: Setup[];
+  weekends: RaceWeekend[];
+  changedSetupIds: string[];
+  changedWeekendIds: string[];
+  timestamp: string | null;
+}
+
+/**
+ * Clear only deleted-setup relationships. Historical sessions are deliberately
+ * shared by reference so their setupId/snapshot bytes cannot be rewritten.
+ */
+export const repairSetupDeletionReferences = (
+  setups: readonly Setup[],
+  weekends: readonly RaceWeekend[],
+  removedSetupIds: ReadonlySet<string>,
+): SetupDeletionReferenceRepair => {
+  const changedSetups = setups.filter(setup => !!setup.sourceSetupId && removedSetupIds.has(setup.sourceSetupId));
+  const changedWeekends = weekends.filter(weekend =>
+    setupPointerKeys.some(key => !!weekend[key] && removedSetupIds.has(weekend[key]!)),
+  );
+  if (changedSetups.length === 0 && changedWeekends.length === 0) {
+    return {
+      setups: [...setups],
+      weekends: [...weekends],
+      changedSetupIds: [],
+      changedWeekendIds: [],
+      timestamp: null,
+    };
+  }
+
+  const newestAffected = Math.max(
+    ...[...changedSetups, ...changedWeekends]
+      .map(item => Date.parse(item.updatedAt || ''))
+      .filter(Number.isFinite),
+    Number.NEGATIVE_INFINITY,
+  );
+  const timestamp = new Date(Math.max(Date.now(), newestAffected + 1)).toISOString();
+  const changedSetupIds = new Set(changedSetups.map(setup => setup.id));
+  const changedWeekendIds = new Set(changedWeekends.map(weekend => weekend.id));
+
+  return {
+    setups: setups.map(setup => changedSetupIds.has(setup.id)
+      ? { ...setup, sourceSetupId: undefined, updatedAt: timestamp }
+      : setup),
+    weekends: weekends.map(weekend => {
+      if (!changedWeekendIds.has(weekend.id)) return weekend;
+      const repaired: RaceWeekend = { ...weekend, updatedAt: timestamp };
+      for (const key of setupPointerKeys) {
+        if (repaired[key] && removedSetupIds.has(repaired[key]!)) delete repaired[key];
+      }
+      return repaired;
+    }),
+    changedSetupIds: [...changedSetupIds],
+    changedWeekendIds: [...changedWeekendIds],
+    timestamp,
+  };
 };
 
 /** An active event may only receive its owned Weekend Setup, never the car selector's setup. */
