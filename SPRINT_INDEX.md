@@ -12,7 +12,7 @@ future deferred work. Do not start Sprint 2, 3, or 4 while v2 Final QA remains o
 
 | Sprint | File | Content | Status |
 |---|---|---|---|
-| UX Overhaul v2 | `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` | Mobile density, persistence semantics, deletion integrity, navigation polish, final QA | **ACTIVE — Final QA Repair 3 planned, not started** |
+| UX Overhaul v2 | `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` | Mobile density, persistence semantics, deletion integrity, navigation polish, final QA | **ACTIVE — product/artifact/handoff gates PASS at `ab2d031`; authority-doc review, governance commit, and saving-point push remain** |
 | 1 | `docs/archive/plan-v3-ux-corrections.md` | UXF-1…10 — owner-correction batch (2026-07-14 handoff) | COMPLETE — released as 5.0 |
 | 2 | `sprint-2-quick-wins.md` | UXP-1,2,3,4,5,6,7,8,9,11,12,13,19,20 + gate — Low-difficulty audit items | deferred — blocked by v2 final QA |
 | 3 | `sprint-3-second-wave.md` | UXP-10,14,15,16,17,18 + gate — Medium-difficulty audit items | pending — blocked by sprint 2 |

@@ -588,7 +588,51 @@ session bytes, and independently kill guard/cleanup/timestamp/cache/persistence/
 mutations. Full 24/24, lint3, build566, fresh draft/debug, stable Android lifecycle,
 whole-branch review, exact scope, protected paths, and clean tree remain hard gates.
 
-No Repair 3 implementation has started. The owner's 2026-07-19 documentation-only
-request explicitly pauses worker dispatch. No `sync.ts`, component, type, native,
-package, config, schema/RLS/migration/Edge Function, release, production, PR,
-master, or Sprint 4 change is presently authorized.
+At this historical checkpoint no Repair 3 implementation had started. The owner's
+then-current documentation-only request paused worker dispatch. No `sync.ts`,
+component, type, native, package, config, schema/RLS/migration/Edge Function,
+release, production, PR, master, or Sprint 4 change was authorized at that point.
+
+### v2.1-H — Repair 3 accepted result and final closeout (supersedes v2.1-G's final status)
+
+The owner later resumed work and approved the smallest safe Repair 3 follow-up.
+Terra High was dispatched for `4698996b777ef5c071351976283def0098f8a2c7`
+despite v2.1-A's permanent Terra ban and without a recorded owner override; this was
+a routing/process breach. The commit implemented the exact four-file work order in
+v2.1-G. Independent QA found one additional release blocker:
+the five-second car-delete Undo callback captured the request-render Current Setup.
+Selecting a different Current Setup while deletion was pending could therefore be
+overwritten when deletion committed. Attempt 1 scored 74/100.
+
+The owner approved a latest-Setup reference plus one production-handler regression
+and waived further expansion of the exhaustive mutation wishlist. SOL High commit
+`ab2d03117c0475aa0abbef9ad38f2907edd3e881` changes only `src/App.tsx` and
+`scripts/car-delete-undo-harness.ts`. The delayed callback now reads the latest
+Current Setup at commit time. The regression changes React state and exact local
+cache bytes during Undo, commits deletion, proves neither is overwritten, and kills
+the captured-state reversion. Terra was not dispatched again. No feature or user
+action was disabled.
+
+Final Part 6.3 evidence on `ab2d031` is green: raw Windows matrix exact 24/24;
+car proof 169 assertions plus 27 accepted D3, five relationship, and one delayed-race
+mutation; exact three-error lint baseline; exact 566-module build; whole-branch
+product review PASS 100/100 for the UX v2 task range `10955ded..ab2d031`; and
+protected-path/product-scope checks clean in that range. The literal merge-base
+range `47db364..ab2d031` is 95 commits/71 paths and includes eight disclosed
+grandfathered pre-A1 native/release/auth/icon/planning commits; the UX v2 task range
+is 87 commits/39 paths with no new native/package/schema/release/Sprint 4 path. Final
+draft `6a5d7c9221f0e85b0eda6228` passes signed-out 360×800, 390×844,
+412×915, and 1080×2118 shells with zero overflow, six visible controls at least
+44px, pinch not disabled, and zero console warning/error. Final Java 21 debug APK is
+12,088,501 bytes with SHA-256
+`59E20FDCB74F37AE3C3393202A458B7BBF97320994BF7FEE87D736C7BC8C8D42`;
+it installs on stable Android 15/WebView 124 and passes 3/3 lifecycle cycles with
+empty app warning/error and crash buffers. The earlier authorized device-only and
+everywhere deletion/no-resurrection result remains accepted and was not destructively
+repeated.
+
+The Part 6.4 briefing packet is
+`docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It is evidence for a future,
+independent reviewer and does not claim that separate review has passed. Production
+Netlify, release/signing/AAB, schema/RLS/migration/Edge Function, PR/master merge,
+and Sprint 4 remain outside the sprint.

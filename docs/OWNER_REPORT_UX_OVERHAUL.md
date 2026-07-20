@@ -2,7 +2,7 @@
 
 ## Current status
 
-Tasks C2, C2.5, C3, C4, C5, the integrated Chunk C gate, D1, D2, and the owner's setup-label microfix are complete. D2 passed on its second QA attempt with a score of 100/100. D3 remains active after its first QA attempt failed 85/100 on one offline/local-only defect. A narrowly scoped SOL High repair is next. Chunk D QA and later work remain blocked until D3 passes.
+All A1–E3 tasks, integrated chunk gates, Repair 3, and final product/artifact gates are complete and pass at product commit `ab2d031`. The final raw suite is 24/24, lint is the exact three-error baseline, build is 566 modules, the final draft/browser matrix and fresh debug APK/stable-emulator lifecycle checks pass, and no product blocker remains. Corrected authority-document re-review, the final governance commit, and the requested saving-point branch push are the only active closeout actions.
 
 ## Task C2 — Session snapshot model and diff engine
 
@@ -562,3 +562,39 @@ After that repair passes, the remaining work is the final full regression, fresh
 ## Documentation handoff update
 
 The project's future-agent documentation was refreshed after attempt 3. `docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md` now records the active worktree and authority order, architecture invariants, prior development strategy, current model routing, available tools, direct web and Android build procedures, all 24 automated tests, browser and authenticated Android test matrices, deletion-test procedure, Workbox and Android runtime caveats, exact accepted artifacts, both outstanding blockers, the proposed four-file repair, and final closeout steps. `HANDOFF.md`, `SPRINT_INDEX.md`, `CODEBASE_KNOWLEDGE.md`, the technical plan, and Ralph state/task files now point to the same current status.
+
+## Final QA Repair 3 — Completed
+
+Repair 3 is now a final **PASS, 100/100** under the reduced proof gate approved by the owner.
+
+The first Repair 3 implementation is commit `4698996`. It prevents the exact setup used by an active Race Day from being deleted. It also repairs permitted setup-deletion relationships, clears only matching top-level Race Day setup references, gives only changed records a newer timestamp, keeps every historical run and setup snapshot unchanged, and prevents an older cloud copy from restoring removed relationships.
+
+Independent QA found one remaining race in that first implementation. Car deletion waits five seconds so the user can press Undo. The delayed callback remembered whichever Current Setup was selected when deletion was requested. If the user selected a different setup during those five seconds, the final delete could overwrite the new selection with the old repaired setup. The automated test originally did not make that mid-Undo selection change, so it passed incorrectly. Independent QA reproduced the problem against the real production handler and scored the attempt 74/100.
+
+The owner chose the smallest safe repair instead of disabling car or setup selection, removing Undo, or expanding the user interface. SOL High commit `ab2d031` adds a current-setup reference that always tracks the latest React state. The delayed delete reads that reference when it actually commits. A new production-handler regression requests deletion, switches to another setup during the Undo window, commits the deletion, and proves the newly selected React setup and exact local cache bytes are preserved. A deliberate reversion to the old captured-state behavior fails the test.
+
+One process deviation must be disclosed. The binding v2.1 owner addendum permanently required SOL High builders and forbade Terra. Repair 3 attempt 1 was nevertheless dispatched to Terra High without a recorded owner override. That was a routing mistake even though most of the four-file implementation was useful. After independent QA failed the attempt, all repair ownership transferred to SOL High as required, and Terra was not used again.
+
+No feature or user action was disabled. The five-second Undo window, normal setup selection, active-car replacement, deletion queues, push order, timestamps, account ownership, status messages, and historical session data remain unchanged.
+
+The final focused car-deletion test passed 169 assertions, all 27 accepted D3 mutations, all five relationship mutations, and the new delayed-Undo mutation. The complete Windows test matrix passed 24 of 24. Type-checking reported exactly the three known baseline errors and no new error. The production build transformed exactly 566 modules. Exact two-file repair scope, protected paths, diff checks, clean worktree, and independent cavecrew review all passed. The SOL worker runtime was independently verified from rollout metadata as GPT-5.6 SOL High.
+
+Repair 3 is closed. The remaining work is final closeout only: one final whole-sprint matrix and boundary review, one fresh Netlify draft preview, one fresh Java 21 debug APK with stable-emulator smoke checks, the cold-reader handoff and final documentation commit, and a saving-point push of `codex/ux-overhaul`. Production publishing, release builds, signing, database changes, pull requests, master changes, and Sprint 4 remain outside this work.
+
+## Final closeout evidence
+
+The finished product at commit `ab2d031` has now passed the final closeout gates.
+
+The full Windows test suite was run again in one capture. All 24 harnesses passed. The car-deletion harness reported 169 assertions, all 27 accepted D3 mutations, all five relationship-repair mutations, and the delayed-Undo regression mutation. Type-checking still reports exactly the same three known errors and no fourth error. The production build completed with exactly 566 transformed modules.
+
+The final product boundary review passed 100/100 for the UX v2 task range `10955ded..ab2d031`: 87 commits and 39 paths with no new native, package, schema, release, or Sprint 4 path. The literal branch range from merge base `47db364` is larger—95 commits and 71 paths—because it includes eight disclosed pre-A1 scrollbar, release-record, icon, native-startup, native-auth, and planning commits. Those inherited paths are not represented as UX v2 task work. The first documentation review correctly stopped closeout because authority documents still described Repair 3 as unstarted and later found this range-labeling error. Both were corrected. No product repair was needed.
+
+A fresh Netlify draft was deployed at `https://6a5d7c9221f0e85b0eda6228--crew-chief-race-notes.netlify.app`. It is a preview only; production was not changed. The signed-out shell passed at 360×800, 390×844, 412×915, and 1080×2118. Every size showed the login gate, no horizontal overflow, six visible controls at least 44 pixels, viewport metadata that does not disable pinch zoom, and zero browser console warnings or errors.
+
+A fresh Java 21 debug APK was built after Capacitor sync. It is 12,088,501 bytes with SHA-256 `59E20FDCB74F37AE3C3393202A458B7BBF97320994BF7FEE87D736C7BC8C8D42`. It installed over the existing app on the stable Android 15/WebView 124 emulator without clearing device data. The app launched normally, remained the foreground activity, and passed three background/foreground cycles with the same process. The app-only warning/error log and crash buffer were empty. The emulator displayed Android's one-time tablet multitasking tutorial above the app; that operating-system overlay is not app content or an app failure.
+
+The previously authorized device-only and everywhere data-deletion sequence was not repeated just to create another destructive cycle. Its accepted result remains: the dedicated account's owned racing data stayed cleared after resume and pull, while the account, authentication, team, and membership stayed intact.
+
+The cold-reader handoff is `docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It contains the base and final commit, task-to-commit/file map, before/after owner-complaint evidence, verbatim 24-harness output, every material kickback and deviation, residual risks, protected boundaries, and the future-review reading order. It reports this sprint's QA result but does not claim that a future third-party review has already passed.
+
+The only remaining delivery action after the corrected documentation is reviewed and committed is the requested saving-point push of `codex/ux-overhaul`. No production publish, release/signing, AAB, schema change, pull request, master merge, or Sprint 4 work is included.

@@ -1,6 +1,6 @@
 # CREW CHIEF — Codebase Knowledge File
 
-> Last updated: 2026-07-19 (UX Overhaul v2 Final QA attempt 3 documentation handoff)
+> Last updated: 2026-07-19 (UX Overhaul v2 final closeout)
 > Branches: `master` is Release 5.0; active v2 is `codex/ux-overhaul` in `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
@@ -1570,7 +1570,7 @@ Canonical active references:
 - `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` — Part 5/6 plan plus v2.1 addenda.
 - `ralph/STATE.md` — complete attempt/score/commit history.
 - `docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md` — consolidated tools, build, QA,
-  deletion-test, runtime, and outstanding-repair runbook.
+  deletion-test, runtime, and final-state/closeout runbook.
 
 Major v2 changes now in the branch:
 
@@ -1651,10 +1651,10 @@ survived 3/3 background/foreground cycles on stable Android 15/WebView 124. Trea
 the API 37 result as runtime residual; use stable API 36 or physical Android for
 final release confidence rather than adding an unsupported app workaround.
 
-## 40. Final Sprint Outstanding — Repair 3
+## 40. Historical Final QA Repair 3 work order
 
-Final whole-branch review found two release blockers; Final QA attempt 3 is FAIL
-82/100. No Repair 3 implementation has started.
+This section records the two blockers found during Final QA attempt 3. It is
+historical and superseded by the accepted result in §41.
 
 1. **Active Race Day Setup deletion.** Canonical editability makes the exact active
    setup non-editable but deletable. Removing it leaves `RaceWeekend.activeSetupId`
@@ -1670,15 +1670,60 @@ Final whole-branch review found two release blockers; Final QA attempt 3 is FAIL
    when it is the same changed saved setup. Untouched records and session history
    remain exact.
 
-Proposed exact scope:
+Historical proposed exact scope:
 
 - `src/lib/setupLifecycle.ts`
 - `src/App.tsx`
 - `scripts/chunk5-setup-harness.ts`
 - `scripts/car-delete-undo-harness.ts`
 
-After repair: focused production-bound mutation proof, raw 24/24, lint3, build566,
-fresh draft/debug APK, stable Android lifecycle and authenticated matrix, stale-cloud
-merge/no-resurrection proof, whole-branch reviewer PASS, Part 6.4 cold-reader handoff,
-final governance, and saving-point push. Production Netlify, release/signing/AAB,
-schema/RLS/migration/Edge Function, PR/master merge, and Sprint 4 remain forbidden.
+## 41. UX Overhaul v2 accepted final state
+
+Repair 3 passed on 2026-07-19. Commit `4698996` blocks deletion of the exact active
+Race Day Setup, repairs permitted Setup lineage and Race Day top-level pointers,
+timestamps only changed rows, keeps sessions byte-identical, repairs the matching
+active cache, and makes repaired local rows beat stale cloud rows. Independent QA
+then found a delayed car-delete race in that first pass: changing Current Setup during
+the five-second Undo window could be overwritten at commit. The owner approved the
+smallest safe repair and waived further exhaustive mutation-list expansion. SOL High
+commit `ab2d031` makes the delayed callback read the latest Current Setup and adds a
+production-handler regression that kills the captured-state reversion. No feature or
+user action was disabled.
+
+Process disclosure: `4698996` was dispatched to Terra High despite v2.1-A's
+permanent Terra ban and without a recorded owner override. That was a routing breach.
+After QA failed the attempt, repair ownership transferred permanently to SOL High;
+Terra was not used again.
+
+Final accepted evidence:
+
+- Product QA base: `ab2d03117c0475aa0abbef9ad38f2907edd3e881`.
+- Raw Windows suite: exact 24/24.
+- Lint: exactly the three known baseline errors; no fourth error.
+- Build: exactly 566 transformed modules.
+- Repair 3 car proof: 169 assertions, 27 accepted D3 mutations, five relationship
+  mutations, and one delayed-Undo mutation; Chunk 5 remains green.
+- Literal merge-base range `47db364..ab2d031` is 95 commits/71 paths and includes
+  eight grandfathered pre-A1 native/release/auth/icon/planning commits through
+  `10955ded`. The audited UX v2 task range `10955ded..ab2d031` is 87 commits/39
+  paths with no new native, package, schema, release, or Sprint 4 path; product
+  review of that task range is PASS 100/100.
+- Final Netlify draft: `https://6a5d7c9221f0e85b0eda6228--crew-chief-race-notes.netlify.app`.
+- Final signed-out browser matrix: 360×800, 390×844, 412×915, and 1080×2118;
+  auth gate present, zero overflow, all six visible controls at least 44px, pinch not
+  disabled, zero console warnings/errors.
+- Final Java 21 debug APK: `android/app/build/outputs/apk/debug/app-debug.apk`,
+  12,088,501 bytes, SHA-256
+  `59E20FDCB74F37AE3C3393202A458B7BBF97320994BF7FEE87D736C7BC8C8D42`.
+- The APK installed on stable Android 15/WebView 124 without clearing device data;
+  launch and 3/3 background/foreground cycles retained PID 8556, the activity stayed
+  foreground, and app warning/error plus crash buffers were empty. The emulator's
+  one-time tablet multitasking tip is a host overlay, not an app failure.
+- The previously authorized device-only/everywhere deletion sequence remains the
+  accepted live-data evidence; it was not destructively repeated during closeout.
+
+The independent-review briefing is
+`docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It reports sprint QA evidence but
+does not claim a future third-party review has passed. Production Netlify,
+release/signing/AAB, schema/RLS/migration/Edge Function, PR/master merge, and Sprint 4
+remain outside this sprint.

@@ -3,14 +3,17 @@
 > **Purpose:** single entry point for any new LLM/agent picking up this project.
 > Read this first, then the linked docs. Last updated **2026-07-19**.
 
-> ## Current override — UX Overhaul v2 Final QA
+> ## Current override — UX Overhaul v2 final closeout
 >
 > - Active worktree: `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`.
-> - Active branch/product QA base: `codex/ux-overhaul` at `c897cfd406ff074ad1a06535bdc015bb7198bf89`; documentation commits may sit above it.
+> - Active branch/product QA base: `codex/ux-overhaul` at `ab2d03117c0475aa0abbef9ad38f2907edd3e881`; final documentation commits may sit above it.
 > - `master` in `C:\Users\maxx\antigravity\Race-Notes` remains Release 5.0. Do not edit or merge it.
-> - Final QA attempt 3 is **FAIL 82/100** after final whole-branch review found two deletion-integrity blockers: active Race Day Setup deletion leaves a broken event relationship, and car cascade relationship repairs lack newer timestamps so stale cloud pointers can return.
-> - Touch-target Repair 2 itself passed: 24/24 harnesses, exact three-error lint baseline, 566-module build, four-size draft, authenticated Android Default/Large geometry, debug APK, and authorized clear-data/no-resurrection flow.
-> - Repair 3 is planned but **not started**. Owner requested documentation only; do not dispatch implementation until a later resume instruction.
+> - Final product QA is **PASS 100/100**. Repair 3 landed in `4698996` and its delayed-Undo race repair in `ab2d031`; no feature or user action was disabled.
+> - Process disclosure: `4698996` was dispatched to Terra High in breach of v2.1-A's permanent Terra ban, with no recorded owner override. QA failed that attempt; the repair transferred permanently to SOL High for `ab2d031`, and Terra was not used again.
+> - Final evidence: exact 24/24 harnesses, exact three-error lint baseline, 566-module build, UX v2 task-range product review PASS with literal-branch inheritance disclosed in the final handoff, four-size signed-out draft, Java 21 debug APK, and 3/3 stable Android lifecycle cycles with empty app warning/error and crash buffers.
+> - Final draft: `https://6a5d7c9221f0e85b0eda6228--crew-chief-race-notes.netlify.app`.
+> - Final debug APK: `android/app/build/outputs/apk/debug/app-debug.apk`, 12,088,501 bytes, SHA-256 `59E20FDCB74F37AE3C3393202A458B7BBF97320994BF7FEE87D736C7BC8C8D42`.
+> - The Part 6.4 cold-reader packet is [`docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`](./docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md). It briefs a future independent reviewer; it is not that reviewer’s verdict.
 > - Exact active work order: [`ralph/CURRENT_TASK.md`](./ralph/CURRENT_TASK.md).
 > - Complete tools/build/test/current-state runbook: [`docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`](./docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md).
 > - Current routing: `gpt-5.6-sol` High implementation worker, primary `gpt-5.6-sol` Extra High QA/plan authority. Terra and `cavecrew-builder` forbidden. `/caveman full`; cavecrew investigator/reviewer only.
@@ -170,10 +173,10 @@ Repo (Windows host): `C:\Users\maxx\antigravity\Race-Notes`
 ## 0. Start-here reading order
 
 1. **`AGENTS.md`** — repository-wide workflow, safety, architecture, and deploy authority.
-2. **`ralph/CURRENT_TASK.md`** — exact active Repair 3 work order and file allowlist.
+2. **`ralph/CURRENT_TASK.md`** — exact active Final Closeout gate state and bans.
 3. **`docs/UX_TECHNICAL_REVIEW_2026-07-17.md`** — active plan, Part 5/6, and binding v2.1 addenda.
 4. **`ralph/STATE.md`** — durable task scores, commits, failures, and current gate.
-5. **`docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`** — complete tools, strategy, build, QA, deletion-test, runtime, and outstanding-item runbook.
+5. **`docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`** — complete tools, strategy, build, QA, deletion-test, runtime, and final-state runbook.
 6. **This file (`HANDOFF.md`)** — broad project history and cross-release gotchas.
 7. **`CODEBASE_KNOWLEDGE.md`** — deep domain, storage, component, sync, and feature history.
 8. **`SPRINT_INDEX.md`** — roadmap index; Sprint 2–4 remain deferred while v2 Final QA is open.
@@ -224,7 +227,7 @@ Package/app identity: **`nimbus.engineering.crewchief`** (renamed from `com.race
   `race_notes_active_weekend`; never synced).
 - New TS interfaces → **only** in `src/types.ts`. Sync push/pull/delete helpers → **only** in `src/lib/sync.ts`.
 - Styling: theme tokens only (`bg-surface`, `bg-surface-container`, `text-on-surface`, `text-on-surface-variant`, `text-primary`, `border-outline-variant`, `font-mono`, `font-display`). No hardcoded hex. Labels are `font-mono uppercase`.
-- Lint = `tsc --noEmit` with a known **3-error baseline** (RaceWeekendView.tsx:467, SetupView.tsx:889, SmasherLoadsView.tsx:617 at product base `c897cfd`). Never add errors on top. Vite build does NOT type-check; re-read current lines after future edits.
+- Lint = `tsc --noEmit` with a known **3-error baseline** (RaceWeekendView.tsx:467, SetupView.tsx:889, SmasherLoadsView.tsx:617 at product base `ab2d031`). Never add errors on top. Vite build does NOT type-check; re-read current lines after future edits.
 
 ---
 
@@ -414,7 +417,7 @@ changes, distribution, and production Netlify publishing.
 - Desktop-thread cwd may be 3d72. Always set and verify the 203f worktree before commands.
 - **cmd `set VAR=value && cmd`** captures a trailing space into VAR → wrap as `set "VAR=value"&&…` (this once produced bogus HTTP 401s in an API smoke test).
 - Deno edge functions live under `supabase/functions/` and must be **excluded from the app `tsconfig`** (already done) or `tsc` errors on `Deno`/esm.sh imports.
-- Current Repair 3 forbids Supabase schema/RLS/migration/Edge Function changes.
+- Final closeout forbids Supabase schema/RLS/migration/Edge Function changes.
 - Android 17/API 37 dev emulator WebView 150 has a reproducible system-library
   `onTrimMemory` SIGILL. Same APK passes 3/3 lifecycle cycles on stable Android 15;
   use stable API 36/physical device for final release confidence when available.
@@ -423,16 +426,11 @@ changes, distribution, and production Netlify publishing.
 
 ## 8. Open items / backlog (from `STATE.md`)
 
-Immediate final-sprint blockers:
-
-1. Exact active Race Day setup is still deletable; deleting it leaves the event
-   unable to resolve a setup for the next run.
-2. Car-cascade pointer cleanup does not advance `updatedAt`; equal-timestamp stale
-   cloud records can restore cleared setup relationships after a failed/racing push.
-
-Repair 3 scope and proof live in `ralph/CURRENT_TASK.md`. No implementation has
-started. After Repair 3: rerun final Part 6.3 QA, whole-branch review, Part 6.4
-handoff, final draft/debug artifacts, governance commit, and saving-point push.
+No product blocker remains in UX Overhaul v2. Repair 3 closed the active-Race-Day
+setup deletion and stale-cloud timestamp gaps; `ab2d031` closed the delayed Undo
+selection race. The final 24/24/lint3/build566/browser/debug-APK/lifecycle/product-
+review gates pass. Final authority-document synchronization and the saving-point
+push are the only closeout actions around the product base recorded above.
 
 Deferred nonblocking backlog remains in `ralph/STATE.md` and the v2 runbook,
 including API 37 WebView runtime behavior, two-back Dashboard exit, dead `quickref`,
