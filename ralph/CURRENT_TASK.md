@@ -41,6 +41,17 @@ Primary independent QA result: **PASS, 100/100** under the owner-approved reduce
 7. **PASS:** final governance/docs committed with zero product/harness bytes.
 8. **PASS:** final closure commit is the branch-tip saving point pushed to `origin/codex/ux-overhaul`. No PR or merge.
 
-## Hard bans
+## Owner-authorized Release 5.2.0 delivery
 
-No production Netlify publish; no release/signed APK or AAB; no signing/release files; no schema, RLS, migration, Edge Function, package, config, or native source/version changes; no PR; no master merge/push; no Sprint 4 work; no other-user/account/auth/team/membership deletion; no credential output or storage.
+The owner explicitly superseded the prior closeout bans for one bounded release delivery on 2026-07-19. Release delivery is complete.
+
+- Netlify production deploy `6a5d8c1eadd194bdc614ea33` is `ready` and published at `https://crew-chief-race-notes.netlify.app`.
+- Production `/`, `/privacy/`, `/delete-account/`, JavaScript, and CSS all returned HTTP 200 after publish.
+- Android version is `5.2.0`, version code `23`, package `nimbus.engineering.crewchief`, minimum API 24, target/compile API 36.
+- Debug APK: `release/CrewChief-5.2.0-debug.apk`, 11,740,533 bytes, SHA-256 `6D435CB4E31DFE9DAE27ABA3034D2AC8BF5B6F91EA4629B9C0A295F3C3E81649`.
+- Signed Play AAB: `release/CrewChief-5.2.0-play.aab`, 9,967,844 bytes, SHA-256 `BE61AC8C443DCE05272DC14516120884DB55C4757713926D94F361DFE0152465`.
+- APK identity/signature and AAB structure/JAR signature passed. The AAB upload certificate matches the retained 5.1 and 5.1.1 Play bundles.
+- SOL High runtime, exact three-error lint baseline, 566-module web build, Capacitor sync, Gradle builds, artifact hashes, ignored secret inputs, exact four-file release scope, and cavecrew review passed.
+- `docs/GOOGLE_PLAY_UPLOAD_5.2.0.md` is the upload handoff. Manual Play Console upload, review, and rollout remain owner actions.
+
+Ongoing bans remain: no PR; no master merge/push; no schema, RLS, migration, or Edge Function change; no Sprint 4 work; no other-user/account/auth/team/membership deletion; no credential output or tracked secret storage. No Git remote push was requested for this release-delivery commit.

@@ -602,3 +602,17 @@ The only remaining delivery action after the corrected documentation is reviewed
 ## Final delivery
 
 The corrected cold-reader handoff and synchronized project documentation passed independent review 100/100 and were committed as `22dc112`. A final Ralph/Sprint closure commit was then created and the complete `codex/ux-overhaul` branch was pushed as the requested saving point. UX Overhaul v2 is complete. No pull request or master merge was created, and Netlify production, release/signing, AAB, database/schema, and Sprint 4 remained untouched.
+
+## Release 5.2.0 delivery
+
+The owner later authorized the completed UX Overhaul for Netlify production and Android release packaging. The old closeout restrictions were overridden only for this bounded release delivery.
+
+The same accepted web build was published to Netlify production as deploy `6a5d8c1eadd194bdc614ea33`. Netlify reports the deploy as ready and production at `https://crew-chief-race-notes.netlify.app`. The main app, privacy page, account-deletion page, JavaScript, and CSS all returned HTTP 200 after publication. Netlify also reported that the files were byte-identical to an already uploaded accepted draft, so production did not introduce a different web build.
+
+A verified GPT-5.6 SOL High worker prepared Android version 5.2.0 with version code 23. Type-checking produced only the same three known baseline errors, the web build transformed exactly 566 modules, Capacitor synchronized six plugins, and Gradle successfully built a debug APK and signed release bundle. No release APK was created.
+
+The debug APK is `release/CrewChief-5.2.0-debug.apk`. It is 11,740,533 bytes with SHA-256 `6D435CB4E31DFE9DAE27ABA3034D2AC8BF5B6F91EA4629B9C0A295F3C3E81649`. It reports the correct package, version, minimum API 24, and target API 36, and its APK v2 signature verifies.
+
+The Play Store bundle is `release/CrewChief-5.2.0-play.aab`. It is 9,967,844 bytes with SHA-256 `BE61AC8C443DCE05272DC14516120884DB55C4757713926D94F361DFE0152465`. Its bundle structure and JAR signature verify. Its upload-certificate SHA-256 is `5CE2F57CB9FB130388062BB352D717F0EF89F7522351915FF10804256E098098`, matching the retained 5.1 and 5.1.1 Play bundles. Signing credentials and Firebase configuration remain ignored and were not printed or committed. Independent cavecrew review found no issue.
+
+The remaining action is manual: upload the AAB in Google Play Console, confirm package/version/target API/upload certificate, add release notes, review warnings and device changes, and submit the chosen track for review or rollout. The exact checklist is in `docs/GOOGLE_PLAY_UPLOAD_5.2.0.md`. No Play Console upload, pull request, master merge, database/schema change, or Sprint 4 work was performed.
