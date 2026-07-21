@@ -73,7 +73,7 @@ const [activeCarId, setActiveCarId] = useState<string | null>(() => {
 });
 ```
 
-New localStorage keys (add to the key registry in `CODEBASE_KNOWLEDGE.md` §6):
+New localStorage keys (add to the key registry in `context/knowledge/CODEBASE_KNOWLEDGE.md` §6):
 
 | Key | Type | Notes |
 |-----|------|-------|
@@ -266,7 +266,7 @@ Deleting a car must do something with its setups/tires/smasher data. Pick one an
 - **B. Cascade delete:** Delete the car and all its scoped data (local + cloud + `deleteWeekendFromCloud`-style hard deletes for each). Powerful but destructive — require a typed confirmation.
 - **C. Reassign:** On delete, prompt "move this car's data to {other car}?" then re-stamp `carId`.
 
-Recommend **A** for v1, with C as a fast follow. Whatever is chosen, document it in `CODEBASE_KNOWLEDGE.md`.
+Recommend **A** for v1, with C as a fast follow. Whatever is chosen, document it in `context/knowledge/CODEBASE_KNOWLEDGE.md`.
 
 Edge case — **zero cars / no active car:** If `cars.length === 0` or `activeCarId` is null/dangling (points to a deleted car), Setup/Tire/Smasher create actions should be disabled with a prompt: "Add a car in Settings → Garage to start." On car list load, if `activeCarId` is missing but cars exist, auto-select the first car.
 
@@ -327,7 +327,7 @@ Weekends stay global, but a weekend binds a `setupId`, and setups are now per-ca
 | `src/components/SetupView.tsx` | Filter setups + tires by `activeCarId`; stamp `carId` on create; default `carType` from active car; accept new props; pass `activeCarId` to `SmasherLoadsView`. |
 | `src/components/SmasherLoadsView.tsx` | Accept `activeCarId` prop; filter + stamp shock sessions. |
 | `src/components/DashboardView.tsx` | Filter Setups/Tires sections by `activeCarId`. |
-| `CODEBASE_KNOWLEDGE.md` | Document new entity, keys, tables, deletion policy, and the global-vs-scoped split. |
+| `context/knowledge/CODEBASE_KNOWLEDGE.md` | Document new entity, keys, tables, deletion policy, and the global-vs-scoped split. |
 
 ---
 

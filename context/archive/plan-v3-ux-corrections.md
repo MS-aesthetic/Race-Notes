@@ -1,7 +1,7 @@
 # CREW CHIEF — Plan v3: UX Correction Batch (UXF)
 
 > **Purpose.** Single source of truth for the 2026-07-14 owner-correction batch.
-> Source of requirements: `docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md` (owner
+> Source of requirements: `context/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md` (owner
 > rejections of Chunks 6B–9 UX/product decisions — technical QA passed, product
 > acceptance did not). This file **supersedes `plan-v2.md`** as the active
 > roadmap; plan-v2.md is archived (see §Superseded documents). The ralph loop
@@ -86,13 +86,13 @@ UXF-9  Batch QA + draft deploy         (LAST — gates the batch)
 | UXF-5 | `src/components/QuickReferenceView.tsx`, `src/components/GuideView.tsx`, `docs/USER_GUIDE.md` | `src/lib/checklistMaintenance.ts` (one string), `src/components/TrackersView.tsx` (one banner), `scripts/chunk8-trackers-harness.ts`, `scripts/chunk9-export-help-harness.ts` |
 | UXF-6 | `src/components/TrackersView.tsx` ("Measure by" + starting-usage input), `src/lib/maintenance.ts` (`getComponentStatus`, `DEFAULT_COMPONENTS`) | `src/types.ts` (narrow `MaintenanceIntervalType`, add `startingUsage`), `src/lib/sync.ts` (`starting_usage` column mapping), `src/lib/checklistMaintenance.ts` (verify only), `scripts/chunk8-trackers-harness.ts` |
 | UXF-7 | `docs/MAIN_CHECKLIST_REDESIGN_PROPOSAL.md` (new) | everything else read-only |
-| UXF-8 | `PROJECT_INSTRUCTIONS.md`, `docs/archive/plan-v2.md` (banner already applied), `CODEBASE_KNOWLEDGE.md` (header line only), `ralph/STATE.md` (WS-Z row + human-gates note) | `docs/archive/car-profiles/*` (RESOLVED Q6 — stays archived; the feature it specced is already built, nothing to restore) |
+| UXF-8 | `context/knowledge/PROJECT_INSTRUCTIONS.md`, `context/archive/plan-v2.md` (banner already applied), `context/knowledge/CODEBASE_KNOWLEDGE.md` (header line only), `ralph/STATE.md` (WS-Z row + human-gates note) | `context/archive/car-profiles/*` (RESOLVED Q6 — stays archived; the feature it specced is already built, nothing to restore) |
 | UXF-9 | test scripts, QA notes in `ralph/STATE.md` | everything (read-only + fixes) |
 | UXF-10 | `src/types.ts`, `src/lib/mainChecklist.ts`, `src/lib/checklistMaintenance.ts`, `src/components/ToDoView.tsx`, `src/components/DashboardView.tsx`, `scripts/chunk8-trackers-harness.ts` | `src/App.tsx` minimal sheet/back wiring only if required; existing Todo sync mapper is verification-only |
 
 ### Loop protocol, model routing, QA rubric
 
-Identical to the archived `docs/archive/plan-v2.md` §1 (kept as the reference
+Identical to the archived `context/archive/plan-v2.md` §1 (kept as the reference
 for the full protocol text). Summary restated so this file stands alone:
 
 - `ws-planner` (GPT 5.6 SOL High) reads this file + `ralph/STATE.md`, picks the
@@ -634,17 +634,17 @@ now the active final batch gate.
 loop runs on this plan.
 
 **Scope:**
-1. `PROJECT_INSTRUCTIONS.md`: line 12 `worktrees\v2` / `preview-v2` →
+1. `context/knowledge/PROJECT_INSTRUCTIONS.md`: line 12 `worktrees\v2` / `preview-v2` →
    `.worktrees\v3` / `preview-v3`; line 6 `plan-v2.md` → **`SPRINT_INDEX.md`**
    (the master entry point added 2026-07-14 — it points on to this file for
    Sprint 1 and to `sprint-2/3/4-*.md` for the newer UX-audit sprints; do not
    point straight at this file anymore); line 17 "All feature work on
    `preview-v2`" → `preview-v3`. No other edits.
-2. `docs/archive/plan-v2.md` already carries its superseded banner (applied
+2. `context/archive/plan-v2.md` already carries its superseded banner (applied
    2026-07-14). Grep the repo for inbound `plan-v2` references and update
    paths where they mean to point at the new plan; leave historical mentions
    in STATE.md/CURRENT_TASK.md as-is.
-3. `CODEBASE_KNOWLEDGE.md`: bump the stale header line ("last updated
+3. `context/knowledge/CODEBASE_KNOWLEDGE.md`: bump the stale header line ("last updated
    2026-07-13 (Chunk 8)") to 2026-07-14 / Chunk 9. **Header only — do not
    regenerate the document** (body is verified current through §29).
 4. `ralph/STATE.md`: update the WS-Z row and backlog entry — migration 014
@@ -653,7 +653,7 @@ loop runs on this plan.
    authenticated/offline/theme/zoom/mobile visual QA, which UXF-9 absorbs.
    Add a "UXF batch" status table (UXF-1…10, all `pending`) in the same format
    as the existing tables.
-5. `docs/archive/car-profiles/*.md`: already moved out of the live docs/ tree.
+5. `context/archive/car-profiles/*.md`: already moved out of the live docs/ tree.
    **RESOLVED (Q6):** stays archived — the Car Profiles feature these docs
    specced is already built (`Car`, `GarageView.tsx`, `byActiveCar`, etc. all
    exist in the current codebase); the named branches are gone because the
@@ -663,7 +663,7 @@ loop runs on this plan.
 fixes; rewriting CODEBASE_KNOWLEDGE body; any src change.
 
 **Acceptance criteria:**
-1. A cold agent following PROJECT_INSTRUCTIONS.md lands in `.worktrees\v3` on
+1. A cold agent following context/knowledge/PROJECT_INSTRUCTIONS.md lands in `.worktrees\v3` on
    `preview-v3` reading this plan.
 2. No doc link 404s (grep-verified) against the archived files' new paths.
 3. STATE.md shows no "await migration 014" language anywhere; UXF table
@@ -730,14 +730,14 @@ walkthrough was not run and is recorded as an unexecuted follow-up rather than a
 
 | Document | Disposition |
 |---|---|
-| `plan-v2.md` | **Archived** → `docs/archive/plan-v2.md` with superseded banner already applied. WS-N…Z technical content stays valid as history; WS-T/U/W/X/Y remain `pending` in STATE.md and are *not* cancelled — they are simply not in this batch; a future plan re-adopts them. |
+| `plan-v2.md` | **Archived** → `context/archive/plan-v2.md` with superseded banner already applied. WS-N…Z technical content stays valid as history; WS-T/U/W/X/Y remain `pending` in STATE.md and are *not* cancelled — they are simply not in this batch; a future plan re-adopts them. |
 | `ralph/STATE.md` | **Kept in place** (not archived) — it is the loop's durable memory across plan generations; UXF-8 corrects its stale WS-Z gate and appends the UXF table. |
-| `docs/IMPLEMENTATION_PLAN_2026-07-12.md` | **Archived** → `docs/archive/IMPLEMENTATION_PLAN_2026-07-12.md` — historical record of the Chunk 1–9 track (complete); superseded for forward work by this file. |
-| `docs/UX_ANALYSIS_2026-07-12.md` | **Archived** → `docs/archive/UX_ANALYSIS_2026-07-12.md` — superseded by the 2026-07-14 handoff and this plan. |
-| `docs/HANDOFF_WS_Z_2026-07-11.md` | **Archived** → `docs/archive/HANDOFF_WS_Z_2026-07-11.md` — WS-Z status folded into `ralph/STATE.md` (UXF-8). |
+| `docs/IMPLEMENTATION_PLAN_2026-07-12.md` | **Archived** → `context/archive/IMPLEMENTATION_PLAN_2026-07-12.md` — historical record of the Chunk 1–9 track (complete); superseded for forward work by this file. |
+| `docs/UX_ANALYSIS_2026-07-12.md` | **Archived** → `context/archive/UX_ANALYSIS_2026-07-12.md` — superseded by the 2026-07-14 handoff and this plan. |
+| `docs/HANDOFF_WS_Z_2026-07-11.md` | **Archived** → `context/archive/HANDOFF_WS_Z_2026-07-11.md` — WS-Z status folded into `ralph/STATE.md` (UXF-8). |
 | `docs/car-profiles/CAR_PROFILES_TASKS.md`, `docs/car-profiles/CAR_PROFILES_IMPLEMENTATION_PLAN.md` | **Archived, confirmed correct (Q6, resolved 2026-07-14):** the Car Profiles feature these docs specced is **already built** — `Car`/`CAR_TYPES` in `src/types.ts`, `src/lib/scope.ts` (`byActiveCar`), `src/components/GarageView.tsx`, `ContextStrip.tsx` all exist and work. The named branches (`feature/car-profiles`, `feature/session-v2`) are gone because the work landed elsewhere, not because it was abandoned. Nothing to restore. |
-| `PROJECT_INSTRUCTIONS.md` | **Not archived — corrected** (UXF-8): v2→v3 worktree/branch, plan pointer. |
-| `CODEBASE_KNOWLEDGE.md` | Kept; header date bump only (UXF-8). |
+| `context/knowledge/PROJECT_INSTRUCTIONS.md` | **Not archived — corrected** (UXF-8): v2→v3 worktree/branch, plan pointer. |
+| `context/knowledge/CODEBASE_KNOWLEDGE.md` | Kept; header date bump only (UXF-8). |
 | `HANDOFF.md` | **Not archived** — still the live onboarding entry point; its stale WS-Z migration note is corrected by UXF-8's reference-path pass. |
 
 ## Decisions log

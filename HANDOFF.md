@@ -13,9 +13,9 @@
 > - Final evidence: exact 24/24 harnesses, exact three-error lint baseline, 566-module build, UX v2 task-range product review PASS with literal-branch inheritance disclosed in the final handoff, four-size signed-out draft, Java 21 debug APK, and 3/3 stable Android lifecycle cycles with empty app warning/error and crash buffers.
 > - Final draft: `https://6a5d7c9221f0e85b0eda6228--crew-chief-race-notes.netlify.app`.
 > - Final debug APK: `android/app/build/outputs/apk/debug/app-debug.apk`, 12,088,501 bytes, SHA-256 `59E20FDCB74F37AE3C3393202A458B7BBF97320994BF7FEE87D736C7BC8C8D42`.
-> - The Part 6.4 cold-reader packet is [`docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`](./docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md). It briefs a future independent reviewer; it is not that reviewer’s verdict.
+> - The Part 6.4 cold-reader packet is [`context/knowledge/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`](./context/knowledge/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md). It briefs a future independent reviewer; it is not that reviewer’s verdict.
 > - Exact active work order: [`ralph/CURRENT_TASK.md`](./ralph/CURRENT_TASK.md).
-> - Complete tools/build/test/current-state runbook: [`docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`](./docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md).
+> - Complete tools/build/test/current-state runbook: [`context/knowledge/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`](./context/knowledge/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md).
 > - Current routing: `gpt-5.6-sol` High implementation worker, primary `gpt-5.6-sol` Extra High QA/plan authority. Terra and `cavecrew-builder` forbidden. `/caveman full`; cavecrew investigator/reviewer only.
 > - Everything below this block remains useful history. Any branch, worktree, model-routing, build-bridge, or open-task statement below that conflicts with this block is historical and superseded.
 
@@ -28,7 +28,7 @@
 > - Play listing must use the public privacy URL and account-deletion URL. Confirm its developer entity is exactly **Nimbus Engineering** before submission.
 > - Final draft: `https://6a57b47b1712493e1f563ff9--crew-chief-race-notes.netlify.app/`. Netlify Forms is enabled and detected `account-deletion-request`; 390px policy/deletion/app-shell checks had no overflow or console errors. Production unchanged.
 
-> **Historical 2026-07-14 UX correction roadmap:** [`docs/archive/plan-v3-ux-corrections.md`](./docs/archive/plan-v3-ux-corrections.md) and [`docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md`](./docs/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md) preserve Release 5.0 planning history. Active work uses the current override above.
+> **Historical 2026-07-14 UX correction roadmap:** [`context/archive/plan-v3-ux-corrections.md`](./context/archive/plan-v3-ux-corrections.md) and [`context/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md`](./context/archive/CLAUDE_UX_REWORK_HANDOFF_2026-07-14.md) preserve Release 5.0 planning history. Active work uses the current override above.
 
 > ### ⚡ Release update 2026-07-14 (supersedes stale details below)
 > - **Release 5.0 baseline:** Main tree `C:\Users\maxx\antigravity\Race-Notes` on `master` now owns released web and Android source. `preview-v3` was promoted and is retired. Future work uses a new branch/worktree from `master`.
@@ -40,7 +40,7 @@
 
 > ### 🎨 UX OVERHAUL track — historical release lineage
 > The UX/UI overhaul was built in `.worktrees/v3` on `preview-v3`, then promoted to `master` for Release 5.0 by owner authorization on 2026-07-14. The worktree and local branch are retired after release.
-> - **Historical source:** [`docs/archive/UX_ANALYSIS_2026-07-12.md`](./docs/archive/UX_ANALYSIS_2026-07-12.md) → [`docs/archive/IMPLEMENTATION_PLAN_2026-07-12.md`](./docs/archive/IMPLEMENTATION_PLAN_2026-07-12.md). Forward work uses `SPRINT_INDEX.md`.
+> - **Historical source:** [`context/archive/UX_ANALYSIS_2026-07-12.md`](./context/archive/UX_ANALYSIS_2026-07-12.md) → [`context/archive/IMPLEMENTATION_PLAN_2026-07-12.md`](./context/archive/IMPLEMENTATION_PLAN_2026-07-12.md). Forward work uses `SPRINT_INDEX.md`.
 > - **Workflow (owner directive):** GPT 5.6 SOL High owns analysis/planning/QA; GPT 5.6 Terra High gets one initial implementation pass; any QA failure transfers fixes to GPT 5.6 SOL High, which loops with SOL QA until PASS. Codex model overrides and rollout metadata are verified in persistent tasks. Generic prose self-identification is not model evidence. **`/caveman full`** stays on.
 > - **Chunk status:** ✅ **1–9 complete**. C9 SOL QA attempt 2 PASS at `c8c4a21` + `254d928`; Chunks 6B–9 completion run closed.
 > - **New reusable code (chunks 1-4):** `src/components/ui/` (`NumberStepper`, `UndoToast`+`InfoToast`, `EmptyState`, `CollapsibleSection`, `SegmentedGrid`, `BottomSheet`, `HelpSheet`, `LapTimeKeypad`); `src/lib/undo.ts`; `src/lib/backStack.ts`; `src/lib/saveStatus.ts`; `src/lib/sessionSequence.ts`; `src/lib/serviceLog.ts`; `src/lib/scope.ts` (`pickAutoWeekend`, `parseWeekendDate`, `sortWeekends`); `src/components/ContextStrip.tsx`; `src/components/GetRaceReadyCard.tsx`. CSS: `.tap-target`, `.sticky-action-bar`, `.status-chip` + light-theme contrast bump.
@@ -174,11 +174,11 @@ Repo (Windows host): `C:\Users\maxx\antigravity\Race-Notes`
 
 1. **`AGENTS.md`** — repository-wide workflow, safety, architecture, and deploy authority.
 2. **`ralph/CURRENT_TASK.md`** — exact active Final Closeout gate state and bans.
-3. **`docs/UX_TECHNICAL_REVIEW_2026-07-17.md`** — active plan, Part 5/6, and binding v2.1 addenda.
+3. **`context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md`** — active plan, Part 5/6, and binding v2.1 addenda.
 4. **`ralph/STATE.md`** — durable task scores, commits, failures, and current gate.
-5. **`docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`** — complete tools, strategy, build, QA, deletion-test, runtime, and final-state runbook.
+5. **`context/knowledge/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`** — complete tools, strategy, build, QA, deletion-test, runtime, and final-state runbook.
 6. **This file (`HANDOFF.md`)** — broad project history and cross-release gotchas.
-7. **`CODEBASE_KNOWLEDGE.md`** — deep domain, storage, component, sync, and feature history.
+7. **`context/knowledge/CODEBASE_KNOWLEDGE.md`** — deep domain, storage, component, sync, and feature history.
 8. **`SPRINT_INDEX.md`** — roadmap index; Sprint 2–4 remain deferred while v2 Final QA is open.
 
 > **Doc-currency note:** historical sections below retain old `preview-v2`/`preview-v3`,
@@ -292,11 +292,11 @@ commits stay separately identifiable where practical.
 
 ---
 
-## 4. Historical roadmap & status (archived `docs/archive/plan-v2.md` + `STATE.md`)
+## 4. Historical roadmap & status (archived `context/archive/plan-v2.md` + `STATE.md`)
 
 **v1 (plan.md, WS-A…WS-M):** COMPLETE — data model, tire lifecycle, setup diff, task↔weekend, weather history, carry-over setups, exports, UI/theme/reference passes.
 
-**v2 (archived `docs/archive/plan-v2.md`, WS-N…WS-Z):**
+**v2 (archived `context/archive/plan-v2.md`, WS-N…WS-Z):**
 
 | WS | Title | Status |
 |---|---|---|

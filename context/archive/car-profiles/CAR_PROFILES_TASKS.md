@@ -127,11 +127,11 @@ Conventions to follow: local-first (localStorage primary, debounced Supabase pus
 
 ## PHASE 8 — Docs & Verification
 
-- [ ] **8.1** Update `CODEBASE_KNOWLEDGE.md`: new `Car` entity + `CAR_TYPES`; new localStorage keys (`race_notes_cars`, `race_notes_active_car`); new tables (`cars`, `shock_sessions`) + `car_id` columns; the global-vs-scoped split; deletion policy; active-car-is-device-local note.
+- [ ] **8.1** Update `context/knowledge/CODEBASE_KNOWLEDGE.md`: new `Car` entity + `CAR_TYPES`; new localStorage keys (`race_notes_cars`, `race_notes_active_car`); new tables (`cars`, `shock_sessions`) + `car_id` columns; the global-vs-scoped split; deletion policy; active-car-is-device-local note.
 - [ ] **8.2** Manual test pass (full list in plan §11): backfill, isolation between two cars, no-leak-on-create, instant switch, cloud round-trip on a second device, team visibility, globals unchanged, empty-state, deletion block.
 - [ ] **8.3** (Recommended) Run a verification subagent to diff the branch against §11 and confirm the §6.6 audit holds.
 - [ ] **8.4** Final `npm run lint`; build check `npm run build`. Commit: `docs: car profiles knowledge update`.
-- [ ] **8.5** Stop at the branch. **Do not merge to `master`** — await owner approval. Optionally build APK / Netlify preview per `CODEBASE_KNOWLEDGE.md` §13 if owner wants to test on device.
+- [ ] **8.5** Stop at the branch. **Do not merge to `master`** — await owner approval. Optionally build APK / Netlify preview per `context/knowledge/CODEBASE_KNOWLEDGE.md` §13 if owner wants to test on device.
 
 **Acceptance:** Docs updated; all §11 checks pass; branch ready for owner review.
 
@@ -150,6 +150,6 @@ Conventions to follow: local-first (localStorage primary, debounced Supabase pus
 | `src/components/SetupView.tsx` | 6 |
 | `src/components/SmasherLoadsView.tsx` | 1, 6 |
 | `src/components/DashboardView.tsx` | 6 |
-| `CODEBASE_KNOWLEDGE.md` | 8 |
+| `context/knowledge/CODEBASE_KNOWLEDGE.md` | 8 |
 
 Full rationale, SQL, code sketches, and risks: **`./CAR_PROFILES_IMPLEMENTATION_PLAN.md`**.

@@ -84,7 +84,7 @@ Primary files:
 
 ### Documentation and workflow
 
-The implementation refreshed `AGENTS.md`, `HANDOFF.md`, `CODEBASE_KNOWLEDGE.md`, `plan-v2.md`, `ralph/CURRENT_TASK.md`, `ralph/STATE.md`, `docs/USER_GUIDE.md`, project instructions, and Ralph agent definitions. Current authority remains `AGENTS.md`, `HANDOFF.md`, `plan-v2.md`, and `ralph/STATE.md`.
+The implementation refreshed `AGENTS.md`, `HANDOFF.md`, `context/knowledge/CODEBASE_KNOWLEDGE.md`, `plan-v2.md`, `ralph/CURRENT_TASK.md`, `ralph/STATE.md`, `docs/USER_GUIDE.md`, project instructions, and Ralph agent definitions. Current authority remains `AGENTS.md`, `HANDOFF.md`, `plan-v2.md`, and `ralph/STATE.md`.
 
 ## Validation completed
 

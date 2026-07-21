@@ -1,7 +1,7 @@
 # UX Overhaul v2 — End-of-Sprint Independent-Review Briefing
 
 This document is the Part 6.4 cold-reader handoff required by
-`docs/UX_TECHNICAL_REVIEW_2026-07-17.md`. It briefs a future model or developer who
+`context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md`. It briefs a future model or developer who
 has no prior conversation context. It reports the sprint team's own QA result and
 evidence. It is not a verdict from the future independent reviewer and must not be
 read as one.
@@ -53,14 +53,14 @@ them preserve attempt history in `ralph/STATE.md`.
 | C3 | `e8d7016` | `src/App.tsx`, `src/components/{RaceWeekendView,SetupView}.tsx`, `scripts/chunk5-setup-harness.ts` | Bound setup changes to session-to-session diffs, preserved Quick Adjust, and removed hot-path history noise. |
 | C4 | `83230c9` | `src/App.tsx`, `scripts/saved-flash-harness.ts` | Kept immediate local writes but coalesced user-facing Saved feedback at tab/background/pagehide/native/session/30-second boundaries. |
 | C5 | `1a3d492` | `src/components/SetupView.tsx`, `scripts/chunk5-setup-harness.ts` | Required meaningful names for blank new Setups and made rename discoverable and focus-safe. |
-| C-QA | `5d553cc` | `docs/OWNER_REPORT_UX_OVERHAUL.md`, `docs/UX_TECHNICAL_REVIEW_2026-07-17.md`, `ralph/{CURRENT_TASK,STATE}.md` | Recorded the read-only integrated Chunk C gate. |
+| C-QA | `5d553cc` | `context/knowledge/OWNER_REPORT_UX_OVERHAUL.md`, `context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md`, `ralph/{CURRENT_TASK,STATE}.md` | Recorded the read-only integrated Chunk C gate. |
 | D1 | `1ca3576` | `src/lib/sync.ts`, `scripts/saved-flash-harness.ts` | Made cloud deletes select matching IDs; zero-row results remain failed queued intents and never report success. |
 | Pre-D2 owner label | `dc5c63d` | `src/components/SetupView.tsx`, `scripts/setup-touch-target-harness.ts` | Changed the requested Setup tire heading to `TIRE` and removed “From Inventory.” |
 | D2 | `803d5d0`, `e29c0f0` | `src/App.tsx`, `src/components/SettingsView.tsx`, `scripts/saved-flash-harness.ts` | Split Clear Racing Data into honest device-only and owned-records-everywhere paths; repaired structured success/failure copy. |
 | D3 | `120fa72`, `a5e72d0` | `src/App.tsx`, `src/components/{GarageView,SettingsView,SetupView}.tsx`, `scripts/{car-delete-undo,chunk5-setup,confirm-sheet,saved-flash}-harness.ts` | Added confirmed dependency-aware car cascade deletion, preserved session history, and repaired signed-out/null identity handling. |
-| D-QA | `98124bb` | `docs/OWNER_REPORT_UX_OVERHAUL.md`, `docs/UX_TECHNICAL_REVIEW_2026-07-17.md`, `ralph/{CURRENT_TASK,STATE}.md` | Recorded the read-only integrated Chunk D gate. |
+| D-QA | `98124bb` | `context/knowledge/OWNER_REPORT_UX_OVERHAUL.md`, `context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md`, `ralph/{CURRENT_TASK,STATE}.md` | Recorded the read-only integrated Chunk D gate. |
 | E1 | `45e60c9`, `e2e7fe9`, `b160f7a` | `src/App.tsx`, `src/components/{RaceWeekendView,SetupView}.tsx`, `src/lib/helpRouting.ts`, `scripts/chunk9-export-help-harness.ts` | Moved help to one context-aware App Guide route and hardened exact implementation-scope/path proof. |
-| E2 | `2e2c277` | `src/components/{GarageView,TiresSubView,TrackersView}.tsx`, `scripts/setup-touch-target-harness.ts`, `CODEBASE_KNOWLEDGE.md` | Standardized Add-X openers versus Create/Save submit labels without handler changes. |
+| E2 | `2e2c277` | `src/components/{GarageView,TiresSubView,TrackersView}.tsx`, `scripts/setup-touch-target-harness.ts`, `context/knowledge/CODEBASE_KNOWLEDGE.md` | Standardized Add-X openers versus Create/Save submit labels without handler changes. |
 | E3 | `f6e9181` | `src/App.tsx`, `src/index.css`, `src/lib/location.ts` | Added native-auth cleanup guards, coarse-pointer scrollbar handling, and comment-only location annotations. |
 | Final proof repair | `810d918` | `scripts/muted-text-color-harness.ts` | Repaired a stale historical byte lock without changing product behavior; current/historical color deltas are explicit and mutation-bound. |
 | Repair 2 | `c897cfd` | `src/index.css`, `scripts/setup-touch-target-harness.ts` | Enforced a global 44px native-control/input-backed-label floor and production-derived mutations after device QA found undersized targets. |
@@ -362,14 +362,14 @@ Read in this order:
 
 1. `AGENTS.md`.
 2. `ralph/CURRENT_TASK.md` and `ralph/STATE.md`.
-3. `docs/UX_TECHNICAL_REVIEW_2026-07-17.md`, especially Parts 2, 5, 6 and v2.1-H.
+3. `context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md`, especially Parts 2, 5, 6 and v2.1-H.
 4. This document.
-5. `docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md` for commands, tools, data testing, and
+5. `context/knowledge/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md` for commands, tools, data testing, and
    runtime caveats.
-6. `HANDOFF.md` and `CODEBASE_KNOWLEDGE.md` for broader release and architecture history.
-7. `docs/OWNER_REPORT_UX_OVERHAUL.md` for the owner's plain-English task/chunk record.
+6. `HANDOFF.md` and `context/knowledge/CODEBASE_KNOWLEDGE.md` for broader release and architecture history.
+7. `context/knowledge/OWNER_REPORT_UX_OVERHAUL.md` for the owner's plain-English task/chunk record.
 8. The v1 predecessor is available from Git history at exact object
-   `04af8de:docs/UX_TECHNICAL_REVIEW_2026-07-17.md`; it is not retained as a separate
+   `04af8de:context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md`; it is not retained as a separate
    file in the current tree. `docs/HANDOFF_MOBILE_DENSITY_REVIEW_2026-07-17.md` was
    another input named by the v2 plan. It exists only as an untracked source in the
    separate `C:\Users\maxx\antigravity\Race-Notes` checkout and was deliberately not

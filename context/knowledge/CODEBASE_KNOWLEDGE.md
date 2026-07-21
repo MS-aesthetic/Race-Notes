@@ -4,7 +4,7 @@
 > Branches: `master` is Release 5.0; active v2 is `codex/ux-overhaul` in `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
 >
-> ⚠️ **2026-07-19:** Release 5.0 remains on `master`; active UX Overhaul v2 Final QA is on `codex/ux-overhaul`. Start with `AGENTS.md`, `ralph/CURRENT_TASK.md`, the v2 technical review/addenda, `ralph/STATE.md`, and `docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`. This file remains the deep domain/history reference.
+> ⚠️ **2026-07-19:** Release 5.0 remains on `master`; active UX Overhaul v2 Final QA is on `codex/ux-overhaul`. Start with `AGENTS.md`, `ralph/CURRENT_TASK.md`, the v2 technical review/addenda, `ralph/STATE.md`, and `context/knowledge/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`. This file remains the deep domain/history reference.
 
 ## 2026-07-15 Play privacy/account deletion override
 
@@ -1567,9 +1567,9 @@ Capacitor sync, and debug Gradle builds now run in 203f.
 Canonical active references:
 
 - `ralph/CURRENT_TASK.md` — exact current file allowlist and gates.
-- `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` — Part 5/6 plan plus v2.1 addenda.
+- `context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md` — Part 5/6 plan plus v2.1 addenda.
 - `ralph/STATE.md` — complete attempt/score/commit history.
-- `docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md` — consolidated tools, build, QA,
+- `context/knowledge/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md` — consolidated tools, build, QA,
   deletion-test, runtime, and final-state/closeout runbook.
 
 Major v2 changes now in the branch:
@@ -1620,7 +1620,7 @@ Current hard automated baselines:
   regex-only or synthetic-fixture-only proof is insufficient for critical behavior.
 
 Build and full procedures are intentionally centralized in
-`docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`; use that document instead of historical
+`context/knowledge/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`; use that document instead of historical
 bridge commands earlier in this file.
 
 ## 39. Final QA Attempt 3 Evidence and Runtime Caveat
@@ -1723,7 +1723,7 @@ Final accepted evidence:
   accepted live-data evidence; it was not destructively repeated during closeout.
 
 The independent-review briefing is
-`docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It reports sprint QA evidence but
+`context/knowledge/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It reports sprint QA evidence but
 does not claim a future third-party review has passed. Production Netlify,
 release/signing/AAB, schema/RLS/migration/Edge Function, PR/master merge, and Sprint 4
 remain outside this sprint.

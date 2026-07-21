@@ -1,7 +1,7 @@
 # Crew Chief UX Overhaul v2 — Final Knowledge and Agent Runbook
 
 > **Purpose:** durable cold-start guide for agents maintaining or independently reviewing the completed UX Overhaul v2 sprint.
-> The Part 6.4 cold-reader packet is `docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`; neither document is a future third-party review verdict.
+> The Part 6.4 cold-reader packet is `context/knowledge/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`; neither document is a future third-party review verdict.
 > **Last verified:** 2026-07-19 against product/QA base `ab2d03117c0475aa0abbef9ad38f2907edd3e881`; final documentation commits may sit above that base.
 
 ## 1. Current authority and exact checkout
@@ -10,10 +10,10 @@ Use this reading order:
 
 1. `AGENTS.md` — repository-wide workflow, safety, architecture, and deploy authority.
 2. `ralph/CURRENT_TASK.md` — exact active work order and file allowlist.
-3. `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` — sprint design, especially Part 5, Part 6, and v2.1 addenda.
+3. `context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md` — sprint design, especially Part 5, Part 6, and v2.1 addenda.
 4. `ralph/STATE.md` — task history, scores, commits, failures, and current gate.
 5. This document — consolidated implementation, tooling, QA, and handoff knowledge.
-6. `CODEBASE_KNOWLEDGE.md` — deeper domain, storage, component, sync, and historical details.
+6. `context/knowledge/CODEBASE_KNOWLEDGE.md` — deeper domain, storage, component, sync, and historical details.
 
 Active checkout:
 
@@ -429,7 +429,7 @@ Final closeout evidence:
 2. Final cavecrew product review is PASS 100/100 for UX v2 task range `10955ded..ab2d031` (87 commits/39 paths, no new native/package/schema/release/Sprint 4 path). Literal merge-base range `47db364..ab2d031` is 95 commits/71 paths because it includes eight disclosed pre-A1 native/release/auth/icon/planning commits. The first closeout review correctly rejected stale authority/range text; no product repair was indicated.
 3. Final draft `https://6a5d7c9221f0e85b0eda6228--crew-chief-race-notes.netlify.app` passes all four signed-out sizes with zero overflow, six controls at least 44px, pinch enabled, and zero console warnings/errors.
 4. Final Java 21 debug APK is 12,088,501 bytes with SHA-256 `59E20FDCB74F37AE3C3393202A458B7BBF97320994BF7FEE87D736C7BC8C8D42`. It installs on stable Android 15/WebView 124 and passes 3/3 lifecycle cycles with empty app warning/error and crash buffers.
-5. The Part 6.4 packet is `docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It reports evidence but does not claim a future third-party review passed.
+5. The Part 6.4 packet is `context/knowledge/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It reports evidence but does not claim a future third-party review passed.
 6. Final authority-doc synchronization, governance commit, and saving-point branch push complete the handoff. No PR, master merge, production Netlify publish, release build, signing, AAB, schema change, or Sprint 4 work is authorized.
 
 ## 13. Known nonblocking residuals

@@ -34,7 +34,7 @@ Read, in order:
 5. `ralph/CURRENT_TASK.md`
 6. `ralph/STATE.md`
 7. `HANDOFF.md`
-8. `CODEBASE_KNOWLEDGE.md`
+8. `context/knowledge/CODEBASE_KNOWLEDGE.md`
 9. This file
 
 Confirm branch `preview-v3`, feature commit `0361278` is present, and the tree is clean before

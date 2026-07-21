@@ -39,5 +39,8 @@ or local SDK paths.
 
 ## Project guidance
 
+**Context hub: [`context/`](./context/README.md)** — consolidated knowledge, archived planning,
+and the agent/skill index. Start there when onboarding an agent.
+
 Read `HANDOFF.md`, `SPRINT_INDEX.md`, `ralph/STATE.md`, and `AGENTS.md` before feature work.
 Production deploys and release merges require explicit owner approval.

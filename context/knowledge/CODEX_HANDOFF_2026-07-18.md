@@ -3,7 +3,7 @@
 Paste-ready kickoff instructions are at the bottom. Read order for a cold-start agent:
 
 1. `ralph/CURRENT_TASK.md` — current task (C2 repair, owner-approved, unblocked)
-2. `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` — plan authority, **including the v2.1 Owner Addendum**
+2. `context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md` — plan authority, **including the v2.1 Owner Addendum**
 3. `ralph/STATE.md` — full history A1→C2
 
 ## Where things stand
@@ -30,7 +30,7 @@ COMMUNICATION DISCIPLINE
 
 WHERE TO WORK
 
-Continue in the existing UX-Overhaul worktree, branch `codex/ux-overhaul`. Do not create a new worktree or branch. Read, in order: `ralph/CURRENT_TASK.md`, then `docs/UX_TECHNICAL_REVIEW_2026-07-17.md` including the v2.1 Owner Addendum, then `ralph/STATE.md`.
+Continue in the existing UX-Overhaul worktree, branch `codex/ux-overhaul`. Do not create a new worktree or branch. Read, in order: `ralph/CURRENT_TASK.md`, then `context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md` including the v2.1 Owner Addendum, then `ralph/STATE.md`.
 
 IMMEDIATE WORK QUEUE
 
@@ -46,6 +46,6 @@ TESTING WORKFLOW
 
 OWNER REPORTING
 
-After every task QA and every chunk QA, write/update `docs/OWNER_REPORT_UX_OVERHAUL.md` in plain English: what was built, what was checked, pass/fail, what's next. This document is for the owner and is never caveman-compressed.
+After every task QA and every chunk QA, write/update `context/knowledge/OWNER_REPORT_UX_OVERHAUL.md` in plain English: what was built, what was checked, pass/fail, what's next. This document is for the owner and is never caveman-compressed.
 
 ---

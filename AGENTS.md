@@ -5,11 +5,13 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 > **📋 Active feature roadmap:** [`SPRINT_INDEX.md`](./SPRINT_INDEX.md) and
 > [`ralph/STATE.md`](./ralph/STATE.md). Read these before feature work.
 >
-> **📚 Full reference:** [`CODEBASE_KNOWLEDGE.md`](./CODEBASE_KNOWLEDGE.md) — comprehensive technical reference (types, tables, localStorage keys, component details, gotchas, session history).
+> **📚 Full reference:** [`context/knowledge/CODEBASE_KNOWLEDGE.md`](./context/knowledge/CODEBASE_KNOWLEDGE.md) — comprehensive technical reference (types, tables, localStorage keys, component details, gotchas, session history).
 >
 > **🧭 NEW AGENT? START WITH [`HANDOFF.md`](./HANDOFF.md)** — consolidated onboarding: current status, session history, worktree/branch gotchas, build/deploy procedures, and the Ralph-loop workflow.
 >
-> **🏁 Release 5.0 is the `master` baseline.** Active UX Overhaul v2 work is on `codex/ux-overhaul` in the existing 203f worktree; see [`ralph/CURRENT_TASK.md`](./ralph/CURRENT_TASK.md) and [`docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`](./docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md). Current v2.1 routing: **GPT 5.6 SOL High implementation workers; GPT 5.6 SOL Extra High primary QA/plan authority; Terra and `cavecrew-builder` forbidden; `/caveman full`** for status.
+> **🗂️ CONTEXT HUB: [`context/`](./context/README.md)** — consolidated knowledge, archived planning, and the agent/skill index ([`context/AGENTS_AND_SKILLS.md`](./context/AGENTS_AND_SKILLS.md)). Point new agents here first.
+>
+> **🏁 `master` = release 5.2.1 (versionCode 24), live on Google Play.** It is the single source of truth; branch all work from `master` (`git switch -c feature/<name>`). Model routing for v2 work: **GPT 5.6 SOL High implementation workers; GPT 5.6 SOL Extra High primary QA/plan authority; Terra and `cavecrew-builder` forbidden; `/caveman full`** for status. Background: [`context/knowledge/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md`](./context/knowledge/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md).
 >
 > This file is current workflow authority. For active status trust
 > [`SPRINT_INDEX.md`](./SPRINT_INDEX.md), [`ralph/STATE.md`](./ralph/STATE.md), and
@@ -135,7 +137,7 @@ keep diffs small and extract logic into `src/lib/*` or `src/components/*`.
 | `SPRINT_INDEX.md` | **Active roadmap index** — serial sprint order, model routing, and plan entry points. |
 | `plan-v3-ux-corrections.md` | Active Sprint 1 UXF workstreams, dependencies, ownership, and acceptance. |
 | `ralph/STATE.md` | Durable workstream status, attempts, QA scores, gates. |
-| `CODEBASE_KNOWLEDGE.md` | Comprehensive technical reference — types, tables, localStorage keys, component details, gotchas, all session history. |
+| `context/knowledge/CODEBASE_KNOWLEDGE.md` | Comprehensive technical reference — types, tables, localStorage keys, component details, gotchas, all session history. |
 | `src/types.ts` | All TypeScript interfaces — start here to understand domain models |
 | `src/data.ts` | `INITIAL_SETUP`, `INITIAL_SETUPS`, `INITIAL_WEEKENDS`, `INITIAL_ACTIVE_SESSION` defaults |
 | `src/App.tsx` | Global state, all mutation handlers, tab routing, new-weekend/session modals, header (`?` help button), Saved toast |

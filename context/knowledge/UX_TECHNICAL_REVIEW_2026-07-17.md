@@ -3,7 +3,7 @@
 **Scope:** Analysis and specification only. No feature code was edited, no build/deploy/migrate/merge/push was performed.
 **Branch under review:** `codex/hide-scrollbars` @ `ab6b98a`, plus two documentation commits, unmerged from `master@47db364`.
 **Working branch for implementation:** `codex/ux-overhaul` (worktree `.worktrees\ux-overhaul`), branched from the reviewed state at `3331f89` — identical code, new name. All file:line citations in this document remain valid.
-**Inputs:** everything from v1 (AGENTS.md, HANDOFF.md, SPRINT_INDEX.md, ralph/STATE.md, ralph/CURRENT_TASK.md, CODEBASE_KNOWLEDGE.md, docs/HANDOFF_MOBILE_DENSITY_REVIEW_2026-07-17.md, 3 owner screenshots, direct source inspection) **plus the owner's round-2 feedback of 2026-07-17** and a second source-inspection pass covering the change-log pipeline (`setupLifecycle.ts`, `quickAdjust.ts`), the clear-data flow (`App.tsx:484-547`), help routing (`helpRouting.ts`), and the four "Add X" form surfaces.
+**Inputs:** everything from v1 (AGENTS.md, HANDOFF.md, SPRINT_INDEX.md, ralph/STATE.md, ralph/CURRENT_TASK.md, context/knowledge/CODEBASE_KNOWLEDGE.md, docs/HANDOFF_MOBILE_DENSITY_REVIEW_2026-07-17.md, 3 owner screenshots, direct source inspection) **plus the owner's round-2 feedback of 2026-07-17** and a second source-inspection pass covering the change-log pipeline (`setupLifecycle.ts`, `quickAdjust.ts`), the clear-data flow (`App.tsx:484-547`), help routing (`helpRouting.ts`), and the four "Add X" form surfaces.
 **Owner priority governing every trade-off below:** visibility of information first; readable/operable text and deliberate controls; the app's save/change/delete behavior must match what the user believes happened.
 
 ---
@@ -193,7 +193,7 @@ At a commit boundary with accumulated changes, exactly one small Saved confirmat
 
 **Decision.** One convention, app-wide, stated once so future surfaces inherit it: **openers say "Add X" (or "+ New X" where that pattern already exists); submit buttons say "Create X"; edit-form submits say "Save Changes"; cancel says "Cancel."** Applied: Garage submit → "Create Car"; Tires submit → "Create Tire"; RaceWeekendView submit → "Create Race Day" (normal casing — the all-caps "CREATE RACE DAY" is retired as part of item 2's typography discipline); Trackers submit → "Create Job". "Create X" is chosen over bare "Save" because these forms create records — "Save" is reserved for edits, keeping the two verbs meaningful everywhere.
 
-**Files.** `GarageView.tsx:250-253`, `TiresSubView.tsx:141`, `RaceWeekendView.tsx:700-703`, `TrackersView.tsx:681`; convention noted in `CODEBASE_KNOWLEDGE.md`.
+**Files.** `GarageView.tsx:250-253`, `TiresSubView.tsx:141`, `RaceWeekendView.tsx:700-703`, `TrackersView.tsx:681`; convention noted in `context/knowledge/CODEBASE_KNOWLEDGE.md`.
 **Harness.** None required (copy-only); grep-check in chunk QA. **LOE: S (2-3h).**
 
 ### 15. Required name for new-from-blank setups *(NEW — owner feedback N7)*
@@ -394,7 +394,7 @@ This work order is executed by two named agents with fixed, non-interchangeable 
 **Task E1 — Context-aware help relocation (item 13).** Files: `App.tsx` header, `helpRouting.ts`, `SetupView.tsx:455` (remove), callback-only `RaceWeekendView.tsx`, and `FourBarQuickAdjust.tsx:118` (verify unchanged). The RaceWeekend callback is an explicit scope correction: its FourBar sheet visibility is child-local, so App cannot truthfully resolve a visible panel without a boolean open/close/unmount signal. Change: header "?" beside Tuning Guide, resolving section at tap time via `APP_GUIDE_SECTIONS` — `'four-bar'` when the panel is visible, `'setup'` on the Setups tab, mapped section elsewhere, guide root otherwise; Tuning Guide button untouched. Harness: section-resolution assertions. Acceptance: deep links preserved from the header in both contexts; no inline "?" remains on the setup sheet; closing/back/tab departure cannot leave stale FourBar context.
 *QA focus (Sol):* tap the header "?" in every tab context; `'setup'` and `'four-bar'` resolutions verified.
 
-**Task E2 — Add-X labeling convention (item 14).** Files: `GarageView.tsx:250-253`, `TiresSubView.tsx:141`, `RaceWeekendView.tsx:700-703`, `TrackersView.tsx:681`; convention noted in `CODEBASE_KNOWLEDGE.md`. Change: submits become "Create Car"/"Create Tire"/"Create Race Day"/"Create Job"; openers unchanged. Acceptance: no surface has identical opener/submit labels; grep for the old strings returns only openers.
+**Task E2 — Add-X labeling convention (item 14).** Files: `GarageView.tsx:250-253`, `TiresSubView.tsx:141`, `RaceWeekendView.tsx:700-703`, `TrackersView.tsx:681`; convention noted in `context/knowledge/CODEBASE_KNOWLEDGE.md`. Change: submits become "Create Car"/"Create Tire"/"Create Race Day"/"Create Job"; openers unchanged. Acceptance: no surface has identical opener/submit labels; grep for the old strings returns only openers.
 *QA focus (Sol):* copy-only diff; all four surfaces; casing consistent with A4's typography.
 
 **Task E3 — Small fixes (Part 3).** Files: `App.tsx:1092, 1108`, `index.css:174`, `location.ts` (annotation only). Change: additive unmount guards + `.catch`; coarse-pointer scoping of the scrollbar rule; stub annotation. No harness changes expected. Acceptance: strictly additive.
@@ -467,7 +467,7 @@ Carried: test at 360×800, 390×844, 412×915, and the 1080×2118 capture; Defau
 
 ## Sources
 
-- `AGENTS.md`, `HANDOFF.md`, `SPRINT_INDEX.md`, `ralph/STATE.md`, `ralph/CURRENT_TASK.md`, `CODEBASE_KNOWLEDGE.md`, `docs/HANDOFF_MOBILE_DENSITY_REVIEW_2026-07-17.md` (repo root)
+- `AGENTS.md`, `HANDOFF.md`, `SPRINT_INDEX.md`, `ralph/STATE.md`, `ralph/CURRENT_TASK.md`, `context/knowledge/CODEBASE_KNOWLEDGE.md`, `docs/HANDOFF_MOBILE_DENSITY_REVIEW_2026-07-17.md` (repo root)
 - Owner feedback round 2, 2026-07-17 (items N1–N9 as addressed in Part 2)
 - Screenshots: `Screenshot_20260717_074317_Crew Chief.jpg` (Dashboard), `Screenshot_20260717_074518_Crew Chief.jpg` (Setups/Tires), `Screenshot_20260717_081519_Crew Chief.jpg` (Runs/QuickAdjust) — `G:\My Drive\Google AI Studio\`
 - Direct source inspection: `src/App.tsx`, `src/index.css`, `src/types.ts`, `src/components/{SettingsView,ContextStrip,SetupView,FourBarQuickAdjust,RaceWeekendView,TiresSubView,GarageView,TrackersView,ui/NumberStepper}.tsx`, `src/lib/{setupLifecycle,quickAdjust,raceDayGate,saveStatus,sync,resumePull,undo,accountDeletion,teamDataOwnership,helpRouting,location}.ts`, `scripts/*-harness.ts` — all in `.worktrees\hide-scrollbars` @ `ab6b98a` (+2 doc commits)
@@ -531,7 +531,7 @@ Owner authorizes **debug** APK builds (`gradlew assembleDebug`) installed to a l
 
 ### v2.1-F — QA reporting requirement
 
-At the end of every task QA and every chunk QA, the QA agent writes/updates a **plain-English owner report** at `docs/OWNER_REPORT_UX_OVERHAUL.md`: what was built, what was checked, what passed/failed, what's next — no caveman, no jargon walls. This is in addition to (not instead of) Ralph state updates.
+At the end of every task QA and every chunk QA, the QA agent writes/updates a **plain-English owner report** at `context/knowledge/OWNER_REPORT_UX_OVERHAUL.md`: what was built, what was checked, what passed/failed, what's next — no caveman, no jargon walls. This is in addition to (not instead of) Ralph state updates.
 
 ### v2.1-G — Final QA attempt 3 findings and Repair 3 scope
 
@@ -632,7 +632,7 @@ everywhere deletion/no-resurrection result remains accepted and was not destruct
 repeated.
 
 The Part 6.4 briefing packet is
-`docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It is evidence for a future,
+`context/knowledge/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It is evidence for a future,
 independent reviewer and does not claim that separate review has passed. Production
 Netlify, release/signing/AAB, schema/RLS/migration/Edge Function, PR/master merge,
 and Sprint 4 remain outside the sprint.

@@ -561,7 +561,7 @@ After that repair passes, the remaining work is the final full regression, fresh
 
 ## Documentation handoff update
 
-The project's future-agent documentation was refreshed after attempt 3. `docs/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md` now records the active worktree and authority order, architecture invariants, prior development strategy, current model routing, available tools, direct web and Android build procedures, all 24 automated tests, browser and authenticated Android test matrices, deletion-test procedure, Workbox and Android runtime caveats, exact accepted artifacts, both outstanding blockers, the proposed four-file repair, and final closeout steps. `HANDOFF.md`, `SPRINT_INDEX.md`, `CODEBASE_KNOWLEDGE.md`, the technical plan, and Ralph state/task files now point to the same current status.
+The project's future-agent documentation was refreshed after attempt 3. `context/knowledge/UX_OVERHAUL_V2_AGENT_KNOWLEDGE.md` now records the active worktree and authority order, architecture invariants, prior development strategy, current model routing, available tools, direct web and Android build procedures, all 24 automated tests, browser and authenticated Android test matrices, deletion-test procedure, Workbox and Android runtime caveats, exact accepted artifacts, both outstanding blockers, the proposed four-file repair, and final closeout steps. `HANDOFF.md`, `SPRINT_INDEX.md`, `context/knowledge/CODEBASE_KNOWLEDGE.md`, the technical plan, and Ralph state/task files now point to the same current status.
 
 ## Final QA Repair 3 — Completed
 
@@ -595,7 +595,7 @@ A fresh Java 21 debug APK was built after Capacitor sync. It is 12,088,501 bytes
 
 The previously authorized device-only and everywhere data-deletion sequence was not repeated just to create another destructive cycle. Its accepted result remains: the dedicated account's owned racing data stayed cleared after resume and pull, while the account, authentication, team, and membership stayed intact.
 
-The cold-reader handoff is `docs/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It contains the base and final commit, task-to-commit/file map, before/after owner-complaint evidence, verbatim 24-harness output, every material kickback and deviation, residual risks, protected boundaries, and the future-review reading order. It reports this sprint's QA result but does not claim that a future third-party review has already passed.
+The cold-reader handoff is `context/knowledge/UX_OVERHAUL_V2_FINAL_HANDOFF_2026-07-19.md`. It contains the base and final commit, task-to-commit/file map, before/after owner-complaint evidence, verbatim 24-harness output, every material kickback and deviation, residual risks, protected boundaries, and the future-review reading order. It reports this sprint's QA result but does not claim that a future third-party review has already passed.
 
 The only remaining delivery action after the corrected documentation is reviewed and committed is the requested saving-point push of `codex/ux-overhaul`. No production publish, release/signing, AAB, schema change, pull request, master merge, or Sprint 4 work is included.
 

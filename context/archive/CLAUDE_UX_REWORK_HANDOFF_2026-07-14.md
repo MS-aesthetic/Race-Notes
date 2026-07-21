@@ -25,7 +25,7 @@ Read these files from the v3 worktree before planning:
 
 1. `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3\AGENTS.md`
 2. `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3\HANDOFF.md`
-3. `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3\CODEBASE_KNOWLEDGE.md`
+3. `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3\context/knowledge/CODEBASE_KNOWLEDGE.md`
 4. `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3\ralph\CURRENT_TASK.md`
 5. `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3\ralph\STATE.md`
 6. `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3\docs\IMPLEMENTATION_PLAN_2026-07-12.md`
@@ -36,7 +36,7 @@ Read these files from the v3 worktree before planning:
 11. `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3\.agents\skills\cavecrew\SKILL.md`
 12. `C:\Users\maxx\antigravity\Race-Notes\.worktrees\v3\.agents\skills\caveman\SKILL.md`
 
-`ralph/CURRENT_TASK.md` accurately records what Chunks 6B–9 built, but its owner decisions are historical where this document conflicts. `CODEBASE_KNOWLEDGE.md` contains useful implementation history; verify its status headings against the newer closure entries near the bottom.
+`ralph/CURRENT_TASK.md` accurately records what Chunks 6B–9 built, but its owner decisions are historical where this document conflicts. `context/knowledge/CODEBASE_KNOWLEDGE.md` contains useful implementation history; verify its status headings against the newer closure entries near the bottom.
 
 ## Current release state
 
@@ -298,7 +298,7 @@ Do not begin a broad build until this revised plan is reviewed. Small diagnostic
 - `scripts/chunk9-export-help-harness.ts` — Tuning Guide help anchors and visible-copy audit
 - `scripts/ux-r1-starters-harness.ts` — starter-template convergence and tombstone behavior
 - `scripts/ux-r1-color-harness.ts` — theme/accent regression coverage
-- Existing sync and lifecycle checks named in `HANDOFF.md` and `CODEBASE_KNOWLEDGE.md` — local/cloud regression coverage
+- Existing sync and lifecycle checks named in `HANDOFF.md` and `context/knowledge/CODEBASE_KNOWLEDGE.md` — local/cloud regression coverage
 
 Owner corrections require changing some assertions. Preserve unaffected regression protection.
 
