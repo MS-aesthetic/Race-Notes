@@ -40,7 +40,7 @@ export const SETUP_STEPS: Record<NumericCornerField, SetupStep> = {
   bottomBarAngFD: { step: 0.5, decimals: 1, unit: '°' },
   bottomBarAngle: { step: 0.5, decimals: 1, unit: '°' },
   droop: { step: 0.125, decimals: 3, unit: 'in', min: 0 },
-  preload: { step: 0.125, decimals: 3, unit: 'in' },
+  preload: { step: 10, decimals: 0, unit: 'lb', min: 0 },
 };
 
 /** Read one legacy numeric token. Rendering never writes this result back. */

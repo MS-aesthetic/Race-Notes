@@ -75,6 +75,7 @@ const computeStagger = (rightSize: string, leftSize: string): string => {
 const INP = 'w-full bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-3 py-1.5 min-h-11 outline-none rounded';
 const LBL = 'block min-h-4 truncate text-xs uppercase font-mono font-semibold text-on-surface-variant mb-1 leading-tight';
 const STACKED_CORNER_FIELD_CLASS = 'min-w-0 min-[360px]:col-span-2 min-[768px]:col-span-1';
+const FULL_WIDTH_CORNER_FIELD_CLASS = 'col-span-1 min-[360px]:col-span-2 min-w-0';
 
 export type PendingSetupDiff =
   | { status: 'available'; sourceLabel: string; rows: SetupSnapshotDiff[] }
@@ -229,7 +230,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
       <div className="min-w-0 p-2 sm:p-3 grid grid-cols-1 min-[360px]:grid-cols-2 gap-2 items-start">
 
         {/* Tire from Inventory picker */}
-        <div className="col-span-1 lg:col-span-2 min-w-0 bg-surface-container p-2 rounded border border-outline-variant/30 flex flex-wrap items-center justify-between gap-2">
+        <div className="col-span-1 min-[360px]:col-span-2 min-w-0 bg-surface-container p-2 rounded border border-outline-variant/30 flex flex-wrap items-center justify-between gap-2">
           <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant flex-shrink-0">Tire</label>
           <select
             value={data.tireInventoryId || ''}
@@ -254,7 +255,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         </div>
 
         {/* Bound Load Graph */}
-        <div className="col-span-1 lg:col-span-2 min-w-0 bg-surface-container p-2 rounded border border-outline-variant/30 flex flex-wrap items-center justify-between gap-2">
+        <div className="col-span-1 min-[360px]:col-span-2 min-w-0 bg-surface-container p-2 rounded border border-outline-variant/30 flex flex-wrap items-center justify-between gap-2">
           <label className="text-[10px] uppercase font-mono font-semibold text-on-surface-variant">Bound Load Graph</label>
           <select value={data.boundGraphId || ''} onChange={(e) => onFieldChange('boundGraphId', e.target.value)}
             className="w-full min-w-0 min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 outline-none rounded">
@@ -269,7 +270,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         </div>
 
         {/* Spring */}
-        <div className="min-w-0">
+        <div className={FULL_WIDTH_CORNER_FIELD_CLASS}>
           <label className={LBL}>Spring</label>
           <input type="text" value={data.spring || ''} onChange={e => onFieldChange('spring', e.target.value)} className={INP} />
         </div>
@@ -280,11 +281,11 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
         )}
 
         {/* Shock */}
-        <div className="min-w-0">
+        <div className={FULL_WIDTH_CORNER_FIELD_CLASS}>
           <label className={LBL}>Shock</label>
           <input type="text" value={data.shock || ''} onChange={e => onFieldChange('shock', e.target.value)} className={INP} />
         </div>
-        <div className="min-w-0">
+        <div className={FULL_WIDTH_CORNER_FIELD_CLASS}>
           <label className={LBL}>Shock Note</label>
           <input type="text" value={data.shockNote || ''} onChange={e => onFieldChange('shockNote', e.target.value)} className={INP} />
         </div>
