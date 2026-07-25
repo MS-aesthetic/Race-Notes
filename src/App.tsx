@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
@@ -21,7 +21,6 @@ import { syncTireLifecycle } from './lib/tireHistory';
 import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
 import { captureSetupSnapshot, displayVersionLabel, finishWeekendLifecycle, getSetupEditability, isSetupLocked, isWeekendFinished, lifecycleLabel, mergeTimestampedRecords, repairSetupDeletionReferences, selectRaceWeekendSetupForSelection, startWeekendLifecycle } from './lib/setupLifecycle';
 import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
-import { applyQuickAdjust, resolveQuickAdjustTarget, type QuickAdjustCommand } from './lib/quickAdjust';
 import { materializeMainChecklist } from './lib/mainChecklist';
 import { KEEP_ADDED_ITEMS_KEY, reconcileMaintenanceChecklist, resetMainChecklist } from './lib/checklistMaintenance';
 import { shouldPullOnResume } from './lib/resumePull';
@@ -102,8 +101,6 @@ const INFO_COPY = {
   'active-weekend': ({ name }: InfoCopyContext) => `Active: ${name || 'Race Day'}`,
   'pressure-source': ({ label }: InfoCopyContext) => `Pressures carried from ${label || 'selected setup'}`,
   'finished-weekend-read-only': () => 'Finished Race Days are view-only.',
-  'quick-adjust-target': () => 'Quick Adjust is unavailable for this run.',
-  'quick-adjust-result': () => 'Quick Adjust could not be saved.',
   'finished-weekend-inactive': () => 'Finished Race Days stay in history and cannot be made active.',
   'missing-car': () => 'Add a car before starting a Race Day.',
   'race-day-active': ({ name, version }: InfoCopyContext) => `Active: ${name || 'Race Day'} · ${version || 'Current Setup'}`,
@@ -122,7 +119,6 @@ const INFO_COPY = {
   'race-day-report-shared': () => 'Race Day PDF shared.',
   'race-day-report-downloaded': () => 'Race Day PDF downloaded.',
   'race-day-report-failed': () => 'Race Day PDF could not be shared.',
-  'four-bar-save-failed': () => 'Four-bar change could not be saved.',
   'clear-device-only': () => 'Device data cleared. Shared team data will re-download on next sync.',
   'clear-everywhere': () => 'Your records are queued for deletion. Team records you do not own remain in cloud.',
   'operation-failed': () => 'That action could not be completed.',
@@ -144,7 +140,6 @@ const componentInfoNotice = (message: string): InfoNotice => {
   if (message === 'Race Day PDF shared.') return { reason: 'race-day-report-shared' };
   if (message === 'Race Day PDF downloaded.') return { reason: 'race-day-report-downloaded' };
   if (message.includes('Race Day PDF')) return { reason: 'race-day-report-failed' };
-  if (message.includes('Four-bar')) return { reason: 'four-bar-save-failed' };
   if (message.includes('missing') && message.includes('logging or adjusting a run')) return { reason: 'missing-weekend-adjust' };
   return { reason: 'operation-failed' };
 };
@@ -226,7 +221,6 @@ export default function App() {
   const weekendsRef = useRef(weekends);
   const savedSetupsRef = useRef(savedSetups);
   const sessionCloudQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const quickAdjustSequenceRef = useRef(0);
   useEffect(() => { activeSessionRef.current = activeSession; }, [activeSession]);
   useEffect(() => { currentSetupRef.current = setup; }, [setup]);
   useEffect(() => { weekendsRef.current = weekends; }, [weekends]);
@@ -343,14 +337,10 @@ export default function App() {
   // ── [27] Help sheet, [37]/[5] info toast, [33] online status ──────────────
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpSection, setHelpSection] = useState<string | undefined>();
-  const [raceDayFourBarVisible, setRaceDayFourBarVisible] = useState(false);
   const openHelp = (section?: string) => {
     setHelpSection(section);
     setHelpOpen(true);
   };
-  const reportRaceDayFourBarVisibility = useCallback((visible: boolean) => {
-    setRaceDayFourBarVisible(visible);
-  }, []);
   const appGuideHelp = isAppGuideSection(helpSection);
   const [infoToast, setInfoToast] = useState<InfoNotice | null>(null);
   const notificationHeaderRef = useRef<HTMLElement | null>(null);
@@ -1835,58 +1825,6 @@ export default function App() {
     }
   };
 
-  const handleCommitQuickAdjust = (command: QuickAdjustCommand): { ok: boolean; error?: string } => {
-    const target = resolveQuickAdjustTarget(
-      activeWeekendId,
-      weekendsRef.current,
-      savedSetupsRef.current,
-      activeSessionRef.current,
-    );
-    if (target.ok === false) {
-      showInfo({ reason: 'quick-adjust-target' });
-      return target;
-    }
-    quickAdjustSequenceRef.current += 1;
-    const now = new Date().toISOString();
-    const commandId = `quick-adjust-${Date.now()}-${quickAdjustSequenceRef.current}`;
-    const result = applyQuickAdjust(target.setup, target.session, command, weekendsRef.current, now, commandId);
-    if (result.ok === false) {
-      showInfo({ reason: 'quick-adjust-result' });
-      return result;
-    }
-
-    const updatedSetups = savedSetupsRef.current.map(item => item.id === result.setup.id ? result.setup : item);
-    const updatedWeekends = applyActiveSessionToWeekends(weekendsRef.current, result.session);
-    savedSetupsRef.current = updatedSetups;
-    weekendsRef.current = updatedWeekends;
-    activeSessionRef.current = result.session;
-    setSavedSetups(updatedSetups);
-    setWeekends(updatedWeekends);
-    setActiveSession(result.session);
-    setSetup(result.setup);
-    localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
-    localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
-    localStorage.setItem('race_notes_active_session', JSON.stringify(result.session));
-    localStorage.setItem('race_notes_setup', JSON.stringify(result.setup));
-
-    if (user) {
-      const userId = user.id;
-      const ownerUserId = syncOwnerId;
-      sessionCloudQueueRef.current = sessionCloudQueueRef.current
-        .catch(() => undefined)
-        .then(async () => {
-          await Promise.all([
-            ...(ownerUserId ? [
-              pushSetups(updatedSetups, ownerUserId, setSyncStatus),
-              pushWeekends(updatedWeekends, ownerUserId),
-            ] : []),
-            pushActiveSession(result.session, userId),
-          ]);
-        });
-    }
-    return { ok: true };
-  };
-
   // Session weather helpers moved into RaceWeekendView ([15]).
 
   const handleActivateWeekend = (weekendId: string) => {
@@ -2509,7 +2447,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => openHelp(resolveContextualAppGuideSection({ activeTab, fourBarVisible: raceDayFourBarVisible }))}
+                onClick={() => openHelp(resolveContextualAppGuideSection({ activeTab, fourBarVisible: false }))}
                 aria-label="App Guide"
                 title="App Guide"
                 className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors"
@@ -2670,11 +2608,7 @@ export default function App() {
                   onCreateWeekend={handleCreateNewWeekend}
                   onCreateSession={handleCreateNewSession}
                   activeSetup={raceWeekendSetup}
-                  shockSessions={shockSessions}
-                  onCommitQuickAdjust={handleCommitQuickAdjust}
                   onInfo={showComponentInfo}
-                  onHelp={openHelp}
-                  onFourBarVisibilityChange={reportRaceDayFourBarVisibility}
                   accounting={accounting}
                   onFinishWeekend={handleFinishWeekend}
                   initialAction={rwInitialAction ?? undefined}

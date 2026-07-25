@@ -122,16 +122,20 @@ Diagnostics, Competition Notes, Attachments. Sections "Tires & Pressures" and "C
 (including the Four-bar Quick Adjust trigger) are gone.
 
 Scope:
-- [ ] `RaceWeekendView.tsx`: delete JSX sections 5-6 (1388-1477), `fourBarOpen` state (293)
+- [x] `RaceWeekendView.tsx`: delete JSX sections 5-6 (1388-1477), `fourBarOpen` state (293)
       + its visibility effect (309-313), the four-bar `BottomSheet` (1724-1726),
       `handleQuickAdjustCommit`/`handleQuickFourBarChange` (449-460),
       `handleImportTiresFromSetup` (~410-447), now-unused imports
       (`QuickAdjustPanel`, `FourBarQuickAdjust`).
-- [ ] Delete `src/components/QuickAdjustPanel.tsx` (only consumer is RaceWeekendView — verified).
-- [ ] `App.tsx`: delete `handleCommitQuickAdjust` (1966-2010), the `onCommitQuickAdjust`
+- [x] Delete `src/components/QuickAdjustPanel.tsx` (only consumer is RaceWeekendView — verified).
+- [x] `App.tsx`: delete `handleCommitQuickAdjust` (1966-2010), the `onCommitQuickAdjust`
       prop (2832) and prop-type plumbing, `applyQuickAdjust`/`resolveQuickAdjustTarget` imports.
-- [ ] `lib/quickAdjust.ts`: trim to `applyExplicitCornerField` (+ its minimal deps) only.
-- [ ] Do NOT touch: session-creation pressure propagation (`setupSteps.ts` helpers in
+- [ ] **DEFERRED to final gate** — `lib/quickAdjust.ts`: trim to `applyExplicitCornerField`
+      (+ its minimal deps) only. Blocked: `scripts/` is inside the tsc program and two harnesses
+      import the doomed exports (see QA notes). Also note the spec target is wrong —
+      `isQuickAdjustRunAvailable` must survive the trim (RaceWeekendView still gates the editor
+      on it), so the keep-set is `applyExplicitCornerField` + `isQuickAdjustRunAvailable`.
+- [x] Do NOT touch: session-creation pressure propagation (`setupSteps.ts` helpers in
       `handleCreateNewSession`), historical rendering (`SessionSetupDetails`,
       `BoundSetupDiffSummary`, RaceWeekendView 136-242), `FourBarQuickAdjust.tsx` itself,
       types/persistence for `tires`/`pressures`/`adjustments`/`changeLog`.
@@ -149,6 +153,69 @@ Acceptance criteria:
 
 Est: ~360 lines removed across 4 files. Risk: medium (cuts a live write-path; historical
 rendering must be regression-checked).
+
+### Chunk B — QA notes (Opus 5 High, uncommitted tree)
+
+- **Actuals:** `RaceWeekendView.tsx` −218/+4, `App.tsx` −68/+2, `QuickAdjustPanel.tsx` −170
+  (deleted). Net −450 across 3 files, ~90 over the estimate. `lib/quickAdjust.ts` untouched
+  (deferred), which is why the 4th file never moved.
+- **Render order verified** in the active editor: header (1126) → Identity (1145) → Track
+  Condition (1161) → Laps & Result (1189) → Handling Diagnostics (1225) → Competition Notes
+  (1269) → Attachments (1280) → SAVE RUN bar (1306). Sections renumbered 7→5. Competition
+  Notes + Attachments bodies are byte-identical to HEAD — only the section comment number moved.
+- **Historical rendering intact:** `resolveBoundSetupDiff` (126), `BoundSetupDiffSummary` (176),
+  `SessionSetupDetails` (210) and its `record.adjustments` list (217-221) are outside every hunk;
+  the "All Race Days" call site at 1438-1439 is unchanged. `types.ts` untouched.
+- **No over-deletion.** 9 hunks, all boundaries clean. `handleCreateNewSession` and the
+  `setupSteps` pressure helpers in `App.tsx` (1769-1783, 1954-1986, 2292-2327) are untouched —
+  the only diff mention of `handleCreateNewSession` is a context line in the props hunk.
+  `FourBarQuickAdjust.tsx`, `NumberStepper.tsx` and `setupSteps.ts` have zero diff.
+  `NumberStepper` retains 3 consumers (`FourBarQuickAdjust`, `SetupView`, `TiresSubView`).
+  Surviving imports still earn their place: `TireDetails` (38), `scopedTireInventory` (481),
+  `displayLifecycleText` (213/1148).
+- **Props/types:** `RaceWeekendViewProps` (42-67) and the `App.tsx:2595` call site match exactly —
+  no leftover required props, no unused passed props.
+- **Baseline:** exactly 3, identities unchanged. `RaceWeekendView.tsx` shifted **467 → 348**
+  (119 lines removed above the error; `SetupView:886` and `SmasherLoadsView:617` unmoved).
+  `npm run build` passes.
+- **Deviation (a) — `quickAdjust.ts` left untrimmed. CONFIRMED VALID.** `tsconfig.json` has no
+  `include` and excludes only `supabase/functions`/`dist`/`node_modules`, so `scripts/` is in the
+  tsc program. `scripts/chunk7-quick-adjust-harness.ts:4-15` imports 10 symbols and
+  `scripts/chunk5-setup-harness.ts:11` imports `applyQuickAdjust`; trimming to the correct keep-set
+  leaves 9 dead named imports → 9 new TS2305 errors. `isQuickAdjustRunAvailable` is genuinely
+  live: `RaceWeekendView.tsx:298` computes `hasActiveSession` from it and 1124 gates the whole
+  editor on that.
+- **Deviation (b) — extra props removed. VALID, no behavior loss.** `raceDayFourBarVisible` had
+  exactly one reader in `src/` (the App Guide header button, now `App.tsx:2450`), so
+  `fourBarVisible: false` is faithful — the sheet it tracked no longer exists. SetupView's four-bar
+  help does **not** route through `resolveContextualAppGuideSection`: `App.tsx:2589` passes
+  `onHelp={openHelp}` → `SetupView.tsx:905` → `FourBarQuickAdjust.tsx:125` calls
+  `onHelp('four-bar')` directly. Unchanged. `shockSessions` still has 14 other `App.tsx` uses and
+  is still passed to its other consumer at 2582.
+- **Deviation (c) — INFO_COPY entries + `componentInfoNotice` "Four-bar" branch. VALID.** No
+  `onInfo`/`showInfo` caller in `src/` references the three removed reasons; the 5 surviving
+  `onInfo?.()` calls in RaceWeekendView (318-322, 478) map to PDF/weekend-missing reasons that
+  still exist. Only hits are in `scripts/saved-flash-harness.ts:1858-1859` (already-stale fixture
+  strings from Chunk A).
+- **Acceptance-criteria grep caveat (same shape as Chunk A).** `grep QuickAdjustPanel` and
+  `grep "applyQuickAdjust\|resolveQuickAdjustTarget"` are clean in `src/` but non-empty repo-wide
+  (harnesses + `HANDOFF.md` + `context/knowledge/CODEBASE_KNOWLEDGE.md` + this plan). `src/` clean
+  is what the criterion meant.
+- **Runtime-only harness collateral (type-checks fine, lint/build unaffected, not in CI).**
+  `scripts/setup-touch-target-harness.ts:34` does `read('src/components/QuickAdjustPanel.tsx')` →
+  now throws ENOENT. `scripts/chunk9-export-help-harness.ts:332,337-338,391-409` asserts on
+  `raceDayFourBarVisible` / `onFourBarVisibilityChange` source text in `App.tsx` and
+  `RaceWeekendView.tsx` → those regexes now fail.
+- **Residual (benign):** `resolveContextualAppGuideSection`'s `if (fourBarVisible)` branch is
+  unreachable from its only production caller; `mergeImportedSetupPressure` in `setupSteps.ts`
+  now has no `src/` consumer; `session.pressureSourceNote` is still written on session creation
+  but no longer displayed in the Runs tab (its only render site was the removed Tires caption).
+  All left in place — `setupSteps.ts` and `helpRouting.ts` are out of Chunk B scope.
+- **Final-gate TODO (order matters):** 1) delete `scripts/chunk7-quick-adjust-harness.ts`;
+  2) rework `scripts/chunk5-setup-harness.ts` C3 fixture off `applyQuickAdjust`;
+  3) then trim `lib/quickAdjust.ts` to `applyExplicitCornerField` + `isQuickAdjustRunAvailable`;
+  4) drop the `QuickAdjustPanel` read + the four-bar-visibility assertions from
+  `setup-touch-target-harness.ts` / `chunk9-export-help-harness.ts`.
 
 ## Chunk C — Bottom action bar: "Next Session"
 

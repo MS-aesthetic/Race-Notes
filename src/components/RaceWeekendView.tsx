@@ -1,21 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS, ShockSession, AccountingEntry, SetupSnapshotDiff } from '../types';
-import { sortBySize } from '../lib/tireSize';
+import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS, AccountingEntry, SetupSnapshotDiff } from '../types';
 import { sortWeekends } from '../lib/scope';
 import { useBackClosable } from '../lib/backStack';
 import { useUndoableDelete } from '../lib/undo';
 import { filterCompatibleSessions, suggestNextSession, buildSessionNameFrom, SessionPrefill } from '../lib/sessionSequence';
 import SegmentedGrid from './ui/SegmentedGrid';
-import NumberStepper from './ui/NumberStepper';
 import EmptyState from './ui/EmptyState';
 import LapTimeKeypad from './ui/LapTimeKeypad';
 import UndoToast from './ui/UndoToast';
 import BottomSheet from './ui/BottomSheet';
 import ConfirmSheet from './ui/ConfirmSheet';
-import FourBarQuickAdjust from './FourBarQuickAdjust';
-import QuickAdjustPanel from './QuickAdjustPanel';
-import { NumericCornerField, formatPsiValue, mergeImportedSetupPressure } from '../lib/setupSteps';
-import { isQuickAdjustRunAvailable, type QuickAdjustCommand } from '../lib/quickAdjust';
+import { isQuickAdjustRunAvailable } from '../lib/quickAdjust';
 import { setupUsedUniquelyMatchesCar } from '../lib/setupCompat';
 import { captureSetupSnapshot, diffSetupSnapshots, displayLifecycleText, displayVersionLabel, isWeekendFinished, lifecycleLabel } from '../lib/setupLifecycle';
 import { buildWeekendReport, createPdfFile } from '../lib/exportPdf';
@@ -62,11 +57,7 @@ interface RaceWeekendViewProps {
   onCreateSession: (data: NewSessionData) => void;
   onFinishWeekend: (weekendId: string) => void;
   activeSetup?: Setup | null;
-  shockSessions?: ShockSession[];
-  onCommitQuickAdjust?: (command: QuickAdjustCommand) => { ok: boolean; error?: string };
   onInfo?: (message: string) => void;
-  onHelp?: (section: string) => void;
-  onFourBarVisibilityChange?: (visible: boolean) => void;
   onGoToGarage: () => void;
   onLogSetupChanges: () => void;
   accounting?: AccountingEntry[];
@@ -114,12 +105,6 @@ function compressImage(file: File, maxPx = 1024, quality = 0.82): Promise<string
     };
     reader.readAsDataURL(file);
   });
-}
-
-/** Parse a "11.5 psi"-style string into a number for the stepper. */
-function parsePsi(s: string | undefined): number | '' {
-  const m = String(s ?? '').match(/-?\d+(?:\.\d+)?/);
-  return m ? parseFloat(m[0]) : '';
 }
 
 const SESSION_TYPE_CHIPS = [
@@ -247,7 +232,7 @@ export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
   onUpdateSession: persistSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
   activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
-  activeSetup = null, shockSessions = [], onCommitQuickAdjust, onInfo, onHelp, onFourBarVisibilityChange, onGoToGarage, onLogSetupChanges, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
+  activeSetup = null, onInfo, onGoToGarage, onLogSetupChanges, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -290,7 +275,6 @@ export default function RaceWeekendView({
 
   // [13] Lap-time keypad
   const [lapPadOpen, setLapPadOpen] = useState(false);
-  const [fourBarOpen, setFourBarOpen] = useState(false);
   const [sharingWeekendId, setSharingWeekendId] = useState<string | null>(null);
   const [pendingFinish, setPendingFinish] = useState<{ weekendId: string; name: string; finalLabel: string } | null>(null);
   const activeRunIdentity = session.id ?? `${session.weekendId ?? ''}:${session.name}:${session.track}`;
@@ -302,15 +286,6 @@ export default function RaceWeekendView({
   // Android hardware back closes these modals first ([29])
   useBackClosable(wkFormOpen, () => setWkFormOpen(false));
   useBackClosable(nsOpen, () => setNsOpen(false));
-  useBackClosable(fourBarOpen, () => setFourBarOpen(false));
-
-  // App owns contextual help routing; report this child-local sheet state.
-  useEffect(() => {
-    onFourBarVisibilityChange?.(fourBarOpen);
-  }, [fourBarOpen, onFourBarVisibilityChange]);
-  useEffect(() => () => {
-    onFourBarVisibilityChange?.(false);
-  }, [onFourBarVisibilityChange]);
 
   // Weekend pending delete stays hidden everywhere until undo/commit resolves.
   const pendingDeleteId = weekendUndo.pending?.id ?? null;
@@ -363,100 +338,6 @@ export default function RaceWeekendView({
 
   const handleNotesChange = (phase: 'cornerEntryNotes' | 'centerApexNotes' | 'cornerExitNotes', value: string) => {
     updateRun({ ...session, diagnostics: { ...session.diagnostics, [phase]: value } });
-  };
-
-  const handleTireChange = (corner: 'lf' | 'rf' | 'lr' | 'rr', field: keyof TireDetails, val: string) => {
-    const currentTires = session.tires || {
-      lf: { compound: '', size: '', airPressure: session.pressures?.lf || '' },
-      rf: { compound: '', size: '', airPressure: session.pressures?.rf || '' },
-      lr: { compound: '', size: '', airPressure: session.pressures?.lr || '' },
-      rr: { compound: '', size: '', airPressure: session.pressures?.rr || '' },
-    };
-    const updatedTires = { ...currentTires, [corner]: { ...currentTires[corner], [field]: val } };
-    const updatedPressures = { ...session.pressures, [corner]: field === 'airPressure' ? val : currentTires[corner].airPressure };
-    const hasPressure = Object.values(updatedPressures).some(value => value.trim() !== '');
-    updateRun({
-      ...session,
-      tires: updatedTires,
-      pressures: updatedPressures,
-      ...(field === 'airPressure' ? { pressureSourceNote: hasPressure ? 'Adjusted in this run' : undefined } : {}),
-    });
-  };
-
-  const handleTireInventorySelect = (corner: 'lf' | 'rf' | 'lr' | 'rr', tireId: string) => {
-    const tire = scopedTireInventory.find(t => t.id === tireId);
-    const currentTires = session.tires || {
-      lf: { compound: '', size: '', airPressure: session.pressures?.lf || '' },
-      rf: { compound: '', size: '', airPressure: session.pressures?.rf || '' },
-      lr: { compound: '', size: '', airPressure: session.pressures?.lr || '' },
-      rr: { compound: '', size: '', airPressure: session.pressures?.rr || '' },
-    };
-    const updated: TireDetails = tire
-      ? {
-          ...currentTires[corner],
-          tireId: tire.id,
-          compound: tire.compound,
-          size: tire.size,
-          durometer: tire.durometer,
-          backSpacing: tire.wheelBackspacing,
-        }
-      : { ...currentTires[corner], tireId: '' };
-    updateRun({ ...session, tires: { ...currentTires, [corner]: updated } });
-  };
-
-  // ── Import tires from bound setup ───────────────────────────────────────────
-
-  const handleImportTiresFromSetup = () => {
-    const boundSetup = activeSetup;
-    if (!boundSetup) return;
-    const currentTires = session.tires || {
-      lf: { compound: '', size: '', airPressure: '' },
-      rf: { compound: '', size: '', airPressure: '' },
-      lr: { compound: '', size: '', airPressure: '' },
-      rr: { compound: '', size: '', airPressure: '' },
-    };
-    const corners = ['lf', 'rf', 'lr', 'rr'] as const;
-    const updatedTires = { ...currentTires };
-    const updatedPressures = { ...session.pressures };
-    let importedPressure = false;
-    for (const corner of corners) {
-      const c = boundSetup[corner];
-      const matchedTire = c.tireInventoryId ? scopedTireInventory.find(t => t.id === c.tireInventoryId) : null;
-      const pressure = mergeImportedSetupPressure(
-        c.tirePress,
-        currentTires[corner].airPressure,
-        updatedPressures[corner],
-      );
-      importedPressure ||= !!pressure.imported;
-      updatedTires[corner] = {
-        ...currentTires[corner],
-        compound: matchedTire?.compound || c.tireComp || currentTires[corner].compound,
-        size: matchedTire?.size || c.tireSize || currentTires[corner].size,
-        tireId: matchedTire?.id || currentTires[corner].tireId,
-        durometer: matchedTire?.durometer || currentTires[corner].durometer,
-        airPressure: pressure.tirePressure,
-      };
-      updatedPressures[corner] = pressure.blockPressure;
-    }
-    updateRun({
-      ...session,
-      tires: updatedTires,
-      pressures: updatedPressures,
-      pressureSourceNote: importedPressure ? `Pressures carried from ${boundSetup.chassis}` : session.pressureSourceNote,
-    });
-  };
-
-  const handleQuickFourBarChange = (corner: 'lr' | 'rr', field: NumericCornerField, value: string, previous: string) => {
-    if (!activeSetup || !onCommitQuickAdjust || previous === value) return;
-    const result = onCommitQuickAdjust({ kind: 'four-bar', corner, field, value });
-    if (result.ok) setIsRunDirty(true);
-    if (!result.ok) onInfo?.(result.error || 'Four-bar change could not be saved.');
-  };
-
-  const handleQuickAdjustCommit = (command: QuickAdjustCommand) => {
-    const result = onCommitQuickAdjust?.(command) ?? { ok: false, error: 'Quick Adjust is unavailable for this run.' };
-    if (result.ok) setIsRunDirty(true);
-    return result;
   };
 
   // ── Photo helpers ────────────────────────────────────────────────────────────
@@ -1385,98 +1266,7 @@ export default function RaceWeekendView({
           })}
         </div>
 
-        {/* 5 ── Tires & pressures */}
-        <div className="pt-4 border-t border-outline-variant/60 mb-6">
-          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            <h3 className="font-mono text-xs uppercase text-on-surface-variant">Tires & Pressures</h3>
-            {activeSetup && (
-              <button
-                type="button"
-                onClick={handleImportTiresFromSetup}
-                className="flex min-h-11 items-center gap-1 text-xs font-mono font-bold uppercase px-2 py-1 rounded border border-primary/50 text-primary hover:bg-primary/10 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[13px]">download</span>
-                Import from Setup
-              </button>
-            )}
-          </div>
-          {session.pressureSourceNote && <p className="mb-2 font-mono text-sm text-on-surface-variant">{displayLifecycleText(session.pressureSourceNote)}</p>}
-          <div
-            className="grid gap-2"
-            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(10.5rem, 1fr))' }}
-          >
-            {(['lf', 'rf', 'lr', 'rr'] as const).map(corner => {
-              const selectedTireId = session.tires?.[corner]?.tireId || '';
-              const airPressure = session.tires?.[corner]?.airPressure || session.pressures[corner] || '';
-              // Tires used by other corners in this session (exclude current corner)
-              const usedByOthers = (['lf', 'rf', 'lr', 'rr'] as const)
-                .filter(c => c !== corner)
-                .map(c => session.tires?.[c]?.tireId)
-                .filter(Boolean) as string[];
-              const availableTires = sortBySize(scopedTireInventory.filter(t => !usedByOthers.includes(t.id) || t.id === selectedTireId));
-              return (
-                <div key={corner} className="bg-surface-container-lowest border border-outline-variant rounded p-2 space-y-2">
-                  <span className="text-xs font-bold text-primary uppercase block">{corner.toUpperCase()}</span>
-                  {scopedTireInventory.length > 0 && (
-                    <div className="relative">
-                      <select
-                        value={selectedTireId}
-                        onChange={e => handleTireInventorySelect(corner, e.target.value)}
-                        className="w-full min-h-11 bg-surface border border-outline-variant focus:border-primary text-on-surface font-mono text-sm px-2 py-1.5 rounded outline-none appearance-none pr-5"
-                      >
-                        <option value="">-- Select Tire --</option>
-                        {availableTires.map(t => (
-                          <option key={t.id} value={t.id}>#{t.tireNumber} · {t.compound} · {t.size}</option>
-                        ))}
-                      </select>
-                      <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-[12px] text-on-surface-variant pointer-events-none">expand_more</span>
-                    </div>
-                  )}
-                  {selectedTireId && (() => {
-                    const t = scopedTireInventory.find(x => x.id === selectedTireId);
-                    return t ? (
-                      <p className="font-mono text-sm text-on-surface-muted">{t.compound} · {t.size} · {t.durometer} duro · {t.wheelBackspacing}" BS</p>
-                    ) : null;
-                  })()}
-                  <NumberStepper
-                    value={parsePsi(airPressure)}
-                    onChange={(v) => handleTireChange(corner, 'airPressure', v === '' ? '' : `${v} psi`)}
-                    step={0.5}
-                    bigStep={1}
-                    min={0}
-                    max={60}
-                    decimals={1}
-                    unit="psi"
-                    ariaLabel={`${corner.toUpperCase()} air pressure`}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 6 ── Changes made */}
-        <div className="pt-4 border-t border-outline-variant/60 mb-6">
-          <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Changes Made</h3>
-          <div className="flex flex-col gap-1 mb-3">
-            {session.adjustments?.map(adj => (
-              <div key={adj.id} className="flex justify-between bg-surface p-2 rounded text-sm font-mono">
-                <span className="text-on-surface-variant">{adj.label}</span>
-                <span className="text-primary font-bold">{adj.value}</span>
-              </div>
-            ))}
-          </div>
-          {activeSetup && onCommitQuickAdjust && (
-            <QuickAdjustPanel
-              setup={activeSetup}
-              loadSessions={shockSessions}
-              onCommit={handleQuickAdjustCommit}
-              onOpenFourBar={() => setFourBarOpen(true)}
-            />
-          )}
-        </div>
-
-        {/* 7 ── Notes & attachments */}
+        {/* 5 ── Notes & attachments */}
         <div className="pt-4 border-t border-outline-variant/60 mb-6">
           <h3 className="font-mono text-xs uppercase text-on-surface-variant mb-2">Competition Notes</h3>
           <textarea
@@ -1719,10 +1509,6 @@ export default function RaceWeekendView({
             </button>
           </div>
         )}
-      </BottomSheet>
-
-      <BottomSheet open={fourBarOpen} onClose={() => setFourBarOpen(false)} title="Four-bar quick-adjust">
-        <FourBarQuickAdjust setup={activeSetup} compact onFieldChange={handleQuickFourBarChange} onHelp={onHelp} />
       </BottomSheet>
 
       <BottomSheet
