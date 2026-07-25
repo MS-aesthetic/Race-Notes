@@ -61,20 +61,20 @@ One commit per chunk, message prefix `feat(simplify):` or `refactor(simplify):`.
 **Goal:** no save-confirmation pills, ever. Errors and feature info notices unchanged.
 
 Scope (all in `src/App.tsx` unless noted):
-- [ ] Remove `savedFlash`/`savedFlashTimer` state (~1129-1130), `clearSavedFlash`,
+- [x] Remove `savedFlash`/`savedFlashTimer` state (~1129-1130), `clearSavedFlash`,
       `flashSaved` (1133-1163), and the `savedFlash` branch of the notification arbiter
       JSX (2690-2740). Keep `infoToast` branch fully intact.
-- [ ] Remove the dirty-flag plumbing: `SavedFeedbackController`/`createSavedFeedbackController`
+- [x] Remove the dirty-flag plumbing: `SavedFeedbackController`/`createSavedFeedbackController`
       (73-91), `installSavedFeedbackBoundaries` (93-129), `flushSavedFeedbackOnTabChange`
       (131-135), refs (295-297), wiring effects (1164-1183), `SAVED_FEEDBACK_INTERVAL_MS`.
-- [ ] Remove `markSavedDirty`/`flushSavedBoundary` (298-299) **and all ~24 call sites**
+- [x] Remove `markSavedDirty`/`flushSavedBoundary` (298-299) **and all ~24 call sites**
       (grep `markSavedDirty` to zero). Prefer deleting call lines over a no-op stub —
       leave no dead machinery.
-- [ ] Per D1 default: stop rendering `Syncing…`/`Synced`/`Offline — saved on device` status
+- [x] Per D1 default: stop rendering `Syncing…`/`Synced`/`Offline — saved on device` status
       notices; keep `Sync failed — will retry` and deferred-delete warnings rendering
       exactly as today. `SyncStatus` type in `src/lib/sync.ts` is NOT changed (frontend-only);
       the arbiter just ignores the non-error statuses.
-- [ ] Remove the `"Saved as you change it"` caption + pulsing dot in `SetupView.tsx:591`
+- [x] Remove the `"Saved as you change it"` caption + pulsing dot in `SetupView.tsx:591`
       (it's a save-confirmation in spirit; Setups header gets cleaner too).
 
 Acceptance criteria:
@@ -86,6 +86,34 @@ Acceptance criteria:
 - tsc: same 3 baseline errors; build passes.
 
 Est: ~150-200 lines removed, single file + one caption. Risk: medium (3-way arbiter surgery).
+
+### Chunk A — QA notes (Opus 5 High, uncommitted tree)
+
+- **Actuals:** `App.tsx` −177/+18 (net −159), `SetupView.tsx` −4/+0. Net −163, at the low end
+  of the estimate. 22 `markSavedDirty()` call sites removed (est. said ~24) + 1
+  `flushSavedBoundary()` call in `handleCreateNewSession`. Every deleted hunk is the call line
+  only — no adjacent statement collateral.
+- **Arbiter:** collapses to `isInfo || isFailure`; info still wins over sync-error. `role="status"`,
+  `aria-live="polite"`, `data-notification-slot="arbiter"`, `top: notificationTop`, and the
+  `onClick={isInfo ? clearInfo : acknowledgeSyncStatus}` dismiss all survived. Dismiss button is
+  now unconditional, which is equivalent — the arbiter only renders for those two branches.
+- **Deviation — `notifySaved` params.** The param existed only to suppress a Saved flash, so it
+  went with it: `handleSaveShockSessions` and `handleSaveTodos` lost their `notifySaved = true`
+  second arg, and `handleSaveCars` lost the `notifySaved` derivation. Call sites updated; prop
+  types already declared one param. `handleSaveCars`' boolean-overload normalization
+  (`if (typeof (expectedAccountId as unknown) === 'boolean') expectedAccountId = undefined;`)
+  stays, and the `@ts-expect-error` caller at `App.tsx:1625` still resolves.
+- **Baseline:** exactly 3, identities unchanged. `SetupView.tsx` shifted **890 → 886**
+  (`RaceWeekendView:467` and `SmasherLoadsView:617` unmoved). `npm run build` passes.
+- **Stale harnesses (decision deferred to final gate).** Three regression harnesses assert on the
+  removed machinery: `scripts/saved-flash-harness.ts` (whole file), `scripts/offline-indicator-harness.ts:58-73`,
+  `scripts/chunk5-setup-harness.ts:308-389,1540`. None are referenced by `package.json` or CI, and
+  all type-check clean, so lint/build are unaffected. `scripts/car-delete-undo-harness.ts:52` is
+  an absence assertion and still passes. Repo-wide `grep markSavedDirty|savedFlash|flashSaved`
+  is therefore non-empty (harnesses + docs); `src/` is clean, which is what the criterion meant.
+- **Residual (benign):** `SUCCESS_TOAST_MS` and the `synced`/`offline-saved` auto-dismiss effect
+  (`App.tsx:1089-1098`) survive but are now unreachable — nothing sets those statuses and the
+  arbiter ignores them. Left in place since `SyncStatus` is frontend-only-unchanged per D1.
 
 ## Chunk B — Runs tab: remove Tires & Pressures + Changes Made
 

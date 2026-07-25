@@ -67,72 +67,7 @@ import { detectAssignmentChanges } from './lib/assignmentNotify';
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
 const INFO_DEDUPE_MS = 5000;
 const SUCCESS_TOAST_MS = 1500;
-const SAVED_FEEDBACK_INTERVAL_MS = 30_000;
 type NotificationStatus = SyncStatus | 'syncing';
-
-export type SavedFeedbackController = {
-  markDirty: () => void;
-  flush: () => boolean;
-  isDirty: () => boolean;
-};
-
-export const createSavedFeedbackController = (announceSaved: () => void): SavedFeedbackController => {
-  let dirty = false;
-  return {
-    markDirty: () => { dirty = true; },
-    flush: () => {
-      if (!dirty) return false;
-      dirty = false;
-      announceSaved();
-      return true;
-    },
-    isDirty: () => dirty,
-  };
-};
-
-type SavedFeedbackBoundaryTargets = {
-  documentTarget: {
-    readonly visibilityState: string;
-    addEventListener: (type: 'visibilitychange', listener: () => void) => void;
-    removeEventListener: (type: 'visibilitychange', listener: () => void) => void;
-  };
-  windowTarget: {
-    addEventListener: (type: 'pagehide', listener: () => void) => void;
-    removeEventListener: (type: 'pagehide', listener: () => void) => void;
-    setInterval: (callback: () => void, delay: number) => number;
-    clearInterval: (handle: number) => void;
-  };
-  addNativeListener?: (listener: (state: { isActive: boolean }) => void) => Promise<{ remove: () => Promise<void> }>;
-};
-
-export const installSavedFeedbackBoundaries = (
-  flushSavedBoundary: () => boolean,
-  targets: SavedFeedbackBoundaryTargets,
-): (() => void) => {
-  const onVisibilityChange = () => {
-    if (targets.documentTarget.visibilityState === 'hidden') flushSavedBoundary();
-  };
-  const onPageHide = () => { flushSavedBoundary(); };
-  const intervalHandle = targets.windowTarget.setInterval(flushSavedBoundary, SAVED_FEEDBACK_INTERVAL_MS);
-  targets.documentTarget.addEventListener('visibilitychange', onVisibilityChange);
-  targets.windowTarget.addEventListener('pagehide', onPageHide);
-  const nativeListener = targets.addNativeListener?.(({ isActive }) => {
-    if (!isActive) flushSavedBoundary();
-  });
-
-  return () => {
-    targets.documentTarget.removeEventListener('visibilitychange', onVisibilityChange);
-    targets.windowTarget.removeEventListener('pagehide', onPageHide);
-    targets.windowTarget.clearInterval(intervalHandle);
-    if (nativeListener) void nativeListener.then(listener => listener.remove());
-  };
-};
-
-export const flushSavedFeedbackOnTabChange = (
-  previousTab: string,
-  nextTab: string,
-  flushSavedBoundary: () => boolean,
-): boolean => previousTab !== nextTab && flushSavedBoundary();
 
 const isOnlineNow = (): boolean => typeof navigator === 'undefined' || navigator.onLine;
 
@@ -292,11 +227,6 @@ export default function App() {
   const savedSetupsRef = useRef(savedSetups);
   const sessionCloudQueueRef = useRef<Promise<void>>(Promise.resolve());
   const quickAdjustSequenceRef = useRef(0);
-  const savedFeedbackControllerRef = useRef<SavedFeedbackController | null>(null);
-  const flashSavedRef = useRef<() => void>(() => undefined);
-  const previousSavedFeedbackTabRef = useRef(activeTab);
-  const markSavedDirty = () => { savedFeedbackControllerRef.current?.markDirty(); };
-  const flushSavedBoundary = () => savedFeedbackControllerRef.current?.flush() ?? false;
   useEffect(() => { activeSessionRef.current = activeSession; }, [activeSession]);
   useEffect(() => { currentSetupRef.current = setup; }, [setup]);
   useEffect(() => { weekendsRef.current = weekends; }, [weekends]);
@@ -328,7 +258,6 @@ export default function App() {
   const handleSaveTires = (updated: TireInventoryItem[]) => {
     setTireInventory(updated);
     localStorage.setItem('race_notes_tires', JSON.stringify(updated));
-    markSavedDirty();
     if (user) pushTires(updated, user.id, setSyncStatus);
   };
 
@@ -445,9 +374,6 @@ export default function App() {
   }, [cars, activeCarId]);
 
   const handleSaveCars = (updated: Car[], expectedAccountId?: string | null) => {
-    const notifySaved = typeof (expectedAccountId as unknown) === 'boolean'
-      ? expectedAccountId as unknown as boolean
-      : true;
     if (typeof (expectedAccountId as unknown) === 'boolean') expectedAccountId = undefined;
     const currentAccountId = userRef.current?.id ?? null;
     if (expectedAccountId !== undefined && currentAccountId !== expectedAccountId) return;
@@ -460,7 +386,6 @@ export default function App() {
     carsRef.current = updated;
     setCars(updated);
     localStorage.setItem('race_notes_cars', JSON.stringify(updated));
-    if (notifySaved) markSavedDirty();
     const currentSyncOwnerId = syncOwnerIdRef.current;
     if (currentSyncOwnerId) pushCars(updated, currentSyncOwnerId, teamRef.current?.id ?? null, setSyncStatus);
   };
@@ -515,7 +440,7 @@ export default function App() {
     }
   };
 
-  const handleSaveShockSessions = (updated: ShockSession[], notifySaved = true) => {
+  const handleSaveShockSessions = (updated: ShockSession[]) => {
     if (user) {
       const remainingIds = new Set(updated.map(session => session.id));
       shockSessions
@@ -524,7 +449,6 @@ export default function App() {
     }
     setShockSessions(updated);
     localStorage.setItem('race_notes_shock_graphs', JSON.stringify(updated));
-    if (notifySaved) markSavedDirty();
     if (syncOwnerId) pushShockSessions(updated, syncOwnerId, setSyncStatus);
   };
 
@@ -537,11 +461,10 @@ export default function App() {
     }
     setMaintenance(updated);
     localStorage.setItem('race_notes_maintenance', JSON.stringify(updated));
-    markSavedDirty();
     if (syncOwnerId) pushMaintenanceComponents(updated, syncOwnerId, setSyncStatus);
   };
 
-  const handleSaveTodos = (updated: Todo[], notifySaved = true) => {
+  const handleSaveTodos = (updated: Todo[]) => {
     const previousTodos = prevTodosForNotifyRef.current;
     prevTodosForNotifyRef.current = updated;
     if (user) {
@@ -552,7 +475,6 @@ export default function App() {
     }
     setTodos(updated);
     localStorage.setItem('race_notes_todos', JSON.stringify(updated));
-    if (notifySaved) markSavedDirty();
     if (syncOwnerId) pushTodos(updated, syncOwnerId, setSyncStatus);
     if (user && teamMembers && teamMembers.length > 1) {
       for (const change of detectAssignmentChanges(previousTodos, updated)) {
@@ -592,7 +514,6 @@ export default function App() {
     }
     setMaintenanceLogs(updated);
     localStorage.setItem('race_notes_maintenance_logs', JSON.stringify(updated));
-    markSavedDirty();
     if (syncOwnerId) pushMaintenanceLogs(updated, syncOwnerId, setSyncStatus);
   };
 
@@ -605,7 +526,6 @@ export default function App() {
     }
     setChecklistTemplates(updated);
     localStorage.setItem('race_notes_checklist_templates', JSON.stringify(updated));
-    markSavedDirty();
     if (syncOwnerId) pushChecklistTemplates(updated, syncOwnerId, setSyncStatus);
   };
 
@@ -618,7 +538,6 @@ export default function App() {
     }
     setWeekendChecklists(updated);
     localStorage.setItem('race_notes_weekend_checklists', JSON.stringify(updated));
-    markSavedDirty();
     if (syncOwnerId) pushWeekendChecklists(updated, syncOwnerId, setSyncStatus);
   };
 
@@ -828,7 +747,6 @@ export default function App() {
     setMaintenanceLogs([]);
     setChecklistTemplates([]);
     setWeekendChecklists([]);
-    markSavedDirty();
     if (isResolvedTeam) {
       showInfo({ reason: resolvedMode === 'device-only' ? 'clear-device-only' : 'clear-everywhere' });
     } else {
@@ -918,7 +836,6 @@ export default function App() {
     status === 'deferred-delete-retrying' || status === 'sync-error'
   );
   const setSyncStatus = (next: NotificationStatus) => {
-    if (isTerminalSyncStatus(next)) clearSavedFlash();
     if (isTerminalSyncStatus(next) && infoToastRef.current?.reason === 'car-delete-queued') {
       infoToastRef.current = null;
       setInfoToast(null);
@@ -935,7 +852,6 @@ export default function App() {
     setSyncStatusState(resolved);
   };
   const acknowledgeSyncStatus = () => {
-    clearSavedFlash();
     syncStatusRef.current = null;
     setSyncStatusState(null);
   };
@@ -1120,21 +1036,11 @@ export default function App() {
     if (!authReady || (user && !pullDone)) return;
     const reconciled = reconcileMaintenanceChecklist(todos, maintenance, weekends, savedSetups);
     if (reconciled === todos) return;
-    handleSaveTodos(reconciled, false);
+    handleSaveTodos(reconciled);
   }, [authReady, maintenance, pullDone, savedSetups, todos, user, weekends]);
 
-  // ── "Saved" flash toast ──────────────────────────────────────────────────
-  // Local-first writes stay instant; commit boundaries request one confirmation
-  // after a dirty edit burst, including while fully offline.
-  const [savedFlash, setSavedFlash] = useState(false);
-  const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const infoToastRef = useRef<InfoNotice | null>(null);
   const infoShownAtRef = useRef(new Map<string, number>());
-  const clearSavedFlash = () => {
-    setSavedFlash(false);
-    if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
-    savedFlashTimer.current = null;
-  };
   const clearInfo = () => {
     infoToastRef.current = null;
     setInfoToast(null);
@@ -1142,7 +1048,6 @@ export default function App() {
   const showInfo = (notice: InfoNotice) => {
     const now = Date.now();
     const dedupeKey = resolveInfoCopy(notice);
-    clearSavedFlash();
     const lastShownAt = infoShownAtRef.current.get(dedupeKey);
     if (lastShownAt !== undefined && now - lastShownAt < INFO_DEDUPE_MS) return;
     infoShownAtRef.current.set(dedupeKey, now);
@@ -1150,37 +1055,6 @@ export default function App() {
     setInfoToast(notice);
   };
   const showComponentInfo = (message: string) => showInfo(componentInfoNotice(message));
-  const flashSaved = () => {
-    if (infoToastRef.current || isTerminalSyncStatus(syncStatusRef.current)) return;
-    if (!isOnline) setSyncStatus('offline-saved');
-    setSavedFlash(true);
-    if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
-    savedFlashTimer.current = setTimeout(() => {
-      savedFlashTimer.current = null;
-      setSavedFlash(false);
-    }, SUCCESS_TOAST_MS);
-  };
-  flashSavedRef.current = flashSaved;
-  if (!savedFeedbackControllerRef.current) {
-    savedFeedbackControllerRef.current = createSavedFeedbackController(() => flashSavedRef.current());
-  }
-  useEffect(() => {
-    return () => {
-      if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
-    };
-  }, []);
-  useEffect(() => {
-    const previousTab = previousSavedFeedbackTabRef.current;
-    previousSavedFeedbackTabRef.current = activeTab;
-    flushSavedFeedbackOnTabChange(previousTab, activeTab, flushSavedBoundary);
-  }, [activeTab]);
-  useEffect(() => installSavedFeedbackBoundaries(flushSavedBoundary, {
-    documentTarget: document,
-    windowTarget: window,
-    addNativeListener: Capacitor.isNativePlatform()
-      ? listener => CapacitorApp.addListener('appStateChange', listener)
-      : undefined,
-  }), []);
 
   // If startup metadata lookup failed offline, retry when connectivity returns.
   // Until this resolves, shared writes remain local and the catch-up effect owns sync.
@@ -1744,7 +1618,7 @@ export default function App() {
     if (user) pushTires(stampedTires, user.id, setSyncStatus);
 
     // Persist shock sessions
-    handleSaveShockSessions(stampedShock, false);
+    handleSaveShockSessions(stampedShock);
 
     // Register car and select it
     // @ts-expect-error Runtime boolean overload keeps UXP-3's account-guard signature stable.
@@ -1919,7 +1793,6 @@ export default function App() {
         else if (!preserveInfoToast) clearInfo();
       }
     }
-    markSavedDirty();
     if (didPersist) {
       if (syncOwnerId) pushSetups(safeSetups, syncOwnerId, setSyncStatus);
     }
@@ -1947,7 +1820,6 @@ export default function App() {
     setWeekends(updatedWeekends);
     localStorage.setItem('race_notes_active_session', JSON.stringify(updatedSession));
     localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
-    markSavedDirty();
 
     if (user) {
       const userId = user.id;
@@ -1996,7 +1868,6 @@ export default function App() {
     localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
     localStorage.setItem('race_notes_active_session', JSON.stringify(result.session));
     localStorage.setItem('race_notes_setup', JSON.stringify(result.setup));
-    markSavedDirty();
 
     if (user) {
       const userId = user.id;
@@ -2113,7 +1984,6 @@ export default function App() {
 
     setActiveWeekendId(lifecycle.weekend.id);
     localStorage.setItem(ACTIVE_WEEKEND_KEY, lifecycle.weekend.id);
-    markSavedDirty();
     showInfo({ reason: 'race-day-active', context: { name: lifecycle.weekend.name, version: lifecycle.weekendSetup.versionLabel } });
     if (continueToRunAfterWeekendRef.current) {
       continueToRunAfterWeekendRef.current = false;
@@ -2278,8 +2148,6 @@ export default function App() {
     activeSessionRef.current = nextSession;
     setActiveSession(nextSession);
     localStorage.setItem('race_notes_active_session', JSON.stringify(nextSession));
-    markSavedDirty();
-    flushSavedBoundary();
     if (pressureSourceNote) {
       const pressureSourceLabel = pressureSourceNote.match(/^Pressures carried from (.+)$/)?.[1];
       showInfo({ reason: 'pressure-source', context: { label: pressureSourceLabel } });
@@ -2313,7 +2181,6 @@ export default function App() {
       c.weekendId === weekendId ? { ...c, weekendId: undefined, weekendName: undefined } : c
     );
     handleSaveWeekendChecklists(updatedChecklists);
-    markSavedDirty();
   };
 
   // [7] Dashboard hero quick-start: create a weekend at the most recent track
@@ -2344,7 +2211,6 @@ export default function App() {
       setAccounting(updated);
       localStorage.setItem('race_notes_accounting', JSON.stringify(updated));
     }
-    markSavedDirty();
     return { result, prevComponent: component };
   };
 
@@ -2358,7 +2224,6 @@ export default function App() {
       setAccounting(updated);
       localStorage.setItem('race_notes_accounting', JSON.stringify(updated));
     }
-    markSavedDirty();
   };
 
   const handleDeleteSession = (weekendId: string, sessionId: string) => {
@@ -2373,7 +2238,6 @@ export default function App() {
       setTireInventory(prevTires => {
         const lifecycled = syncTireLifecycle(prevTires, updated);
         localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
-        markSavedDirty();
         if (user) pushTires(lifecycled, user.id);
         return lifecycled;
       });
@@ -2384,7 +2248,6 @@ export default function App() {
       setActiveSession(prev => {
         const cleared = { ...prev, id: undefined, weekendId: undefined };
         localStorage.setItem('race_notes_active_session', JSON.stringify(cleared));
-        markSavedDirty();
         return cleared;
       });
     }
@@ -2415,7 +2278,6 @@ export default function App() {
     const lifecycled = syncTireLifecycle(tireInventory, updatedList);
     setTireInventory(lifecycled);
     localStorage.setItem('race_notes_tires', JSON.stringify(lifecycled));
-    markSavedDirty();
     if (user) pushTires(lifecycled, user.id);
   };
 
@@ -2459,7 +2321,6 @@ export default function App() {
     localStorage.setItem('race_notes_setup', JSON.stringify(result.currentSetup));
     localStorage.setItem('race_notes_active_session', JSON.stringify(clearedSession));
     localStorage.removeItem(ACTIVE_WEEKEND_KEY);
-    markSavedDirty();
 
     if (user) {
       if (syncOwnerId) {
@@ -2685,25 +2546,13 @@ export default function App() {
           />
         )}
 
-        {/* One compact notification arbiter. Info replaces success/sync feedback
+        {/* One compact notification arbiter. Info replaces sync warnings
             so users receive one clear reason at a time. */}
         {(() => {
           const isInfo = !!infoToast;
           const isFailure = syncStatus === 'deferred-delete-retrying' || syncStatus === 'sync-error';
-          const isBusy = !isInfo && !savedFlash && syncStatus === 'syncing';
-          const statusNotice = !isInfo && (isFailure || !savedFlash) ? syncStatus : null;
-          if (!isInfo && !savedFlash && !statusNotice) return null;
-          const msg = isInfo
-            ? resolveInfoCopy(infoToast)
-            : savedFlash && !isFailure
-            ? (isOnline ? 'Saved' : 'Offline — saved on device')
-            : statusNotice === 'syncing' ? 'Syncing…'
-            : statusNotice === 'synced' ? 'Synced'
-            : statusNotice === 'offline-saved' ? 'Offline — saved on device'
-            : statusNotice === 'deferred-delete-retrying' ? 'Sync failed — will retry'
-            : 'Sync failed — will retry';
-          const isSuccess = !isInfo && !isFailure && (savedFlash || statusNotice === 'synced' || statusNotice === 'offline-saved');
-          const isPersistent = statusNotice === 'deferred-delete-retrying' || statusNotice === 'sync-error';
+          if (!isInfo && !isFailure) return null;
+          const msg = isInfo ? resolveInfoCopy(infoToast) : 'Sync failed — will retry';
           return (
             <div
               data-notification-slot="arbiter"
@@ -2713,27 +2562,20 @@ export default function App() {
               <div
                 role="status"
                 aria-live="polite"
-                className={`pointer-events-auto flex min-h-11 max-w-md items-center gap-2.5 rounded-full border-2 px-4 py-2 font-display text-sm font-bold tracking-wide shadow-2xl animate-fade-in ${
-                  isSuccess
-                    ? 'bg-green-500 border-green-300 text-black'
-                    : 'bg-surface-container border-outline-variant text-on-surface'
-                }`}
-                style={{ boxShadow: isSuccess ? '0 8px 30px rgba(34,197,94,0.45)' : undefined }}
+                className="pointer-events-auto flex min-h-11 max-w-md items-center gap-2.5 rounded-full border-2 border-outline-variant bg-surface-container px-4 py-2 font-display text-sm font-bold tracking-wide text-on-surface shadow-2xl animate-fade-in"
               >
-                <span className={`material-symbols-outlined text-xl ${isBusy ? 'animate-spin' : ''}`} style={{ fontVariationSettings: "'FILL' 1" }}>
-                  {isInfo ? 'info' : savedFlash && !isOnline ? 'cloud_off' : isSuccess ? 'check_circle' : isBusy ? 'progress_activity' : isPersistent ? 'cloud_off' : 'cloud'}
+                <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  {isInfo ? 'info' : 'cloud_off'}
                 </span>
                 <span className="min-w-0 flex-1">{msg}</span>
-                {(isInfo || isPersistent) && (
-                  <button
-                    type="button"
-                    aria-label="Dismiss notification"
-                    className="tap-target -mr-2 shrink-0 text-on-surface-variant"
-                    onClick={isInfo ? clearInfo : acknowledgeSyncStatus}
-                  >
-                    <span className="material-symbols-outlined">close</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  aria-label="Dismiss notification"
+                  className="tap-target -mr-2 shrink-0 text-on-surface-variant"
+                  onClick={isInfo ? clearInfo : acknowledgeSyncStatus}
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
               </div>
             </div>
           );
@@ -2896,7 +2738,6 @@ export default function App() {
                   onSaveAccounting={(updated) => {
                     setAccounting(updated);
                     localStorage.setItem('race_notes_accounting', JSON.stringify(updated));
-                    markSavedDirty();
                   }}
                   maintenance={maintenance}
                   onSaveMaintenance={handleSaveMaintenance}

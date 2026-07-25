@@ -586,10 +586,6 @@ export default function SetupView({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="font-display font-bold tracking-tight text-2xl uppercase text-on-surface">Setups</h2>
-            <p className="font-label-sm text-xs text-on-surface-variant font-mono mt-1 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
-              Saved as you change it
-            </p>
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
