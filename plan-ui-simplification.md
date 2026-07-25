@@ -223,15 +223,16 @@ rendering must be regression-checked).
 end of the session form, labeled "Next Session", which advances to logging the next run (D2).
 
 Scope:
-- [ ] `RaceWeekendView.tsx` 1516-1528: drop the `.sticky-action-bar` wrapper (or replace
+- [x] `RaceWeekendView.tsx` 1516-1528: drop the `.sticky-action-bar` wrapper (or replace
       with a plain non-sticky block) so the button sits inline after Attachments — it is
       already last in DOM order; only the sticky positioning goes.
-- [ ] Label: `NEXT SESSION` (match existing button text casing convention), icon swap
+- [x] Label: `NEXT SESSION` (match existing button text casing convention), icon swap
       (`save` → something forward-looking, e.g. `arrow_forward`/`add` per existing icon set).
-- [ ] Handler: persist + `setIsRunDirty(false)` + `setEditorCollapsed(true)` + `openNewSession()`.
-- [ ] Keep `isRunDirty` gating? **No** — show the button whenever the editor is open
+- [x] Handler: persist + `setIsRunDirty(false)` + `setEditorCollapsed(true)` + `openNewSession()`.
+      (`setIsRunDirty(false)` moot — the flag itself is gone.)
+- [x] Keep `isRunDirty` gating? **No** — show the button whenever the editor is open
       (a "next" affordance shouldn't hide when nothing changed). Remove the gate.
-- [ ] `src/index.css`: leave `.sticky-action-bar` class in place if any other view adopts it;
+- [x] `src/index.css`: leave `.sticky-action-bar` class in place if any other view adopts it;
       if RaceWeekendView was its only consumer, delete it (verify by grep).
 
 Acceptance criteria:
@@ -242,6 +243,53 @@ Acceptance criteria:
 - tsc baseline unchanged; build passes.
 
 Est: ~25-40 lines. Risk: low.
+
+### Chunk C — QA notes (Opus 5 High, uncommitted tree)
+
+- **Actuals:** `RaceWeekendView.tsx` −21/+9, `index.css` −12/+0. Net **−24**, inside the estimate.
+- **Placement verified.** Button is the last child of the `p-3 pt-0` editor body, immediately after
+  Attachments (1272-1292), inside the `{editorCollapsed ? null : (…)}` branch — so it hides with the
+  editor. Non-sticky plain block, `mt-6 pt-4 border-t border-outline-variant/60`: siblings get their
+  gap from a trailing `mb-6`, but Attachments has none, so `mt-6` reproduces the same 24px + rule
+  + 16px rhythm. Container structure is sound after the fragment removal — the conditional now wraps
+  a single `<div>` root (open 1135, close 1305, `)}` 1306, `</section>` 1307, `hasActiveSession` close
+  1308). Button sits above "All Race Days" (1310) and inside `.app-main-scroll`, whose
+  `padding-bottom: calc(4rem + safe-area)` keeps it clear of the bottom nav.
+- **Handler:** `handleNextSession` (601-605) = `persistSession({ ...session })` +
+  `setEditorCollapsed(true)` + `openNewSession()`. `session` is a prop and the handler is rebuilt each
+  render, so the spread reads committed state at click time — no stale closure. Every editor input is
+  controlled off `session` with no local buffer, so there is nothing unflushed to lose. Single persist
+  call; the pre-existing per-keystroke `updateRun` path is unchanged, so the extra write is an
+  idempotent same-value re-persist (identical to the old `handleSaveRun`, not a new double-persist).
+- **`openNewSession` (467-492) is pure state-setting** — 11 `setNs*` setters + `setNsOpen(true)`, no
+  `setEditorCollapsed`, no re-expand. Its three early-return guards are all unreachable from this
+  button: it only renders under `hasActiveSession` (292), which requires `activeCarId` truthy and
+  `isQuickAdjustRunAvailable` true — the latter already asserts `weekend` non-null, `weekend.id ===
+  activeWeekendId` and `setup` non-null, which is exactly `!activeCarId` / `!currentWeekend` /
+  `activeWeekendMissingSetup` (`!!currentWeekend && !activeSetup`) all false. So no path where the
+  editor collapses and the new-session sheet fails to open.
+- **`isRunDirty` + `activeRunIdentity` fully removed** — `grep` over `src/` returns zero for both.
+  The identity-reset `useEffect` went with them. `updateRun` (324-326) is now a bare pass-through to
+  `persistSession`; all 9 call sites still route through it, so persistence is unchanged.
+- **`.sticky-action-bar` deleted** from `index.css` (was 292-303). `grep` over `src/` + `index.html`
+  returns zero — RaceWeekendView was the only consumer. Remaining repo hits are docs
+  (`HANDOFF.md:46`, `context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md:73`,
+  `context/archive/IMPLEMENTATION_PLAN_2026-07-12.md`) and the stale harness below.
+- **Baseline:** exactly 3, identities unchanged. `RaceWeekendView.tsx` shifted **348 → 341**
+  (7 lines net removed above the error; `SetupView:886` and `SmasherLoadsView:617` unmoved).
+  `npm run build` passes.
+- **New stale-harness breakage (runtime string matches only; type-checks clean, not in CI).**
+  `scripts/chunk5-setup-harness.ts:133-136` assert the four `.sticky-action-bar` CSS declarations and
+  `:142` asserts `/\{isRunDirty && \(\s*<div className="sticky-action-bar rounded-b-lg">/` in
+  `RaceWeekendView.tsx` — all five now fail. Added to the final-gate harness TODO.
+- **Collapsed-editor residual — FIXED at chunk gate (Fable 5).** `editorCollapsed` was never reset,
+  so after "Next Session" → submit the new run's editor opened collapsed. Since Chunk C makes this
+  the primary run-to-run flow, `setEditorCollapsed(false)` was added to `handleNewSessionSubmit`
+  (~509) so a newly created session always opens expanded. Re-verified lint (same 3) + build after
+  the fix.
+- **Final-gate TODO addendum:** 5) drop the `.sticky-action-bar` CSS assertions and the `isRunDirty`
+  sticky-bar regex from `scripts/chunk5-setup-harness.ts:133-136,142` (folds into the existing item 2
+  rework of that file).
 
 ## Chunk D — Setups tab: static-setup cleanup
 

@@ -240,7 +240,6 @@ export default function RaceWeekendView({
   const [showZipInput, setShowZipInput] = useState(false);
   const [zipCode, setZipCode] = useState('');
   const [editorCollapsed, setEditorCollapsed] = useState(false);
-  const [isRunDirty, setIsRunDirty] = useState(false);
   const [expandedWeekendIds, setExpandedWeekendIds] = useState<Set<string>>(
     () => new Set([weekends.find(w => w.id === session.weekendId)?.id ?? weekends[0]?.id ?? ''].filter(Boolean))
   );
@@ -277,11 +276,6 @@ export default function RaceWeekendView({
   const [lapPadOpen, setLapPadOpen] = useState(false);
   const [sharingWeekendId, setSharingWeekendId] = useState<string | null>(null);
   const [pendingFinish, setPendingFinish] = useState<{ weekendId: string; name: string; finalLabel: string } | null>(null);
-  const activeRunIdentity = session.id ?? `${session.weekendId ?? ''}:${session.name}:${session.track}`;
-
-  useEffect(() => {
-    setIsRunDirty(false);
-  }, [activeRunIdentity]);
 
   // Android hardware back closes these modals first ([29])
   useBackClosable(wkFormOpen, () => setWkFormOpen(false));
@@ -328,7 +322,6 @@ export default function RaceWeekendView({
   // ── Session helpers ──────────────────────────────────────────────────────────
 
   const updateRun = (updatedSession: ActiveSession) => {
-    setIsRunDirty(true);
     persistSession(updatedSession);
   };
 
@@ -513,6 +506,7 @@ export default function RaceWeekendView({
       pressureSourceNote: nsPrefill.pressureSourceNote,
     });
     setNsOpen(false);
+    setEditorCollapsed(false);
   };
 
   // ── Session weather (string) fetch for the new-session modal ───────────────
@@ -603,12 +597,12 @@ export default function RaceWeekendView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAction]);
 
-  // ── [14] Save Run: force-persist the session + collapse the editor ─────────
+  // ── [14] Next Session: persist + collapse the finished run, then open the next ─
 
-  const handleSaveRun = () => {
+  const handleNextSession = () => {
     persistSession({ ...session });
-    setIsRunDirty(false);
     setEditorCollapsed(true);
+    openNewSession();
   };
 
   // ── Modal JSX (rendered from every return branch) ───────────────────────────
@@ -1139,7 +1133,6 @@ export default function RaceWeekendView({
         </button>
 
         {editorCollapsed ? null : (
-        <>
         <div className="p-3 pt-0">
 
         {/* 1 ── Identity */}
@@ -1298,22 +1291,18 @@ export default function RaceWeekendView({
             </div>
           )}
         </div>
-        </div>
 
-        </>
-        )}
-
-        {/* [14] Sticky save bar appears only after a run edit. */}
-        {isRunDirty && (
-        <div className="sticky-action-bar rounded-b-lg">
+        {/* 6 ── Next session */}
+        <div className="mt-6 pt-4 border-t border-outline-variant/60">
           <button
             type="button"
-            onClick={handleSaveRun}
+            onClick={handleNextSession}
             className="w-full flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary font-display font-bold uppercase tracking-wider text-on-primary active:opacity-90"
           >
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>save</span>
-            SAVE RUN
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>arrow_forward</span>
+            NEXT SESSION
           </button>
+        </div>
         </div>
         )}
       </section>
