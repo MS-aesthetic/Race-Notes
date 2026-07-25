@@ -35,8 +35,9 @@ planning, live operational files, and the tool-loaded agent/skill configs.
 
 ### `archive/` — superseded planning & history
 Completed/superseded plans, sprint files, QA plans, and older handoffs kept for historical
-reference (`plan-v2.md`, `plan-v3-ux-corrections.md`, `sprint-2/3/4-*.md`, `car-profiles/`,
-`IMPLEMENTATION_PLAN_2026-07-12.md`, `UX_ANALYSIS_2026-07-12.md`, and prior release/QA docs).
+reference (`plan-v2.md`, `plan-v3-ux-corrections.md`, `plan-setup-layout-preload.md`,
+`sprint-2/3/4-*.md`, `car-profiles/`, `IMPLEMENTATION_PLAN_2026-07-12.md`,
+`UX_ANALYSIS_2026-07-12.md`, and prior release/QA docs).
 Not active — do not follow these as current direction.
 
 ---
