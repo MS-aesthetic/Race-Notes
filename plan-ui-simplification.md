@@ -356,9 +356,29 @@ Est: ~80-90 lines. Risk: low.
 
 ## Final gate (Fable 5 High, end of sprint)
 
-- [ ] Full `npm run lint` + `npm run build` clean vs baseline.
-- [ ] Manual pass on device build (debug APK): every acceptance criterion above re-checked.
-- [ ] Historical-data regression: open an old weekend with adjustments + snapshots + legacy
-      changeLog and verify all history renders.
-- [ ] Plan updated with actuals, then archived to `context/archive/` per repo convention.
-- [ ] Debug APK rebuilt for owner testing.
+- [x] Full `npm run lint` + `npm run build` clean vs baseline. Final baseline lines:
+      `RaceWeekendView.tsx:341`, `SetupView.tsx:806`, `SmasherLoadsView.tsx:617` — same 3
+      identities as the pre-sprint baseline (467/890/617); shifts are pure line drift from
+      removals above each error.
+- [ ] **OWNER**: Manual pass on device build (debug APK): acceptance criteria re-checked with
+      real data — no confirmation pills anywhere; sync-error warning still appears on failure;
+      Runs editor shows only Identity/Track Condition/Laps & Result/Diagnostics/Notes/
+      Attachments; NEXT SESSION inline at form end, advances and opens the new editor expanded.
+- [ ] **OWNER**: Historical-data regression: open an old weekend with adjustments + snapshots +
+      legacy changeLog and verify all history renders in "All Race Days" and Setups.
+- [x] Debug APK rebuilt for owner testing (`release/CrewChief-5.2.1-ui-simplification-debug.apk`).
+- [ ] Plan archived to `context/archive/` — HELD until the owner picks a direction; the plan
+      stays at repo root while this branch is under active evaluation.
+
+### Final gate decision — harness/lib cleanup DEFERRED until a direction is chosen
+
+The stale-harness disposal (items 1-5 accumulated in the chunk QA notes: delete
+`saved-flash-harness.ts` + `chunk7-quick-adjust-harness.ts`, rework `chunk5-setup-harness.ts`,
+patch `offline-indicator-harness.ts` / `chunk9-export-help-harness.ts` /
+`setup-touch-target-harness.ts`) and the `lib/quickAdjust.ts` trim it blocks are all
+**dead-code hygiene, not user-facing**. Doing them now would churn ~2000 lines of QA scripts
+on a branch the owner may abandon, and none of it affects lint, build, or the shipped app.
+If this direction wins: do the full sweep (harnesses, `quickAdjust.ts` trim, D3 lifecycle
+decision) as its own cleanup sprint before merging. If the other direction wins: nothing
+was wasted. Sprint totals: **−783 net lines of src/** across 4 chunks (A −163, B −450,
+C −24 src, D −85; plus CSS/App wiring), one component file deleted.
