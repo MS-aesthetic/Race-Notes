@@ -1,7 +1,7 @@
 # Plan — UI Simplification Sprint (feature/ui-simplification)
 
 **Branch:** `feature/ui-simplification` (off `master` @ `13343e5`, v5.2.1 / versionCode 24)
-**Status:** SPEC — awaiting owner approval of decision points, then Chunk A begins.
+**Status:** Chunks A–D implemented (A–C committed, D pending commit). Final gate next.
 **Direction note:** This branch is one of two parallel directions the owner may develop.
 `master` stays untouched as the "full-featured" direction. Do NOT merge to master without
 an explicit owner decision. Rebase onto master only if master moves.
@@ -297,16 +297,16 @@ Est: ~25-40 lines. Risk: low.
 Conservative scope — the lifecycle system stays (D3).
 
 Scope:
-- [ ] Remove `PendingSetupDiffSummary` + `resolvePendingSetupDiff` (`SetupView.tsx:80-154`,
+- [x] Remove `PendingSetupDiffSummary` + `resolvePendingSetupDiff` (`SetupView.tsx:80-154`,
       render at 954-957) — the "Pending — will bind to next session" drift widget loses its
       purpose without trackside adjustments.
-- [ ] KEEP `LegacySetupLog` (156-172, render at 959) — it displays existing historical
+- [x] KEEP `LegacySetupLog` (156-172, render at 959) — it displays existing historical
       changeLog entries; the data source stops growing but old data must stay visible.
-- [ ] KEEP: static editor (metadata, notes, car setup details, 4 corner forms, four-bar,
+- [x] KEEP: static editor (metadata, notes, car setup details, 4 corner forms, four-bar,
       attachments), Compare/diff (`SetupDiffView`), clone/share, lifecycle badges.
-- [ ] Sweep for now-dead props/imports in SetupView after the trim.
-- [ ] Note in plan after QA: line number of the `SetupView.tsx:890` baseline error will
-      shift up by the removed line count — record the new line here: ______
+- [x] Sweep for now-dead props/imports in SetupView after the trim.
+- [x] Note in plan after QA: line number of the `SetupView.tsx:890` baseline error will
+      shift up by the removed line count — record the new line here: **806**
 
 Acceptance criteria:
 - Setups page shows no "Pending" diff widget for the active weekend's setup; legacy change
@@ -314,6 +314,43 @@ Acceptance criteria:
 - tsc: same 3 errors (SetupView one at a shifted line); build passes.
 
 Est: ~80-90 lines. Risk: low.
+
+### Chunk D — QA notes (Opus 5 High, uncommitted tree)
+
+- **Actuals:** `SetupView.tsx` −88/+3 (net **−85**), single file — `git diff HEAD --numstat` shows
+  no other path. Inside the estimate. `App.tsx`, `setupLifecycle.ts`, `types.ts`,
+  `SetupDiffView.tsx`, `RaceWeekendView.tsx` all zero diff.
+- **Removal is complete and clean.** `PendingSetupDiff` type + `resolvePendingSetupDiff` +
+  `PendingSetupDiffSummary` (was 80-154) gone as one contiguous block; `grep` over `src/` returns
+  zero for all three, and no other `src/` file ever imported them. The render-site IIFE
+  (`{setupItem.id === activeEventSetupId && (() => {…})()}`) was removed whole — the hunk's own
+  context lines show `</fieldset>` above and `<LegacySetupLog …>` below, and JSX nesting still
+  closes correctly (`</fieldset>` 868 → `<LegacySetupLog>` 870 → `</div>` 871 → `)}` 872 → card
+  `</div>` 873 → `);` 874 → map close 875).
+- **`LegacySetupLog` byte-identical**, component (now 80-99) and render (now 870). Both appear only
+  as diff context lines — zero `+`/`−` inside either.
+- **Import trim correct.** `SetupSnapshotDiff` dropped from the `types` import, and
+  `captureSetupSnapshot` / `diffSetupSnapshots` / `isWeekendFinished` from the `setupLifecycle`
+  import; grep confirms zero remaining uses of any of the four in the file. Kept symbols still
+  earn their place: `RaceWeekend` types the `weekends?` prop (36); `weekends` +
+  `activeEventSetupId` feed the four `getSetupEditability` call sites (391, 399, 413, 576) and
+  `weekends` is also passed to `TiresSubView` (898). Note tsconfig has no `noUnusedLocals`, so tsc
+  would not have caught a missed import — the sweep is grep-verified, not compiler-verified.
+- **Header wrapper simplification (extra, not in scope list, benign).** The `flex items-start
+  justify-between gap-3` row + inner bare `<div>` around the `<h2>` were dropped; the `h2` is now a
+  direct child of the `flex flex-col gap-2` header (509-510). Both wrappers were single-child
+  leftovers from the Chunk A caption removal. Visually equivalent — the `h2` classes are unchanged,
+  it stretches full width as a flex item exactly as the removed row did, and `gap-2` to the sub-tab
+  grid is untouched.
+- **Baseline:** exactly 3, identities unchanged. `SetupView.tsx` shifted **886 → 806** (80 lines
+  net removed above the error; `RaceWeekendView:341` and `SmasherLoadsView:617` unmoved).
+  `npm run build` passes.
+- **Additional stale-harness breakage (runtime string matches only; type-checks clean, not in CI).**
+  `scripts/chunk5-setup-harness.ts` asserts on the deleted symbols as source text at
+  790-791, 872-879, 1018-1022, 1117-1119. The harness imports nothing from `SetupView.tsx` (only
+  `src/types` + `src/lib/*`, all untouched), so tsc stays clean — it fails only when executed.
+  `:1124` still works (`LegacySetupLog` → `// ─── Corner Form Sub-component` extraction markers both
+  survive). Folds into final-gate TODO item 2 (rework of that file).
 
 ---
 

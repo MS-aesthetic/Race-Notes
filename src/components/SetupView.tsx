@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Setup, CornerSetup, TireInventoryItem, Car, ShockSession, RaceWeekend, SetupSnapshotDiff } from '../types';
+import { Setup, CornerSetup, TireInventoryItem, Car, ShockSession, RaceWeekend } from '../types';
 import { User } from '@supabase/supabase-js';
 import { uploadAttachment, deleteAttachment } from '../lib/sync';
 import SmasherLoadsView from './SmasherLoadsView';
@@ -13,7 +13,7 @@ import FourBarQuickAdjust from './FourBarQuickAdjust';
 import TiresSubView from './TiresSubView';
 import { cloneSetup, makeBlankSetup, pickImmediatePriorSetupForCar, pickLatestSetupForCar } from '../lib/setupCompat';
 import { calculateTireStagger, NumericCornerField, SETUP_STEPS, formatStoredNumber, legacyValueNote, parseStoredNumber } from '../lib/setupSteps';
-import { captureSetupSnapshot, diffSetupSnapshots, displayLifecycleText, displayVersionLabel, getSetupEditability, isWeekendFinished, lifecycleLabel } from '../lib/setupLifecycle';
+import { displayLifecycleText, displayVersionLabel, getSetupEditability, lifecycleLabel } from '../lib/setupLifecycle';
 import { applyExplicitCornerField } from '../lib/quickAdjust';
 import { buildSetupReport, createPdfFile } from '../lib/exportPdf';
 import { shareOrDownloadReport } from '../lib/reportShare';
@@ -76,82 +76,6 @@ const INP = 'w-full bg-surface border border-outline-variant focus:border-primar
 const LBL = 'block min-h-4 truncate text-xs uppercase font-mono font-semibold text-on-surface-variant mb-1 leading-tight';
 const STACKED_CORNER_FIELD_CLASS = 'min-w-0 min-[360px]:col-span-2 min-[768px]:col-span-1';
 const FULL_WIDTH_CORNER_FIELD_CLASS = 'col-span-1 min-[360px]:col-span-2 min-w-0';
-
-export type PendingSetupDiff =
-  | { status: 'available'; sourceLabel: string; rows: SetupSnapshotDiff[] }
-  | { status: 'unavailable'; reason: string };
-
-/** Resolve display-only changes for the setup bound to the active Race Day. */
-export function resolvePendingSetupDiff(
-  weekends: RaceWeekend[],
-  savedSetups: Setup[],
-  setup: Setup,
-  activeEventSetupId?: string,
-): PendingSetupDiff {
-  if (!activeEventSetupId || setup.id !== activeEventSetupId) {
-    return { status: 'unavailable', reason: 'No active Race Day is bound to this setup.' };
-  }
-
-  const weekend = weekends.find(item =>
-    !isWeekendFinished(item) && item.activeSetupId === activeEventSetupId,
-  );
-  if (!weekend) {
-    return { status: 'unavailable', reason: 'Active Race Day setup history is unavailable.' };
-  }
-
-  const currentSnapshot = captureSetupSnapshot(setup);
-  const newestSession = weekend.sessions[0];
-  if (newestSession) {
-    if (!newestSession.setupSnapshot || !newestSession.setupId) {
-      return { status: 'unavailable', reason: 'Latest run has no frozen setup snapshot.' };
-    }
-    if (newestSession.setupId !== setup.id) {
-      return { status: 'unavailable', reason: 'Latest run belongs to a different setup lineage.' };
-    }
-    return {
-      status: 'available',
-      sourceLabel: newestSession.name,
-      rows: diffSetupSnapshots(newestSession.setupSnapshot, currentSnapshot),
-    };
-  }
-
-  const baselineSetup = weekend.baselineSetupId
-    ? savedSetups.find(item => item.id === weekend.baselineSetupId)
-    : undefined;
-  if (!baselineSetup) {
-    return { status: 'unavailable', reason: 'Starting Setup snapshot is unavailable.' };
-  }
-  if (baselineSetup.carId && setup.carId && baselineSetup.carId !== setup.carId) {
-    return { status: 'unavailable', reason: 'Starting Setup belongs to a different car.' };
-  }
-  return {
-    status: 'available',
-    sourceLabel: 'Starting Setup',
-    rows: diffSetupSnapshots(captureSetupSnapshot(baselineSetup), currentSnapshot),
-  };
-}
-
-export function PendingSetupDiffSummary({ pending }: { pending: PendingSetupDiff }) {
-  return (
-    <section className="mt-4 rounded-lg border border-primary/40 bg-primary/5 p-3" data-setup-pending-diff>
-      <h4 className="font-display text-xs font-bold text-primary">Pending — will bind to next session</h4>
-      {pending.status === 'unavailable' ? (
-        <p className="mt-1 font-mono text-xs text-on-surface-variant">Unavailable: {pending.reason}</p>
-      ) : pending.rows.length === 0 ? (
-        <p className="mt-1 font-mono text-xs text-on-surface-variant">No setup changes since {pending.sourceLabel}.</p>
-      ) : (
-        <div className="mt-2 space-y-1" aria-label={`Pending setup changes since ${pending.sourceLabel}`}>
-          {pending.rows.map(row => (
-            <div key={`${row.corner ?? 'setup'}-${row.field}`} className="grid grid-cols-1 min-[360px]:grid-cols-2 items-start gap-1 min-[360px]:gap-2 rounded border border-outline-variant/40 bg-surface px-2 py-1.5 font-mono text-xs">
-              <span className="min-w-0 break-words text-on-surface">{row.label}</span>
-              <span className="min-w-0 break-words min-[360px]:text-right text-on-surface-variant">{row.before} → <strong className="text-primary">{row.after}</strong></span>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
 
 export function LegacySetupLog({ changes }: { changes: Setup['changeLog'] }) {
   const legacyChanges = (changes || []).filter(change => !change.runId);
@@ -583,11 +507,7 @@ export default function SetupView({
 
       {/* Page Header & sub-tab nav */}
       <div className="flex flex-col gap-2 border-b border-outline-variant pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display font-bold tracking-tight text-2xl uppercase text-on-surface">Setups</h2>
-          </div>
-        </div>
+        <h2 className="font-display font-bold tracking-tight text-2xl uppercase text-on-surface">Setups</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <SubTabBtn tab="setups" label="Setups" icon="settings_input_component" />
           <SubTabBtn tab="smasherloads" label="Loads" icon="show_chart" />
@@ -946,11 +866,6 @@ export default function SetupView({
                         ) : null}
                       </div>
                       </fieldset>
-
-                      {setupItem.id === activeEventSetupId && (() => {
-                        const pending = resolvePendingSetupDiff(weekends, setups, setupItem, activeEventSetupId);
-                        return <PendingSetupDiffSummary pending={pending} />;
-                      })()}
 
                       <LegacySetupLog changes={setupItem.changeLog} />
                     </div>
