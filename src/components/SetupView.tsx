@@ -44,7 +44,6 @@ interface SetupViewProps {
 }
 
 export const SETUP_NOTICE_COPY = {
-  historicalSetup: 'Starting and finished snapshots stay unchanged. Clone this setup to make a new editable Current Setup.',
   minimumSetups: 'You must keep at least one setup configuration.',
 } as const;
 
@@ -624,19 +623,6 @@ export default function SetupView({
                   {/* Collapsible content */}
                   {isExpanded && (
                     <div className="min-w-0 p-2 sm:p-3 border-t border-outline-variant/50 bg-surface-container-low">
-                      {isReadOnly && (
-                        <div className="mb-4 space-y-3 rounded-lg border border-outline-variant bg-surface-container p-3 font-mono text-xs text-on-surface-variant">
-                          <p>{SETUP_NOTICE_COPY.historicalSetup}</p>
-                          {!editability.deletable && (
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <p>{setupDeleteReason(editability.reason)}</p>
-                              <button type="button" onClick={() => onGoToGarage?.()} className="min-h-11 rounded border border-outline-variant px-3 text-xs font-bold uppercase text-on-surface hover:border-primary hover:text-primary">
-                                Manage car in Garage
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
                       <fieldset disabled={isReadOnly} className="min-w-0 space-y-6 disabled:opacity-75">
 
                       {/* Metadata grid */}

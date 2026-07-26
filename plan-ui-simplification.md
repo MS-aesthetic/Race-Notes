@@ -561,3 +561,59 @@ decision) as its own cleanup sprint before merging. If the other direction wins:
 was wasted. Sprint totals: **−939 net lines of src/** across 6 chunks (A −163, B −450,
 C −24 src, D −85, E −44, F −112; plus CSS/App wiring and the exportPdf gate fix), one
 component file deleted.
+
+---
+
+## Owner amendments — 2026-07-26 round 2 (browser/APK hands-on)
+
+Owner verdict on current state: "I think I've made this too complicated and it's hard to
+navigate. Trying to reduce noise and clutter by getting back to the essentials." → Chunk G.
+
+### Known issue (recorded, NOT fixed — owner: "shouldn't matter right now")
+
+**Setup revert on next session.** Owner logged a setup change, proceeded to next session, and
+the setup reverted to its starting point. Almost certainly the lifecycle snapshot machinery
+(`setupLifecycle.ts` baseline/weekend roles + `captureSetupSnapshot` at session creation)
+restoring/rebinding rather than carrying the edited state forward. All entry points to
+trackside change-logging are hidden as of Chunk G, so it is unreachable — but if setup
+tracking is ever revisited (D3), START HERE.
+
+## Chunk G — Back to essentials (hide lifecycle chrome, drop per-run weather)
+
+Scope:
+- [x] `SetupView.tsx`: hide the read-only/lifecycle notice box on setup cards — the
+      `historicalSetup` copy ("Starting and finished snapshots stay unchanged…", ~47), the
+      "managed from Race Day" line (~55), and the "Manage car in Garage" button (~633-634)
+      inside it. Remove the whole notice block render; keep `getSetupEditability` itself
+      (read-only INPUT locking stays — only the explanatory chrome goes). Keep the
+      `CarRequiredPrompt` usage (~515) — that is the no-car empty state, different thing.
+- [x] `RaceWeekendView.tsx`: remove `LogSetupChangesButton` (component ~121-131 + render
+      ~1232) — last trackside change-logging entry point.
+- [x] `RaceWeekendView.tsx`: remove the WEATHER text input from the Active Log identity
+      section (session.weather field). The weekend-level Location & Weather widget STAYS.
+      `session.weather` keeps existing in types/persistence (frontend-only); new-session
+      creation may still stamp it from weekend weather — leave writes alone.
+- [x] Sweep now-dead props/imports (e.g. `onLogSetupChanges` plumbing from App.tsx,
+      `onGoToGarage` in SetupView IF the notice was its last non-empty-state consumer).
+
+Acceptance: Setups cards show no lifecycle notice / garage button; Runs tab has no
+"Log setup changes" button; Active Log has no Weather input; weekend weather widget intact;
+tsc 3 baseline identities; build passes. Pipeline: Opus 5 medium build → Fable 5 gate
+(owner waived the Opus High quick-QA step for this chunk) → Netlify preview refresh.
+
+### Chunk G — QA notes (Fable 5 gate; Opus High step waived by owner)
+
+- **Actuals:** `SetupView.tsx` −14, `RaceWeekendView.tsx` −29/+4, `App.tsx` −4. Net **−47**.
+- **Editability locking verified intact:** `getSetupEditability` still drives the
+  `<fieldset disabled={isReadOnly}>` form lock (626), the "View only" badge (578), hidden
+  rename/Use-Setup buttons, and the delete button's disabled state + a11y reason
+  (`setupDeleteReason` kept for 596/615). Only the explanatory notice chrome went.
+- **`onLogSetupChanges` chain fully removed** (5 sites, sole consumer). `onGoToGarage` kept —
+  still used by the no-car empty state and two child views.
+- **`session.weather` now has zero references in `RaceWeekendView` render**; writes at session
+  creation (App.tsx 1963/2021/2266), new-session modal stamp (nsWxStr), and the weekend-level
+  Location & Weather widget all untouched.
+- **Baseline:** 3 identities unchanged — `RaceWeekendView` 255→242, `SetupView` 785→771,
+  `SmasherLoadsView` 617. Build passes. Harness note: `saved-flash-harness.ts:254` string
+  assertion on the notice copy now stale (existing deferred category).
+- Deployed to Netlify preview alias `ui-simplification` after commit.

@@ -59,7 +59,6 @@ interface RaceWeekendViewProps {
   activeSetup?: Setup | null;
   onInfo?: (message: string) => void;
   onGoToGarage: () => void;
-  onLogSetupChanges: () => void;
   accounting?: AccountingEntry[];
   /** [15] One-shot: open a creation modal as soon as the tab mounts. */
   initialAction?: 'new-session' | 'new-weekend';
@@ -118,18 +117,6 @@ const SESSION_TYPE_CHIPS = [
 const displayStoredVersionLabel = (versionLabel: string | undefined): string =>
   versionLabel ? displayVersionLabel({ versionLabel } as Setup) : '';
 
-export function LogSetupChangesButton({ onLogSetupChanges }: { onLogSetupChanges: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onLogSetupChanges}
-      className="min-h-11 rounded border border-primary/50 px-3 py-2 font-mono text-xs font-bold text-primary hover:bg-primary/10"
-    >
-      Log setup changes
-    </button>
-  );
-}
-
 export function SessionSetupDetails({ record }: { record: SessionRecord }) {
   return (
     <>
@@ -146,7 +133,7 @@ export default function RaceWeekendView({
   session, weekends, tireInventory = [], savedSetups = [], activeCarId = null,
   onUpdateSession: persistSession, onUpdateWeekend, onDeleteSession, onDeleteWeekend, onSelectSession,
   activeWeekendId, onActivateWeekend, onCreateWeekend, onCreateSession,
-  activeSetup = null, onInfo, onGoToGarage, onLogSetupChanges, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
+  activeSetup = null, onInfo, onGoToGarage, accounting = [], onFinishWeekend, initialAction, onInitialActionConsumed,
 }: RaceWeekendViewProps) {
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -1054,15 +1041,6 @@ export default function RaceWeekendView({
           <p className="font-mono text-sm text-on-surface-muted mb-2">
             {session.track}{session.time ? ` · ${session.time}` : ''}{session.setupUsed ? ` · ${displayLifecycleText(session.setupUsed)}` : ''}
           </p>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs uppercase font-mono text-on-surface-variant">Weather</span>
-            <input
-              type="text"
-              className="min-h-11 bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface font-mono"
-              value={session.weather || ''}
-              onChange={e => updateRun({ ...session, weather: e.target.value })}
-            />
-          </label>
         </div>
 
         {/* 2 ── Track condition */}
@@ -1225,12 +1203,9 @@ export default function RaceWeekendView({
       {/* ── All Race Days (active first, then date desc — [15]) ───────────── */}
       {sortedWeekends.length > 0 && (
         <section>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-on-surface font-display font-bold uppercase text-sm tracking-wide">
-              All Race Days
-            </h2>
-            <LogSetupChangesButton onLogSetupChanges={onLogSetupChanges} />
-          </div>
+          <h2 className="mb-3 text-on-surface font-display font-bold uppercase text-sm tracking-wide">
+            All Race Days
+          </h2>
 
           <div className="flex flex-col gap-3">
             {sortedWeekends.map(wk => {
