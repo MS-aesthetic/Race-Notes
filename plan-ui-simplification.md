@@ -1,7 +1,8 @@
 # Plan — UI Simplification Sprint (feature/ui-simplification)
 
 **Branch:** `feature/ui-simplification` (off `master` @ `13343e5`, v5.2.1 / versionCode 24)
-**Status:** Chunks A–F implemented and committed (F pending commit); owner device QA open.
+**Status:** Chunks A–I implemented and committed; owner QA (browser/APK) open. Setups are
+de-lifecycled as of Chunk I (D3 resolved: plain saved setups + clone; no roles/locks).
 **Direction note:** This branch is one of two parallel directions the owner may develop.
 `master` stays untouched as the "full-featured" direction. Do NOT merge to master without
 an explicit owner decision. Rebase onto master only if master moves.
@@ -617,3 +618,127 @@ tsc 3 baseline identities; build passes. Pipeline: Opus 5 medium build → Fable
   `SmasherLoadsView` 617. Build passes. Harness note: `saved-flash-harness.ts:254` string
   assertion on the notice copy now stale (existing deferred category).
 - Deployed to Netlify preview alias `ui-simplification` after commit.
+
+---
+
+## Owner amendments — 2026-07-26 round 3 (browser hands-on, screenshots)
+
+1. Weekend banner "still too busy — once loaded, keep minimized unless user clicks on it"
+   → Chunk H.
+2. Simplify Setups: **no view-only limitations; no baseline / "active trackside" / final
+   roles for race weekends; just saved setups + copy/clone; static message telling the user
+   to clone before adjustments** → Chunk I. This ACTIVATES the deferred D3 decision at the
+   behavior level (weekends bind a plain saved setup; no lifecycle clones), with data wipe
+   confirmed by owner — zero migration concerns.
+
+Sonnet investigation (this session) findings that bind the specs below:
+- `RaceWeekend.setupId` (types.ts:340) is the pre-existing plain-reference field — reuse it;
+  types.ts stays untouched.
+- ONE unavoidable lib edit: `lib/quickAdjust.ts:83-99 isQuickAdjustRunAvailable` hard-codes
+  the clone triad (`lifecycleRole==='weekend' && setup.weekendId===weekend.id &&
+  weekend.activeSetupId===setup.id`); must become a plain `weekend.setupId===setup.id` check
+  or the Runs editor never renders. Everything else is App.tsx/component call sites.
+- `handleSaveSetups` in App.tsx has 4 `getSetupEditability` guards that mirror the SetupView
+  UI gating — must drop in lockstep or edits silently fail to persist.
+- Weekend-creation "Starting Setup" is a plain <select> in `weekendFormModal`
+  (RaceWeekendView 571-591); COPY LATEST / START BLANK belong to SetupView's create form,
+  unrelated.
+- `captureSetupSnapshot` + pressure propagation are lifecycle-agnostic — session creation
+  works unchanged once `resolveWeekendSetup` does a plain id lookup.
+
+## Chunk H — Weekend banner collapsed by default
+
+Scope (`RaceWeekendView.tsx` only):
+- [x] Wrap the Location & Weather block (914-984) + Race Day Notes block (987-995) in a
+      collapsed-by-default conditional. Header row (888-911) stays always visible and becomes
+      the toggle: rotate-chevron pattern copied from `editorCollapsed` (1030-1033), PLUS
+      `aria-expanded` (the existing patterns lack it; add it here). Edit-pencil inside the
+      header keeps working via stopPropagation (copy the All Race Days nested-interactive
+      pattern, 1238-1256).
+- [x] Default collapsed on every load; expansion is component state only, no persistence.
+- [x] No mount-safety issues: weather never auto-fetches (fetch is button-driven), notes
+      persist per keystroke through props — plain conditional render is safe (investigated).
+
+### Chunk H — QA notes (Fable 5 gate)
+
+- Actuals: +29/−9 (net +20). Header is a div-with-role toggle (valid HTML — real pencil
+  button can't nest inside a button), `aria-expanded` added, chevron rotates, pencil isolated
+  via stopPropagation on click+keydown. `border-b` made conditional to avoid a doubled
+  divider when collapsed (cosmetic deviation, accepted). Baseline: RaceWeekendView 242→243
+  (one state line above the error), others unmoved. Committed `24203c6`.
+
+Acceptance: Runs tab loads with the banner showing only the header row; tapping it reveals
+weather + notes; pencil still opens the edit form without toggling; tsc 3 identities; build
+passes.
+
+## Chunk I — De-lifecycle setups (binds D3)
+
+Scope:
+- [x] `lib/quickAdjust.ts` (the ONE lib edit): `isQuickAdjustRunAvailable` — replace the
+      clone-triad check with `weekend.setupId === setup.id`; keep all non-lifecycle checks
+      (weekend active/finished, session binding) unchanged.
+- [x] `App.tsx handleCreateNewWeekend` (~1851): no `startWeekendLifecycle`, no clones —
+      stamp `weekend.setupId = sourceSetup?.id` + `setupName`; leave baseline/active/final
+      fields unset.
+- [x] `App.tsx handleFinishWeekend` (2181-2237): full rewrite — mark finished + timestamps,
+      persist, clear active session/weekend. No fallback setup, no final/current clones, no
+      `setSetup()` reassignment. Simplify `INFO_COPY['weekend-finished']` (109) to
+      "${name} finished." and drop the finalLabel/currentLabel context.
+- [x] `App.tsx resolveWeekendSetup` (316-325): plain `savedSetups.find(s => s.id ===
+      weekend.setupId)`; drop `isSetupLocked`/role checks.
+- [x] `App.tsx handleSaveSetups`: drop the 4 `getSetupEditability` guards (1627/1631/1636/
+      1644) + `isSetupLocked` at 1696; KEEP the dangling-pointer repair (1650-1687) — more
+      important now that setups are freely deletable.
+- [x] `App.tsx`: stop passing `activeEventSetupId` to SetupView (drop prop end-to-end);
+      prune dead setupLifecycle imports.
+- [x] `SetupView.tsx`: remove all editability gating — `getSetupEditability`/`isReadOnly`
+      (554-555), rename guard (369), delete guards (377/391), View-only chip (578), sr-only
+      reason + `setupDeleteReason` (50-56, 596), delete-button disable (615-618),
+      `!isReadOnly` clauses on rename (573) / Use Setup (589); `<fieldset
+      disabled={isReadOnly}>` (626) → plain `<div>`. KEEP minimum-setups check +
+      car-ownership check on delete.
+- [x] `SetupView.tsx`: "Active trackside" chip (577) → reword to "IN USE" (the selected-setup
+      mechanic stays; only the lifecycle-flavored wording goes).
+- [x] `SetupView.tsx`: add the static clone tip between the create form (538) and the
+      accordion list, styled like the attachment captions:
+      "Editing a setup changes it everywhere it's used — clone it first to keep the original."
+- [x] `RaceWeekendView.tsx`: finish-weekend copy rewrites (1334, 1341→1431 ConfirmSheet);
+      delete the `finalSetupId` history line (867); weekend banner setup line should render
+      the plain setup name; dropdown `!setup.lockedAt` filter (584) may stay (permanent no-op).
+- [x] Copy pass on missing-setup INFO_COPY strings (App.tsx 106-111): drop "Restore it"
+      phrasing (no restore path exists); point to rebinding via Edit Race Day.
+- [x] KEEP untouched: `isWeekendFinished` + finished-weekend read-only rules (weekend.status,
+      orthogonal to setup lifecycle), `types.ts`, `setupLifecycle.ts` itself (goes fully dead
+      except `captureSetupSnapshot`/label helpers — deferred-cleanup category),
+      `lib/tireHistory.ts syncTireLifecycle` (unrelated tire system, name collision only).
+
+Acceptance: create weekend → picks saved setup, NO new setup rows appear in Setups; every
+setup card fully editable (no View only, no disabled fields, no locked delete); finish
+weekend → weekend moves to history, setup list unchanged; Runs editor still gates open with
+an active weekend+session; clone tip visible; tsc 3 identities (SetupView 771 shifts; its
+TS2322 sits INSIDE the fieldset→div block — identity must not change and must NOT be
+drive-by-fixed); build passes.
+
+### Chunk I — QA notes (Fable 5 gate)
+
+- **Actuals:** `App.tsx` +32/−116, `SetupView.tsx` +12/−31, `RaceWeekendView.tsx` +14/−13,
+  `lib/quickAdjust.ts` +1/−3. Net **−104**. All 12 scope items done.
+- **Gate verified by direct read:** `isQuickAdjustRunAvailable` is the plain
+  `weekend.setupId === setup.id` binding (quickAdjust.ts:83-97); `handleCreateNewWeekend`
+  (App 1789) builds the weekend with `setupId`/`setupName` and zero setup writes (sets the
+  picked setup as the app's current setup — carried over from old behavior);
+  `handleFinishWeekend` (App 2131) marks finished + clears session/active id, no clones,
+  no `setSetup`. Create→resolve→gate trace confirmed by builder with line refs.
+- **Approved deviations:** (1) setup REBINDING enabled in Edit Race Day — the select now
+  shows in edit mode and `handleUpdateWeekend` no longer force-restores the old binding;
+  required so a weekend whose setup is deleted (now possible — no locks) has a recovery
+  path matching the new missing-setup copy. (2) missing-setup strings in RaceWeekendView
+  aligned to the new copy. (3) history fallback "Starting Setup saved" → "No setup".
+  (4) `missing-weekend-finish` INFO_COPY now unreachable — left, deferred-dead category.
+- **Baseline:** RaceWeekendView 243 (unmoved), SetupView 771→**752** (same TS2322 `key`
+  error, NOT drive-by-fixed, per spec), SmasherLoadsView 617. Build passes.
+- **Dead-code note:** `setupLifecycle.ts` is now dead except `captureSetupSnapshot`,
+  `isWeekendFinished`, label helpers, `mergeTimestampedRecords`,
+  `repairSetupDeletionReferences`, `selectRaceWeekendSetupForSelection`;
+  `resolveQuickAdjustTarget`/`applyQuickAdjust` in quickAdjust.ts remain dead (zero
+  callers). All folds into the deferred cleanup sprint if this direction wins.

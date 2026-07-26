@@ -13,7 +13,7 @@ import FourBarQuickAdjust from './FourBarQuickAdjust';
 import TiresSubView from './TiresSubView';
 import { cloneSetup, makeBlankSetup, pickImmediatePriorSetupForCar, pickLatestSetupForCar } from '../lib/setupCompat';
 import { calculateTireStagger, NumericCornerField, SETUP_STEPS, formatStoredNumber, legacyValueNote, parseStoredNumber } from '../lib/setupSteps';
-import { displayLifecycleText, displayVersionLabel, getSetupEditability, lifecycleLabel } from '../lib/setupLifecycle';
+import { displayLifecycleText, displayVersionLabel, lifecycleLabel } from '../lib/setupLifecycle';
 import { applyExplicitCornerField } from '../lib/quickAdjust';
 import { buildSetupReport, createPdfFile } from '../lib/exportPdf';
 import { shareOrDownloadReport } from '../lib/reportShare';
@@ -34,8 +34,6 @@ interface SetupViewProps {
   onSaveShockSessions?: (updated: ShockSession[]) => void;
   /** Needed to derive per-tire usage history (which sessions/tracks/corners used each tire). */
   weekends?: RaceWeekend[];
-  /** Setup owned by the active Race Day, if one is in play. */
-  activeEventSetupId?: string;
   /** Deep-link into a specific sub-tab (e.g. from Dashboard Tires panel). */
   initialSubTab?: 'setups' | 'smasherloads' | 'tires';
   onInfo?: (message: string) => void;
@@ -46,14 +44,6 @@ interface SetupViewProps {
 export const SETUP_NOTICE_COPY = {
   minimumSetups: 'You must keep at least one setup configuration.',
 } as const;
-
-const setupDeleteReason = (reason: ReturnType<typeof getSetupEditability>['reason']): string => {
-  if (reason === 'historical-role') return 'Historical setup snapshots cannot be deleted individually.';
-  if (reason === 'locked') return 'Locked setups cannot be deleted individually.';
-  if (reason === 'finished-weekend') return 'Setups from finished Race Days cannot be deleted individually.';
-  if (reason === 'in-play-elsewhere') return 'The active Race Day setup is managed from Race Day.';
-  return 'This setup cannot be deleted individually.';
-};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -235,7 +225,7 @@ function CornerForm({ corner, cornerLabel, data, isRear, tireInventory, usedTire
 
 export default function SetupView({
   savedSetups, activeSetupId, onSaveSetups, user, tireInventory, onSaveTires, onDeleteTireFromCloud,
-  activeCarId = null, activeCar = null, shockSessions = [], onSaveShockSessions, weekends = [], activeEventSetupId,
+  activeCarId = null, activeCar = null, shockSessions = [], onSaveShockSessions, weekends = [],
   initialSubTab, onInfo, onHelp, onGoToGarage,
 }: SetupViewProps) {
   const [subTab, setSubTab] = useState<'setups' | 'smasherloads' | 'tires'>(initialSubTab ?? 'setups');
@@ -366,7 +356,6 @@ export default function SetupView({
 
   const handleRenameSetup = (event: React.MouseEvent<HTMLButtonElement>, target: Setup) => {
     event.stopPropagation();
-    if (!getSetupEditability(target, weekends, activeEventSetupId).editable) return;
     setExpandedId(target.id);
     setRenameFocusSetupId(target.id);
   };
@@ -374,9 +363,6 @@ export default function SetupView({
   const handleDeleteSetup = (setupId: string) => {
     const target = setups.find((setupItem) => setupItem.id === setupId);
     if (!target) return;
-    if (!getSetupEditability(target, weekends, activeEventSetupId).deletable) {
-      return;
-    }
     if (setups.length <= 1) { onInfo?.('minimumSetups'); return; }
     setPendingDeleteSetupId(setupId);
   };
@@ -388,9 +374,6 @@ export default function SetupView({
     const target = setups.find((setupItem) => setupItem.id === setupId);
     if (!target) return;
     if (!activeCarId || target.carId !== activeCarId) return;
-    if (!getSetupEditability(target, weekends, activeEventSetupId).deletable) {
-      return;
-    }
     if (setups.length <= 1) {
       onInfo?.('minimumSetups');
       return;
@@ -538,6 +521,8 @@ export default function SetupView({
             </form>
           )}
 
+          {!noCar && <p className="text-[10px] text-on-surface-muted font-mono italic">Editing a setup changes it everywhere it's used — clone it first to keep the original.</p>}
+
           {/* Accordion list — filtered to active car */}
           <div className="space-y-3" id="setups-accordion">
             {!noCar && displayedSetups.length === 0 && (
@@ -551,8 +536,6 @@ export default function SetupView({
             {displayedSetups.map((setupItem) => {
               const isExpanded = expandedId === setupItem.id;
               const isActive = activeId === setupItem.id;
-              const editability = getSetupEditability(setupItem, weekends, activeEventSetupId);
-              const isReadOnly = !editability.editable;
               return (
                 <div key={setupItem.id}
                   className={`bg-surface-container border rounded-lg overflow-hidden transition-all duration-200 ${isActive ? 'border-primary shadow-[0_0_12px_rgba(211,47,47,0.1)]' : 'border-outline-variant/60'}`}
@@ -570,12 +553,11 @@ export default function SetupView({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="min-w-0 break-words font-display text-base font-bold text-on-surface uppercase tracking-wide">{setupItem.chassis}</h3>
-                          {!isReadOnly && <button type="button" title="Rename setup" aria-label="Rename setup" onClick={(event) => handleRenameSetup(event, setupItem)}
+                          <button type="button" title="Rename setup" aria-label="Rename setup" onClick={(event) => handleRenameSetup(event, setupItem)}
                             className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded text-on-surface-variant transition-colors hover:text-primary">
                             <span className="material-symbols-outlined text-[18px]">edit</span>
-                          </button>}
-                          {isActive && <span className="bg-primary/15 text-primary border border-primary/30 text-[9px] uppercase font-bold px-1.5 py-0.5 rounded tracking-wide">Active trackside</span>}
-                          {isReadOnly && <span className="border border-outline-variant text-on-surface-variant text-[9px] uppercase font-bold px-1.5 py-0.5 rounded tracking-wide">View only</span>}
+                          </button>
+                          {isActive && <span className="bg-primary/15 text-primary border border-primary/30 text-[9px] uppercase font-bold px-1.5 py-0.5 rounded tracking-wide">In use</span>}
                         </div>
                         {setupItem.versionLabel && <p className="font-mono text-[11px] font-bold text-primary mt-1">{displayVersionLabel(setupItem)}</p>}
                         <div className="text-xs text-on-surface-variant font-mono mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
@@ -586,14 +568,13 @@ export default function SetupView({
                       </div>
                     </div>
                     <div className="w-full min-w-0 flex flex-wrap items-center justify-end gap-2 self-stretch sm:self-auto sm:w-auto">
-                      {!isActive && isExpanded && !isReadOnly && (
+                      {!isActive && isExpanded && (
                         <button type="button" onClick={(e) => { e.stopPropagation(); setActiveId(setupItem.id); updateAndSaveSetups(setups, setupItem.id); }}
                           className="min-w-0 px-3 py-1 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase rounded hover:opacity-90 transition-all shadow">
                           Use Setup
                         </button>
                       )}
                       <div className="w-full min-w-0 flex flex-wrap items-center justify-end gap-1 border-t border-outline-variant/60 pt-2 sm:w-auto sm:border-t-0 sm:border-l sm:pt-0 sm:pl-2">
-                        {!editability.deletable && <span id={`setup-delete-reason-${setupItem.id}`} className="sr-only">{setupDeleteReason(editability.reason)}</span>}
                         <button type="button" title="Share setup PDF" disabled={sharingSetupId === setupItem.id} onClick={(e) => { e.stopPropagation(); void handleShareSetup(setupItem); }}
                           className="flex min-h-11 min-w-11 items-center justify-center text-on-surface-variant hover:text-primary transition-colors rounded disabled:opacity-40">
                           <span className="material-symbols-outlined text-[18px]">{sharingSetupId === setupItem.id ? 'progress_activity' : 'share'}</span>
@@ -612,8 +593,8 @@ export default function SetupView({
                           className={`p-1.5 rounded ${priorSetup(setupItem) ? 'text-on-surface-variant hover:text-primary' : 'text-on-surface-muted opacity-30 cursor-not-allowed'}`}>
                           <span className="material-symbols-outlined text-[18px]">compare_arrows</span>
                         </button>
-                        <button type="button" title={editability.deletable ? 'Delete setup permanently' : setupDeleteReason(editability.reason)} aria-describedby={!editability.deletable ? `setup-delete-reason-${setupItem.id}` : undefined} disabled={!editability.deletable} onClick={(e) => { e.stopPropagation(); handleDeleteSetup(setupItem.id); }}
-                          className="flex min-h-11 min-w-11 items-center justify-center text-on-surface-variant hover:text-red-400 transition-colors rounded disabled:text-on-surface-muted disabled:opacity-40">
+                        <button type="button" title="Delete setup permanently" onClick={(e) => { e.stopPropagation(); handleDeleteSetup(setupItem.id); }}
+                          className="flex min-h-11 min-w-11 items-center justify-center text-on-surface-variant hover:text-red-400 transition-colors rounded">
                           <span className="material-symbols-outlined text-[18px]">delete</span>
                         </button>
                       </div>
@@ -623,7 +604,7 @@ export default function SetupView({
                   {/* Collapsible content */}
                   {isExpanded && (
                     <div className="min-w-0 p-2 sm:p-3 border-t border-outline-variant/50 bg-surface-container-low">
-                      <fieldset disabled={isReadOnly} className="min-w-0 space-y-6 disabled:opacity-75">
+                      <div className="min-w-0 space-y-6">
 
                       {/* Metadata grid */}
                       <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2">
@@ -830,7 +811,7 @@ export default function SetupView({
                           <p className="text-[10px] text-on-surface-muted font-mono italic">No attachments yet. Add photos, data sheets, or time slips.</p>
                         ) : null}
                       </div>
-                      </fieldset>
+                      </div>
                     </div>
                   )}
                 </div>

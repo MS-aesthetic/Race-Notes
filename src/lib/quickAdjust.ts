@@ -90,9 +90,7 @@ export function isQuickAdjustRunAvailable(
     || weekend.id !== activeWeekendId
     || weekend.status === 'finished'
     || !setup
-    || setup.lifecycleRole !== 'weekend'
-    || setup.weekendId !== weekend.id
-    || weekend.activeSetupId !== setup.id
+    || weekend.setupId !== setup.id
     || !session.id
     || session.weekendId !== weekend.id) return false;
   return weekend.sessions.some(record => record.id === session.id);

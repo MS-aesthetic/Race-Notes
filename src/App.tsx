@@ -18,8 +18,8 @@ import AuthView from './components/AuthView';
 import { pushSetups, pushWeekends, pushActiveSession, pullAllData, pullTodos, pushTodos, pushTires, pullTires, deleteTireFromCloud, pushCars, pullCars, pushShockSessions, pullShockSessions, pushMaintenanceComponents, pullMaintenanceComponents, pushMaintenanceLogs, pullMaintenanceLogs, pushChecklistTemplates, pullChecklistTemplates, pushWeekendChecklists, pullWeekendChecklists, deleteTeamSharedRecordFromCloud, type SyncStatus } from './lib/sync';
 import { registerForPush, sendPush } from './lib/push';
 import { syncTireLifecycle } from './lib/tireHistory';
-import { makeBlankSetup, normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
-import { captureSetupSnapshot, displayVersionLabel, finishWeekendLifecycle, getSetupEditability, isSetupLocked, isWeekendFinished, lifecycleLabel, mergeTimestampedRecords, repairSetupDeletionReferences, selectRaceWeekendSetupForSelection, startWeekendLifecycle } from './lib/setupLifecycle';
+import { normalizeSetup, normalizeSetups, pickLatestSetupForCar, pickWeekendSourceSetup } from './lib/setupCompat';
+import { captureSetupSnapshot, displayVersionLabel, isWeekendFinished, mergeTimestampedRecords, repairSetupDeletionReferences, selectRaceWeekendSetupForSelection } from './lib/setupLifecycle';
 import { formatPressureBlock, mirrorPressureBlockToTires, pressureBlockHasValue, resolveSessionPressureBlock, setupPressureBlock } from './lib/setupSteps';
 import { materializeMainChecklist } from './lib/mainChecklist';
 import { KEEP_ADDED_ITEMS_KEY, reconcileMaintenanceChecklist, resetMainChecklist } from './lib/checklistMaintenance';
@@ -103,12 +103,12 @@ const INFO_COPY = {
   'finished-weekend-inactive': () => 'Finished Race Days stay in history and cannot be made active.',
   'missing-car': () => 'Add a car before starting a Race Day.',
   'race-day-active': ({ name, version }: InfoCopyContext) => `Active: ${name || 'Race Day'} · ${version || 'Current Setup'}`,
-  'missing-weekend-log': () => 'Race Day setup is missing or locked. Restore it before logging a run.',
-  'missing-weekend-adjust': () => 'Race Day setup is missing. Restore it before logging or adjusting a run.',
-  'missing-weekend-finish': () => 'Race Day setup is missing. Restore it before finishing this Race Day.',
-  'weekend-finished': ({ name, finalLabel, currentLabel }: InfoCopyContext) => `${name || 'Race Day'} finished. ${finalLabel || 'Final Setup'} saved; ${currentLabel || 'Current Setup'} is ready.`,
+  'missing-weekend-log': () => 'This Race Day has no setup. Pick one in Edit Race Day before logging a run.',
+  'missing-weekend-adjust': () => 'This Race Day has no setup. Pick one in Edit Race Day before logging or adjusting a run.',
+  'missing-weekend-finish': () => 'This Race Day has no setup. Pick one in Edit Race Day before finishing it.',
+  'weekend-finished': ({ name }: InfoCopyContext) => `${name || 'Race Day'} finished.`,
   'finished-run-history': () => 'Finished runs stay in history and cannot be loaded for editing.',
-  'missing-weekend-load': () => 'Race Day setup is missing or locked. Restore it before loading this run.',
+  'missing-weekend-load': () => 'This Race Day has no setup. Pick one in Edit Race Day before loading this run.',
   'setup-copy': ({ label }: InfoCopyContext) => `Copied from ${label || 'selected setup'}`,
   'attachment-sign-in': () => 'Please sign in to attach files.',
   'upload-failed': () => 'Upload failed.',
@@ -314,14 +314,8 @@ export default function App() {
   const selectedWeekend = activeWeekendId ? weekends.find(item => item.id === activeWeekendId) ?? null : null;
   const activeWeekend = selectedWeekend && !isWeekendFinished(selectedWeekend) ? selectedWeekend : null;
   const resolveWeekendSetup = (weekend: RaceWeekend | null | undefined): Setup | null => {
-    if (!weekend) return null;
-    if (!weekend.activeSetupId) return null;
-    const candidate = savedSetupsRef.current.find(item => item.id === weekend.activeSetupId) ?? null;
-    if (!candidate
-      || isSetupLocked(candidate, weekendsRef.current)
-      || candidate.lifecycleRole !== 'weekend'
-      || candidate.weekendId !== weekend.id) return null;
-    return candidate;
+    if (!weekend || !weekend.setupId) return null;
+    return savedSetupsRef.current.find(item => item.id === weekend.setupId) ?? null;
   };
   const activeWeekendSetup = resolveWeekendSetup(activeWeekend);
   const savedActiveSetup = setup.carId === activeCarId ? savedSetups.find(item => item.id === setup.id) ?? null : null;
@@ -1615,37 +1609,16 @@ export default function App() {
     const priorSetups = savedSetupsRef.current;
     const priorById = new Map<string, Setup>(priorSetups.map(item => [item.id, item] as const));
     const contextWeekend = weekendsRef.current.find(item => item.id === activeWeekendId && !isWeekendFinished(item));
-    const eventSetupId = contextWeekend?.activeSetupId;
+    const eventSetupId = contextWeekend?.setupId;
     const now = new Date().toISOString();
     const comparable = (value: Setup) => {
       const { updatedAt: _updatedAt, ...rest } = value;
       return JSON.stringify(rest);
     };
-    const hasBlockedEdit = updatedSetups.some(candidate => {
+    const submittedSetups = updatedSetups.map<Setup>(candidate => {
       const prior = priorById.get(candidate.id);
-      return !!prior
-        && !getSetupEditability(prior, weekendsRef.current, eventSetupId).editable
-        && comparable(prior) !== comparable(candidate);
-    }) || priorSetups.some(prior => (
-      !updatedSetups.some(candidate => candidate.id === prior.id)
-      && !getSetupEditability(prior, weekendsRef.current, eventSetupId).deletable
-    ));
-    if (hasBlockedEdit) return;
-    const submittedSetups = updatedSetups.flatMap<Setup>(candidate => {
-      const prior = priorById.get(candidate.id);
-      const canEdit = !prior || getSetupEditability(prior, weekendsRef.current, eventSetupId).editable;
-      if (!canEdit) {
-        return prior ? [prior] : [];
-      }
-      return [{ ...candidate, updatedAt: !prior || comparable(prior) !== comparable(candidate) ? now : candidate.updatedAt }];
+      return { ...candidate, updatedAt: !prior || comparable(prior) !== comparable(candidate) ? now : candidate.updatedAt };
     });
-    for (const prior of priorSetups) {
-      if (!submittedSetups.some(item => item.id === prior.id)
-        && !getSetupEditability(prior, weekendsRef.current, eventSetupId).deletable) {
-        submittedSetups.push(prior);
-      }
-    }
-    // Historical cards communicate through their own passive banner only.
 
     const removedSetupIds = new Set<string>(
       priorSetups
@@ -1693,7 +1666,7 @@ export default function App() {
 
     const requestedActiveId = eventSetupId || activeId;
     const requested = requestedActiveId ? repairedSetups.find(item => item.id === requestedActiveId) : null;
-    const nextActiveId = requested && !isSetupLocked(requested, weekendsRef.current)
+    const nextActiveId = requested
       ? requested.id
       : pickLatestSetupForCar(repairedSetups, activeCarId)?.id;
     const activeSelectionChanged = activeId !== undefined && !eventSetupId && (
@@ -1823,65 +1796,44 @@ export default function App() {
     const now = new Date().toISOString();
     const weekendId = `wknd-${Date.now()}`;
     const date = data.date || new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-    const savedSource = pickWeekendSourceSetup(
+    const sourceSetup = pickWeekendSourceSetup(
       savedSetupsRef.current,
       activeCarId,
       data.setupId,
       activeCarSetup?.id,
     );
-    const sourceSetup = savedSource || makeBlankSetup({
-      id: `setup-current-source-${weekendId}`,
-      chassis: activeCar?.chassis || activeCar?.name || 'My Car',
-      track: data.track,
-      date,
-      carType: activeCar?.carType || '',
-      carId: activeCarId,
-      lifecycleRole: 'current',
-      versionLabel: lifecycleLabel('current'),
-      changeLog: [],
-      updatedAt: now,
-    });
-    const baseWeekend: RaceWeekend = {
+    const weekend: RaceWeekend = {
       id: weekendId,
       name: data.name,
       track: data.track,
       date,
       sessions: [],
+      status: 'active',
+      setupId: sourceSetup?.id,
+      setupName: sourceSetup?.chassis,
+      updatedAt: now,
     };
-    const lifecycle = startWeekendLifecycle(baseWeekend, sourceSetup, now);
-    const updatedSetups = [
-      lifecycle.weekendSetup,
-      lifecycle.baseline,
-      ...(!savedSource ? [sourceSetup] : []),
-      ...savedSetupsRef.current,
-    ];
-    const updatedWeekends = [lifecycle.weekend, ...weekendsRef.current];
+    const updatedWeekends = [weekend, ...weekendsRef.current];
 
-    savedSetupsRef.current = updatedSetups;
     weekendsRef.current = updatedWeekends;
-    setSavedSetups(updatedSetups);
     setWeekends(updatedWeekends);
-    setSetup(lifecycle.weekendSetup);
-    localStorage.setItem('race_notes_saved_setups', JSON.stringify(updatedSetups));
     localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
-    localStorage.setItem('race_notes_setup', JSON.stringify(lifecycle.weekendSetup));
-    if (user) {
-      if (syncOwnerId) {
-        pushSetups(updatedSetups, syncOwnerId, setSyncStatus);
-        pushWeekends(updatedWeekends, syncOwnerId, setSyncStatus);
-      }
+    if (sourceSetup) {
+      setSetup(sourceSetup);
+      localStorage.setItem('race_notes_setup', JSON.stringify(sourceSetup));
     }
+    if (user && syncOwnerId) pushWeekends(updatedWeekends, syncOwnerId, setSyncStatus);
 
     const keepAddedItems = localStorage.getItem(KEEP_ADDED_ITEMS_KEY) !== 'false';
     handleSaveTodos(resetMainChecklist(todos, keepAddedItems, now, checklistTemplates, {
       components: maintenance,
       weekends: updatedWeekends,
-      setups: updatedSetups,
+      setups: savedSetupsRef.current,
     }));
 
-    setActiveWeekendId(lifecycle.weekend.id);
-    localStorage.setItem(ACTIVE_WEEKEND_KEY, lifecycle.weekend.id);
-    showInfo({ reason: 'race-day-active', context: { name: lifecycle.weekend.name, version: lifecycle.weekendSetup.versionLabel } });
+    setActiveWeekendId(weekend.id);
+    localStorage.setItem(ACTIVE_WEEKEND_KEY, weekend.id);
+    showInfo({ reason: 'race-day-active', context: { name: weekend.name, version: sourceSetup?.chassis } });
     if (continueToRunAfterWeekendRef.current) {
       continueToRunAfterWeekendRef.current = false;
       setRwInitialAction('new-session');
@@ -2161,8 +2113,6 @@ export default function App() {
       baselineSetupId: prior.baselineSetupId,
       activeSetupId: prior.activeSetupId,
       finalSetupId: prior.finalSetupId,
-      setupId: prior.setupId,
-      setupName: prior.setupName,
       updatedAt: new Date().toISOString(),
     };
     const updatedList = weekendsRef.current.map(w => w.id === stamped.id ? stamped : w);
@@ -2182,58 +2132,25 @@ export default function App() {
     const target = weekendsRef.current.find(item => item.id === weekendId);
     if (!target || isWeekendFinished(target)) return;
     const now = new Date().toISOString();
-    const finishFallback = makeBlankSetup({
-      id: `setup-baseline-${target.id}`,
-      chassis: activeCar?.chassis || activeCar?.name || 'My Car',
-      track: target.track,
-      date: target.date,
-      carType: activeCar?.carType || '',
-      carId: activeCarId || undefined,
-      lifecycleRole: 'baseline',
-      versionLabel: `${target.date || 'Race Day'} ${lifecycleLabel('baseline')}`,
-      weekendId: target.id,
-      lockedAt: now,
-      changeLog: [],
-      updatedAt: now,
-    });
-    const result = finishWeekendLifecycle(target, savedSetupsRef.current, now, finishFallback);
-    if (!result) {
-      showInfo({ reason: 'missing-weekend-finish' });
-      return;
-    }
-    const updatedWeekends = weekendsRef.current.map(item => item.id === target.id ? result.weekend : item);
+    const finishedWeekend: RaceWeekend = { ...target, status: 'finished', finishedAt: now, updatedAt: now };
+    const updatedWeekends = weekendsRef.current.map(item => item.id === target.id ? finishedWeekend : item);
     const clearedSession: ActiveSession = { ...INITIAL_ACTIVE_SESSION, weekendId: undefined, updatedAt: now };
 
-    savedSetupsRef.current = result.setups;
     weekendsRef.current = updatedWeekends;
     activeSessionRef.current = clearedSession;
     skipWeekendRecoveryRef.current = true;
-    setSavedSetups(result.setups);
     setWeekends(updatedWeekends);
-    setSetup(result.currentSetup);
     setActiveSession(clearedSession);
     setActiveWeekendId(null);
-    localStorage.setItem('race_notes_saved_setups', JSON.stringify(result.setups));
     localStorage.setItem('race_notes_weekends', JSON.stringify(updatedWeekends));
-    localStorage.setItem('race_notes_setup', JSON.stringify(result.currentSetup));
     localStorage.setItem('race_notes_active_session', JSON.stringify(clearedSession));
     localStorage.removeItem(ACTIVE_WEEKEND_KEY);
 
     if (user) {
-      if (syncOwnerId) {
-        pushSetups(result.setups, syncOwnerId, setSyncStatus);
-        pushWeekends(updatedWeekends, syncOwnerId, setSyncStatus);
-      }
+      if (syncOwnerId) pushWeekends(updatedWeekends, syncOwnerId, setSyncStatus);
       pushActiveSession(clearedSession, user.id, setSyncStatus);
     }
-    showInfo({
-      reason: 'weekend-finished',
-      context: {
-        name: target.name,
-        finalLabel: lifecycleLabel('final', target),
-        currentLabel: lifecycleLabel('current'),
-      },
-    });
+    showInfo({ reason: 'weekend-finished', context: { name: target.name } });
   };
 
   const handleSelectRecentSession = (rec: SessionRecord, weekendId: string) => {
@@ -2538,7 +2455,6 @@ export default function App() {
                   shockSessions={shockSessions}
                   onSaveShockSessions={handleSaveShockSessions}
                   weekends={weekends}
-                  activeEventSetupId={activeWeekend?.activeSetupId}
                   initialSubTab={setupSubTab}
                   onSaveSetups={handleSaveSetups}
                   onInfo={showComponentInfo}
