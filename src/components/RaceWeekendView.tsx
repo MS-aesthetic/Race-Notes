@@ -141,6 +141,7 @@ export default function RaceWeekendView({
   const [showZipInput, setShowZipInput] = useState(false);
   const [zipCode, setZipCode] = useState('');
   const [editorCollapsed, setEditorCollapsed] = useState(false);
+  const [bannerCollapsed, setBannerCollapsed] = useState(true);
   const [expandedWeekendIds, setExpandedWeekendIds] = useState<Set<string>>(
     () => new Set([weekends.find(w => w.id === session.weekendId)?.id ?? weekends[0]?.id ?? ''].filter(Boolean))
   );
@@ -885,7 +886,15 @@ export default function RaceWeekendView({
         <section className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
 
           {/* Header row */}
-          <div className="flex items-start gap-2 p-3 border-b border-outline-variant/50">
+          <div
+            role="button"
+            tabIndex={0}
+            aria-expanded={!bannerCollapsed}
+            aria-label={`${currentWeekend.name} details`}
+            onClick={() => setBannerCollapsed(v => !v)}
+            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setBannerCollapsed(v => !v); } }}
+            className={`flex items-start gap-2 p-3 cursor-pointer hover:bg-surface-container-high transition-colors ${bannerCollapsed ? '' : 'border-b border-outline-variant/50'}`}
+          >
             <span className="material-symbols-outlined text-primary text-2xl mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_today</span>
             <div className="flex-1 min-w-0">
               <h2 className="font-display font-bold uppercase text-base text-on-surface tracking-wide leading-tight">{currentWeekend.name}</h2>
@@ -900,15 +909,24 @@ export default function RaceWeekendView({
                 {currentWeekend.sessions.length} run{currentWeekend.sessions.length !== 1 ? 's' : ''} logged
               </p>
             </div>
-            <button
-              type="button"
-              aria-label="Edit Race Day"
-              onClick={() => openWeekendForm(currentWeekend)}
-              className="flex min-w-12 min-h-12 items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors"
-            >
-              <span className="material-symbols-outlined text-[18px]">edit</span>
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="Edit Race Day"
+                onClick={event => { event.stopPropagation(); openWeekendForm(currentWeekend); }}
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') event.stopPropagation(); }}
+                className="flex min-w-12 min-h-12 items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">edit</span>
+              </button>
+              <span
+                className="material-symbols-outlined text-on-surface-variant transition-transform duration-200"
+                style={{ transform: bannerCollapsed ? 'rotate(180deg)' : 'none' }}
+              >expand_less</span>
+            </div>
           </div>
+
+          {bannerCollapsed ? null : (<>
 
           {/* Weather */}
           <div className="p-3 border-b border-outline-variant/50 space-y-2">
@@ -993,6 +1011,8 @@ export default function RaceWeekendView({
               onChange={e => handleWeekendNotes(e.target.value)}
             />
           </div>
+
+          </>)}
 
         </section>
       )}
