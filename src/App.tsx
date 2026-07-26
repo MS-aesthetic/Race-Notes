@@ -65,7 +65,6 @@ import { detectAssignmentChanges } from './lib/assignmentNotify';
 
 const ACTIVE_WEEKEND_KEY = 'race_notes_active_weekend';
 const INFO_DEDUPE_MS = 5000;
-const SUCCESS_TOAST_MS = 1500;
 type NotificationStatus = SyncStatus | 'syncing';
 
 const isOnlineNow = (): boolean => typeof navigator === 'undefined' || navigator.onLine;
@@ -648,9 +647,7 @@ export default function App() {
           if (nextSetup) localStorage.setItem('race_notes_setup', JSON.stringify(nextSetup));
           else localStorage.removeItem('race_notes_setup');
         }
-        if (!isTerminalSyncStatus(syncStatusRef.current)) {
-          showInfo({ reason: 'car-delete-queued', context: { label } });
-        }
+        showInfo({ reason: 'car-delete-queued', context: { label } });
       },
     });
   };
@@ -820,30 +817,9 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [nativeAuthError, setNativeAuthError] = useState<{ id: number; message: string } | null>(null);
   const [hasLocalAcct, setHasLocalAcct] = useState<boolean>(() => hasLocalAccount());
-  const [syncStatus, setSyncStatusState] = useState<NotificationStatus | null>(null);
   const syncStatusRef = useRef<NotificationStatus | null>(null);
-  const isTerminalSyncStatus = (status: NotificationStatus | null): boolean => (
-    status === 'deferred-delete-retrying' || status === 'sync-error'
-  );
   const setSyncStatus = (next: NotificationStatus) => {
-    if (isTerminalSyncStatus(next) && infoToastRef.current?.reason === 'car-delete-queued') {
-      infoToastRef.current = null;
-      setInfoToast(null);
-    }
-    const current = syncStatusRef.current;
-    const resolved = isTerminalSyncStatus(current) && !isTerminalSyncStatus(next) ? current : next;
-    syncStatusRef.current = resolved;
-    setSyncStatusState(resolved);
-  };
-  const clearTransientSyncStatus = () => {
-    const current = syncStatusRef.current;
-    const resolved = isTerminalSyncStatus(current) ? current : null;
-    syncStatusRef.current = resolved;
-    setSyncStatusState(resolved);
-  };
-  const acknowledgeSyncStatus = () => {
-    syncStatusRef.current = null;
-    setSyncStatusState(null);
+    syncStatusRef.current = next;
   };
   const [pullDone, setPullDone] = useState(false); // initial cloud pull resolved — gates [4]
   const [authGeneration, setAuthGeneration] = useState(0);
@@ -1074,19 +1050,6 @@ export default function App() {
     void refreshTeamMetadata();
     return () => { cancelled = true; };
   }, [isOnline, teamResolved, user]);
-  // One lifetime owns every displayed success state. 'syncing' remains until
-  // the operation replaces it with a terminal status.
-  useEffect(() => {
-    if (syncStatus !== 'synced' && syncStatus !== 'offline-saved') return;
-    const t = setTimeout(() => {
-      const current = syncStatusRef.current;
-      const resolved = current === 'synced' || current === 'offline-saved' ? null : current;
-      syncStatusRef.current = resolved;
-      setSyncStatusState(resolved);
-    }, SUCCESS_TOAST_MS);
-    return () => clearTimeout(t);
-  }, [syncStatus]);
-
   // [15] Weekend/session creation modals now live in RaceWeekendView.
   // This one-shot action tells the Sessions tab to open a modal on arrival.
   const [rwInitialAction, setRwInitialAction] = useState<'new-session' | 'new-weekend' | null>(null);
@@ -1352,11 +1315,9 @@ export default function App() {
     }
     const pullUserId = user.id;
     const isCurrentPull = () => pullGenerationRef.current === generation;
-    let pullReportedFailure = false;
     const reportPullFailure = (status: SyncStatus) => {
       if (status !== 'sync-error') return;
       if (!isCurrentPull()) return;
-      pullReportedFailure = true;
       setSyncStatus('sync-error');
     };
     lastPullStartedAtRef.current = Date.now();
@@ -1526,8 +1487,6 @@ export default function App() {
         setWeekendChecklists(cloudWkndChecklists);
         localStorage.setItem('race_notes_weekend_checklists', JSON.stringify(cloudWkndChecklists));
       }
-
-      if (!pullReportedFailure) clearTransientSyncStatus();
     };
 
     doPull().catch(error => {
@@ -2484,13 +2443,10 @@ export default function App() {
           />
         )}
 
-        {/* One compact notification arbiter. Info replaces sync warnings
-            so users receive one clear reason at a time. */}
+        {/* One compact notification arbiter for dismissible feature notices. */}
         {(() => {
-          const isInfo = !!infoToast;
-          const isFailure = syncStatus === 'deferred-delete-retrying' || syncStatus === 'sync-error';
-          if (!isInfo && !isFailure) return null;
-          const msg = isInfo ? resolveInfoCopy(infoToast) : 'Sync failed — will retry';
+          if (!infoToast) return null;
+          const msg = resolveInfoCopy(infoToast);
           return (
             <div
               data-notification-slot="arbiter"
@@ -2503,14 +2459,14 @@ export default function App() {
                 className="pointer-events-auto flex min-h-11 max-w-md items-center gap-2.5 rounded-full border-2 border-outline-variant bg-surface-container px-4 py-2 font-display text-sm font-bold tracking-wide text-on-surface shadow-2xl animate-fade-in"
               >
                 <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  {isInfo ? 'info' : 'cloud_off'}
+                  info
                 </span>
                 <span className="min-w-0 flex-1">{msg}</span>
                 <button
                   type="button"
                   aria-label="Dismiss notification"
                   className="tap-target -mr-2 shrink-0 text-on-surface-variant"
-                  onClick={isInfo ? clearInfo : acknowledgeSyncStatus}
+                  onClick={clearInfo}
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>

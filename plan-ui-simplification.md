@@ -364,11 +364,124 @@ Est: ~80-90 lines. Risk: low.
       real data — no confirmation pills anywhere; sync-error warning still appears on failure;
       Runs editor shows only Identity/Track Condition/Laps & Result/Diagnostics/Notes/
       Attachments; NEXT SESSION inline at form end, advances and opens the new editor expanded.
-- [ ] **OWNER**: Historical-data regression: open an old weekend with adjustments + snapshots +
-      legacy changeLog and verify all history renders in "All Race Days" and Setups.
+      *(Superseded in part by the 2026-07-26 amendments below — sync-error pill is now removed
+      too, and the historical-data gate is dropped.)*
+- [x] ~~OWNER: Historical-data regression~~ — DROPPED per owner 2026-07-26: data will be wiped;
+      historical trackside-history rendering is removed instead (Chunk F).
 - [x] Debug APK rebuilt for owner testing (`release/CrewChief-5.2.1-ui-simplification-debug.apk`).
 - [ ] Plan archived to `context/archive/` — HELD until the owner picks a direction; the plan
       stays at repo root while this branch is under active evaluation.
+
+---
+
+## Owner amendments — 2026-07-26 (post-APK review)
+
+1. **All sync pills go.** "User will understand that sync won't work in airplane mode." The
+   remaining `sync-error` / `deferred-delete-retrying` warning pill is removed too → Chunk E.
+   Boundary kept (flagged to owner): dismissible feature notices (`infoToast` — share/upload/
+   operation failures, car-switch guidance) stay; they are not save/sync pills and removing
+   them would silence non-sync errors.
+2. **Historical trackside history not needed.** Owner will wipe data; the render surfaces for
+   per-run adjustments/diff history are removed → Chunk F. Data-model fields still untouched
+   (frontend-only rule).
+
+## Chunk E — Remove sync warning pills
+
+**Goal:** the notification surface renders `infoToast` notices ONLY. No sync pills of any kind.
+
+Scope (src/App.tsx):
+- [x] Arbiter: drop the `isFailure` branch — render only when `infoToast` is set; msg/icon/
+      dismiss simplify accordingly (`clearInfo` only).
+- [x] Remove now-dead sync-status display plumbing as far as it cleanly goes WITHOUT touching
+      `src/lib/sync.ts`: `acknowledgeSyncStatus`, auto-clear effects (`SUCCESS_TOAST_MS`,
+      `clearTransientSyncStatus`) — investigate actual usage first; keep `setSyncStatus`
+      callback wiring into sync.ts intact (a no-op-ish state write is fine) or remove the
+      state entirely if nothing else reads it. Grep `syncStatus` for other readers (e.g.
+      header offline chip uses `isOnline`, not `syncStatus` — verify).
+- [x] KEEP: the header offline connectivity chip (`isOnline`) — it is how the user "understands
+      sync won't work in airplane mode".
+
+Acceptance: airplane-mode edits produce no pill of any kind; feature notices still render;
+tsc same 3 identities; build passes.
+
+### Chunk E — QA notes (Opus 5 High, uncommitted tree)
+
+- **Actuals:** `App.tsx` +7/−51 (net **−44**), single file — `git diff HEAD --numstat` shows no
+  other `src/` path. `src/lib/sync.ts` byte-untouched, as required.
+- **Arbiter is infoToast-only** (2446-2476). Guard collapsed to `if (!infoToast) return null;`,
+  `msg = resolveInfoCopy(infoToast)`, icon hardcoded `info`, dismiss hardcoded `clearInfo`. The
+  a11y/layout contract survived intact: `data-notification-slot="arbiter"`, `role="status"`,
+  `aria-live="polite"`, `aria-label="Dismiss notification"`, `top: notificationTop`, `tap-target`
+  on the close button. Zero `syncStatus` / `isFailure` / `cloud_off` / `Sync failed — will retry`
+  left in the block.
+- **Reader map — nothing dangles.** Repo grep over `src/` for `syncStatus|syncStatusRef|`
+  `acknowledgeSyncStatus|clearTransientSyncStatus|SUCCESS_TOAST_MS|isTerminalSyncStatus|`
+  `pullReportedFailure` returns exactly 4 hits, all the intended survivors: the
+  `NotificationStatus` type (68), the ref (820), and the two-line `setSyncStatus` (821-823). The
+  `syncStatus` *state* (`useState` + `setSyncStatusState`), `acknowledgeSyncStatus`,
+  `clearTransientSyncStatus`, `isTerminalSyncStatus`, `SUCCESS_TOAST_MS`, the success auto-clear
+  effect, and `pullReportedFailure` are all gone with no orphan callers.
+- **The `setSyncStatus` minimal-ref-write choice is right.** The plan offered "no-op-ish state
+  write OR remove the state entirely"; the build agent took a third, better option — keep the
+  callback and the ref, drop the `useState`. It preserves ~45 `pushX(…, setSyncStatus)` call
+  sites and both `deferred-delete-retrying` reporters (936, 973) without a single signature
+  change, keeps `sync.ts` untouched per D1, and removes a re-render per push. Contravariance
+  still holds for the forwarded prop: `(next: NotificationStatus) => void` is assignable to
+  `onSyncStatus?: (status: SyncStatus) => void` because `NotificationStatus = SyncStatus |
+  'syncing'` is the wider parameter — `ExportView`/`SettingsView` forwarding type-checks
+  unchanged (tsc clean, `App.tsx:2614` → `SettingsView.tsx:399` → `ExportView.tsx:81-83`).
+- **Cross-arbitration removal (a) — `setSyncStatus` no longer kills a live `car-delete-queued`
+  toast: CORRECT.** That branch existed only so a sync-failure *pill* could take the slot from an
+  info notice. With no pill, the eviction has no beneficiary — keeping it would have been a
+  notice that deletes itself for no visible reason. The notice now runs its normal 3s lifetime
+  (`App.tsx:347-354`) or dies on `clearInfo`.
+- **Cross-arbitration removal (b) — the `isTerminalSyncStatus(syncStatusRef.current)` gate around
+  the car-delete notice (now `App.tsx:650`) is gone: CORRECT, and this one was load-bearing.**
+  Left in place it would have read a ref that nothing else reads or resets, so a single earlier
+  `sync-error` would have latched it `true` for the rest of the session and silently swallowed
+  every subsequent "queued for delete" notice — precisely the outcome the "feature notices stay"
+  boundary forbids. Verified nothing else can swallow it: the only remaining suppressor is the
+  5s `INFO_DEDUPE_MS` dedupe (1014-1022), which keys on the *resolved copy string* (car label
+  included), so it can only collapse a literal double-delete of the same car inside 5s.
+- **`infoToastRef` is now write-only (1008, 1011, 1020, 350) — benign.** Its one reader was the
+  removed eviction branch. It is still assigned in lockstep with `setInfoToast`, so it is
+  correct-but-dead rather than stale; no `noUnusedLocals` in tsconfig, so it costs nothing.
+  Candidate for the deferred cleanup sprint, not a Chunk E defect.
+- **Airplane mode:** `setSyncStatus('sync-error')` / `('deferred-delete-retrying')` /
+  `('syncing')` are now a single ref assignment with no reader — no state update, no render, no
+  throw, no unmount-timer risk (the only timer that touched sync status was the deleted
+  `SUCCESS_TOAST_MS` effect). Offline UX is carried entirely by the header `isOnline` chip
+  (`App.tsx:2393`, `cloud_off`), which is untouched.
+- **Baseline unshifted:** exactly 3 errors, same identities *and same line numbers* —
+  `RaceWeekendView.tsx:341`, `SetupView.tsx:806`, `SmasherLoadsView.tsx:617`. All removals sit
+  in `App.tsx`, so nothing drifted. `npm run build` passes (4.82s, PWA 22 precache entries).
+- **Additional stale-harness breakage (runtime only; type-checks clean, not in `package.json`).**
+  `scripts/car-delete-undo-harness.ts:740` carries a D3 mutation named
+  `terminal-priority-guard-removed` whose "before" text is the exact guard this chunk deleted;
+  the uniqueness assert at `:751` now finds 0 occurrences and the harness fails there. Its
+  sandbox `isTerminalSyncStatus` stub (`:402, :494`) is now unreferenced by the extracted body.
+  Note the irony worth recording: that mutant is now the production source. Folds into the
+  final-gate deferred cleanup as a new item alongside 1-5. `scripts/offline-indicator-harness.ts` and
+  `scripts/saved-flash-harness.ts` were already stale from Chunk A — Chunk E deepens, but does
+  not widen, that debt.
+
+## Chunk F — Remove historical trackside-history rendering
+
+**Goal:** no per-run setup-history/diff chrome anywhere.
+
+Scope:
+- [ ] `RaceWeekendView.tsx`: remove `resolveBoundSetupDiff`, `BoundSetupDiffSummary`, and the
+      adjustments/diff rendering inside `SessionSetupDetails` (~126-242). If
+      `SessionSetupDetails` has non-history content (e.g. plain "setup used" label), keep that
+      part — build agent reports structure and judges; goal is zero history/diff UI in
+      "All Race Days" cards.
+- [ ] `SetupView.tsx`: remove `LegacySetupLog` (component + render).
+- [ ] Sweep now-dead imports/types usages in both files (grep-verify each).
+- [ ] Do NOT touch: types.ts, snapshot capture at session creation (App.tsx), setupLifecycle.ts,
+      SetupDiffView (manual Compare stays — it is user-invoked, not run-history).
+
+Acceptance: "All Race Days" session cards show no adjustments/diff blocks; Setups cards show
+no legacy change log; tsc same 3 identities (lines shift up); build passes.
 
 ### Final gate decision — harness/lib cleanup DEFERRED until a direction is chosen
 
