@@ -75,8 +75,8 @@ function setupSection(setup: Setup, activeSession?: ActiveSession): { html: stri
         <tr><td>Avg Lap</td><td>${html(activeSession.avgLap || '—')}s</td><td>Max RPM</td><td>${html(activeSession.maxRpm || '—')}</td></tr>
         <tr><td>Conditions</td><td colspan="3">${html(activeSession.condition || '—')}</td></tr>
       </tbody></table>
-      <h2>Setup Changes (${adjustments.length})</h2>
-      ${adjustmentRows ? `<table><tbody>${adjustmentRows}</tbody></table>` : '<p class="empty">No changes recorded.</p>'}
+      ${adjustmentRows ? `<h2>Setup Changes (${adjustments.length})</h2>
+      <table><tbody>${adjustmentRows}</tbody></table>` : ''}
       <h2>CREW CHIEF</h2>
       <p style="font-size:13px;white-space:pre-wrap;font-style:italic;color:#333">${html(activeSession.competitionNotes || 'No notes.')}</p>` : '';
   const lines = [

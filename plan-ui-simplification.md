@@ -1,7 +1,7 @@
 # Plan — UI Simplification Sprint (feature/ui-simplification)
 
 **Branch:** `feature/ui-simplification` (off `master` @ `13343e5`, v5.2.1 / versionCode 24)
-**Status:** Chunks A–D implemented (A–C committed, D pending commit). Final gate next.
+**Status:** Chunks A–F implemented and committed (F pending commit); owner device QA open.
 **Direction note:** This branch is one of two parallel directions the owner may develop.
 `master` stays untouched as the "full-featured" direction. Do NOT merge to master without
 an explicit owner decision. Rebase onto master only if master moves.
@@ -470,18 +470,83 @@ tsc same 3 identities; build passes.
 **Goal:** no per-run setup-history/diff chrome anywhere.
 
 Scope:
-- [ ] `RaceWeekendView.tsx`: remove `resolveBoundSetupDiff`, `BoundSetupDiffSummary`, and the
+- [x] `RaceWeekendView.tsx`: remove `resolveBoundSetupDiff`, `BoundSetupDiffSummary`, and the
       adjustments/diff rendering inside `SessionSetupDetails` (~126-242). If
       `SessionSetupDetails` has non-history content (e.g. plain "setup used" label), keep that
       part — build agent reports structure and judges; goal is zero history/diff UI in
       "All Race Days" cards.
-- [ ] `SetupView.tsx`: remove `LegacySetupLog` (component + render).
-- [ ] Sweep now-dead imports/types usages in both files (grep-verify each).
-- [ ] Do NOT touch: types.ts, snapshot capture at session creation (App.tsx), setupLifecycle.ts,
+- [x] `SetupView.tsx`: remove `LegacySetupLog` (component + render).
+- [x] Sweep now-dead imports/types usages in both files (grep-verify each).
+- [x] Do NOT touch: types.ts, snapshot capture at session creation (App.tsx), setupLifecycle.ts,
       SetupDiffView (manual Compare stays — it is user-invoked, not run-history).
 
 Acceptance: "All Race Days" session cards show no adjustments/diff blocks; Setups cards show
 no legacy change log; tsc same 3 identities (lines shift up); build passes.
+
+### Chunk F — QA notes (Opus 5, uncommitted tree)
+
+- **Actuals:** `RaceWeekendView.tsx` +4/−93 (net **−89**), `SetupView.tsx` +0/−23 (net **−23**) —
+  net **−112**. `git diff HEAD --numstat` and `git status --porcelain` both show exactly these two
+  paths; `types.ts`, `App.tsx`, `setupLifecycle.ts` and `SetupDiffView` are byte-untouched, so the
+  "do not touch" fence held.
+- **`SessionSetupDetails` kept-and-narrowed is the right call.** The component was not pure
+  history: `Config` (`displayLifecycleText(record.setupUsed)`), `Conditions` and `Notes` are the
+  only per-run summary a collapsed session card carries, and nothing else renders them. What was
+  removed is exactly the two history surfaces — the `<BoundSetupDiffSummary>` element and the
+  `record.adjustments` bullet list. Signature narrowed `{ record, boundDiff }` → `{ record }`
+  (`RaceWeekendView.tsx:133`), and the sole call site collapsed cleanly: the 4-line IIFE that
+  computed `boundDiff` is gone, replaced by a bare `<SessionSetupDetails record={sx} />`
+  (`:1340`) inside the same `{expanded && (…)}` block — no orphan braces, no stray fragment.
+- **`LogSetupChangesButton` survived byte-identical** (`RaceWeekendView.tsx:121-131`) despite
+  sitting immediately below the removed 77-line span — the diff shows it wholly as context, zero
+  `+`/`-` lines. Still rendered at `:1232`. Correct: it is a user-invoked action, not run history,
+  and it is the same boundary that spared `SetupDiffView`.
+- **`LegacySetupLog` fully gone** from `SetupView.tsx` — component (was 80-100) and render. The
+  render removal took the element *and* its preceding blank line out of the attachments card;
+  `</fieldset>` → `</div>` now close consecutively (`:846-847`) with the enclosing
+  `{expanded && (…)}` / `.map()` chain intact. `changeLog` survivors are exactly two, both the
+  `changeLog: []` initializers on new-setup creation, now at `:350` and `:424` (were 371/445
+  pre-diff — pure drift from the 23 removed lines above them). No `Setup['changeLog']` consumer
+  remains in the view layer.
+- **Import sweep — grep-verified, zero residue.** `SetupSnapshotDiff` dropped from the `../types`
+  import (`:2`); `captureSetupSnapshot` and `diffSetupSnapshots` dropped from the
+  `../lib/setupLifecycle` import (`:15`, which correctly keeps `displayLifecycleText` /
+  `displayVersionLabel` / `isWeekendFinished` / `lifecycleLabel`). A grep of both files for
+  `resolveBoundSetupDiff|BoundSetupDiffSummary|BoundSetupDiff|LegacySetupLog|SetupSnapshotDiff|`
+  `captureSetupSnapshot|diffSetupSnapshots|boundDiff` returns **0 hits**, and `adjustments` is now
+  0 hits in `RaceWeekendView.tsx`. `savedSetups` is still live — prop type `:46`, destructure
+  `:146`, `scopedSetups` filter `:211`, `setupUsedUniquelyMatchesCar` `:394` — so the prop stays,
+  it just no longer feeds diff resolution.
+- **Baseline shifted, identities unchanged:** exactly 3 errors —
+  `RaceWeekendView.tsx:255` TS2345 (was 341, −86), `SetupView.tsx:785` TS2322 (was 806, −21),
+  `SmasherLoadsView.tsx:617` TS2345 (unchanged, untouched file). Both shifts are pure line drift
+  from removals above the error, consistent with the removed spans. `npm run build` passes
+  (4.88s, PWA 22 precache entries).
+- **`lib/exportPdf.ts` — the "Setup Changes" section is NOT in the weekend PDF, and it is
+  UNCONDITIONAL where it does render.** Two corrections to the build agent's flag:
+  (a) `buildWeekendReport` (`:184`) calls `weekendSection`, which contains zero `adjustments`
+  references — Race Day PDFs, including the per-weekend share at `RaceWeekendView.tsx:225`, are
+  unaffected. The heading lives in `setupSection` (`:66-98`), reached only by `buildSetupReport`
+  and `buildMasterReport`.
+  (b) Inside `setupSection`, the whole `activeRunHtml` block is gated on `activeSession` being
+  passed, but *within* that block `<h2>Setup Changes (${adjustments.length})</h2>` (`:79`) renders
+  unconditionally, with an explicit `'<p class="empty">No changes recorded.</p>'` empty state
+  (`:80`). So: `ExportView.tsx:102` (Export Setup) and `:113` (Export All) both pass
+  `activeSession` and will therefore print a literal **"Setup Changes (0)" + "No changes
+  recorded."** in every PDF once data is wiped. `SetupView.tsx:473` passes no `activeSession`, so
+  the Setups-card share is clean. **FIXED at chunk gate (Fable 5):** the heading + table now
+  render only when adjustments exist (`exportPdf.ts:78-79`, 2-line conditional); the plain-text
+  `lines` fallback already spread an empty array, so no change needed there. Lint/build
+  re-verified after the fix.
+- **`scripts/chunk5-setup-harness.ts` debt deepens sharply.** It compiles production exports by
+  source-slicing and now references three symbols that no longer exist: `resolveBoundSetupDiff`
+  (`:796, :884`), `BoundSetupDiffSummary` (`:797, :818-828, :1026, :1121`) and `LegacySetupLog`
+  (`:1019, :1033, :1124`), plus an assertion on the exact removed render string
+  `'<LegacySetupLog changes={setupItem.changeLog} />'` (`:879`). It will fail at extraction, not
+  at an assert. Runtime-only, not in `package.json`, type-checks clean — same category as the
+  Chunk A/E harness rot. This **deepens, does not widen**, the deferred-cleanup debt: the harness
+  set needing disposal is unchanged, but `chunk5-setup-harness.ts` has moved from "rework" to
+  "rework or delete — three of its subjects no longer exist."
 
 ### Final gate decision — harness/lib cleanup DEFERRED until a direction is chosen
 
@@ -493,5 +558,6 @@ patch `offline-indicator-harness.ts` / `chunk9-export-help-harness.ts` /
 on a branch the owner may abandon, and none of it affects lint, build, or the shipped app.
 If this direction wins: do the full sweep (harnesses, `quickAdjust.ts` trim, D3 lifecycle
 decision) as its own cleanup sprint before merging. If the other direction wins: nothing
-was wasted. Sprint totals: **−783 net lines of src/** across 4 chunks (A −163, B −450,
-C −24 src, D −85; plus CSS/App wiring), one component file deleted.
+was wasted. Sprint totals: **−939 net lines of src/** across 6 chunks (A −163, B −450,
+C −24 src, D −85, E −44, F −112; plus CSS/App wiring and the exportPdf gate fix), one
+component file deleted.

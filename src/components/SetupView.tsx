@@ -77,27 +77,6 @@ const LBL = 'block min-h-4 truncate text-xs uppercase font-mono font-semibold te
 const STACKED_CORNER_FIELD_CLASS = 'min-w-0 min-[360px]:col-span-2 min-[768px]:col-span-1';
 const FULL_WIDTH_CORNER_FIELD_CLASS = 'col-span-1 min-[360px]:col-span-2 min-w-0';
 
-export function LegacySetupLog({ changes }: { changes: Setup['changeLog'] }) {
-  const legacyChanges = (changes || []).filter(change => !change.runId);
-  if (legacyChanges.length === 0) return null;
-  return (
-    <details className="mt-3 rounded-lg border border-outline-variant/60 bg-surface-container/50 p-3">
-      <summary className="min-h-11 cursor-pointer font-display text-xs font-bold uppercase text-on-surface">Legacy log</summary>
-      <div className="mt-2 space-y-2">
-        {legacyChanges.map(change => (
-          <div key={change.id} className="rounded border border-outline-variant/40 bg-surface p-2">
-            <div className="flex items-start justify-between gap-2">
-              <span className="font-mono text-xs font-bold text-on-surface">{change.label}</span>
-              <time className="font-mono text-[9px] text-on-surface-variant">{new Date(change.timestamp).toLocaleString()}</time>
-            </div>
-            {(change.before || change.after) && <p className="mt-1 font-mono text-[10px] text-on-surface-variant">{change.before || '—'} → <span className="text-primary">{change.after || '—'}</span></p>}
-          </div>
-        ))}
-      </div>
-    </details>
-  );
-}
-
 // ─── Corner Form Sub-component ────────────────────────────────────────────────
 
 interface CornerFormProps {
@@ -866,8 +845,6 @@ export default function SetupView({
                         ) : null}
                       </div>
                       </fieldset>
-
-                      <LegacySetupLog changes={setupItem.changeLog} />
                     </div>
                   )}
                 </div>

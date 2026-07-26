@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS, AccountingEntry, SetupSnapshotDiff } from '../types';
+import { ActiveSession, TireDetails, TireInventoryItem, RaceWeekend, SessionRecord, WeatherSnapshot, Setup, SessionType, TrackConditionPreset, TRACK_CONDITION_PRESETS, AccountingEntry } from '../types';
 import { sortWeekends } from '../lib/scope';
 import { useBackClosable } from '../lib/backStack';
 import { useUndoableDelete } from '../lib/undo';
@@ -12,7 +12,7 @@ import BottomSheet from './ui/BottomSheet';
 import ConfirmSheet from './ui/ConfirmSheet';
 import { isQuickAdjustRunAvailable } from '../lib/quickAdjust';
 import { setupUsedUniquelyMatchesCar } from '../lib/setupCompat';
-import { captureSetupSnapshot, diffSetupSnapshots, displayLifecycleText, displayVersionLabel, isWeekendFinished, lifecycleLabel } from '../lib/setupLifecycle';
+import { displayLifecycleText, displayVersionLabel, isWeekendFinished, lifecycleLabel } from '../lib/setupLifecycle';
 import { buildWeekendReport, createPdfFile } from '../lib/exportPdf';
 import { shareOrDownloadReport } from '../lib/reportShare';
 import CarRequiredPrompt from './CarRequiredPrompt';
@@ -118,83 +118,6 @@ const SESSION_TYPE_CHIPS = [
 const displayStoredVersionLabel = (versionLabel: string | undefined): string =>
   versionLabel ? displayVersionLabel({ versionLabel } as Setup) : '';
 
-export type BoundSetupDiff =
-  | { status: 'available'; sourceLabel: string; rows: SetupSnapshotDiff[] }
-  | { status: 'unavailable'; reason: string };
-
-/** Resolve one session's display-only diff from newest-first frozen history. */
-export function resolveBoundSetupDiff(
-  weekend: RaceWeekend,
-  savedSetups: Setup[],
-  record: SessionRecord,
-): BoundSetupDiff {
-  const sessionIndex = weekend.sessions.findIndex(item => item.id === record.id);
-  if (sessionIndex < 0) {
-    return { status: 'unavailable', reason: 'Run is not part of this Race Day.' };
-  }
-  if (!record.setupSnapshot || !record.setupId) {
-    return { status: 'unavailable', reason: 'This legacy run has no frozen setup snapshot.' };
-  }
-
-  const eventSetupId = weekend.activeSetupId ?? weekend.setupId;
-  if (eventSetupId && record.setupId !== eventSetupId) {
-    return { status: 'unavailable', reason: 'Run belongs to a different setup lineage.' };
-  }
-
-  const olderSession = weekend.sessions[sessionIndex + 1];
-  if (olderSession) {
-    if (!olderSession.setupSnapshot || !olderSession.setupId) {
-      return { status: 'unavailable', reason: 'Previous run has no frozen setup snapshot.' };
-    }
-    if (olderSession.setupId !== record.setupId) {
-      return { status: 'unavailable', reason: 'Previous run belongs to a different setup lineage.' };
-    }
-    return {
-      status: 'available',
-      sourceLabel: olderSession.name,
-      rows: diffSetupSnapshots(olderSession.setupSnapshot, record.setupSnapshot),
-    };
-  }
-
-  const baselineSetup = weekend.baselineSetupId
-    ? savedSetups.find(item => item.id === weekend.baselineSetupId)
-    : undefined;
-  if (!baselineSetup) {
-    return { status: 'unavailable', reason: 'Starting Setup snapshot is unavailable.' };
-  }
-  const eventSetup = savedSetups.find(item => item.id === record.setupId);
-  if (baselineSetup.carId && eventSetup?.carId && baselineSetup.carId !== eventSetup.carId) {
-    return { status: 'unavailable', reason: 'Starting Setup belongs to a different car.' };
-  }
-  return {
-    status: 'available',
-    sourceLabel: 'Starting Setup',
-    rows: diffSetupSnapshots(captureSetupSnapshot(baselineSetup), record.setupSnapshot),
-  };
-}
-
-export function BoundSetupDiffSummary({ boundDiff }: { boundDiff: BoundSetupDiff }) {
-  return (
-    <section className="rounded border border-outline-variant/50 bg-surface p-2" data-session-bound-diff>
-      <p className="text-xs font-bold uppercase tracking-wider text-on-surface">Bound setup changes</p>
-      {boundDiff.status === 'unavailable' ? (
-        <p className="mt-1 text-xs text-on-surface-variant">Unavailable: {boundDiff.reason}</p>
-      ) : boundDiff.rows.length === 0 ? (
-        <p className="mt-1 text-xs text-on-surface-variant">No setup changes from {boundDiff.sourceLabel}.</p>
-      ) : (
-        <div className="mt-1 space-y-1" aria-label={`Setup changes from ${boundDiff.sourceLabel}`}>
-          {boundDiff.rows.map(row => (
-            <div key={`${row.corner ?? 'setup'}-${row.field}`} className="grid grid-cols-1 min-[360px]:grid-cols-2 items-start gap-1 min-[360px]:gap-2 text-xs">
-              <span className="min-w-0 break-words text-on-surface-variant">{row.label}</span>
-              <span className="min-w-0 break-words min-[360px]:text-right">{row.before} → <strong className="text-primary">{row.after}</strong></span>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
 export function LogSetupChangesButton({ onLogSetupChanges }: { onLogSetupChanges: () => void }) {
   return (
     <button
@@ -207,21 +130,12 @@ export function LogSetupChangesButton({ onLogSetupChanges }: { onLogSetupChanges
   );
 }
 
-export function SessionSetupDetails({ record, boundDiff }: { record: SessionRecord; boundDiff: BoundSetupDiff }) {
+export function SessionSetupDetails({ record }: { record: SessionRecord }) {
   return (
     <>
       <p><strong>Config:</strong> {record.setupUsed ? displayLifecycleText(record.setupUsed) : '—'}</p>
-      <BoundSetupDiffSummary boundDiff={boundDiff} />
       <p><strong>Conditions:</strong> {record.condition}</p>
       <p><strong>Notes:</strong> {record.competitionNotes || 'None'}</p>
-      {record.adjustments && record.adjustments.length > 0 && (
-        <div>
-          <strong>Adjustments:</strong>
-          <ul className="list-disc pl-4 mt-1">
-            {record.adjustments.map(adjustment => <li key={adjustment.id}>{adjustment.label} {adjustment.value}</li>)}
-          </ul>
-        </div>
-      )}
     </>
   );
 }
@@ -1423,10 +1337,7 @@ export default function RaceWeekendView({
                                     </button>
                                   </div>
                                 </div>
-                                {(() => {
-                                  const boundDiff = resolveBoundSetupDiff(wk, savedSetups, sx);
-                                  return <SessionSetupDetails record={sx} boundDiff={boundDiff} />;
-                                })()}
+                                <SessionSetupDetails record={sx} />
                               </div>
                             )}
                           </div>
