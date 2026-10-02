@@ -1,9 +1,18 @@
 # CREW CHIEF — Agent Handoff & Onboarding
 
 > **Purpose:** single entry point for any new LLM/agent picking up this project.
-> Read this first, then the linked docs. Last updated **2026-07-19**.
+> Read this first, then the linked docs. Last updated **2026-10-02**.
 
-> ## Current override — UX Overhaul v2 final closeout
+> ## Current override — 2026-10-02 (supersedes the v2 block below)
+>
+> - `master` = release **5.2.1** (versionCode 24, `e4b980b`; tip `13343e5`), live on Google Play. v2 is merged; `codex/ux-overhaul` and the 203f worktree are gone.
+> - Active work: **UI Simplification** on `feature/ui-simplification` (`af24f98`, Chunks A–I), a parallel "simplified" direction. Owner device QA open. Do not merge to master without owner decision. Spec: [`plan-ui-simplification.md`](./plan-ui-simplification.md).
+> - Verified facts, lint/build/harness baseline per direction, build guard, Supabase gaps: [`context/knowledge/CURRENT_STATE.md`](./context/knowledge/CURRENT_STATE.md).
+> - Harness matrix: `node scripts/run-harnesses.mjs` (knows expected failures per direction).
+> - Supabase: migration `20260715180000_team_data_owner_write_policies.sql` is **not applied live** (verified 2026-10-02).
+> - Claude Code cloud sessions: see [`CLAUDE.md`](./CLAUDE.md) and `.claude/skills/crewchief-*`.
+
+> ## Historical override — UX Overhaul v2 final closeout (2026-07-19)
 >
 > - Active worktree: `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`.
 > - Active branch/product QA base: `codex/ux-overhaul` at `ab2d03117c0475aa0abbef9ad38f2907edd3e881`; final documentation commits may sit above it.

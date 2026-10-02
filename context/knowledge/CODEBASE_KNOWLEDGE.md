@@ -1,5 +1,13 @@
 # CREW CHIEF — Codebase Knowledge File
 
+> **Freshness note (2026-10-02):** several structural sections here predate 5.2.x. Superseded facts,
+> corrected in [`CURRENT_STATE.md`](./CURRENT_STATE.md): appId is `nimbus.engineering.crewchief`
+> (not `com.racenotes.app`); `TeamView`/`ToDoView` are not orphaned; Trackers = Checklist /
+> Maintenance Logs / Accounting (Shopping retired); 38 lib files, 20 components + 9 `ui/`; 27
+> localStorage keys; 24 migrations (not 9); sync merge is newest `updated_at` wins (not "cloud
+> always wins"). The project tree, key table, push table, and table list sections are partial.
+
+
 > Last updated: 2026-07-19 (UX Overhaul v2 final closeout)
 > Branches: `master` is Release 5.0; active v2 is `codex/ux-overhaul` in `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`
 > Purpose: Comprehensive reference for any LLM or developer picking up this codebase.
