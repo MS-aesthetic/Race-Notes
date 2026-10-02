@@ -7,6 +7,8 @@ AI coding agent guide for the **Race Notes** PWA — a professional motorsport l
 >
 > **📚 Full reference:** [`context/knowledge/CODEBASE_KNOWLEDGE.md`](./context/knowledge/CODEBASE_KNOWLEDGE.md) — comprehensive technical reference (types, tables, localStorage keys, component details, gotchas, session history).
 >
+> **✅ VERIFIED FACTS (2026-10-02): [`context/knowledge/CURRENT_STATE.md`](./context/knowledge/CURRENT_STATE.md)** — branches, the two product directions (`master` vs `feature/ui-simplification`), lint/build/harness baseline, env + build guard, Supabase migration gaps. Wins over older docs on facts.
+>
 > **🧭 NEW AGENT? START WITH [`HANDOFF.md`](./HANDOFF.md)** — consolidated onboarding: current status, session history, worktree/branch gotchas, build/deploy procedures, and the Ralph-loop workflow.
 >
 > **🗂️ CONTEXT HUB: [`context/`](./context/README.md)** — consolidated knowledge, archived planning, and the agent/skill index ([`context/AGENTS_AND_SKILLS.md`](./context/AGENTS_AND_SKILLS.md)). Point new agents here first.
@@ -58,7 +60,7 @@ review, and user-facing status message in this repository.
 ## Branch & Deploy Workflow (READ FIRST)
 
 > **BRANCH RULE — `master` is the released baseline.** Never commit new feature work
-> directly to `master`. **Active v2 exception:** remain on existing
+> directly to `master`. **(Historical — v2 closed and merged; released as 5.2.x. The `codex/ux-overhaul` branch no longer exists.) Former v2 exception:** remain on existing
 > `codex/ux-overhaul` at `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`; do not
 > create or switch a branch/worktree. New future workstreams, after v2 closes, start
 > from current `master`:
@@ -89,7 +91,7 @@ review, and user-facing status message in this repository.
 
 ## Architecture
 
-**No router.** Navigation is entirely tab-based: `activeTab` state in `src/App.tsx` conditionally renders one of six view components — `'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'trackers'`. There is **no `'todos'` tab and no `'team'` tab**. Trackers sub-tabs: Checklist, Service, Templates, Accounting. `ToDoView` renders one Main Checklist; `TeamView.tsx` remains unwired. To add a new tab: add the tab key to the `activeTab` union type, add a `<button>` in bottom `<nav>`, and add conditional render in `<main>`.
+**No router.** Navigation is entirely tab-based: `activeTab` state in `src/App.tsx` conditionally renders one of six view components — `'dashboard' | 'setups' | 'raceweekend' | 'quickref' | 'settings' | 'trackers'`. There is **no `'todos'` tab and no `'team'` tab**. Trackers sub-tabs: Checklist, Maintenance Logs (id `service`), Accounting (`templates` id redirects to Checklist). `ToDoView` (inside `TrackersView`) renders one Main Checklist; `TeamView.tsx` is rendered by `AuthView`. To add a new tab: add the tab key to the `activeTab` union type, add a `<button>` in bottom `<nav>`, and add conditional render in `<main>`.
 
 **Mandatory login gate (added 2026-07).** The app requires sign-in before any tab renders. `isUnlocked = !!user || hasLocalAcct` in `App.tsx` gates the entire UI behind `<AuthView />`. `hasLocalAccount()`/`rememberLocalAccount()` in `src/lib/supabase.ts` maintain a `race_notes_registered_user` localStorage flag independent of live Supabase session validity, so the app stays usable **offline** on a device that has logged in before — only explicit sign-out clears the flag. Google OAuth (web + native, via `signInWithGoogle()`) is available alongside email/password.
 
@@ -102,7 +104,7 @@ localStorage.setItem('race_notes_saved_setups', JSON.stringify(updated));
 if (user) pushSetups(updated, user.id, setSyncStatus);
 ```
 
-**"Saved" flash toast (added 2026-07, session 10).** A guarded effect in `App.tsx` watches the core datasets (`setup, savedSetups, weekends, activeSession, tireInventory, cars, shockSessions, todos, accounting, shopping`) and shows a prominent bottom-center "Saved" toast on any change — covering every save path, online or offline, without wiring each handler. Guards: `flashReadyRef` (skips initial hydration, ~800ms) and `suppressPullRef` (silences cloud-pull-driven state updates).
+**"Saved" flash toast (added 2026-07, session 10; `master` only — removed on `feature/ui-simplification` by Chunks A/E, where `infoToast` is the only status surface).** A guarded effect in `App.tsx` watches the core datasets (`setup, savedSetups, weekends, activeSession, tireInventory, cars, shockSessions, todos, accounting, shopping`) and shows a prominent bottom-center "Saved" toast on any change — covering every save path, online or offline, without wiring each handler. Guards: `flashReadyRef` (skips initial hydration, ~800ms) and `suppressPullRef` (silences cloud-pull-driven state updates).
 
 ---
 
@@ -135,14 +137,16 @@ keep diffs small and extract logic into `src/lib/*` or `src/components/*`.
 | File | Purpose |
 |---|---|
 | `SPRINT_INDEX.md` | **Active roadmap index** — serial sprint order, model routing, and plan entry points. |
-| `plan-v3-ux-corrections.md` | Active Sprint 1 UXF workstreams, dependencies, ownership, and acceptance. |
+| `plan-ui-simplification.md` | Spec + QA notes for the simplified direction (`feature/ui-simplification`, Chunks A–I). |
+| `context/knowledge/CURRENT_STATE.md` | Verified current facts; wins over older docs. |
+| `context/archive/plan-v3-ux-corrections.md` | Historical Sprint 1 UXF workstreams (complete, released as 5.0). |
 | `ralph/STATE.md` | Durable workstream status, attempts, QA scores, gates. |
 | `context/knowledge/CODEBASE_KNOWLEDGE.md` | Comprehensive technical reference — types, tables, localStorage keys, component details, gotchas, all session history. |
 | `src/types.ts` | All TypeScript interfaces — start here to understand domain models |
 | `src/data.ts` | `INITIAL_SETUP`, `INITIAL_SETUPS`, `INITIAL_WEEKENDS`, `INITIAL_ACTIVE_SESSION` defaults |
 | `src/App.tsx` | Global state, all mutation handlers, tab routing, new-weekend/session modals, header (`?` help button), Saved toast |
 | `src/lib/supabase.ts` | Supabase client singleton + auth helpers (`signIn`, `signUp`, `fetchProfile`, `getUserTeam`, `signInWithGoogle`, `hasLocalAccount`/`rememberLocalAccount`) |
-| `src/lib/sync.ts` | Push/pull functions — `pushSetups`, `pushWeekends`, `pushTodos`, `pullAllData` |
+| `src/lib/sync.ts` | Push/pull/delete for setups, weekends, active session, tires, cars, shocks, todos, maintenance, checklists, trips, attachments; `pullAllData`; team-shared deletes |
 | `src/lib/tireHistory.ts` | Derives tire usage history from weekend/session data; CSV + printable report export |
 | `src/lib/tireSize.ts` | `parseTireSize` / `compareTireSize` / `sortBySize` — parses decimals AND fractions (`86 1/2` == `86.5`) for size sorting |
 | `src/lib/shockCompare.ts` | Linear interpolation + comparison table for overlaying multiple shock-load graphs |
@@ -198,7 +202,7 @@ npm run android:build:release # Produce release APK
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
-App runs fully offline without these — Supabase calls are wrapped in try/catch and silently degrade.
+App runs fully offline without these at runtime — Supabase calls are wrapped in try/catch and silently degrade. **But `npm run build` aborts without them** (guard `scripts/viteRequireCloudConfig.ts`, added in 5.2.1 after 5.2.0 shipped without cloud config). `ALLOW_UNCONFIGURED_BUILD=1` is for compile checks only; never ship that bundle.
 
 **Lint baseline:** `npm run lint` (`tsc --noEmit`) currently has **3 pre-existing errors** (two `File`-typed upload args in `RaceWeekendView`/`SmasherLoadsView`, one `key`-on-`CornerForm`). Vite build does NOT type-check, so these do not block builds. Don't add new type errors on top of the baseline.
 
@@ -228,9 +232,10 @@ App runs fully offline without these — Supabase calls are wrapped in try/catch
 ## Android / Capacitor
 
 - Capacitor 8 wraps the PWA as a native Android app. After any web change: `npm run android:sync` to push to native.
-- Android source is in `android/` — avoid editing native files unless changing permissions or splash screens. Exception: `MainActivity`'s deep-link intent-filter (`com.racenotes.app://auth-callback`) is required for native Google OAuth — don't remove it.
+- Android source is in `android/` — avoid editing native files unless changing permissions or splash screens. Exception: `MainActivity`'s deep-link intent-filter (`nimbus.engineering.crewchief://auth-callback` primary; legacy `com.racenotes.app://auth-callback` kept) is required for native Google OAuth — don't remove it.
 - Target API 36 (Android 16), AGP 8.9.1, Gradle 8.11.1 — bumped ahead of Google Play's Aug 31, 2026 API-36 requirement.
-- Release artifacts are written under ignored `release/`: `CrewChief-5.0-release.apk` for direct installation and `CrewChief-5.0-play.aab` for Google Play. Track artifact hashes and release notes, not APK/AAB binaries.
+- Release artifacts are written under ignored `release/`: `CrewChief-<version>-release.apk` for direct installation and `CrewChief-<version>-play.aab` for Google Play. Track artifact hashes and release notes, not APK/AAB binaries.
 - **Bump `versionCode` and `versionName`** in `android/app/build.gradle` with every APK build meant to install over a previous version.
 - `android/app/build.gradle` is tracked as of Release 5.0. Signing credentials belong only in ignored `android/keystore.properties` or the documented environment variables. Always re-check the tracked version values and never commit credentials or keystores.
 - Real builds/git pushes for this repo should go through **Windows-MCP PowerShell** (real Windows Git Credential Manager), not a Linux sandbox — sandboxes typically lack git push credentials and can produce spurious `tsc`/build artifacts on cross-platform mounts. **Never write repo files through a Linux mount** (`cp`/`>` over `/sessions/.../mnt/...`) — it can produce null-byte-corrupted files. Use the host-side file tools.
+- **Claude Code cloud sessions** (Linux container, repo at `/home/user/Race-Notes`) are the exception: they have working git push, npm, lint, build, harnesses, and Supabase/Netlify connectors, but no Android/Gradle or keystore. Use the `.claude/skills/crewchief-*` skills there.

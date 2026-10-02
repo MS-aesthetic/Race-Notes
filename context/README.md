@@ -11,6 +11,7 @@ planning, live operational files, and the tool-loaded agent/skill configs.
 
 ## Read in this order
 
+0. **[`knowledge/CURRENT_STATE.md`](./knowledge/CURRENT_STATE.md)** — verified current facts (2026-10-02); wins over older docs on facts.
 1. **[`/AGENTS.md`](../AGENTS.md)** (repo root) — architecture, conventions, file map, workflow rules.
 2. **[`/HANDOFF.md`](../HANDOFF.md)** (repo root) — consolidated onboarding: current status, session
    history, build/deploy procedures, worktree/branch gotchas.
@@ -25,6 +26,7 @@ planning, live operational files, and the tool-loaded agent/skill configs.
 ### `knowledge/` — durable knowledge & handoffs
 | File | What it is |
 | --- | --- |
+| `CURRENT_STATE.md` | Verified fact sheet: branches/directions, baseline, env, deploy, Supabase gaps. |
 | `CODEBASE_KNOWLEDGE.md` | Durable facts about the codebase (architecture, invariants). |
 | `PROJECT_INSTRUCTIONS.md` | Standing project instructions for agents. |
 | `CODEX_HANDOFF_2026-07-18.md` | Codex session handoff. |

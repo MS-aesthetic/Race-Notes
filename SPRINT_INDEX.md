@@ -1,5 +1,10 @@
 # CREW CHIEF — Sprint Index (UX tracks)
 
+> **Current (2026-10-02):** `master` = release 5.2.1. Active work is the **UI Simplification** sprint on
+> `feature/ui-simplification` (Chunks A–I committed, owner device QA open; do not merge to master
+> without owner decision). Verified facts: `context/knowledge/CURRENT_STATE.md`. Statements below
+> about the 203f worktree and `codex/ux-overhaul` are historical; that branch is merged and gone.
+
 Release baseline `master` remains at `C:\Users\maxx\antigravity\Race-Notes`.
 UX Overhaul v2 is **complete** on `codex/ux-overhaul` at
 `C:\Users\maxx\.codex\worktrees\203f\Race-Notes`. Its authority is
@@ -12,11 +17,12 @@ future deferred work. Do not start Sprint 2, 3, or 4 until the owner separately 
 
 | Sprint | File | Content | Status |
 |---|---|---|---|
+| UI Simplification | `plan-ui-simplification.md` | Chunks A–I: remove save pills, slim Runs editor, NEXT SESSION, de-lifecycle setups, collapsed banner | **IN OWNER QA — `af24f98` on `feature/ui-simplification`; parallel direction to master** |
 | UX Overhaul v2 | `context/knowledge/UX_TECHNICAL_REVIEW_2026-07-17.md` | Mobile density, persistence semantics, deletion integrity, navigation polish, final QA | **COMPLETE — product `ab2d031`; reviewed Part 6.4 handoff `22dc112`; final saving-point branch pushed** |
 | 1 | `context/archive/plan-v3-ux-corrections.md` | UXF-1…10 — owner-correction batch (2026-07-14 handoff) | COMPLETE — released as 5.0 |
-| 2 | `sprint-2-quick-wins.md` | UXP-1,2,3,4,5,6,7,8,9,11,12,13,19,20 + gate — Low-difficulty audit items | deferred — requires separate owner opening/approval |
-| 3 | `sprint-3-second-wave.md` | UXP-10,14,15,16,17,18 + gate — Medium-difficulty audit items | pending — blocked by sprint 2 |
-| 4 | `sprint-4-design-needed.md` | UXP-21,22 — High-difficulty IA items with their own Maxx design session | pending — design session gates build |
+| 2 | `context/archive/sprint-2-quick-wins.md` | UXP-1,2,3,4,5,6,7,8,9,11,12,13,19,20 + gate — Low-difficulty audit items | deferred — requires separate owner opening/approval |
+| 3 | `context/archive/sprint-3-second-wave.md` | UXP-10,14,15,16,17,18 + gate — Medium-difficulty audit items | pending — blocked by sprint 2 |
+| 4 | `context/archive/sprint-4-design-needed.md` | UXP-21,22 — High-difficulty IA items with their own Maxx design session | pending — design session gates build |
 
 ## ID scheme
 
